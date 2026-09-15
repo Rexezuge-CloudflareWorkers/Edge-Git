@@ -19,7 +19,7 @@
     "isomorphic-git": "^1.36.1"
   },
   "devDependencies": {
-    "@types/node": "26.4.1",
+    "@types/node": "26.5.1",
     "typescript": "6.0.3"
   }
 }
