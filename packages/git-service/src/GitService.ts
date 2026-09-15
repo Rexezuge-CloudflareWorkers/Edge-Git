@@ -310,8 +310,9 @@ export class GitService {
               continue;
             }
           }
-          // deepen: truncate parent traversal at maxDepth.
-          if (maxDepth !== undefined && depth >= maxDepth) {
+          // deepen: truncate parent traversal at maxDepth (N commits from each tip:
+          // a tip at depth d expands parents only while d + 1 < maxDepth).
+          if (maxDepth !== undefined && depth + 1 >= maxDepth) {
             shallowBoundary.add(oid);
             // Still include this commit's tree (shallow boundary keeps its tree).
             const commit = await git.readCommit({
