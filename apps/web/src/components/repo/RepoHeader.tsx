@@ -39,7 +39,6 @@ export function RepoHeader({
           </h1>
           <VisibilityBadge isPrivate={repo.isPrivate} />
         </div>
-        {repo.description && <p className="mt-2 text-sm text-[var(--color-text-secondary)]">{repo.description}</p>}
 
         <nav className="flex items-center gap-0.5 mt-4">
           {TABS.map((t) => (
