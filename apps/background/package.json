@@ -1,0 +1,30 @@
+{
+  "name": "@edge-git/background",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./RepoWorker": "./src/RepoWorker.ts",
+    "./CronTasksWorker": "./src/CronTasksWorker.ts",
+    "./scheduled": "./src/scheduled/index.ts",
+    "./scheduled/*": "./src/scheduled/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@edge-git/backend-data": "workspace:*",
+    "@edge-git/backend-errors": "workspace:*",
+    "@edge-git/backend-runtime": "workspace:*",
+    "@edge-git/backend-services": "workspace:*",
+    "@edge-git/git-protocol": "workspace:*",
+    "@edge-git/git-service": "workspace:*",
+    "@edge-git/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "26.4.1",
+    "typescript": "6.0.3"
+  }
+}
