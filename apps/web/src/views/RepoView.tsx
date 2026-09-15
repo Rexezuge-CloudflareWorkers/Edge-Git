@@ -91,7 +91,7 @@ export function RepoView({
     <div>
       <RepoHeader repo={repoData} activeTab={tab} issueCount={issueCount} onTabChange={setTab} />
       <div className="max-w-7xl mx-auto px-6 py-6">
-        {tab === 'code' && <CodeTab owner={owner} repo={repo} showNotice={showNotice} />}
+        {tab === 'code' && <CodeTab owner={owner} repo={repo} repoMeta={repoData} showNotice={showNotice} />}
         {tab === 'issues' && (
           <IssuesTab owner={owner} repo={repo} canWrite={authorized ?? false} showNotice={showNotice} onCountChange={setIssueCount} />
         )}
