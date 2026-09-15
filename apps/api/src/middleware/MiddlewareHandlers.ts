@@ -1,17 +1,17 @@
 import { Context, Next } from 'hono';
 import { AccessAuthServiceFactory, TokenServiceFactory } from '@edge-git/backend-services/auth';
 import type { AccessIdentityContext } from '@edge-git/backend-services/auth';
-import type { TokenService } from '@edge-git/backend-services/auth';
+
 import { UserServiceFactory } from '@edge-git/backend-services/user';
 import { RepoServiceFactory } from '@edge-git/backend-services/repo';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { getBasicCredentials, getBearerToken } from '@edge-git/git-protocol';
-import { UnauthorizedError, ForbiddenError, NotFoundError } from '@edge-git/backend-errors';
+import { UnauthorizedError, ForbiddenError } from '@edge-git/backend-errors';
 
 type RequestContext = Context<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
 async function authenticateUserIdentity(c: RequestContext): Promise<string> {
-  const env = c.env as Env;
+  const env = c.env;
   const email = await AccessAuthServiceFactory.create(env).getAuthenticatedUserEmail(
     c.req.raw,
     c.executionCtx as unknown as AccessIdentityContext,
@@ -40,7 +40,7 @@ export interface GitAuthResult {
 function unauthorizedGit(): Response {
   return new Response('Unauthorized', {
     status: 401,
-    headers: { 'WWW-Authenticate': 'Basic realm="Edge-Git"'},
+    headers: { 'WWW-Authenticate': 'Basic realm="Edge-Git"' },
   });
 }
 
@@ -48,8 +48,13 @@ async function resolvePatToEmail(env: Env, pat: string): Promise<string> {
   return TokenServiceFactory.create({ DB: env.DB }).authenticateWithPAT(pat);
 }
 
-async function gitAuthForRepo(c: RequestContext, owner: string, repoName: string, service: 'git-upload-pack' | 'git-receive-pack'): Promise<GitAuthResult | Response> {
-  const env = c.env as Env;
+async function gitAuthForRepo(
+  c: RequestContext,
+  owner: string,
+  repoName: string,
+  service: 'git-upload-pack' | 'git-receive-pack',
+): Promise<GitAuthResult | Response> {
+  const env = c.env;
   const repo = await RepoServiceFactory.create({ DB: env.DB }).getByOwnerAndName(owner, repoName);
   if (!repo) {
     // Return 401 (not 404) to avoid repo existence oracle for private repos.
@@ -107,5 +112,6 @@ class MiddlewareHandlers {
 
 export { MiddlewareHandlers, gitAuthForRepo, unauthorizedGit };
 export type { RequestContext };
-export { NotFoundError };
-export type { TokenService };
+
+export { type TokenService } from '@edge-git/backend-services/auth';
+export { NotFoundError } from '@edge-git/backend-errors';

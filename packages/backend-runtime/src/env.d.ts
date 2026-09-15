@@ -23,7 +23,7 @@ declare global {
     AUDIT_LOG_RETENTION_DAYS?: string;
   }
 
-  interface CloudflareEnv extends Env {}
+  type CloudflareEnv = Env;
 }
 
 export {};

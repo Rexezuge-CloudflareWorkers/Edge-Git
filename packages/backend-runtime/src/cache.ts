@@ -21,8 +21,7 @@ type BuildCacheKeyArgs = {
 function buildCacheKey({ key, params, baseUrl }: BuildCacheKeyArgs): URL {
   const path = key.startsWith('/') ? key : `/${key}`;
   const url = new URL(`/__cache${path}`, baseUrl ?? CACHE_BASE_URL);
-  for (const param of Object.keys(params)) {
-    const value = params[param];
+  for (const [param, value] of Object.entries(params)) {
     if (value) url.searchParams.set(param, value);
   }
   return url;
@@ -45,10 +44,10 @@ async function putJson<T>({ key, data, params, baseUrl, options }: PutJsonArgs<T
     'Content-Type': 'application/json',
     'Cache-Control': `public, max-age=${Math.floor(ttl)}`,
   });
-  const response = new Response(JSON.stringify(data), { headers });
+  const response = Response.json(data, { headers });
   const finalKey = buildCacheKey({ key, params: params ?? {}, baseUrl });
   await cache.put(finalKey, response);
-  logger.debug(`Cached data for key: ${finalKey.toString()}`);
+  logger.debug(`Cached data for key: ${finalKey.href}`);
 }
 
 type GetJsonArgs = {
@@ -63,7 +62,7 @@ async function getJson<T>({ key, params, baseUrl }: GetJsonArgs): Promise<T | nu
   const response = await cache.match(finalKey);
   if (!response || !response.ok) return null;
   const data = (await response.json()) as T;
-  logger.debug('Cache hit for key: ', finalKey.toString());
+  logger.debug('Cache hit for key: ', finalKey.href);
   return data;
 }
 
@@ -81,12 +80,12 @@ async function getOrSetJson<T>({ key, fetcher, options, params, baseUrl }: GetOr
   const cached = await getJson<T>({ key, params, baseUrl });
   if (cached) return cached;
 
-  const fresh = await fetcher();
+  const fresh: unknown = await fetcher();
   if (fresh === null || fresh === undefined) {
-    return fresh;
+    return fresh as T;
   }
-  await putJson({ key, data: fresh, params, baseUrl, options });
-  return fresh;
+  await putJson({ key, data: fresh as T, params, baseUrl, options });
+  return fresh as T;
 }
 
 export const cache = {

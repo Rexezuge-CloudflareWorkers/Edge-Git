@@ -1,4 +1,4 @@
-import * as git from "isomorphic-git";
+import * as git from 'isomorphic-git';
 import type { IsoGitFs } from './IsoGitFs';
 import type { RefUpdateResult } from '@edge-git/git-protocol';
 
@@ -9,12 +9,12 @@ const logger = {
 };
 
 export class GitService {
-  private readonly fs: ReturnType<IsoGitFs["getPromiseFsClient"]>;
+  private readonly fs: ReturnType<IsoGitFs['getPromiseFsClient']>;
   private readonly gitdir: string;
 
   private readonly cache: object = {};
 
-  constructor(fs: ReturnType<IsoGitFs["getPromiseFsClient"]>, gitdir: string) {
+  constructor(fs: ReturnType<IsoGitFs['getPromiseFsClient']>, gitdir: string) {
     this.fs = fs;
     this.gitdir = gitdir;
   }
@@ -24,7 +24,7 @@ export class GitService {
       fs: this.fs,
       dir: this.gitdir,
       bare: true,
-      defaultBranch: "main",
+      defaultBranch: 'main',
     });
   }
 
@@ -33,36 +33,30 @@ export class GitService {
     const refs: Array<{ ref: string; oid: string }> = [];
 
     try {
-      const headContent = await this.fs.promises.readFile("/repo/HEAD", {
-        encoding: "utf-8",
+      const headContent = this.fs.promises.readFile('/repo/HEAD', {
+        encoding: 'utf8',
       });
-      const headStr =
-        typeof headContent === "string"
-          ? headContent
-          : new TextDecoder().decode(headContent);
-      const match = headStr.trim().match(/^ref:\s*(.+)$/);
+      const headStr = typeof headContent === 'string' ? headContent : new TextDecoder().decode(headContent);
+      const match = /^ref:\s*(\S.*)$/.exec(headStr.trim());
       if (match) {
         symbolicHead = match[1]; // e.g., "refs/heads/main"
       }
     } catch {
-      logger.warn("(read-head-file) No HEAD found in repository.");
+      logger.warn('(read-head-file) No HEAD found in repository.');
     }
 
     try {
       const headOid = await git.resolveRef({
         fs: this.fs,
         gitdir: this.gitdir,
-        ref: "HEAD",
+        ref: 'HEAD',
       });
-      refs.push({ ref: "HEAD", oid: headOid });
+      refs.push({ ref: 'HEAD', oid: headOid });
     } catch {
-      logger.warn("(resolve-head-ref) No HEAD ref found in repository.");
+      logger.warn('(resolve-head-ref) No HEAD ref found in repository.');
     }
 
-    const [branches, tags] = await Promise.all([
-      this.listBranchesWithOid(),
-      this.listTags(),
-    ]);
+    const [branches, tags] = await Promise.all([this.listBranchesWithOid(), this.listTags()]);
 
     refs.push(...branches, ...tags);
 
@@ -83,7 +77,7 @@ export class GitService {
             ref: `refs/heads/${branch}`,
           });
           return { ref: `refs/heads/${branch}`, oid };
-        })
+        }),
       );
       return branches;
     } catch {
@@ -99,7 +93,7 @@ export class GitService {
       });
       return branchRefs;
     } catch (error) {
-      logger.warn("(list-branches) Failed to list branches: ", error);
+      logger.warn('(list-branches) Failed to list branches: ', error);
       return [];
     }
   }
@@ -113,7 +107,7 @@ export class GitService {
       });
       return branch ?? null;
     } catch (error) {
-      logger.warn("(current-branch) Failed to get current branch: ", error);
+      logger.warn('(current-branch) Failed to get current branch: ', error);
       return null;
     }
   }
@@ -132,7 +126,7 @@ export class GitService {
             ref: `refs/tags/${tag}`,
           });
           return { ref: `refs/tags/${tag}`, oid };
-        })
+        }),
       );
       return tags;
     } catch {
@@ -149,7 +143,7 @@ export class GitService {
         cache: this.cache,
       });
     } catch (error) {
-      logger.warn(`(read-object) Failed to read object ${oid}: ${error}`);
+      logger.warn(`(read-object) Failed to read object ${oid}: ${String(error)}`);
       return null;
     }
   }
@@ -160,13 +154,13 @@ export class GitService {
         fs: this.fs,
         gitdir: this.gitdir,
         oid,
-        format: "content",
+        format: 'content',
         cache: this.cache,
       });
 
       // Ensure we return string or Uint8Array
       const object = result.object;
-      if (typeof object === "string" || object instanceof Uint8Array) {
+      if (typeof object === 'string' || object instanceof Uint8Array) {
         return {
           type: result.type,
           object,
@@ -180,9 +174,7 @@ export class GitService {
         object: new TextEncoder().encode(JSON.stringify(object)),
       };
     } catch (error) {
-      logger.warn(
-        `(read-object-ls-refs) Failed to read object ${oid}: ${error}`
-      );
+      logger.warn(`(read-object-ls-refs) Failed to read object ${oid}: ${String(error)}`);
       return null;
     }
   }
@@ -209,10 +201,61 @@ export class GitService {
     });
   }
 
-  async collectObjectsForPack(
-    wants: string[],
-    haves: string[]
-  ): Promise<string[]> {
+  private async enqueueRelatedObjects(type: string, oid: string, queue: string[]): Promise<void> {
+    switch (type) {
+      case 'commit': {
+        // Parse commit to get tree and parent OIDs
+        const commit = await git.readCommit({
+          fs: this.fs,
+          gitdir: this.gitdir,
+          oid,
+          cache: this.cache,
+        });
+
+        // Add tree to queue
+        queue.push(commit.commit.tree);
+
+        // Add parent commits to queue
+        for (const parent of commit.commit.parent) {
+          queue.push(parent);
+        }
+        break;
+      }
+      case 'tree': {
+        // Parse tree to get all entries (blobs and subtrees)
+        const tree = await git.readTree({
+          fs: this.fs,
+          gitdir: this.gitdir,
+          oid,
+          cache: this.cache,
+        });
+
+        // Add all tree entries to queue
+        for (const entry of tree.tree) {
+          queue.push(entry.oid);
+        }
+        break;
+      }
+      case 'tag': {
+        // Parse tag to get the object it points to
+        const tag = await git.readTag({
+          fs: this.fs,
+          gitdir: this.gitdir,
+          oid,
+          cache: this.cache,
+        });
+
+        queue.push(tag.tag.object);
+        break;
+      }
+      default: {
+        // For blobs, we just add them to the set (no traversal needed)
+        break;
+      }
+    }
+  }
+
+  async collectObjectsForPack(wants: string[], haves: string[]): Promise<string[]> {
     const objectsToSend = new Set<string>();
     const visited = new Set<string>();
     const haveSet = new Set(haves);
@@ -240,51 +283,9 @@ export class GitService {
           cache: this.cache,
         });
 
-        if (type === "commit") {
-          // Parse commit to get tree and parent OIDs
-          const commit = await git.readCommit({
-            fs: this.fs,
-            gitdir: this.gitdir,
-            oid,
-            cache: this.cache,
-          });
-
-          // Add tree to queue
-          queue.push(commit.commit.tree);
-
-          // Add parent commits to queue
-          for (const parent of commit.commit.parent) {
-            queue.push(parent);
-          }
-        } else if (type === "tree") {
-          // Parse tree to get all entries (blobs and subtrees)
-          const tree = await git.readTree({
-            fs: this.fs,
-            gitdir: this.gitdir,
-            oid,
-            cache: this.cache,
-          });
-
-          // Add all tree entries to queue
-          for (const entry of tree.tree) {
-            queue.push(entry.oid);
-          }
-        } else if (type === "tag") {
-          // Parse tag to get the object it points to
-          const tag = await git.readTag({
-            fs: this.fs,
-            gitdir: this.gitdir,
-            oid,
-            cache: this.cache,
-          });
-
-          queue.push(tag.tag.object);
-        }
-        // For blobs, we just add them to the set (no traversal needed)
+        await this.enqueueRelatedObjects(type, oid, queue);
       } catch (error) {
-        logger.error(
-          `(collect-objects) Failed to read object ${oid}: ${error}`
-        );
+        logger.error(`(collect-objects) Failed to read object ${oid}: ${String(error)}`);
         // Continue processing other objects even if one fails
       }
     }
@@ -332,9 +333,7 @@ export class GitService {
     return common;
   }
 
-  async getLastCommit(
-    branch: string
-  ): Promise<git.ReadCommitResult | undefined> {
+  async getLastCommit(branch: string): Promise<git.ReadCommitResult | undefined> {
     try {
       const [commit] = await git.log({
         fs: this.fs,
@@ -346,22 +345,12 @@ export class GitService {
 
       return commit ?? undefined;
     } catch (error) {
-      logger.warn(
-        `(get-last-commit) Failed to get last commit for branch ${branch}: ${error}`
-      );
+      logger.warn(`(get-last-commit) Failed to get last commit for branch ${branch}: ${String(error)}`);
       return undefined;
     }
   }
 
-  async getLog({
-    ref,
-    depth,
-    filepath,
-  }: {
-    ref?: string;
-    depth?: number;
-    filepath?: string;
-  }) {
+  async getLog({ ref, depth, filepath }: { ref?: string; depth?: number; filepath?: string }) {
     try {
       const commits = await git.log({
         fs: this.fs,
@@ -374,12 +363,12 @@ export class GitService {
 
       return commits;
     } catch (error) {
-      logger.warn(`(get-log) Failed to get log for ref ${ref}: ${error}`);
+      logger.warn(`(get-log) Failed to get log for ref ${ref}: ${String(error)}`);
       return [];
     }
   }
 
-  async resolveRef(ref = "HEAD") {
+  async resolveRef(ref = 'HEAD') {
     try {
       const oid = await git.resolveRef({
         fs: this.fs,
@@ -388,12 +377,12 @@ export class GitService {
       });
       return oid;
     } catch (error) {
-      logger.warn(`(resolve-ref) Failed to resolve ref ${ref}: ${error}`);
+      logger.warn(`(resolve-ref) Failed to resolve ref ${ref}: ${String(error)}`);
       return null;
     }
   }
 
-  async getTree(resolvedRef: string, path = "") {
+  async getTree(resolvedRef: string, path = '') {
     try {
       const { tree } = await git.readTree({
         fs: this.fs,
@@ -405,9 +394,7 @@ export class GitService {
 
       return tree;
     } catch (error) {
-      logger.error(
-        `(get-tree) Failed to get tree for ${resolvedRef}:${path}: ${error}`
-      );
+      logger.error(`(get-tree) Failed to get tree for ${resolvedRef}:${path}: ${String(error)}`);
       return [];
     }
   }
@@ -430,9 +417,7 @@ export class GitService {
         isBinary,
       };
     } catch (error) {
-      logger.error(
-        `(get-blob) Failed to get blob for ${resolvedRef}:${filepath}: ${error}`
-      );
+      logger.error(`(get-blob) Failed to get blob for ${resolvedRef}:${filepath}: ${String(error)}`);
       return null;
     }
   }
@@ -452,10 +437,7 @@ export class GitService {
     return false;
   }
 
-  async getFileStateChanges(
-    oldCommit: string | undefined,
-    newCommit: string | undefined
-  ) {
+  async getFileStateChanges(oldCommit: string | undefined, newCommit: string | undefined) {
     type File =
       | {
           isBinary: false;
@@ -467,7 +449,7 @@ export class GitService {
         };
 
     type Change = {
-      type: "add" | "modify" | "remove";
+      type: 'add' | 'modify' | 'remove';
       path: string;
       old: File | null;
       new: File | null;
@@ -480,7 +462,7 @@ export class GitService {
       trees: [git.TREE({ ref: oldCommit }), git.TREE({ ref: newCommit })],
       map: async (filepath, [A, B]): Promise<Change | undefined> => {
         // ignore directories
-        if (filepath === ".") {
+        if (filepath === '.') {
           return;
         }
 
@@ -489,7 +471,7 @@ export class GitService {
         const Atype = A ? await A.type() : null;
         const Btype = B ? await B.type() : null;
 
-        if (Atype === "tree" || Btype === "tree") {
+        if (Atype === 'tree' || Btype === 'tree') {
           return;
         }
 
@@ -498,25 +480,15 @@ export class GitService {
         const Boid = B ? await B.oid() : null;
 
         // determine modification type
-        let type: "equal" | "modify" | "add" | "remove" = "equal";
-        if (Aoid !== Boid) {
-          type = "modify";
-        }
-        if (Aoid === null && Boid !== null) {
-          type = "add";
-        }
-        if (Boid === null && Aoid !== null) {
-          type = "remove";
-        }
         if (Aoid === null && Boid === null) {
-          logger.warn(
-            `(get-file-state-changes): Both A and B are null for path ${filepath}`
-          );
+          logger.warn(`(get-file-state-changes): Both A and B are null for path ${filepath}`);
           return; // Should not happen
         }
+        const type: 'equal' | 'modify' | 'add' | 'remove' =
+          Aoid === null ? 'add' : Boid === null ? 'remove' : Aoid === Boid ? 'equal' : 'modify';
 
         // Don't return 'equal' files
-        if (type === "equal") {
+        if (type === 'equal') {
           return;
         }
 
@@ -568,9 +540,7 @@ export class GitService {
         oid: commitOid,
       });
       if (!commit.commit.parent || commit.commit.parent.length === 0) {
-        logger.info(
-          `(get-commit): Commit ${commitOid} is a root commit. Comparing with empty tree.`
-        );
+        logger.info(`(get-commit): Commit ${commitOid} is a root commit. Comparing with empty tree.`);
         return {
           commit,
           changes: await this.getFileStateChanges(undefined, commitOid),
@@ -583,9 +553,7 @@ export class GitService {
         changes: await this.getFileStateChanges(parentOid, commitOid),
       };
     } catch (error) {
-      logger.error(
-        `(get-commit) Failed to get commit changes for ${commitOid}: ${error}`
-      );
+      logger.error(`(get-commit) Failed to get commit changes for ${commitOid}: ${String(error)}`);
       return {
         commit: null,
         changes: [],
@@ -593,13 +561,10 @@ export class GitService {
     }
   }
 
-  // TODO: simplify this and some docs
-  async applyRefUpdates(
-    commands: Array<{ oldOid: string; newOid: string; ref: string }>,
-    atomic: boolean
-  ): Promise<RefUpdateResult[]> {
+  // Ref update validation + application (atomic opt-in).
+  async applyRefUpdates(commands: Array<{ oldOid: string; newOid: string; ref: string }>, atomic: boolean): Promise<RefUpdateResult[]> {
     const results: RefUpdateResult[] = [];
-    const ZERO_OID = "0".repeat(40);
+    const ZERO_OID = '0'.repeat(40);
 
     // Validate all commands first
     for (const cmd of commands) {
@@ -611,7 +576,7 @@ export class GitService {
         try {
           currentOid = await git.resolveRef({
             fs: this.fs,
-            gitdir: "/repo",
+            gitdir: '/repo',
             ref: cmd.ref,
           });
         } catch {
@@ -619,15 +584,11 @@ export class GitService {
         }
 
         // Validate old OID matches current
-        if (
-          currentOid &&
-          cmd.oldOid !== ZERO_OID &&
-          currentOid !== cmd.oldOid
-        ) {
+        if (currentOid && cmd.oldOid !== ZERO_OID && currentOid !== cmd.oldOid) {
           results.push({
             ref: cmd.ref,
             ok: false,
-            error: "ref update rejected: old OID mismatch",
+            error: 'ref update rejected: old OID mismatch',
           });
           continue;
         }
@@ -649,7 +610,7 @@ export class GitService {
             results.push({
               ref: cmd.ref,
               ok: false,
-              error: "ref already exists",
+              error: 'ref already exists',
             });
           } else {
             results.push({ ref: cmd.ref, ok: true });
@@ -667,7 +628,7 @@ export class GitService {
 
           const isFF = await git.isDescendent({
             fs: this.fs,
-            gitdir: "/repo",
+            gitdir: '/repo',
             oid: cmd.newOid,
             ancestor: currentOid,
           });
@@ -678,7 +639,7 @@ export class GitService {
             results.push({
               ref: cmd.ref,
               ok: false,
-              error: "non-fast-forward update rejected",
+              error: 'non-fast-forward update rejected',
             });
           }
         }
@@ -696,28 +657,27 @@ export class GitService {
       return results.map((r) => ({
         ...r,
         ok: false,
-        error: r.error || "atomic transaction failed",
+        error: r.error || 'atomic transaction failed',
       }));
     }
 
     // Apply successful updates
-    for (let i = 0; i < commands.length; i += 1) {
+    for (const [i, cmd] of commands.entries()) {
       if (!results[i].ok) continue;
 
-      const cmd = commands[i];
       const isDelete = cmd.newOid === ZERO_OID;
 
       try {
         if (isDelete) {
           await git.deleteRef({
             fs: this.fs,
-            gitdir: "/repo",
+            gitdir: '/repo',
             ref: cmd.ref,
           });
         } else {
           await git.writeRef({
             fs: this.fs,
-            gitdir: "/repo",
+            gitdir: '/repo',
             ref: cmd.ref,
             value: cmd.newOid,
             force: true,

@@ -12,10 +12,6 @@ import { createLogger } from '@edge-git/backend-runtime/logger';
 
 const logger = createLogger('RepoWorker');
 
-type Storage = {
-  fullName: string;
-};
-
 class RepoWorker extends DurableObject<Env> {
   private readonly dofs: DofsFs;
   private readonly isoGitFs: ReturnType<IsoGitFs['getPromiseFsClient']>;
@@ -31,7 +27,9 @@ class RepoWorker extends DurableObject<Env> {
     this.isoGitFs = new IsoGitFs(this.dofs).getPromiseFsClient();
     this.git = new GitService(this.isoGitFs, '/repo');
 
-    this.ctx.blockConcurrencyWhile(async () => {
+    // Durable Object idiom: block concurrency until storage is ready.
+    // eslint-disable-next-line sonarjs/no-async-constructor
+    void this.ctx.blockConcurrencyWhile(async () => {
       this.dofs.setDeviceSize(5 * 1024 * 1024 * 1024);
       await this.ensureRepoInitialized();
       const storedFullName = await this.ctx.storage.get<string>('fullName');
@@ -86,7 +84,7 @@ class RepoWorker extends DurableObject<Env> {
 
   public async ensureRepoInitialized(): Promise<void> {
     try {
-      await this.isoGitFs.promises.stat('/repo/HEAD');
+      this.isoGitFs.promises.stat('/repo/HEAD');
     } catch {
       await this.initRepo();
     }
@@ -220,7 +218,7 @@ class RepoWorker extends DurableObject<Env> {
       let binary = '';
       const chunk = 8192;
       for (let i = 0; i < content.length; i += chunk) {
-        binary += String.fromCharCode(...content.subarray(i, i + chunk));
+        binary += String.fromCodePoint(...content.subarray(i, i + chunk));
       }
       return { ...(blob as object), contentBase64: btoa(binary) };
     }
