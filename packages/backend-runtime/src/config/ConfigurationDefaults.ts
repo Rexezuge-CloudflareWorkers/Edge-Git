@@ -1,0 +1,10 @@
+export const DEFAULT_DEBUG_MODE = 'false';
+export const DEFAULT_MAX_REPOS_PER_USER = '100';
+export const DEFAULT_MAX_TOKENS_PER_USER = '5';
+export const DEFAULT_MAX_TOKEN_EXPIRY_DAYS = '90';
+export const DEFAULT_SITE_URL = '';
+export const DEFAULT_SERVE_SPA_FROM_WORKER = 'true';
+export const DEFAULT_BACKGROUND_TASK_RUN_RETENTION_DAYS = '30';
+export const DEFAULT_AUDIT_LOG_RETENTION_DAYS = '90';
+export const DEFAULT_MAX_PACK_OBJECTS = '10000';
+export const DEFAULT_GIT_CACHE_TTL_SECONDS = '3600';
