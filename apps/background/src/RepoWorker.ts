@@ -27,16 +27,29 @@ class RepoWorker extends DurableObject<Env> {
     this.isoGitFs = new IsoGitFs(this.dofs).getPromiseFsClient();
     this.git = new GitService(this.isoGitFs, '/repo');
 
-    // Durable Object idiom: block concurrency until storage is ready.
-    // eslint-disable-next-line sonarjs/no-async-constructor
-    void this.ctx.blockConcurrencyWhile(async () => {
+    // NOTE: Do NOT call blockConcurrencyWhile here. `new Fs()` already
+    // schedules its own blockConcurrencyWhile(ensureSchema). Nesting a second
+    // block that runs isomorphic-git init deadlocks (30s timeout → DO reset →
+    // HTTP 500 on every POST git-upload-pack / receive-pack advertise).
+    // Repo init is lazy via ensureRepoInitialized() on each entrypoint.
+  }
+
+  private async loadFullNameIfNeeded(): Promise<void> {
+    if (this.fullNameValue) return;
+    try {
+      const stored = await this.ctx.storage.get<string>('fullName');
+      if (stored) this.fullNameValue = stored;
+    } catch {
+      // storage may be unavailable during early init; callers handle missing name
+    }
+  }
+
+  private ensureDeviceSize(): void {
+    try {
       this.dofs.setDeviceSize(5 * 1024 * 1024 * 1024);
-      await this.ensureRepoInitialized();
-      const storedFullName = await this.ctx.storage.get<string>('fullName');
-      if (storedFullName && !this.fullNameValue) {
-        this.fullNameValue = storedFullName;
-      }
-    });
+    } catch {
+      // ENOSPC / already set — safe to ignore, write path surfaces real errors
+    }
   }
 
   public get fullName(): string {
@@ -57,11 +70,17 @@ class RepoWorker extends DurableObject<Env> {
     const pathname = url.pathname;
 
     if (pathname === '/git-receive-pack' && request.method === 'POST') {
+      await this.loadFullNameIfNeeded();
+      this.ensureDeviceSize();
+      await this.ensureRepoInitialized();
       const data = new Uint8Array(await request.arrayBuffer());
       return this.receivePack(data);
     }
 
     if (pathname === '/git-upload-pack' && request.method === 'POST') {
+      await this.loadFullNameIfNeeded();
+      this.ensureDeviceSize();
+      await this.ensureRepoInitialized();
       const data = new Uint8Array(await request.arrayBuffer());
       return this.uploadPack(data);
     }
@@ -71,6 +90,7 @@ class RepoWorker extends DurableObject<Env> {
       if (body.fullName) {
         await this.setFullName(body.fullName);
       }
+      this.ensureDeviceSize();
       await this.ensureRepoInitialized();
       return Response.json({ ok: true });
     }
@@ -84,14 +104,23 @@ class RepoWorker extends DurableObject<Env> {
 
   public async ensureRepoInitialized(): Promise<void> {
     try {
-      this.isoGitFs.promises.stat('/repo/HEAD');
+      await this.isoGitFs.promises.stat('/repo/HEAD');
+      return;
     } catch {
-      await this.initRepo();
+      // missing HEAD → init below
     }
+    await this.initRepo();
   }
 
   public async listRefs(): Promise<{ refs: Array<{ ref: string; oid: string }>; symbolicHead: string | null }> {
+    await this.prepare();
     return this.git.listRefs();
+  }
+
+  private async prepare(): Promise<void> {
+    await this.loadFullNameIfNeeded();
+    this.ensureDeviceSize();
+    await this.ensureRepoInitialized();
   }
 
   public async receivePack(data: Uint8Array): Promise<Response> {
@@ -167,10 +196,12 @@ class RepoWorker extends DurableObject<Env> {
   }
 
   public async getLatestCommit(branch = 'HEAD'): Promise<unknown> {
+    await this.prepare();
     return this.git.getLastCommit(branch);
   }
 
   public async getCommits(args: { ref?: string; depth?: number; filepath?: string }): Promise<unknown> {
+    await this.prepare();
     const latestCommit = (await this.git.getLastCommit(args.ref ?? 'HEAD')) as { oid: string } | null;
     if (!latestCommit) {
       return [];
@@ -179,12 +210,14 @@ class RepoWorker extends DurableObject<Env> {
   }
 
   public async getBranches(): Promise<{ branches: string[]; currentBranch: string | null }> {
+    await this.prepare();
     const branches = await this.git.listBranches();
     const currentBranch = await this.git.currentBranch();
     return { branches, currentBranch: currentBranch ?? null };
   }
 
   public async getTree(args: { ref?: string; path?: string }): Promise<unknown> {
+    await this.prepare();
     const { ref, path } = args;
     const resolvedRef = await this.git.resolveRef(ref);
     if (!resolvedRef) {
@@ -205,6 +238,7 @@ class RepoWorker extends DurableObject<Env> {
   }
 
   public async getBlob(args: { ref?: string; filepath: string }): Promise<unknown> {
+    await this.prepare();
     const { ref, filepath } = args;
     const resolvedRef = await this.git.resolveRef(ref);
     if (!resolvedRef) {
@@ -226,6 +260,7 @@ class RepoWorker extends DurableObject<Env> {
   }
 
   public async getCommit(commitOid: string): Promise<unknown> {
+    await this.prepare();
     return this.git.getCommit(commitOid);
   }
 }

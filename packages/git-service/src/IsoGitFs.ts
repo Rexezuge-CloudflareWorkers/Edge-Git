@@ -134,7 +134,7 @@ export class IsoGitFs {
    */
   private ensureErrCode(error: Error) {
     const e = new ErrorWithCode(error.message);
-    if (e.code) return e;
+    if ((e as { code?: string }).code) return e;
     const msg = e.message.trim();
     if (this.KNOWN_CODES.has(msg)) {
       e.code = msg;
@@ -147,6 +147,10 @@ export class IsoGitFs {
         return e;
       }
     }
+    // Default to ENOENT so isomorphic-git treats missing paths as absent
+    // instead of swallowing the error (previous version returned undefined).
+    if (!e.code) e.code = 'ENOENT';
+    return e;
   }
 
   /**
@@ -156,10 +160,9 @@ export class IsoGitFs {
    * @param path - The path involved in the system call.
    * @throws The annotated error.
    */
-  private annotateAndThrow(error: unknown, syscall: string, path: string) {
+  private annotateAndThrow(error: unknown, syscall: string, path: string): never {
     if (error instanceof Error) {
       const e = this.ensureErrCode(error);
-      if (!e) return;
       e.path = path;
       e.syscall = syscall;
       throw e;
@@ -173,7 +176,7 @@ export class IsoGitFs {
    * @param options - Encoding options.
    * @returns The content of the file as a Buffer or string.
    */
-  readFile(path: string, options: TextEncoding | { encoding?: TextEncoding }) {
+  async readFile(path: string, options?: TextEncoding | { encoding?: TextEncoding }) {
     const encoding = typeof options === 'string' ? options : options?.encoding;
     const normalizedPath = normalizePath(path);
     try {
@@ -219,7 +222,7 @@ export class IsoGitFs {
    * Deletes a file.
    * @param path - The path to the file to delete.
    */
-  unlink(path: string) {
+  async unlink(path: string) {
     const normalizedPath = normalizePath(path);
     try {
       this.dofs.unlink(normalizedPath);
@@ -233,7 +236,7 @@ export class IsoGitFs {
    * @param path - The path to the directory.
    * @returns An array of the names of the files in the directory (excluding '.' and '..').
    */
-  readdir(path: string) {
+  async readdir(path: string) {
     const normalizedPath = normalizePath(path);
     try {
       const names = this.dofs.listDir(normalizedPath, {});
@@ -249,7 +252,7 @@ export class IsoGitFs {
    * @param path - The path to the directory to create.
    * @param options - Options for creating the directory, including `recursive` and `mode`.
    */
-  mkdir(path: string, options?: { recursive?: boolean; mode?: number }) {
+  async mkdir(path: string, options?: { recursive?: boolean; mode?: number }) {
     const normalizedPath = normalizePath(path);
     try {
       this.dofs.mkdir(normalizedPath, { recursive: true, ...options });
@@ -263,7 +266,7 @@ export class IsoGitFs {
    * @param path - The path to the directory to remove.
    * @param options - Options for removing the directory, including `recursive`.
    */
-  rmdir(path: string, options?: { recursive?: boolean }) {
+  async rmdir(path: string, options?: { recursive?: boolean }) {
     const normalizedPath = normalizePath(path);
     try {
       this.dofs.rmdir(normalizedPath, { recursive: true, ...options });
@@ -278,7 +281,7 @@ export class IsoGitFs {
    * @param detectSymlink - Whether to detect if the path is a symlink.
    * @returns A Node.js-like `Stats` object.
    */
-  statCore(path: string, detectSymlink: boolean) {
+  async statCore(path: string, detectSymlink: boolean) {
     let isSymlink = false;
     const normalizedPath = normalizePath(path);
     if (detectSymlink) {
@@ -340,7 +343,7 @@ export class IsoGitFs {
    * @param path - The path to the file or directory.
    * @returns A Node.js-like `Stats` object.
    */
-  stat(path: string) {
+  async stat(path: string) {
     return this.statCore(path, false);
   }
 
@@ -349,7 +352,7 @@ export class IsoGitFs {
    * @param path - The path to the file or directory.
    * @returns A Node.js-like `Stats` object.
    */
-  lstat(path: string) {
+  async lstat(path: string) {
     return this.statCore(path, true);
   }
 
@@ -358,7 +361,7 @@ export class IsoGitFs {
    * @param path - The path to the symbolic link.
    * @returns The path to which the symbolic link points.
    */
-  readlink(path: string) {
+  async readlink(path: string) {
     try {
       return this.dofs.readlink(path);
     } catch (error) {
@@ -371,7 +374,7 @@ export class IsoGitFs {
    * @param target - The target path of the link.
    * @param path - The path where the symbolic link will be created.
    */
-  symlink(target: string, path: string) {
+  async symlink(target: string, path: string) {
     try {
       return this.dofs.symlink(target, path);
     } catch (error) {

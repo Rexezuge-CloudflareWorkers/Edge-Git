@@ -33,7 +33,7 @@ export class GitService {
     const refs: Array<{ ref: string; oid: string }> = [];
 
     try {
-      const headContent = this.fs.promises.readFile('/repo/HEAD', {
+      const headContent = await this.fs.promises.readFile('/repo/HEAD', {
         encoding: 'utf8',
       });
       const headStr = typeof headContent === 'string' ? headContent : new TextDecoder().decode(headContent);
