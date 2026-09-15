@@ -1,4 +1,4 @@
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes, useMatch } from 'react-router-dom';
 import { Header } from './components/layout/Header';
 import { NoticeBar } from './components/layout/NoticeBar';
 import Unauthorized from './components/layout/Unauthorized';
@@ -13,6 +13,7 @@ import { RepoView } from './views/RepoView';
 export default function SpaApp() {
   const { notice, showNotice } = useNotice();
   const { user, authorized } = useCurrentUser();
+  const isRepoPage = useMatch('/:owner/:repo') !== null;
 
   if (authorized === null) {
     return (
@@ -26,7 +27,7 @@ export default function SpaApp() {
 
   return (
     <div className="min-h-screen bg-[var(--color-surface-base)] text-[var(--color-text-primary)]">
-      <Header userEmail={user?.email ?? null} />
+      {!isRepoPage && <Header userEmail={user?.email ?? null} />}
       {notice && <NoticeBar notice={notice} />}
 
       <Routes>
