@@ -81,11 +81,13 @@ describe('upload-pack parsing', () => {
       'ofs-delta',
       'include-tag',
       'sideband-all',
+      'wait-for-done',
     ]);
     expect(req.shallowOptions?.deepen).toBe(5);
     expect(req.filterSpec).toBe('blob:none');
     expect(req.capabilities.thinPack).toBe(true);
     expect(req.capabilities.sidebandAll).toBe(true);
+    expect(req.waitForDone).toBe(true);
   });
 
   it('falls back to regex command extraction', () => {
@@ -128,9 +130,29 @@ describe('upload-pack parsing', () => {
     expect((await res.arrayBuffer()).byteLength).toBeGreaterThan(pack.length);
   });
 
-  it('acknowledges common commits when not done', async () => {
+  it('acknowledges common commits without packfile via flush', async () => {
     const res = await buildFetchResponse({ commonCommits: ['a'.repeat(40)], packfileData: null, noProgress: true, done: false });
-    expect(await res.text()).toContain('ACK');
+    const text = await res.text();
+    expect(text).toContain('ACK');
+    expect(text).not.toContain('ready');
+    expect(text).not.toContain('packfile');
+  });
+
+  it('emits shallow-info section with packfile', async () => {
+    const pack = new Uint8Array([0x50, 0x41, 0x43, 0x4b, 0, 0, 0, 2, 0, 0, 0, 1]);
+    const res = await buildFetchResponse({
+      commonCommits: [],
+      packfileData: pack,
+      noProgress: true,
+      done: true,
+      shallow: ['b'.repeat(40)],
+      unshallow: ['c'.repeat(40)],
+    });
+    const text = await res.text();
+    expect(text).toContain('shallow-info');
+    expect(text).toContain(`shallow ${'b'.repeat(40)}`);
+    expect(text).toContain(`unshallow ${'c'.repeat(40)}`);
+    expect(text).toContain('packfile');
   });
 });
 

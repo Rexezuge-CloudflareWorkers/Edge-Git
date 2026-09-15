@@ -7,6 +7,7 @@ import {
   parseCommand,
   parseFetchRequest,
   parseReceivePackRequest,
+  shouldSendPackfileForFetch,
 } from '@edge-git/git-protocol';
 import { createLogger } from '@edge-git/backend-runtime/logger';
 
@@ -167,17 +168,62 @@ class RepoWorker extends DurableObject<Env> {
     if (command === 'fetch') {
       const fetchRequest = parseFetchRequest(data, args);
 
+      if (fetchRequest.wants.length === 0) {
+        return buildFetchResponse({
+          commonCommits: [],
+          packfileData: null,
+          noProgress: true,
+          done: fetchRequest.done,
+        });
+      }
+
       const commonCommits = await this.git.findCommonCommits(fetchRequest.haves);
 
+      // wait-for-done: never send ready/packfile until the client says done.
+      // Otherwise (classic stateless negotiation) send ACK+ready+packfile in the
+      // same response as soon as a common base exists (or for clones).
+      const shouldSendPackfile = shouldSendPackfileForFetch(fetchRequest, commonCommits);
+
       let packfileData: Uint8Array | undefined | null = null;
+      let shallow: string[] = [];
+      const unshallow: string[] = [];
 
-      if (fetchRequest.done && fetchRequest.wants.length > 0) {
+      if (shouldSendPackfile) {
         try {
-          const objectsToPack = await this.git.collectObjectsForPack(fetchRequest.wants, fetchRequest.haves);
+          // deepen-not entries may be ref names; resolve to oids for exclusion.
+          const excludeOids: string[] = [];
+          const deepenNot = fetchRequest.shallowOptions?.deepenNot ?? [];
+          for (const entry of deepenNot) {
+            const resolved = await this.git.resolveRef(entry);
+            excludeOids.push(resolved ?? entry);
+          }
 
-          logger.info(`(upload-pack-fetch) Packing ${objectsToPack.length} objects for wants: ${fetchRequest.wants.join(', ')}`);
+          const depth = fetchRequest.shallowOptions?.deepen;
+          const since = fetchRequest.shallowOptions?.deepenSince;
+          const { oids, shallow: boundary } = await this.git.collectObjectsForPack(fetchRequest.wants, fetchRequest.haves, {
+            depth,
+            since,
+            exclude: excludeOids,
+            filter: fetchRequest.filterSpec,
+          });
 
-          packfileData = await this.git.packObjects(objectsToPack);
+          // include-tag: also send annotated tags pointing at packed commits.
+          let oidsToPack = oids;
+          if (fetchRequest.capabilities.includeTag) {
+            oidsToPack = await this.expandWithTags(oidsToPack);
+          }
+
+          logger.info(`(upload-pack-fetch) Packing ${oidsToPack.length} objects for wants: ${fetchRequest.wants.join(', ')}`);
+
+          packfileData = await this.git.packObjects(oidsToPack);
+          if (depth !== undefined || since !== undefined) {
+            shallow = boundary;
+            // Client-sent shallow lines now fulfilled are unshallowed.
+            const clientShallow = fetchRequest.shallowOptions?.shallow ?? [];
+            for (const s of clientShallow) {
+              if (!shallow.includes(s)) unshallow.push(s);
+            }
+          }
         } catch (error) {
           logger.error('(upload-pack-fetch) Failed to pack objects: ', error);
           return new Response(`ERR pack-objects failed: ${(error as Error).message}`, { status: 500 });
@@ -189,10 +235,31 @@ class RepoWorker extends DurableObject<Env> {
         packfileData,
         noProgress: fetchRequest.capabilities.noProgress,
         done: fetchRequest.done,
+        shallow,
+        unshallow,
       });
     }
 
     return new Response('Unsupported command', { status: 400 });
+  }
+
+  private async expandWithTags(oids: string[]): Promise<string[]> {
+    try {
+      const tags = await this.git.listTags();
+      const packed = new Set(oids);
+      const extra: string[] = [];
+      for (const tag of tags) {
+        if (packed.has(tag.oid)) continue;
+        const target = await this.git.peelTag(tag.oid);
+        if (target && packed.has(target)) {
+          extra.push(tag.oid);
+          packed.add(tag.oid);
+        }
+      }
+      return extra.length > 0 ? [...oids, ...extra] : oids;
+    } catch {
+      return oids;
+    }
   }
 
   public async getLatestCommit(branch = 'HEAD'): Promise<unknown> {

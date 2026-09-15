@@ -11,7 +11,7 @@ export function advertiseUploadPack(): Response {
     PktLine.encode('version 2\n'),
     PktLine.encode('agent=edge-git/0.1.0\n'),
     PktLine.encode('ls-refs\n'),
-    PktLine.encode('fetch\n'),
+    PktLine.encode('fetch=wait-for-done shallow filter\n'),
     PktLine.encode('side-band-64k\n'),
     PktLine.encode('object-format=sha1\n'),
     PktLine.encodeFlush(),
@@ -195,6 +195,7 @@ export type FetchRequest = {
   wants: string[];
   haves: string[];
   done: boolean;
+  waitForDone: boolean;
   capabilities: {
     thinPack: boolean;
     noProgress: boolean;
@@ -218,11 +219,16 @@ function applyExactFetchArg(
     capabilities: { thinPack: boolean; noProgress: boolean; includeTag: boolean; ofsDelta: boolean; sidebandAll: boolean };
     setDone: (value: boolean) => void;
     setDeepenRelative: (value: boolean) => void;
+    setWaitForDone: (value: boolean) => void;
   },
 ): boolean {
   switch (arg) {
     case 'done': {
       state.setDone(true);
+      return true;
+    }
+    case 'wait-for-done': {
+      state.setWaitForDone(true);
       return true;
     }
     case 'thin-pack': {
@@ -259,6 +265,7 @@ export function parseFetchRequest(_data: Uint8Array, args: string[]): FetchReque
   const wants: string[] = [];
   const haves: string[] = [];
   let done = false;
+  let waitForDone = false;
   const capabilities = {
     thinPack: false,
     noProgress: false,
@@ -290,6 +297,9 @@ export function parseFetchRequest(_data: Uint8Array, args: string[]): FetchReque
         },
         setDeepenRelative: (value) => {
           deepenRelative = value;
+        },
+        setWaitForDone: (value) => {
+          waitForDone = value;
         },
       })
     ) {
@@ -323,10 +333,24 @@ export function parseFetchRequest(_data: Uint8Array, args: string[]): FetchReque
     wants,
     haves,
     done,
+    waitForDone,
     capabilities,
     shallowOptions,
     filterSpec,
   };
+}
+
+export function shouldSendPackfileForFetch(
+  fetchRequest: Pick<FetchRequest, 'wants' | 'haves' | 'done' | 'waitForDone'>,
+  commonCommits: string[],
+): boolean {
+  if (fetchRequest.wants.length === 0) return false;
+  if (fetchRequest.done) return true;
+  // wait-for-done: never send ready/packfile until the client says done.
+  if (fetchRequest.waitForDone) return false;
+  // Classic stateless negotiation: single-round ACK+ready+packfile as soon as
+  // a common base exists (or for clones with no haves).
+  return commonCommits.length > 0 || fetchRequest.haves.length === 0;
 }
 
 export async function buildLsRefsResponse(
@@ -408,16 +432,45 @@ export type FetchResponseOptions = {
   noProgress: boolean;
   done: boolean;
   objectCount?: number;
+  shallow?: string[];
+  unshallow?: string[];
 };
 
 export function buildFetchResponse(options: FetchResponseOptions): Response {
   const lines: Uint8Array[] = [];
   const { commonCommits, packfileData, noProgress, done } = options;
+  const shallow = options.shallow ?? [];
+  const unshallow = options.unshallow ?? [];
+  const willSendPackfile = !!packfileData && packfileData.length > 0;
 
-  if (!done) {
+  // Protocol v2 framing (gitprotocol-v2 / fetch-pack.c):
+  // - No packfile  -> `acknowledgments` + (NAK | ACK*) + flush (no ready, no delim).
+  // - Packfile + !done -> `acknowledgments` + ACK* + ready + delim
+  //   [+ shallow-info + delim] + packfile + flush.
+  // - Packfile + done -> omit acknowledgments (MUST), send
+  //   [shallow-info + delim] + packfile + flush.
+  if (!willSendPackfile) {
+    if (done) {
+      // done + nothing to send: acknowledgments MUST be omitted.
+      lines.push(PktLine.encodeFlush());
+    } else {
+      lines.push(PktLine.encode('acknowledgments\n'));
+
+      if (commonCommits.length === 0) {
+        lines.push(PktLine.encode('NAK\n'));
+      } else {
+        for (const oid of commonCommits) {
+          lines.push(PktLine.encode(`ACK ${oid}\n`));
+        }
+      }
+
+      lines.push(PktLine.encodeFlush());
+    }
+  } else if (!done) {
     lines.push(PktLine.encode('acknowledgments\n'));
 
     if (commonCommits.length === 0) {
+      // Clone / no-haves case still needs a packfile: NAK + ready.
       lines.push(PktLine.encode('NAK\n'));
     } else {
       for (const oid of commonCommits) {
@@ -428,7 +481,18 @@ export function buildFetchResponse(options: FetchResponseOptions): Response {
     lines.push(PktLine.encode('ready\n'), PktLine.encodeDelim());
   }
 
-  if (packfileData && packfileData.length > 0) {
+  if (willSendPackfile && (shallow.length > 0 || unshallow.length > 0)) {
+    lines.push(PktLine.encode('shallow-info\n'));
+    for (const oid of shallow) {
+      lines.push(PktLine.encode(`shallow ${oid}\n`));
+    }
+    for (const oid of unshallow) {
+      lines.push(PktLine.encode(`unshallow ${oid}\n`));
+    }
+    lines.push(PktLine.encodeDelim());
+  }
+
+  if (willSendPackfile && packfileData) {
     lines.push(PktLine.encode('packfile\n'));
 
     const objectCount = options.objectCount ?? parsePackfileObjectCount(packfileData);
