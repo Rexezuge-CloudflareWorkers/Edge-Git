@@ -4,7 +4,12 @@ import {
   DEFAULT_BACKGROUND_TASK_RUN_RETENTION_DAYS,
   DEFAULT_DEBUG_MODE,
   DEFAULT_GIT_CACHE_TTL_SECONDS,
+  DEFAULT_MAX_FETCH_BODY_BYTES,
+  DEFAULT_MAX_FETCH_HAVES,
+  DEFAULT_MAX_FETCH_WANTS,
+  DEFAULT_MAX_PACK_BYTES,
   DEFAULT_MAX_PACK_OBJECTS,
+  DEFAULT_MAX_PUSH_COMMANDS,
   DEFAULT_MAX_REPOS_PER_USER,
   DEFAULT_MAX_TOKENS_PER_USER,
   DEFAULT_MAX_TOKEN_EXPIRY_DAYS,
@@ -58,6 +63,26 @@ class AppConfiguration {
 
   public getGitCacheTtlSeconds(): number {
     return EnvParser.positiveInt(this.env, 'GIT_CACHE_TTL_SECONDS', DEFAULT_GIT_CACHE_TTL_SECONDS);
+  }
+
+  public getMaxFetchWants(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_FETCH_WANTS', DEFAULT_MAX_FETCH_WANTS);
+  }
+
+  public getMaxFetchHaves(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_FETCH_HAVES', DEFAULT_MAX_FETCH_HAVES);
+  }
+
+  public getMaxPushCommands(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_PUSH_COMMANDS', DEFAULT_MAX_PUSH_COMMANDS);
+  }
+
+  public getMaxPackBytes(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_PACK_BYTES', DEFAULT_MAX_PACK_BYTES);
+  }
+
+  public getMaxFetchBodyBytes(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_FETCH_BODY_BYTES', DEFAULT_MAX_FETCH_BODY_BYTES);
   }
 
   public getTaskRunRetentionDays(): number {

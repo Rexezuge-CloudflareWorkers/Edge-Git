@@ -340,6 +340,77 @@ export function parseFetchRequest(_data: Uint8Array, args: string[]): FetchReque
   };
 }
 
+export interface FetchCountLimits {
+  maxWants: number;
+  maxHaves: number;
+}
+
+export interface ReceiveCountLimits {
+  maxCommands: number;
+  maxPackBytes: number;
+}
+
+const MAX_DEEPEN = 1_000_000;
+const MAX_DEEPEN_SINCE = 4_294_967_295;
+const DEEPEN_SINCE_FUTURE_SKEW_SECONDS = 86_400;
+
+export function validateFetchRequestCounts(
+  fetchRequest: Pick<FetchRequest, 'wants' | 'haves' | 'shallowOptions'>,
+  limits: FetchCountLimits,
+): string | null {
+  if (fetchRequest.wants.length > limits.maxWants) {
+    return `too many wants: ${fetchRequest.wants.length} > ${limits.maxWants}`;
+  }
+  if (fetchRequest.haves.length > limits.maxHaves) {
+    return `too many haves: ${fetchRequest.haves.length} > ${limits.maxHaves}`;
+  }
+  const shallowOptions = fetchRequest.shallowOptions;
+  if (shallowOptions) {
+    if ((shallowOptions.deepenNot?.length ?? 0) > limits.maxHaves) {
+      return `too many deepen-not: ${shallowOptions.deepenNot?.length} > ${limits.maxHaves}`;
+    }
+    const deepen = shallowOptions.deepen;
+    if (deepen !== undefined && (!Number.isSafeInteger(deepen) || deepen <= 0 || deepen > MAX_DEEPEN)) {
+      return `invalid deepen: ${String(deepen)}`;
+    }
+    const deepenSince = shallowOptions.deepenSince;
+    if (deepenSince !== undefined) {
+      if (!Number.isSafeInteger(deepenSince) || deepenSince < 0 || deepenSince > MAX_DEEPEN_SINCE) {
+        return `invalid deepen-since: ${String(deepenSince)}`;
+      }
+      const nowSeconds = Math.trunc(Date.now() / 1000);
+      if (deepenSince > nowSeconds + DEEPEN_SINCE_FUTURE_SKEW_SECONDS) {
+        return `invalid deepen-since: ${String(deepenSince)} is in the future`;
+      }
+    }
+  }
+  return null;
+}
+
+export function validateReceivePackCounts(
+  commandCount: number,
+  packfileLength: number,
+  limits: ReceiveCountLimits,
+): string | null {
+  if (commandCount > limits.maxCommands) {
+    return `too many ref updates: ${commandCount} > ${limits.maxCommands}`;
+  }
+  if (packfileLength > limits.maxPackBytes) {
+    return `pack too large: ${packfileLength} > ${limits.maxPackBytes} bytes`;
+  }
+  return null;
+}
+
+export function buildFetchErrorResponse(message: string, status = 400): Response {
+  return new Response(`ERR ${message}\n`, {
+    status,
+    headers: {
+      'Content-Type': 'application/x-git-upload-pack-result',
+      'Cache-Control': 'no-cache',
+    },
+  });
+}
+
 export function shouldSendPackfileForFetch(
   fetchRequest: Pick<FetchRequest, 'wants' | 'haves' | 'done' | 'waitForDone'>,
   commonCommits: string[],

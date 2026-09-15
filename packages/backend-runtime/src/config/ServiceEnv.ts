@@ -18,6 +18,11 @@ interface ServiceEnv {
   MAX_TOKEN_EXPIRY_DAYS?: string;
   MAX_PACK_OBJECTS?: string;
   GIT_CACHE_TTL_SECONDS?: string;
+  MAX_FETCH_WANTS?: string;
+  MAX_FETCH_HAVES?: string;
+  MAX_PUSH_COMMANDS?: string;
+  MAX_PACK_BYTES?: string;
+  MAX_FETCH_BODY_BYTES?: string;
   BACKGROUND_TASK_RUN_RETENTION_DAYS?: string;
   AUDIT_LOG_RETENTION_DAYS?: string;
   LOG_LEVEL?: string;

@@ -78,9 +78,17 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
       const repoName = RepoService.normalizeRepo(repoParam);
       const auth = await gitAuthForRepo(c as never, owner, repoName, 'git-upload-pack');
       if (auth instanceof Response) return auth;
+      const maxFetchBodyBytes = ConfigurationManager.repo.getMaxFetchBodyBytes(c.env);
+      const contentLength = Number(c.req.header('Content-Length'));
+      if (Number.isSafeInteger(contentLength) && contentLength > maxFetchBodyBytes) {
+        return c.text(`ERR fetch request too large: ${contentLength} > ${maxFetchBodyBytes} bytes`, 413);
+      }
       const fullName = `${owner}/${repoName}`;
       const stub = getRepoStub(c.env, fullName);
       const body = new Uint8Array(await c.req.arrayBuffer());
+      if (body.byteLength > maxFetchBodyBytes) {
+        return c.text(`ERR fetch request too large: ${body.byteLength} > ${maxFetchBodyBytes} bytes`, 413);
+      }
       const res = await stub.fetch(new Request('https://do/git-upload-pack', { method: 'POST', body: body as unknown as BodyInit }));
       return new Response(res.body, {
         status: res.status,
@@ -94,9 +102,17 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
       const repoName = RepoService.normalizeRepo(repoParam);
       const auth = await gitAuthForRepo(c as never, owner, repoName, 'git-receive-pack');
       if (auth instanceof Response) return auth;
+      const maxPackBytes = ConfigurationManager.repo.getMaxPackBytes(c.env);
+      const contentLength = Number(c.req.header('Content-Length'));
+      if (Number.isSafeInteger(contentLength) && contentLength > maxPackBytes) {
+        return c.text(`ERR pack too large: ${contentLength} > ${maxPackBytes} bytes`, 413);
+      }
       const fullName = `${owner}/${repoName}`;
       const stub = getRepoStub(c.env, fullName);
       const body = new Uint8Array(await c.req.arrayBuffer());
+      if (body.byteLength > maxPackBytes) {
+        return c.text(`ERR pack too large: ${body.byteLength} > ${maxPackBytes} bytes`, 413);
+      }
       const res = await stub.fetch(new Request('https://do/git-receive-pack', { method: 'POST', body: body as unknown as BodyInit }));
       return new Response(res.body, {
         status: res.status,

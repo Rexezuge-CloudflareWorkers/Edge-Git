@@ -20,6 +20,10 @@ pnpm exec wrangler deploy
 
 Clone: `git clone https://<host>/<owner>/<repo>`; authenticated: `git clone https://<owner>:<PAT>@<host>/<owner>/<repo>`.
 
+## Git limits
+
+DoS guards (all tunable via vars, shown with defaults): fetch `MAX_FETCH_WANTS=64` wants / `MAX_FETCH_HAVES=512` haves per request, `MAX_FETCH_BODY_BYTES=1048576` request body; pack `MAX_PACK_OBJECTS=10000` objects / `MAX_PACK_BYTES=52428800` bytes each way; push `MAX_PUSH_COMMANDS=100` ref updates. Over-limit fetches fail with `ERR …` (`400`/`413`); over-limit pushes fail closed (`413` at the edge, `unpack …` report-status from the DO). The isomorphic-git object cache is cleared after every push and expires after `GIT_CACHE_TTL_SECONDS=3600`.
+
 ## CD vars
 
 `WRANGLER_JSONC` (full file) or `WRANGLER_VARS_PATCH_JSON` e.g. `{"POLICY_AUD":"…","TEAM_DOMAIN":"https://….cloudflareaccess.com","SITE_URL":"https://git.example.com"}`.

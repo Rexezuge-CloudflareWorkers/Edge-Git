@@ -9,9 +9,12 @@ export {
   parseFetchRequest,
   buildLsRefsResponse,
   buildFetchResponse,
+  buildFetchErrorResponse,
   shouldSendPackfileForFetch,
+  validateFetchRequestCounts,
+  validateReceivePackCounts,
   getBasicCredentials,
   getBearerToken,
 } from './protocol';
-export type { AdvertiseRefs, Command, FetchRequest, FetchResponseOptions } from './protocol';
+export type { AdvertiseRefs, Command, FetchCountLimits, FetchRequest, FetchResponseOptions, ReceiveCountLimits } from './protocol';
 export type { RefUpdateResult } from './types';
