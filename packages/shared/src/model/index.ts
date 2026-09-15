@@ -1,0 +1,42 @@
+export interface RepositoryMetadata {
+  id: string;
+  ownerEmail: string;
+  owner: string;
+  name: string;
+  fullName: string;
+  description: string | null;
+  isPrivate: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface UserAccessTokenMetadata {
+  tokenId: string;
+  userEmail: string;
+  tokenHash: string;
+  name: string;
+  expiresAt: number;
+  lastUsedAt: number | null;
+  createdAt: number;
+}
+
+export interface IssueMetadata {
+  id: string;
+  repositoryId: string;
+  fullName: string;
+  number: number;
+  title: string;
+  body: string | null;
+  status: 'open' | 'closed';
+  creatorEmail: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface CommentMetadata {
+  id: string;
+  issueId: string | null;
+  authorEmail: string;
+  body: string;
+  createdAt: number;
+}
