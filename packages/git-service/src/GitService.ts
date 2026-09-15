@@ -191,6 +191,20 @@ export class GitService {
     }
   }
 
+  async peelTag(tagOid: string): Promise<string | null> {
+    try {
+      const tag = await git.readTag({
+        fs: this.fs,
+        gitdir: this.gitdir,
+        oid: tagOid,
+        cache: this.cache,
+      });
+      return tag.tag.object ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   async indexPack(filePath: string) {
     await git.indexPack({
       fs: this.fs,
@@ -201,96 +215,165 @@ export class GitService {
     });
   }
 
-  private async enqueueRelatedObjects(type: string, oid: string, queue: string[]): Promise<void> {
+  async collectObjectsForPack(
+    wants: string[],
+    haves: string[],
+    opts: { depth?: number; since?: number; exclude?: string[]; filter?: string } = {},
+  ): Promise<{ oids: string[]; shallow: string[] }> {
+    const objectsToSend = new Set<string>();
+    const visited = new Set<string>();
+    const haveSet = new Set(haves);
+    const excludeSet = opts.exclude ? new Set(opts.exclude) : new Set<string>();
+    const shallowBoundary = new Set<string>();
+    const maxDepth = opts.depth;
+    const since = opts.since;
+    const filter = opts.filter?.trim() ?? '';
+    const filterBlobs = filter === 'blob:none';
+    const blobLimitMatch = /^blob:limit=(\d+)$/.exec(filter);
+    const blobLimit = blobLimitMatch ? Math.trunc(Number(blobLimitMatch[1])) : undefined;
+
+    const shouldSkipBlob = (size: number): boolean => {
+      if (filterBlobs) return true;
+      if (blobLimit !== undefined && Number.isFinite(blobLimit)) return size > blobLimit;
+      return false;
+    };
+
+    // BFS queue with depth tracking for shallow/deepen support.
+    // Depth 0 = want tips; parents increment depth. Trees/blobs inherit commit depth.
+    const queue: Array<{ oid: string; depth: number }> = wants.map((oid) => ({ oid, depth: 0 }));
+
+    while (queue.length > 0) {
+      const item = queue.shift();
+      if (!item) continue;
+      const { oid, depth } = item;
+      if (!oid || visited.has(oid)) continue;
+
+      visited.add(oid);
+
+      // If the client already has this object (or it's explicitly excluded via
+      // deepen-not), don't include it or traverse further.
+      if (haveSet.has(oid) || excludeSet.has(oid)) continue;
+
+      let objType: string;
+      try {
+        const read = await git.readObject({
+          fs: this.fs,
+          gitdir: this.gitdir,
+          oid,
+          cache: this.cache,
+        });
+        objType = read.type;
+      } catch (error) {
+        logger.error(`(collect-objects) Failed to read object ${oid}: ${String(error)}`);
+        continue;
+      }
+
+      // Filter support: blob:none / blob:limit=N skip blob payloads.
+      if (objType === 'blob') {
+        try {
+          const obj = await git.readObject({
+            fs: this.fs,
+            gitdir: this.gitdir,
+            oid,
+            format: 'content',
+            cache: this.cache,
+          });
+          const content = obj.object;
+          const size = typeof content === 'string' ? content.length : (content as Uint8Array).length;
+          if (shouldSkipBlob(size)) continue;
+        } catch {
+          // If content read fails, fall through and include the oid.
+        }
+        objectsToSend.add(oid);
+        continue;
+      }
+
+      // tree:0 filter drops trees and blobs but keeps commits/tags.
+      if (filter === 'tree:0' && objType === 'tree') continue;
+
+      // Add this object to the set of objects to send
+      objectsToSend.add(oid);
+
+      try {
+        if (objType === 'commit') {
+          // deepen-since: stop descending into parents older than the cutoff.
+          if (since !== undefined) {
+            const commit = await git.readCommit({
+              fs: this.fs,
+              gitdir: this.gitdir,
+              oid,
+              cache: this.cache,
+            });
+            const timestamp = commit.commit.committer.timestamp ?? commit.commit.author.timestamp;
+            if (timestamp < since) {
+              shallowBoundary.add(oid);
+              continue;
+            }
+          }
+          // deepen: truncate parent traversal at maxDepth.
+          if (maxDepth !== undefined && depth >= maxDepth) {
+            shallowBoundary.add(oid);
+            // Still include this commit's tree (shallow boundary keeps its tree).
+            const commit = await git.readCommit({
+              fs: this.fs,
+              gitdir: this.gitdir,
+              oid,
+              cache: this.cache,
+            });
+            queue.push({ oid: commit.commit.tree, depth: depth + 1 });
+            continue;
+          }
+        }
+        await this.enqueueRelatedObjectsWithDepth(objType, oid, queue, depth);
+      } catch (error) {
+        logger.error(`(collect-objects) Failed to expand object ${oid}: ${String(error)}`);
+      }
+    }
+
+    return { oids: Array.from(objectsToSend), shallow: Array.from(shallowBoundary) };
+  }
+
+  private async enqueueRelatedObjectsWithDepth(type: string, oid: string, queue: Array<{ oid: string; depth: number }>, depth: number): Promise<void> {
     switch (type) {
       case 'commit': {
-        // Parse commit to get tree and parent OIDs
         const commit = await git.readCommit({
           fs: this.fs,
           gitdir: this.gitdir,
           oid,
           cache: this.cache,
         });
-
-        // Add tree to queue
-        queue.push(commit.commit.tree);
-
-        // Add parent commits to queue
+        queue.push({ oid: commit.commit.tree, depth: depth + 1 });
         for (const parent of commit.commit.parent) {
-          queue.push(parent);
+          queue.push({ oid: parent, depth: depth + 1 });
         }
         break;
       }
       case 'tree': {
-        // Parse tree to get all entries (blobs and subtrees)
         const tree = await git.readTree({
           fs: this.fs,
           gitdir: this.gitdir,
           oid,
           cache: this.cache,
         });
-
-        // Add all tree entries to queue
         for (const entry of tree.tree) {
-          queue.push(entry.oid);
+          queue.push({ oid: entry.oid, depth: depth + 1 });
         }
         break;
       }
       case 'tag': {
-        // Parse tag to get the object it points to
         const tag = await git.readTag({
           fs: this.fs,
           gitdir: this.gitdir,
           oid,
           cache: this.cache,
         });
-
-        queue.push(tag.tag.object);
+        queue.push({ oid: tag.tag.object, depth: depth + 1 });
         break;
       }
       default: {
-        // For blobs, we just add them to the set (no traversal needed)
         break;
       }
     }
-  }
-
-  async collectObjectsForPack(wants: string[], haves: string[]): Promise<string[]> {
-    const objectsToSend = new Set<string>();
-    const visited = new Set<string>();
-    const haveSet = new Set(haves);
-
-    // BFS queue to traverse the commit graph
-    const queue: string[] = [...wants];
-
-    while (queue.length > 0) {
-      const oid = queue.shift();
-      if (!oid || visited.has(oid)) continue;
-
-      visited.add(oid);
-
-      // If the client already has this object, don't include it or traverse further
-      if (haveSet.has(oid)) continue;
-
-      // Add this object to the set of objects to send
-      objectsToSend.add(oid);
-
-      try {
-        const { type } = await git.readObject({
-          fs: this.fs,
-          gitdir: this.gitdir,
-          oid,
-          cache: this.cache,
-        });
-
-        await this.enqueueRelatedObjects(type, oid, queue);
-      } catch (error) {
-        logger.error(`(collect-objects) Failed to read object ${oid}: ${String(error)}`);
-        // Continue processing other objects even if one fails
-      }
-    }
-
-    return Array.from(objectsToSend);
   }
 
   async packObjects(oids: string[]) {

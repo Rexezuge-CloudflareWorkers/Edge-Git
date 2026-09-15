@@ -9,6 +9,7 @@ export {
   parseFetchRequest,
   buildLsRefsResponse,
   buildFetchResponse,
+  shouldSendPackfileForFetch,
   getBasicCredentials,
   getBearerToken,
 } from './protocol';

@@ -14,7 +14,14 @@ describe('git protocol', () => {
     expect(req.wants).toEqual(['abc123']);
     expect(req.haves).toEqual(['def456']);
     expect(req.done).toBe(true);
+    expect(req.waitForDone).toBe(false);
     expect(req.capabilities.noProgress).toBe(true);
+  });
+
+  it('parses wait-for-done negotiation flag', () => {
+    const req = parseFetchRequest(new Uint8Array(), ['want abc123', 'have def456', 'wait-for-done']);
+    expect(req.done).toBe(false);
+    expect(req.waitForDone).toBe(true);
   });
 
   it('parses receive-pack commands and packfile split', () => {
@@ -27,10 +34,41 @@ describe('git protocol', () => {
     expect(new TextDecoder().decode(packfile)).toBe('PACKDATA');
   });
 
-  it('builds fetch NAK+ready response when not done', async () => {
+  it('builds fetch NAK+flush response when not done without packfile', async () => {
     const res = await buildFetchResponse({ commonCommits: [], packfileData: null, noProgress: true, done: false });
     expect(res.status).toBe(200);
     expect(res.headers.get('Content-Type')).toContain('git-upload-pack-result');
+    const text = await res.text();
+    expect(text).toContain('NAK');
+    expect(text).not.toContain('ready');
+    expect(text).not.toContain('packfile');
+  });
+
+  it('builds single-round ACK+ready+packfile when not done with common', async () => {
+    const pack = new Uint8Array([0x50, 0x41, 0x43, 0x4b, 0, 0, 0, 2, 0, 0, 0, 1]);
+    const res = await buildFetchResponse({
+      commonCommits: ['a'.repeat(40)],
+      packfileData: pack,
+      noProgress: true,
+      done: false,
+    });
+    const text = await res.text();
+    expect(text).toContain('ACK');
+    expect(text).toContain('ready');
+    expect(text).toContain('packfile');
+  });
+
+  it('omits acknowledgments when done with packfile', async () => {
+    const pack = new Uint8Array([0x50, 0x41, 0x43, 0x4b, 0, 0, 0, 2, 0, 0, 0, 1]);
+    const res = await buildFetchResponse({
+      commonCommits: ['a'.repeat(40)],
+      packfileData: pack,
+      noProgress: true,
+      done: true,
+    });
+    const text = await res.text();
+    expect(text).not.toContain('acknowledgments');
+    expect(text).toContain('packfile');
   });
 
   it('builds report-status ok', async () => {
