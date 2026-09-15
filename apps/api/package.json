@@ -1,0 +1,26 @@
+{
+  "name": "@edge-git/api",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@edge-git/backend-data": "workspace:*",
+    "@edge-git/backend-errors": "workspace:*",
+    "@edge-git/backend-runtime": "workspace:*",
+    "@edge-git/backend-services": "workspace:*",
+    "@edge-git/background": "workspace:*",
+    "@edge-git/git-protocol": "workspace:*",
+    "@edge-git/git-service": "workspace:*",
+    "@edge-git/shared": "workspace:*",
+    "chanfana": "3.4.0",
+    "hono": "4.13.7",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "26.4.1",
+    "typescript": "6.0.3"
+  }
+}
