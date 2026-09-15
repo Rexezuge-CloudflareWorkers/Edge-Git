@@ -171,25 +171,43 @@ export class IsoGitFs {
   }
 
   /**
+   * Annotates an error and returns it as a rejected promise, preserving the
+   * `fs.promises` rejection contract for the synchronous `dofs` backend.
+   * @param error - The original error.
+   * @param syscall - The name of the system call that failed.
+   * @param path - The path involved in the system call.
+   * @returns A rejected promise with the annotated error.
+   */
+  private annotateAndReject(error: unknown, syscall: string, path: string): Promise<never> {
+    try {
+      this.annotateAndThrow(error, syscall, path);
+    } catch (annotated) {
+      return Promise.reject(annotated instanceof Error ? annotated : new Error(String(annotated)));
+    }
+    // Unreachable: annotateAndThrow always throws, but keep TS control-flow happy.
+    throw error;
+  }
+
+  /**
    * Reads the content of a file.
    * @param path - The path to the file.
    * @param options - Encoding options.
    * @returns The content of the file as a Buffer or string.
    */
-  async readFile(path: string, options?: TextEncoding | { encoding?: TextEncoding }) {
+  readFile(path: string, options?: TextEncoding | { encoding?: TextEncoding }): Promise<Uint8Array | string> {
     const encoding = typeof options === 'string' ? options : options?.encoding;
     const normalizedPath = normalizePath(path);
     try {
       const data: unknown = this.dofs.read(normalizedPath, { encoding });
       if (typeof data === 'string') {
-        if (!encoding || encoding === 'buffer') return new TextEncoder().encode(data);
-        return data;
+        if (!encoding || encoding === 'buffer') return Promise.resolve(new TextEncoder().encode(data));
+        return Promise.resolve(data);
       }
       const bytes = data instanceof Uint8Array ? data : new Uint8Array(data as ArrayBuffer);
-      if (!encoding || encoding === 'buffer') return bytes;
-      return new TextDecoder('utf-8').decode(bytes);
+      if (!encoding || encoding === 'buffer') return Promise.resolve(bytes);
+      return Promise.resolve(new TextDecoder('utf-8').decode(bytes));
     } catch (error) {
-      this.annotateAndThrow(error, 'readFile', normalizedPath);
+      return this.annotateAndReject(error, 'readFile', normalizedPath);
     }
   }
 
@@ -222,12 +240,13 @@ export class IsoGitFs {
    * Deletes a file.
    * @param path - The path to the file to delete.
    */
-  async unlink(path: string) {
+  unlink(path: string): Promise<void> {
     const normalizedPath = normalizePath(path);
     try {
       this.dofs.unlink(normalizedPath);
+      return Promise.resolve();
     } catch (error) {
-      this.annotateAndThrow(error, 'unlink', normalizedPath);
+      return this.annotateAndReject(error, 'unlink', normalizedPath);
     }
   }
 
@@ -236,14 +255,13 @@ export class IsoGitFs {
    * @param path - The path to the directory.
    * @returns An array of the names of the files in the directory (excluding '.' and '..').
    */
-  async readdir(path: string) {
+  readdir(path: string): Promise<string[]> {
     const normalizedPath = normalizePath(path);
     try {
       const names = this.dofs.listDir(normalizedPath, {});
-      return names.filter((n) => n !== '.' && n !== '..');
+      return Promise.resolve(names.filter((n) => n !== '.' && n !== '..'));
     } catch (error) {
-      this.annotateAndThrow(error, 'readdir', normalizedPath);
-      return []; // to satisfy TS
+      return this.annotateAndReject(error, 'readdir', normalizedPath);
     }
   }
 
@@ -252,12 +270,13 @@ export class IsoGitFs {
    * @param path - The path to the directory to create.
    * @param options - Options for creating the directory, including `recursive` and `mode`.
    */
-  async mkdir(path: string, options?: { recursive?: boolean; mode?: number }) {
+  mkdir(path: string, options?: { recursive?: boolean; mode?: number }): Promise<void> {
     const normalizedPath = normalizePath(path);
     try {
       this.dofs.mkdir(normalizedPath, { recursive: true, ...options });
+      return Promise.resolve();
     } catch (error) {
-      this.annotateAndThrow(error, 'mkdir', normalizedPath);
+      return this.annotateAndReject(error, 'mkdir', normalizedPath);
     }
   }
 
@@ -266,12 +285,13 @@ export class IsoGitFs {
    * @param path - The path to the directory to remove.
    * @param options - Options for removing the directory, including `recursive`.
    */
-  async rmdir(path: string, options?: { recursive?: boolean }) {
+  rmdir(path: string, options?: { recursive?: boolean }): Promise<void> {
     const normalizedPath = normalizePath(path);
     try {
       this.dofs.rmdir(normalizedPath, { recursive: true, ...options });
+      return Promise.resolve();
     } catch (error) {
-      this.annotateAndThrow(error, 'rmdir', normalizedPath);
+      return this.annotateAndReject(error, 'rmdir', normalizedPath);
     }
   }
 
@@ -281,7 +301,7 @@ export class IsoGitFs {
    * @param detectSymlink - Whether to detect if the path is a symlink.
    * @returns A Node.js-like `Stats` object.
    */
-  async statCore(path: string, detectSymlink: boolean) {
+  statCore(path: string, detectSymlink: boolean): Promise<StatsLike> {
     let isSymlink = false;
     const normalizedPath = normalizePath(path);
     if (detectSymlink) {
@@ -292,7 +312,7 @@ export class IsoGitFs {
         if (error instanceof Error && error.message === 'ENOENT') {
           isSymlink = false;
         } else {
-          this.annotateAndThrow(error, 'lstat', normalizedPath);
+          return this.annotateAndReject(error, 'lstat', normalizedPath);
         }
       }
     }
@@ -332,9 +352,9 @@ export class IsoGitFs {
         birthtime,
       };
 
-      return nodeStat;
+      return Promise.resolve(nodeStat);
     } catch (error) {
-      this.annotateAndThrow(error, detectSymlink ? 'lstat' : 'stat', normalizedPath);
+      return this.annotateAndReject(error, detectSymlink ? 'lstat' : 'stat', normalizedPath);
     }
   }
 
@@ -343,7 +363,7 @@ export class IsoGitFs {
    * @param path - The path to the file or directory.
    * @returns A Node.js-like `Stats` object.
    */
-  async stat(path: string) {
+  stat(path: string): Promise<StatsLike> {
     return this.statCore(path, false);
   }
 
@@ -352,7 +372,7 @@ export class IsoGitFs {
    * @param path - The path to the file or directory.
    * @returns A Node.js-like `Stats` object.
    */
-  async lstat(path: string) {
+  lstat(path: string): Promise<StatsLike> {
     return this.statCore(path, true);
   }
 
@@ -361,11 +381,11 @@ export class IsoGitFs {
    * @param path - The path to the symbolic link.
    * @returns The path to which the symbolic link points.
    */
-  async readlink(path: string) {
+  readlink(path: string): Promise<string> {
     try {
-      return this.dofs.readlink(path);
+      return Promise.resolve(this.dofs.readlink(path));
     } catch (error) {
-      this.annotateAndThrow(error, 'readlink', path);
+      return this.annotateAndReject(error, 'readlink', path);
     }
   }
 
@@ -374,11 +394,12 @@ export class IsoGitFs {
    * @param target - The target path of the link.
    * @param path - The path where the symbolic link will be created.
    */
-  async symlink(target: string, path: string) {
+  symlink(target: string, path: string): Promise<void> {
     try {
-      return this.dofs.symlink(target, path);
+      this.dofs.symlink(target, path);
+      return Promise.resolve();
     } catch (error) {
-      this.annotateAndThrow(error, 'symlink', path);
+      return this.annotateAndReject(error, 'symlink', path);
     }
   }
 }
