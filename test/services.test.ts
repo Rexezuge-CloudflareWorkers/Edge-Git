@@ -104,6 +104,30 @@ function createFakeDb(seed: { now?: number } = {}): D1Queryable & {
           if (!state.users.some((u) => u.email === email)) state.users.push({ email, created_at });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
+        if (q.startsWith('UPDATE repositories SET')) {
+          const id = params[params.length - 1] as string;
+          const row = state.repos.find((r) => r.id === id);
+          if (row) {
+            let idx = 1;
+            row.updated_at = params[0];
+            if (q.includes('description = ?')) row.description = params[idx++] as string | null;
+            if (q.includes('is_private = ?')) row.is_private = params[idx++] as number;
+          }
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('DELETE FROM comments WHERE issue_id IN')) {
+          return Promise.resolve({ success: true, meta: { changes: 0 } });
+        }
+        if (q.startsWith('DELETE FROM issues WHERE repository_id = ?')) {
+          const kept = state.issues.filter((i) => i.repository_id !== params[0]);
+          state.issues.splice(0, state.issues.length, ...kept);
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('DELETE FROM repositories WHERE id = ?')) {
+          const kept = state.repos.filter((r) => r.id !== params[0]);
+          state.repos.splice(0, state.repos.length, ...kept);
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
         return Promise.resolve({ success: true, meta: { changes: 0 } });
       },
     };
@@ -138,6 +162,27 @@ describe('RepoService', () => {
     await expect(svc.createRepo('alice@example.com', 'bad owner!', 'x', null, false)).rejects.toThrow('Invalid');
     await expect(svc.requireOwner('alice', 'missing', 'alice@example.com')).rejects.toThrow('not found');
     await expect(svc.requireOwner('alice', 'one', 'mallory@example.com')).rejects.toThrow('owner');
+  });
+
+  it('updates description/visibility as owner only and deletes with issues', async () => {
+    const db = createFakeDb();
+    const svc = new RepoService({ DB: db });
+    await svc.createRepo('alice@example.com', 'alice', 'demo', 'old', false);
+    const issueSvc = new IssueService({ DB: db });
+    await issueSvc.createIssue({ repositoryId: db.repos[0].id as string, fullName: 'alice/demo', title: 'T', creatorEmail: 'a@x.co' });
+
+    const updated = await svc.updateRepo('alice', 'demo', 'alice@example.com', { description: 'new', isPrivate: true });
+    expect(updated.description).toBe('new');
+    expect(updated.is_private).toBe(1);
+
+    await expect(svc.updateRepo('alice', 'demo', 'mallory@example.com', { description: 'x' })).rejects.toThrow('owner');
+    await expect(svc.updateRepo('alice', 'demo', 'alice@example.com', { description: 'x'.repeat(501) })).rejects.toThrow('500');
+    await expect(svc.updateRepo('alice', 'missing', 'alice@example.com', { description: 'x' })).rejects.toThrow('not found');
+
+    await expect(svc.deleteRepo('alice', 'demo', 'mallory@example.com')).rejects.toThrow('owner');
+    await svc.deleteRepo('alice', 'demo', 'alice@example.com');
+    expect(db.repos).toHaveLength(0);
+    expect(db.issues).toHaveLength(0);
   });
 });
 

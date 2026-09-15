@@ -124,6 +124,16 @@ function createDaoFakeDb(): D1Queryable & {
           state.comments.push({ id, issue_id, author_email, body, created_at });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
+        if (q.startsWith('DELETE FROM comments WHERE issue_id IN')) {
+          const repoId = params[0] as string;
+          const issueIds = new Set(state.issues.filter((i) => i.repository_id === repoId).map((i) => i.id));
+          state.comments = state.comments.filter((c) => !issueIds.has(c.issue_id));
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('DELETE FROM issues WHERE repository_id = ?')) {
+          state.issues = state.issues.filter((i) => i.repository_id !== params[0]);
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
         if (q.startsWith('INSERT INTO users')) {
           const [email, created_at] = params as Array<string | number>;
           if (!state.users.some((u) => u.email === email)) state.users.push({ email, created_at });
@@ -183,6 +193,9 @@ describe('IssueDAO', () => {
     await expect(dao.getByNumber('r1', 1)).resolves.toMatchObject({ status: 'closed' });
     await dao.addComment('c1', 'i1', 'a@x.co', 'fixing', 210);
     await expect(dao.listComments('i1')).resolves.toHaveLength(1);
+    await dao.deleteByRepo('r1');
+    await expect(dao.listByRepo('r1')).resolves.toHaveLength(0);
+    await expect(dao.listComments('i1')).resolves.toHaveLength(0);
   });
 });
 

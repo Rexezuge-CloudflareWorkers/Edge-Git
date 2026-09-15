@@ -107,6 +107,10 @@ class RepoWorker extends DurableObject<Env> {
     await this.git.initRepo();
   }
 
+  public async deleteRepo(): Promise<void> {
+    await this.ctx.storage.deleteAll();
+  }
+
   public async ensureRepoInitialized(): Promise<void> {
     try {
       await this.isoGitFs.promises.stat('/repo/HEAD');

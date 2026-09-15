@@ -39,6 +39,16 @@ export function Header({ userEmail }: { userEmail: string | null }) {
                 <Plus className="h-3.5 w-3.5" />
                 New
               </button>
+              <button
+                type="button"
+                onClick={() => navigate('/settings')}
+                className={cn(
+                  'px-3.5 py-1.5 rounded-md text-sm transition-colors duration-150',
+                  'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]',
+                )}
+              >
+                Settings
+              </button>
             </nav>
           )}
         </div>

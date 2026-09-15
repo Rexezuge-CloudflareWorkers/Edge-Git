@@ -1,5 +1,5 @@
 import type { BlobResponse, BranchesResponse, GitCommit, Repo, TreeEntry } from '../types';
-import { apiGet, apiPost } from '../lib/api';
+import { apiDelete, apiGet, apiPatch, apiPost } from '../lib/api';
 
 function authedBase(owner: string, repo: string): string {
   return `/user/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
@@ -21,6 +21,14 @@ export async function createRepo(input: { owner?: string; name: string; descript
 // Authenticated repo fetch (works for own + visible repos when logged in).
 export async function loadRepoAuthed(owner: string, repo: string): Promise<Repo> {
   return apiGet<Repo>(authedBase(owner, repo));
+}
+
+export async function updateRepo(owner: string, repo: string, patch: { description?: string | null; isPrivate?: boolean }): Promise<Repo> {
+  return apiPatch<Repo>(authedBase(owner, repo), patch);
+}
+
+export async function deleteRepo(owner: string, repo: string): Promise<{ ok: boolean }> {
+  return apiDelete<{ ok: boolean }>(authedBase(owner, repo));
 }
 
 // Public repo fetch (anonymous OK for public repos; 404 otherwise).

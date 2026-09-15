@@ -1,4 +1,4 @@
-import { RepositoryDAO } from '@edge-git/backend-data/dao';
+import { IssueDAO, RepositoryDAO } from '@edge-git/backend-data/dao';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError, ForbiddenError, NotFoundError } from '@edge-git/backend-errors';
@@ -78,6 +78,35 @@ class RepoService {
       throw new ForbiddenError('Only the repository owner can perform this action');
     }
     return repo;
+  }
+
+  public async updateRepo(
+    owner: string,
+    name: string,
+    userEmail: string,
+    patch: { description?: string | null; isPrivate?: boolean },
+  ): Promise<RepositoryRow> {
+    const repo = await this.requireOwner(owner, name, userEmail);
+    if (typeof patch.description === 'string' && patch.description.length > 500) {
+      throw new BadRequestError('Description must be 500 characters or fewer');
+    }
+    if (patch.isPrivate !== undefined && typeof patch.isPrivate !== 'boolean') {
+      throw new BadRequestError('isPrivate must be a boolean');
+    }
+    const dao = new RepositoryDAO(this.env.DB);
+    await dao.update(repo.id, { description: patch.description, isPrivate: patch.isPrivate, now: TimestampUtil.getCurrentUnixTimestampInSeconds() });
+    const updated = await dao.getById(repo.id);
+    if (!updated) {
+      throw new NotFoundError('Repository not found');
+    }
+    return updated;
+  }
+
+  public async deleteRepo(owner: string, name: string, userEmail: string): Promise<{ id: string }> {
+    const repo = await this.requireOwner(owner, name, userEmail);
+    await new IssueDAO(this.env.DB).deleteByRepo(repo.id);
+    await new RepositoryDAO(this.env.DB).deleteById(repo.id);
+    return { id: repo.id };
   }
 }
 

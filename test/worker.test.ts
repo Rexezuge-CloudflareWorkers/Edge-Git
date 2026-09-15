@@ -20,6 +20,9 @@ function createApiFakeDb() {
         if (q.includes('FROM repositories WHERE owner = ? AND name = ?')) {
           return Promise.resolve((state.repos.find((r) => r.owner === params[0] && r.name === params[1]) ?? null) as T | null);
         }
+        if (q.includes('FROM repositories WHERE id = ?')) {
+          return Promise.resolve((state.repos.find((r) => r.id === params[0]) ?? null) as T | null);
+        }
         if (q.includes('FROM user_access_tokens WHERE token_hash = ?')) {
           return Promise.resolve(
             (state.tokens.find((t) => t.token_hash === params[0] && (t.expires_at as number) > (params[1] as number)) ?? null) as T | null,
@@ -88,6 +91,34 @@ function createApiFakeDb() {
           if (!state.users.some((u) => u.email === email)) state.users.push({ email, created_at });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
+        if (q.startsWith('UPDATE repositories SET')) {
+          const id = params[params.length - 1] as string;
+          const row = state.repos.find((r) => r.id === id);
+          if (row) {
+            let idx = 1;
+            row.updated_at = params[0];
+            if (q.includes('description = ?')) row.description = params[idx++] as string | null;
+            if (q.includes('is_private = ?')) row.is_private = params[idx++] as number;
+          }
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('DELETE FROM comments WHERE issue_id IN')) {
+          const repoId = params[0] as string;
+          const issueIds = new Set(state.issues.filter((i) => i.repository_id === repoId).map((i) => i.id));
+          const keptComments = state.comments.filter((cm) => !issueIds.has(cm.issue_id));
+          state.comments.splice(0, state.comments.length, ...keptComments);
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('DELETE FROM issues WHERE repository_id = ?')) {
+          const keptIssues = state.issues.filter((i) => i.repository_id !== params[0]);
+          state.issues.splice(0, state.issues.length, ...keptIssues);
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('DELETE FROM repositories WHERE id = ?')) {
+          const keptRepos = state.repos.filter((r) => r.id !== params[0]);
+          state.repos.splice(0, state.repos.length, ...keptRepos);
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
         return Promise.resolve({ success: true, meta: { changes: 1 } });
       },
     };
@@ -101,6 +132,7 @@ function createStub() {
   return {
     setFullName: () => Promise.resolve(),
     ensureRepoInitialized: () => Promise.resolve(),
+    deleteRepo: () => Promise.resolve(),
     listRefs: () => Promise.resolve({ refs: [{ ref: 'refs/heads/main', oid: 'a'.repeat(40) }], symbolicHead: 'refs/heads/main' }),
     getBranches: () => Promise.resolve({ branches: ['main'], currentBranch: 'main' }),
     getTree: () => Promise.resolve([]),
@@ -195,10 +227,60 @@ describe('EdgeGitWorker HTTP surface', () => {
     expect(pack.status).toBe(200);
   });
 
-  it('serves the SPA catch-all under /user/', async () => {
+  it('updates and deletes repos as owner only, purging issues', async () => {
+    const worker = new EdgeGitWorker() as unknown as { onRequest(r: Request, e: unknown, c: unknown): Promise<Response> };
+    const db = createApiFakeDb();
+    const env = createEnv(db);
+    const bobEnv = { ...env, DEV_AUTH_EMAIL: 'bob@example.com' };
+    const json = { 'Content-Type': 'application/json' };
+    const call = (path: string, init?: RequestInit): Promise<Response> => worker.onRequest(new Request(`https://git.example.com${path}`, init), env, ctx);
+    const callAsBob = (path: string, init?: RequestInit): Promise<Response> =>
+      worker.onRequest(new Request(`https://git.example.com${path}`, init), bobEnv, ctx);
+
+    expect((await call('/user/repos', { method: 'POST', headers: json, body: JSON.stringify({ name: 'mine' }) })).status).toBe(201);
+
+    const patched = await call('/user/repos/alice/mine', {
+      method: 'PATCH',
+      headers: json,
+      body: JSON.stringify({ description: 'Hello', isPrivate: true }),
+    });
+    expect(patched.status).toBe(200);
+    await expect(patched.json()).resolves.toMatchObject({ description: 'Hello', isPrivate: true, viewerCanManage: true });
+
+    expect((await call('/user/repos/alice/mine', { method: 'PATCH', headers: json, body: JSON.stringify({}) })).status).toBe(400);
+    expect(
+      (await call('/user/repos/alice/mine', { method: 'PATCH', headers: json, body: JSON.stringify({ description: 'x'.repeat(501) }) })).status,
+    ).toBe(400);
+    expect((await call('/user/repos/alice/missing', { method: 'PATCH', headers: json, body: JSON.stringify({ description: 'y' }) })).status).toBe(
+      404,
+    );
+
+    expect((await callAsBob('/user/repos/alice/mine', { method: 'PATCH', headers: json, body: JSON.stringify({ description: 'hijack' }) })).status).toBe(
+      403,
+    );
+    expect((await call('/user/repos', { method: 'POST', headers: json, body: JSON.stringify({ name: 'ours' }) })).status).toBe(201);
+    await expect(callAsBob('/user/repos/alice/ours').then((r) => r.json())).resolves.toMatchObject({ viewerCanManage: false });
+    expect((await callAsBob('/user/repos/alice/mine', { method: 'DELETE' })).status).toBe(403);
+
+    expect(
+      (await call('/user/repos/alice/mine/issues', { method: 'POST', headers: json, body: JSON.stringify({ title: 'Gone' }) })).status,
+    ).toBe(201);
+
+    const deleted = await call('/user/repos/alice/mine', { method: 'DELETE' });
+    expect(deleted.status).toBe(200);
+    expect((await call('/user/repos/alice/mine')).status).toBe(404);
+    expect(db.issues).toHaveLength(0);
+    expect((await call('/user/repos/alice/mine', { method: 'DELETE' })).status).toBe(404);
+  });
+
+  it('serves the SPA shell for /settings and /new', async () => {
     const worker = new EdgeGitWorker() as unknown as { onRequest(r: Request, e: unknown, c: unknown): Promise<Response> };
     const env = createEnv(createApiFakeDb());
-    expect((await worker.onRequest(new Request('https://git.example.com/user/unknown-route'), env, ctx)).status).toBe(200);
+    for (const path of ['/settings', '/new', '/user/unknown-route']) {
+      const res = await worker.onRequest(new Request(`https://git.example.com${path}`), env, ctx);
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toContain('text/html');
+    }
   });
 
   it('serves public repo reads anonymously and gates private repos', async () => {
