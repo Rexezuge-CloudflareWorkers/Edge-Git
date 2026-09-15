@@ -1,0 +1,117 @@
+import { useEffect, useState } from 'react';
+import { CircleDot } from 'lucide-react';
+import type { Issue } from '../../types';
+import { createIssue, listIssues } from '../../services/issueService';
+import { formatTimestamp } from '../../lib/format';
+import { Button } from '../ui/Button';
+import { Card, CardHeader, CardTitle } from '../ui/Card';
+import { Input, Textarea } from '../ui/Input';
+import { IssueStatusBadge } from '../ui/Badge';
+import { RefreshButton } from '../shared/RefreshButton';
+
+export function IssuesTab({
+  owner,
+  repo,
+  canWrite,
+  showNotice,
+  onCountChange,
+}: {
+  owner: string;
+  repo: string;
+  canWrite: boolean;
+  showNotice: (type: 'success' | 'error', text: string) => void;
+  onCountChange?: (count: number) => void;
+}) {
+  const [issues, setIssues] = useState<Issue[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const list = await listIssues(owner, repo);
+        setIssues(list);
+        onCountChange?.(list.length);
+      } catch (error) {
+        showNotice('error', error instanceof Error ? error.message : 'Failed To Load Issues.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    void run();
+  }, [owner, repo, showNotice, onCountChange, reloadKey]);
+
+  const refresh = () => {
+    setLoading(true);
+    setReloadKey((k) => k + 1);
+  };
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await createIssue(owner, repo, { title: title.trim(), body: body.trim() || undefined });
+      setTitle('');
+      setBody('');
+      showNotice('success', 'Issue Created.');
+      setLoading(true);
+      setReloadKey((k) => k + 1);
+    } catch (error) {
+      showNotice('error', error instanceof Error ? error.message : 'Failed To Create Issue.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {canWrite && (
+        <Card>
+          <CardHeader>
+            <CardTitle>New Issue</CardTitle>
+          </CardHeader>
+          <form onSubmit={submit} className="space-y-3">
+            <Input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} required />
+            <Textarea placeholder="Description (optional)" value={body} onChange={(e) => setBody(e.target.value)} rows={3} />
+            <Button type="submit" variant="primary" size="sm" loading={saving}>
+              Create Issue
+            </Button>
+          </form>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Issues</CardTitle>
+          <RefreshButton onRefresh={refresh} loading={loading} />
+        </CardHeader>
+        {!loading && issues.length === 0 ? (
+          <div className="text-center text-[var(--color-text-muted)] py-10 text-sm">
+            <CircleDot className="h-6 w-6 mx-auto mb-3" />
+            No Issues Yet.
+          </div>
+        ) : (
+          <ul className="divide-y divide-[var(--color-border)]">
+            {issues.map((i) => (
+              <li key={i.id} className="py-3 first:pt-0 last:pb-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <IssueStatusBadge status={i.status} />
+                  <span className="font-medium text-[var(--color-text-primary)]">{i.title}</span>
+                  <span className="text-xs text-[var(--color-text-muted)]">#{i.number}</span>
+                </div>
+                {i.body && <p className="mt-1 text-sm text-[var(--color-text-secondary)] whitespace-pre-wrap">{i.body}</p>}
+                <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                  Opened by {i.creator_email} · {formatTimestamp(i.created_at)}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+    </div>
+  );
+}

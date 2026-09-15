@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 
@@ -9,6 +10,7 @@ const apiSpaShellPath = path.resolve(apiGeneratedDir, 'spa-shell.ts');
 export default defineConfig({
   plugins: [
     react(),
+    tailwindcss(),
     {
       name: 'spa-shell-embed',
       closeBundle() {
@@ -29,6 +31,10 @@ export default defineConfig({
   server: {
     proxy: {
       '/user': {
+        target: 'http://localhost:8787',
+        changeOrigin: true,
+      },
+      '/repos': {
         target: 'http://localhost:8787',
         changeOrigin: true,
       },

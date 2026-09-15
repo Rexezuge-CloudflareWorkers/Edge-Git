@@ -3,12 +3,14 @@ import { fromHono } from 'chanfana';
 import type { HonoOpenAPIRouterType } from 'chanfana';
 import { Hono } from 'hono';
 import { MiddlewareHandlers, gitAuthForRepo } from '@/middleware';
+import type { RequestContext } from '@/middleware';
 import { getRepoStub, ensureRepo } from './repoStub';
-import { advertiseUploadPack, advertiseReceivePack } from '@edge-git/git-protocol';
+import { advertiseUploadPack, advertiseReceivePack, getBasicCredentials, getBearerToken } from '@edge-git/git-protocol';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { RepoServiceFactory } from '@edge-git/backend-services/repo';
 import { IssueServiceFactory } from '@edge-git/backend-services/issue';
-import { TokenServiceFactory } from '@edge-git/backend-services/auth';
+import { AccessAuthServiceFactory, TokenServiceFactory } from '@edge-git/backend-services/auth';
+import type { AccessIdentityContext } from '@edge-git/backend-services/auth';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { SPA_HTML } from '@/generated/spa-shell';
@@ -31,11 +33,49 @@ function toRepoJson(r: RepositoryRow): unknown {
   };
 }
 
-async function requireVisibleRepo(env: Env, owner: string, repoName: string, viewerEmail: string): Promise<RepositoryRow | null> {
+async function requireVisibleRepo(env: Env, owner: string, repoName: string, viewerEmail: string | null): Promise<RepositoryRow | null> {
   const row = await RepoServiceFactory.create({ DB: env.DB }).getByOwnerAndName(owner, repoName);
   if (!row) return null;
   if (row.is_private === 1 && row.owner_email !== viewerEmail) return null;
   return row;
+}
+
+/**
+ * Best-effort viewer identity for public HTML/API routes. Returns the Access
+ * email when the request carries one (or DEV/DEMO mode is on), else the PAT
+ * owner when a valid token is presented, else null for anonymous visitors.
+ * Never throws — anonymous is a valid outcome here.
+ */
+async function resolvePublicViewer(c: RequestContext): Promise<string | null> {
+  try {
+    const email = await AccessAuthServiceFactory.create(c.env).getAuthenticatedUserEmail(
+      c.req.raw,
+      c.executionCtx as unknown as AccessIdentityContext,
+    );
+    if (email) return email;
+  } catch {
+    // Anonymous — fall through to PAT.
+  }
+  const creds = getBasicCredentials(c.req.raw);
+  const bearer = getBearerToken(c.req.raw);
+  const pat = creds?.password || bearer || null;
+  if (!pat) return null;
+  try {
+    return await TokenServiceFactory.create({ DB: c.env.DB }).authenticateWithPAT(pat);
+  } catch {
+    return null;
+  }
+}
+
+async function withPublicRepo(c: RequestContext, fn: (row: RepositoryRow, fullName: string) => Promise<Response>): Promise<Response> {
+  const owner = c.req.param('owner');
+  const repoParam = c.req.param('repo');
+  if (!owner || !repoParam) return c.json({ error: 'Not found' }, 404);
+  const repoName = RepoService.normalizeRepo(repoParam);
+  const viewerEmail = await resolvePublicViewer(c);
+  const row = await requireVisibleRepo(c.env, owner, repoName, viewerEmail);
+  if (!row) return c.json({ error: 'Not found' }, 404);
+  return fn(row, `${owner}/${repoName}`);
 }
 
 class EdgeGitWorker extends AbstractEntrypointWorker {
@@ -49,7 +89,14 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
       Variables: { AuthenticatedUserEmailAddress: string };
     }>();
 
-    app.get('/', (c) => c.redirect('/user/'));
+    // User home (public shell; data is gated per-endpoint). /user stays the
+    // Cloudflare Access entry point and redirects into the authenticated app.
+    app.get('/', (c) => {
+      if (!ConfigurationManager.spa.isServeFromWorker(c.env)) {
+        return c.notFound();
+      }
+      return c.html(SPA_HTML);
+    });
     app.get('/user', (c) => c.redirect('/user/' + new URL(c.req.url).search));
     app.get('/health', (c) => c.json({ ok: true, service: 'edge-git' }));
 
@@ -117,6 +164,61 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
       return new Response(res.body, {
         status: res.status,
         headers: { 'Content-Type': 'application/x-git-receive-pack-result', 'Cache-Control': 'no-cache' },
+      });
+    });
+
+    // Public read-model API — anonymous OK for public repos (private → 404
+    // unless the caller presents Access identity or a PAT for the owner).
+    // Mutations stay behind /user/* Access auth below.
+    app.get('/repos/:owner/:repo', async (c) => {
+      return withPublicRepo(c as never, (row) => Promise.resolve(c.json(toRepoJson(row))));
+    });
+
+    app.get('/repos/:owner/:repo/branches', async (c) => {
+      return withPublicRepo(c as never, async (_row, fullName) => c.json(await getRepoStub(c.env, fullName).getBranches()));
+    });
+
+    app.get('/repos/:owner/:repo/tree', async (c) => {
+      return withPublicRepo(c as never, async (_row, fullName) => {
+        const url = new URL(c.req.url);
+        return c.json(
+          await getRepoStub(c.env, fullName).getTree({
+            ref: url.searchParams.get('ref') ?? undefined,
+            path: url.searchParams.get('path') ?? undefined,
+          }),
+        );
+      });
+    });
+
+    app.get('/repos/:owner/:repo/blob', async (c) => {
+      return withPublicRepo(c as never, async (_row, fullName) => {
+        const url = new URL(c.req.url);
+        return c.json(
+          await getRepoStub(c.env, fullName).getBlob({
+            ref: url.searchParams.get('ref') ?? undefined,
+            filepath: url.searchParams.get('path') ?? '',
+          }),
+        );
+      });
+    });
+
+    app.get('/repos/:owner/:repo/commits', async (c) => {
+      return withPublicRepo(c as never, async (_row, fullName) => {
+        const url = new URL(c.req.url);
+        const depth = url.searchParams.get('depth');
+        return c.json(
+          await getRepoStub(c.env, fullName).getCommits({
+            ref: url.searchParams.get('ref') ?? undefined,
+            depth: depth ? Number(depth) : undefined,
+          }),
+        );
+      });
+    });
+
+    app.get('/repos/:owner/:repo/issues', async (c) => {
+      return withPublicRepo(c as never, async (row) => {
+        const issues = await IssueServiceFactory.create({ DB: c.env.DB }).listByRepo(row.id, 50);
+        return c.json({ issues });
       });
     });
 
@@ -276,16 +378,21 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
       return c.json(created, 201);
     });
 
-    // SPA catch-all
+    // SPA catch-all — public shell for user home (/), repo home
+    // (/:owner/:repo, GitHub-style), and the legacy authenticated /user/* app.
+    // Git Smart HTTP paths never reach here: they match exact routes above.
     app.get('*', (c) => {
       if (!ConfigurationManager.spa.isServeFromWorker(c.env)) {
         return c.notFound();
       }
       const path: string = new URL(c.req.url).pathname;
-      if (!path.startsWith('/user/')) {
-        return c.notFound();
+      if (path === '/' || path.startsWith('/user/')) {
+        return c.html(SPA_HTML);
       }
-      return c.html(SPA_HTML);
+      if (/^\/[^/]+\/[^/]+\/?$/.test(path)) {
+        return c.html(SPA_HTML);
+      }
+      return c.notFound();
     });
 
     this.app = openapi;
