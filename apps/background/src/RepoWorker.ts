@@ -198,7 +198,8 @@ class RepoWorker extends DurableObject<Env> {
             excludeOids.push(resolved ?? entry);
           }
 
-          const depth = fetchRequest.shallowOptions?.deepen;
+          const rawDepth = fetchRequest.shallowOptions?.deepen;
+          const depth = rawDepth !== undefined && Number.isFinite(rawDepth) && rawDepth > 0 ? Math.trunc(rawDepth) : undefined;
           const since = fetchRequest.shallowOptions?.deepenSince;
           const { oids, shallow: boundary } = await this.git.collectObjectsForPack(fetchRequest.wants, fetchRequest.haves, {
             depth,
