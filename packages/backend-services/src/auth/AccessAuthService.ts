@@ -16,23 +16,51 @@ interface AccessIdentityContext {
   };
 }
 
+type AccessAuthStrategy = (env: AccessAuthEnv, request: Request, accessCtx?: AccessIdentityContext) => Promise<string | null>;
+
+function demoModeStrategy(env: AccessAuthEnv): Promise<string | null> {
+  return Promise.resolve(ConfigurationManager.auth.isDemoMode(env) ? DEMO_USER_EMAIL : null);
+}
+
+function devEmailStrategy(env: AccessAuthEnv): Promise<string | null> {
+  return Promise.resolve(env.DEV_AUTH_EMAIL ?? null);
+}
+
+async function accessJwtStrategy(env: AccessAuthEnv, request: Request): Promise<string | null> {
+  if (env.TEAM_DOMAIN && env.POLICY_AUD) {
+    return AccessAuthService.verifyAccessJwt(request, env.TEAM_DOMAIN, env.POLICY_AUD);
+  }
+  return null;
+}
+
+async function accessCtxStrategy(_env: AccessAuthEnv, _request: Request, accessCtx?: AccessIdentityContext): Promise<string | null> {
+  const identity = await accessCtx?.access?.getIdentity?.().catch(() => null);
+  return identity?.email ?? null;
+}
+
+const DEFAULT_ACCESS_AUTH_STRATEGIES: readonly AccessAuthStrategy[] = [
+  demoModeStrategy,
+  devEmailStrategy,
+  accessJwtStrategy,
+  accessCtxStrategy,
+];
+
 class AccessAuthService {
-  constructor(private readonly env: AccessAuthEnv) {}
+  private readonly strategies: readonly AccessAuthStrategy[];
+
+  constructor(
+    private readonly env: AccessAuthEnv,
+    strategies: readonly AccessAuthStrategy[] = DEFAULT_ACCESS_AUTH_STRATEGIES,
+  ) {
+    this.strategies = strategies;
+  }
 
   public async getAuthenticatedUserEmail(request: Request, accessCtx?: AccessIdentityContext): Promise<string> {
-    if (ConfigurationManager.auth.isDemoMode(this.env)) {
-      return DEMO_USER_EMAIL;
-    }
-    if (this.env.DEV_AUTH_EMAIL) {
-      return this.env.DEV_AUTH_EMAIL;
-    }
-    if (this.env.TEAM_DOMAIN && this.env.POLICY_AUD) {
-      return AccessAuthService.verifyAccessJwt(request, this.env.TEAM_DOMAIN, this.env.POLICY_AUD);
-    }
-    const identity = await accessCtx?.access?.getIdentity?.().catch(() => null);
-    const email = identity?.email;
-    if (email) {
-      return email;
+    for (const strategy of this.strategies) {
+      const email = await strategy(this.env, request, accessCtx);
+      if (email) {
+        return email;
+      }
     }
     return AccessAuthService.verifyAccessJwt(request, this.env.TEAM_DOMAIN, this.env.POLICY_AUD);
   }
@@ -78,11 +106,14 @@ class AccessAuthService {
   }
 }
 
+/**
+@deprecated Prefer `createRequestScope(env).get(Tokens.AccessAuthService)`; this thin wrapper only preserves backward compatibility.
+*/
 class AccessAuthServiceFactory {
   public static create(env: AccessAuthEnv): AccessAuthService {
     return new AccessAuthService(env);
   }
 }
 
-export { AccessAuthService, AccessAuthServiceFactory };
-export type { AccessAuthEnv, AccessIdentityContext };
+export { AccessAuthService, AccessAuthServiceFactory, DEFAULT_ACCESS_AUTH_STRATEGIES };
+export type { AccessAuthEnv, AccessIdentityContext, AccessAuthStrategy };

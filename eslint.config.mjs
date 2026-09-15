@@ -183,7 +183,8 @@ export default tseslint.config(
       'no-restricted-imports': ['error', {
         patterns: [
           { group: ['@edge-git/backend-data', '@edge-git/backend-data/*'], message: 'backend-runtime must not import from backend-data (higher layer)' },
-          { group: ['@edge-git/provider-clients', '@edge-git/provider-clients/*'], message: 'backend-runtime must not import from provider-clients (higher layer)' },
+          { group: ['@edge-git/git-protocol', '@edge-git/git-protocol/*'], message: 'backend-runtime must not import from git-protocol (higher layer)' },
+          { group: ['@edge-git/git-service', '@edge-git/git-service/*'], message: 'backend-runtime must not import from git-service (higher layer)' },
           { group: ['@edge-git/backend-services', '@edge-git/backend-services/*'], message: 'backend-runtime must not import from backend-services (higher layer)' },
           { group: ['@edge-git/api', '@edge-git/api/*'], message: 'backend-runtime must not import from apps/api' },
           { group: ['@edge-git/background', '@edge-git/background/*'], message: 'backend-runtime must not import from apps/background' },
@@ -198,7 +199,8 @@ export default tseslint.config(
       'no-restricted-imports': ['error', {
         patterns: [
           { group: ['@edge-git/backend-runtime', '@edge-git/backend-runtime/*'], message: 'backend-data must not import from backend-runtime' },
-          { group: ['@edge-git/provider-clients', '@edge-git/provider-clients/*'], message: 'backend-data must not import from provider-clients' },
+          { group: ['@edge-git/git-protocol', '@edge-git/git-protocol/*'], message: 'backend-data must not import from git-protocol' },
+          { group: ['@edge-git/git-service', '@edge-git/git-service/*'], message: 'backend-data must not import from git-service (higher layer)' },
           { group: ['@edge-git/backend-services', '@edge-git/backend-services/*'], message: 'backend-data must not import services (higher layer)' },
           { group: ['@edge-git/api', '@edge-git/api/*'], message: 'backend-data must not import from apps/api' },
           { group: ['@edge-git/background', '@edge-git/background/*'], message: 'backend-data must not import from apps/background' },
@@ -206,17 +208,31 @@ export default tseslint.config(
       }],
     },
   },
-  // Layer 2: provider-clients — only shared and backend-errors
+  // Layer 2: git-protocol — only shared and backend-errors
   {
-    files: ['packages/provider-clients/**/*.{ts,js}'],
+    files: ['packages/git-protocol/**/*.{ts,js}'],
     rules: {
       'no-restricted-imports': ['error', {
         patterns: [
-          { group: ['@edge-git/backend-data', '@edge-git/backend-data/*'], message: 'provider-clients must not import DAOs from backend-data' },
-          { group: ['@edge-git/backend-runtime', '@edge-git/backend-runtime/*'], message: 'provider-clients must not import from backend-runtime' },
-          { group: ['@edge-git/backend-services', '@edge-git/backend-services/*'], message: 'provider-clients must not import from backend-services (higher layer)' },
-          { group: ['@edge-git/api', '@edge-git/api/*'], message: 'provider-clients must not import from apps/api' },
-          { group: ['@edge-git/background', '@edge-git/background/*'], message: 'provider-clients must not import from apps/background' },
+          { group: ['@edge-git/backend-data', '@edge-git/backend-data/*'], message: 'git-protocol must not import DAOs from backend-data' },
+          { group: ['@edge-git/backend-runtime', '@edge-git/backend-runtime/*'], message: 'git-protocol must not import from backend-runtime' },
+          { group: ['@edge-git/git-service', '@edge-git/git-service/*'], message: 'git-protocol must not import from git-service (higher layer)' },
+          { group: ['@edge-git/backend-services', '@edge-git/backend-services/*'], message: 'git-protocol must not import from backend-services (higher layer)' },
+          { group: ['@edge-git/api', '@edge-git/api/*'], message: 'git-protocol must not import from apps/api' },
+          { group: ['@edge-git/background', '@edge-git/background/*'], message: 'git-protocol must not import from apps/background' },
+        ],
+      }],
+    },
+  },
+  // Layer 2-3: git-service — layers 0-2 only (no backend-services/apps)
+  {
+    files: ['packages/git-service/**/*.{ts,js}'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [
+          { group: ['@edge-git/backend-services', '@edge-git/backend-services/*'], message: 'git-service must not import from backend-services (higher layer)' },
+          { group: ['@edge-git/api', '@edge-git/api/*'], message: 'git-service must not import from apps/api' },
+          { group: ['@edge-git/background', '@edge-git/background/*'], message: 'git-service must not import from apps/background' },
         ],
       }],
     },
@@ -233,14 +249,25 @@ export default tseslint.config(
       }],
     },
   },
-  // Layer 5: apps/api — route through backend-services, not directly to provider-clients
+  // Layer 5: apps/api — route through backend-services, not directly to git-service
   {
     files: ['apps/api/**/*.{ts,js}'],
     rules: {
       'no-restricted-imports': ['error', {
         patterns: [
-          { group: ['@edge-git/provider-clients', '@edge-git/provider-clients/*'], message: 'apps/api must not import provider-clients directly; use @edge-git/backend-services instead' },
+          { group: ['@edge-git/git-service', '@edge-git/git-service/*'], message: 'apps/api must not import git-service directly; use @edge-git/git-protocol + DO RPC via @edge-git/background instead' },
           { group: ['@edge-git/backend-data/dao', '@edge-git/backend-data/dao/*'], message: 'apps/api must not import DAOs directly; use @edge-git/backend-services instead (type-only imports are allowed)', allowTypeImports: true },
+        ],
+      }],
+    },
+  },
+  // Layer 5: apps/background — layers 0-3 + git-* allowed (not apps/api)
+  {
+    files: ['apps/background/**/*.{ts,js}'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [
+          { group: ['@edge-git/api', '@edge-git/api/*'], message: 'apps/background must not import from apps/api' },
         ],
       }],
     },

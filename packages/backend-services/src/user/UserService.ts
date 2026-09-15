@@ -6,15 +6,32 @@ interface UserServiceEnv {
   DB: D1Queryable;
 }
 
+interface UserServiceDeps {
+  userDAO?: () => Promise<UserDAO>;
+}
+
 class UserService {
-  constructor(private readonly env: UserServiceEnv) {}
+  private readonly deps: Required<UserServiceDeps>;
+
+  constructor(
+    private readonly env: UserServiceEnv,
+    deps: UserServiceDeps = {},
+  ) {
+    this.deps = {
+      userDAO: () => Promise.resolve(new UserDAO(env.DB)),
+      ...deps,
+    };
+  }
 
   public async upsertUser(email: string): Promise<void> {
-    const dao = new UserDAO(this.env.DB);
+    const dao = await this.deps.userDAO();
     await dao.upsertUser(email.toLowerCase(), TimestampUtil.getCurrentUnixTimestampInSeconds());
   }
 }
 
+/**
+@deprecated Prefer `createRequestScope(env).get(Tokens.UserService)`; this thin wrapper only preserves backward compatibility.
+*/
 class UserServiceFactory {
   public static create(env: UserServiceEnv): UserService {
     return new UserService(env);
@@ -22,4 +39,4 @@ class UserServiceFactory {
 }
 
 export { UserService, UserServiceFactory };
-export type { UserServiceEnv };
+export type { UserServiceDeps, UserServiceEnv };

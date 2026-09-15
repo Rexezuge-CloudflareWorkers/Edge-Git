@@ -1,9 +1,22 @@
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { GitBranch, Plus } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { LanguageSelector } from '../shared/LanguageSelector';
 
-export function Header({ userEmail }: { userEmail: string | null }) {
+export function Header({
+  userEmail,
+  language,
+  onLanguageChange,
+  languageDisabled,
+}: {
+  userEmail: string | null;
+  language?: string;
+  onLanguageChange?: (lng: string) => void;
+  languageDisabled?: boolean;
+}) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--color-border)] bg-[var(--color-surface-base)]/95 backdrop-blur">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
@@ -26,7 +39,7 @@ export function Header({ userEmail }: { userEmail: string | null }) {
                   'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]',
                 )}
               >
-                Dashboard
+                {t('header.dashboard', 'Dashboard')}
               </button>
               <button
                 type="button"
@@ -37,7 +50,7 @@ export function Header({ userEmail }: { userEmail: string | null }) {
                 )}
               >
                 <Plus className="h-3.5 w-3.5" />
-                New
+                {t('header.new', 'New')}
               </button>
               <button
                 type="button"
@@ -47,13 +60,16 @@ export function Header({ userEmail }: { userEmail: string | null }) {
                   'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]',
                 )}
               >
-                Settings
+                {t('header.settings', 'Settings')}
               </button>
             </nav>
           )}
         </div>
 
         <div className="flex items-center gap-3">
+          {onLanguageChange && (
+            <LanguageSelector value={language} onChange={onLanguageChange} disabled={languageDisabled} />
+          )}
           <div className="text-sm text-[var(--color-text-muted)] truncate max-w-xs">{userEmail ?? ''}</div>
         </div>
       </div>

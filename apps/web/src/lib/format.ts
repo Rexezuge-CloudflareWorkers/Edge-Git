@@ -1,4 +1,6 @@
-export function formatTimestamp(timestampSeconds: number | null | undefined): string {
+import { resolveLocale } from './locale';
+
+export function formatTimestamp(timestampSeconds: number | null | undefined, lng?: string | null): string {
   if (timestampSeconds === null || timestampSeconds === undefined) return 'Never';
   const date = new Date(timestampSeconds * 1000);
   const now = new Date();
@@ -10,10 +12,10 @@ export function formatTimestamp(timestampSeconds: number | null | undefined): st
   if (diffHours < 24) return `${diffHours}h ago`;
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
+  return date.toLocaleDateString(resolveLocale(lng));
 }
 
-export function formatExpiryTimestamp(timestampSeconds: number | null | undefined): string {
+export function formatExpiryTimestamp(timestampSeconds: number | null | undefined, lng?: string | null): string {
   if (timestampSeconds === null || timestampSeconds === undefined) return 'Never';
   const date = new Date(timestampSeconds * 1000);
   const now = new Date();
@@ -25,12 +27,12 @@ export function formatExpiryTimestamp(timestampSeconds: number | null | undefine
   if (diffHours < 24) return `Expires in ${diffHours}h`;
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 30) return `Expires in ${diffDays}d`;
-  return `Expires ${date.toLocaleDateString()}`;
+  return `Expires ${date.toLocaleDateString(resolveLocale(lng))}`;
 }
 
-export function formatCommitDate(timestampSeconds: number, timezoneOffset: number): string {
+export function formatCommitDate(timestampSeconds: number, timezoneOffset: number, lng?: string | null): string {
   const date = new Date((timestampSeconds + timezoneOffset * 60) * 1000);
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  return date.toLocaleDateString(resolveLocale(lng), { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 export function firstLine(message: string): string {

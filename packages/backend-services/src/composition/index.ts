@@ -1,5 +1,24 @@
+export { Tokens } from './tokens';
+export { createRequestScope } from './requestScope';
+export type { RequestKeys, RequestScopeEnv } from './requestScope';
+
+/**
+@deprecated Prefer `createRequestScope(env).get(Tokens.AccessAuthService)`; kept for backward compatibility during migration.
+*/
 export { AccessAuthService, AccessAuthServiceFactory } from '../auth/AccessAuthService';
+/**
+@deprecated Prefer `createRequestScope(env).get(Tokens.TokenService)`; kept for backward compatibility during migration.
+*/
 export { TokenService, TokenServiceFactory } from '../auth/TokenService';
+/**
+@deprecated Prefer `createRequestScope(env).get(Tokens.RepoService)`; kept for backward compatibility during migration.
+*/
 export { RepoService, RepoServiceFactory } from '../repo/RepoService';
+/**
+@deprecated Prefer `createRequestScope(env).get(Tokens.UserService)`; kept for backward compatibility during migration.
+*/
 export { UserService, UserServiceFactory } from '../user/UserService';
+/**
+@deprecated Prefer `createRequestScope(env).get(Tokens.IssueService)`; kept for backward compatibility during migration.
+*/
 export { IssueService, IssueServiceFactory } from '../issue/IssueService';

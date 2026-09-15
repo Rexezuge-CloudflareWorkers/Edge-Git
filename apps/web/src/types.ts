@@ -1,5 +1,12 @@
 export interface CurrentUser {
   email: string;
+  /**
+   * Preferred UI language (BCP 47 tag). Optional: the backend does not persist
+   * it yet, so the SPA treats a missing value as "use localStorage > navigator
+   * > en" and persists language changes locally (best-effort `PATCH /user/me`
+   * when the backend starts accepting it).
+   */
+  preferredLanguage?: string | null;
 }
 
 export interface Repo {

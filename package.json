@@ -13,6 +13,7 @@
     "test:integration": "vitest run --config test/integration/vitest.config.mts",
     "test:coverage:integration": "vitest run --coverage --config test/integration/vitest.config.mts",
     "lint": "eslint --fix --quiet .",
+    "validate:locales": "node scripts/validate_locales.mjs",
     "typegen": "wrangler types --config ./apps/api/wrangler.template.jsonc --env-interface CloudflareEnv"
   },
   "devDependencies": {

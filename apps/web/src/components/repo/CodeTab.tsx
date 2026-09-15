@@ -3,6 +3,7 @@ import { File, Folder, GitBranch, History } from 'lucide-react';
 import type { GitCommit, Repo, TreeEntry } from '../../types';
 import { decodeBlobContent, loadBlob, loadBranches, loadCommits, loadTree } from '../../services/repoService';
 import { firstLine, formatCommitDate, formatTimestamp } from '../../lib/format';
+import { formatDateLocale } from '../../lib/locale';
 import { Card } from '../ui/Card';
 import { Select } from '../ui/Input';
 import { Badge, VisibilityBadge } from '../ui/Badge';
@@ -272,7 +273,7 @@ export function CodeTab({
               </div>
               <div className="flex items-center justify-between gap-2">
                 <dt className="text-[var(--color-text-muted)]">Created</dt>
-                <dd className="text-xs text-[var(--color-text-secondary)]">{new Date(repoMeta.createdAt * 1000).toLocaleDateString()}</dd>
+                <dd className="text-xs text-[var(--color-text-secondary)]">{formatDateLocale(new Date(repoMeta.createdAt * 1000))}</dd>
               </div>
               <div className="flex items-center justify-between gap-2">
                 <dt className="text-[var(--color-text-muted)]">Updated</dt>

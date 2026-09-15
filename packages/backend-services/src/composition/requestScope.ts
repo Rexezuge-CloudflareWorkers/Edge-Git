@@ -1,0 +1,75 @@
+import { IssueDAO, RepositoryDAO, UserAccessTokenDAO, UserDAO } from '@edge-git/backend-data/dao';
+import type { D1Queryable } from '@edge-git/backend-data/utils';
+import { Container } from '@edge-git/backend-runtime/di';
+import { AppConfiguration } from '@edge-git/backend-runtime/config';
+// NOTE: service imports use the package entry points (`@edge-git/...`)
+// rather than relative file paths so route unit tests mocking those modules
+// (`vi.mock('@edge-git/backend-services/repo', ...)`) keep working
+// after migration to `scope.get(...)`. Runtime behavior is identical.
+import { AccessAuthService, TokenService } from '@edge-git/backend-services/auth';
+import { RepoService } from '@edge-git/backend-services/repo';
+import { UserService } from '@edge-git/backend-services/user';
+import { IssueService } from '@edge-git/backend-services/issue';
+import { Tokens } from './tokens';
+
+// Minimal structural env for scope creation. Secrets are resolved lazily and
+// memoized — requests that never touch encrypted state pay no Secrets Store
+// round-trip.
+//
+// NOTE: no `[key: string]: unknown` index signature on purpose — interfaces
+// (e.g. endpoint `*Env`) do not carry an implicit index signature, so a target
+// with one would reject every `createRequestScope(env)` call site. Extra
+// bindings are still assignable structurally; services receive `env as never`.
+interface RequestScopeEnv {
+  DB: D1Queryable;
+  AES_ENCRYPTION_KEY_SECRET?: { get(): Promise<string> };
+}
+
+interface RequestKeys {
+  masterKey: string;
+}
+
+function memoize<T>(fn: () => Promise<T>): () => Promise<T> {
+  let pending: Promise<T> | undefined;
+  return () => (pending ??= fn());
+}
+
+// Composition root: builds a per-request child scope wiring DAOs → services.
+// Replaces the scattered `*Factory.create({ DB })` / `new XDAO(env.DB)`
+// call sites in apps/api and apps/background.
+function createRequestScope(env: RequestScopeEnv): Container {
+  const scope = new Container();
+  scope.bindValue(Tokens.Env, env);
+  scope.bindValue(Tokens.Db, env.DB);
+
+  const masterKey = memoize(() => {
+    if (!env.AES_ENCRYPTION_KEY_SECRET) throw new Error('AES_ENCRYPTION_KEY_SECRET is not configured for this scope.');
+    return env.AES_ENCRYPTION_KEY_SECRET.get();
+  });
+  const keys = memoize(async (): Promise<RequestKeys> => ({ masterKey: await masterKey() }));
+  scope.bindValue(Tokens.Keys, keys);
+
+  const userDAO = memoize(() => Promise.resolve(new UserDAO(env.DB)));
+  const repositoryDAO = memoize(() => Promise.resolve(new RepositoryDAO(env.DB)));
+  const tokenDAO = memoize(() => Promise.resolve(new UserAccessTokenDAO(env.DB)));
+  const issueDAO = memoize(() => Promise.resolve(new IssueDAO(env.DB)));
+  scope.bindValue(Tokens.UserDAO, userDAO);
+  scope.bindValue(Tokens.RepositoryDAO, repositoryDAO);
+  scope.bindValue(Tokens.UserAccessTokenDAO, tokenDAO);
+  scope.bindValue(Tokens.IssueDAO, issueDAO);
+
+  scope.bind(Tokens.AccessAuthService, () => new AccessAuthService(env as never));
+  scope.bind(Tokens.TokenService, () => new TokenService(env as never, { tokenDAO }));
+  scope.bind(Tokens.RepoService, () => new RepoService(env as never, { repositoryDAO, issueDAO }));
+  scope.bind(Tokens.UserService, () => new UserService(env as never, { userDAO }));
+  scope.bind(Tokens.IssueService, () => new IssueService(env as never, { issueDAO }));
+  // Lazy bind so unit tests mocking `@edge-git/backend-runtime/config` with
+  // only `ConfigurationManager` keep working; the factory only touches the
+  // mocked module when the token is actually resolved.
+  scope.bind(Tokens.AppConfig, () => AppConfiguration.fromEnv(env));
+
+  return scope;
+}
+
+export { createRequestScope };
+export type { RequestKeys, RequestScopeEnv };

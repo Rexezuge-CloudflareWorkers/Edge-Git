@@ -1,9 +1,6 @@
 import { Context, Next } from 'hono';
-import { AccessAuthServiceFactory, TokenServiceFactory } from '@edge-git/backend-services/auth';
+import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import type { AccessIdentityContext } from '@edge-git/backend-services/auth';
-
-import { UserServiceFactory } from '@edge-git/backend-services/user';
-import { RepoServiceFactory } from '@edge-git/backend-services/repo';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { getBasicCredentials, getBearerToken } from '@edge-git/git-protocol';
 import { UnauthorizedError, ForbiddenError } from '@edge-git/backend-errors';
@@ -12,11 +9,12 @@ type RequestContext = Context<{ Bindings: Env; Variables: { AuthenticatedUserEma
 
 async function authenticateUserIdentity(c: RequestContext): Promise<string> {
   const env = c.env;
-  const email = await AccessAuthServiceFactory.create(env).getAuthenticatedUserEmail(
+  const scope = createRequestScope(env);
+  const email = await scope.get(Tokens.AccessAuthService).getAuthenticatedUserEmail(
     c.req.raw,
     c.executionCtx as unknown as AccessIdentityContext,
   );
-  await UserServiceFactory.create({ DB: env.DB }).upsertUser(email);
+  await scope.get(Tokens.UserService).upsertUser(email);
   return email;
 }
 
@@ -45,7 +43,7 @@ function unauthorizedGit(): Response {
 }
 
 async function resolvePatToEmail(env: Env, pat: string): Promise<string> {
-  return TokenServiceFactory.create({ DB: env.DB }).authenticateWithPAT(pat);
+  return createRequestScope(env).get(Tokens.TokenService).authenticateWithPAT(pat);
 }
 
 async function gitAuthForRepo(
@@ -55,7 +53,7 @@ async function gitAuthForRepo(
   service: 'git-upload-pack' | 'git-receive-pack',
 ): Promise<GitAuthResult | Response> {
   const env = c.env;
-  const repo = await RepoServiceFactory.create({ DB: env.DB }).getByOwnerAndName(owner, repoName);
+  const repo = await createRequestScope(env).get(Tokens.RepoService).getByOwnerAndName(owner, repoName);
   if (!repo) {
     // Return 401 (not 404) to avoid repo existence oracle for private repos.
     // Callers for public UI routes should handle 404 separately.

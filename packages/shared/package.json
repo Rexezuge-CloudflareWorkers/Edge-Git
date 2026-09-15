@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./constants": "./src/constants/index.ts",
     "./constants/*": "./src/constants/*.ts",
+    "./i18n": "./src/i18n/index.ts",
     "./model": "./src/model/index.ts",
     "./model/*": "./src/model/*.ts",
     "./utils": "./src/utils/index.ts",

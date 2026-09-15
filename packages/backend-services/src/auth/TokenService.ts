@@ -18,15 +18,29 @@ interface CreatedToken {
   expiresAt: number;
 }
 
+interface TokenServiceDeps {
+  tokenDAO?: () => Promise<UserAccessTokenDAO>;
+}
+
 class TokenService {
-  constructor(private readonly env: TokenServiceEnv) {}
+  private readonly deps: Required<TokenServiceDeps>;
+
+  constructor(
+    private readonly env: TokenServiceEnv,
+    deps: TokenServiceDeps = {},
+  ) {
+    this.deps = {
+      tokenDAO: () => Promise.resolve(new UserAccessTokenDAO(env.DB)),
+      ...deps,
+    };
+  }
 
   public static async hashToken(token: string): Promise<string> {
     return CryptoUtil.sha256Hex(`edge-git-pat:${token}`);
   }
 
   public async authenticateWithPAT(token: string): Promise<string> {
-    const dao = new UserAccessTokenDAO(this.env.DB);
+    const dao = await this.deps.tokenDAO();
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const tokenHash = await TokenService.hashToken(token);
     const tokenData: UserAccessTokenMetadata | undefined = await dao.getByTokenHash(tokenHash, now);
@@ -38,7 +52,7 @@ class TokenService {
   }
 
   public async createToken(userEmail: string, name: string, expiresInDays?: number): Promise<CreatedToken> {
-    const dao = new UserAccessTokenDAO(this.env.DB);
+    const dao = await this.deps.tokenDAO();
     const maxTokens: number = ConfigurationManager.token.getMaxPerUser(this.env);
     const maxExpiryInDays: number = ConfigurationManager.token.getMaxExpiryDays(this.env);
     const existingTokens: UserAccessTokenMetadata[] = await dao.getByUserEmail(userEmail);
@@ -59,16 +73,19 @@ class TokenService {
   }
 
   public async listTokens(userEmail: string): Promise<UserAccessTokenMetadata[]> {
-    const dao = new UserAccessTokenDAO(this.env.DB);
+    const dao = await this.deps.tokenDAO();
     return dao.getByUserEmail(userEmail);
   }
 
   public async deleteToken(tokenId: string, userEmail: string): Promise<void> {
-    const dao = new UserAccessTokenDAO(this.env.DB);
+    const dao = await this.deps.tokenDAO();
     await dao.delete(tokenId, userEmail);
   }
 }
 
+/**
+@deprecated Prefer `createRequestScope(env).get(Tokens.TokenService)`; this thin wrapper only preserves backward compatibility.
+*/
 class TokenServiceFactory {
   public static create(env: TokenServiceEnv): TokenService {
     return new TokenService(env);
@@ -76,4 +93,4 @@ class TokenServiceFactory {
 }
 
 export { TokenService, TokenServiceFactory };
-export type { CreatedToken, TokenServiceEnv };
+export type { CreatedToken, TokenServiceDeps, TokenServiceEnv };
