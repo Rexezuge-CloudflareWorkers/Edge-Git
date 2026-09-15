@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { BookMarked } from 'lucide-react';
+import { BookMarked, GitBranch } from 'lucide-react';
 import type { Repo } from '../../types';
 import { VisibilityBadge } from '../ui/Badge';
 import { cn } from '../../lib/utils';
@@ -24,9 +24,19 @@ export function RepoHeader({
   onTabChange: (tab: RepoTab) => void;
 }) {
   return (
-    <div className="border-b border-[var(--color-border)] bg-[var(--color-surface-1)]">
+    <div className="sticky top-0 z-40 border-b border-[var(--color-border)] bg-[var(--color-surface-1)]/95 backdrop-blur">
       <div className="max-w-7xl mx-auto px-6 pt-6">
         <div className="flex items-center gap-3 flex-wrap">
+          <Link to="/" aria-label="Edge-Git home" className="flex items-center gap-2 text-xl font-semibold tracking-tight">
+            <GitBranch className="h-5 w-5 text-[var(--color-accent)]" />
+            <span>
+              <span className="text-[var(--color-accent)]">Edge</span>
+              <span className="text-[var(--color-text-primary)]">-Git</span>
+            </span>
+          </Link>
+          <span aria-hidden="true" className="text-[var(--color-text-muted)] font-normal">
+            /
+          </span>
           <BookMarked className="h-5 w-5 text-[var(--color-text-muted)]" />
           <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
             <Link to={`/${repo.owner}/${repo.name}`} className="text-[var(--color-accent)] hover:underline">
