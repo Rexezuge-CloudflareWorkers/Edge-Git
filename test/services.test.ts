@@ -1,0 +1,232 @@
+import { describe, expect, it } from 'vitest';
+import type { D1Queryable } from '@edge-git/backend-data/utils';
+import { CursorUtil } from '@edge-git/backend-data/utils/CursorUtil';
+import { isD1ErrorRetryable } from '@edge-git/backend-data/utils/D1ErrorClassifier';
+import { executeD1WithRetry } from '@edge-git/backend-data/utils/D1Utils';
+import { ConfigurationManager } from '@edge-git/backend-runtime/config';
+import { AppConfiguration } from '@edge-git/backend-runtime/config/AppConfiguration';
+import { EnvParser } from '@edge-git/backend-runtime/config/EnvParser';
+import { IssueService } from '@edge-git/backend-services/issue';
+import { RepoService } from '@edge-git/backend-services/repo';
+import { TokenService } from '@edge-git/backend-services/auth';
+import { UserService } from '@edge-git/backend-services/user';
+import { DatabaseError } from '@edge-git/backend-errors';
+
+// Minimal in-memory D1 fake covering the queries used by DAOs under test.
+function createFakeDb(seed: { now?: number } = {}): D1Queryable & {
+  repos: Array<Record<string, unknown>>;
+  tokens: Array<Record<string, unknown>>;
+  issues: Array<Record<string, unknown>>;
+  users: Array<Record<string, unknown>>;
+} {
+  const now = seed.now ?? 1_700_000_000;
+  const state = { repos: [] as Array<Record<string, unknown>>, tokens: [] as Array<Record<string, unknown>>, issues: [] as Array<Record<string, unknown>>, users: [] as Array<Record<string, unknown>> };
+  void now;
+
+  function statement(query: string, params: unknown[]) {
+    const q = query.replace(/\s+/g, ' ').trim();
+    return {
+      first<T>(): Promise<T | null> {
+        if (q.startsWith('SELECT * FROM repositories WHERE owner = ? AND name = ?')) {
+          const row = state.repos.find((r) => r.owner === params[0] && r.name === params[1]);
+          return Promise.resolve((row ?? null) as T | null);
+        }
+        if (q.startsWith('SELECT * FROM repositories WHERE id = ?')) {
+          const row = state.repos.find((r) => r.id === params[0]);
+          return Promise.resolve((row ?? null) as T | null);
+        }
+        if (q.startsWith('SELECT COALESCE(MAX(number)')) {
+          const max = state.issues.filter((i) => i.repository_id === params[0]).reduce((m, i) => Math.max(m, i.number as number), 0);
+          return Promise.resolve({ max_n: max } as unknown as T);
+        }
+        if (q.startsWith('SELECT * FROM user_access_tokens WHERE token_hash = ?')) {
+          const row = state.tokens.find((t) => t.token_hash === params[0] && (t.expires_at as number) > (params[1] as number));
+          return Promise.resolve((row ?? null) as T | null);
+        }
+        if (q.startsWith('SELECT email, created_at FROM users WHERE email = ?')) {
+          const row = state.users.find((u) => u.email === params[0]);
+          return Promise.resolve((row ?? null) as T | null);
+        }
+        return Promise.resolve(null);
+      },
+      all<T>(): Promise<{ results: T[] }> {
+        if (q.startsWith('SELECT * FROM repositories WHERE owner_email = ?')) {
+          const rows = state.repos.filter((r) => r.owner_email === params[0]).slice(0, params[1] as number);
+          return Promise.resolve({ results: rows as T[] });
+        }
+        if (q.startsWith('SELECT * FROM repositories WHERE owner = ?')) {
+          const rows = state.repos.filter((r) => r.owner === params[0]);
+          return Promise.resolve({ results: rows as T[] });
+        }
+        if (q.startsWith('SELECT * FROM user_access_tokens WHERE user_email = ?')) {
+          const rows = state.tokens.filter((t) => t.user_email === params[0]);
+          return Promise.resolve({ results: rows as T[] });
+        }
+        if (q.startsWith('SELECT * FROM issues WHERE repository_id = ?')) {
+          const rows = state.issues
+            .filter((i) => i.repository_id === params[0])
+            .sort((a, b) => (b.number as number) - (a.number as number))
+            .slice(0, params[1] as number);
+          return Promise.resolve({ results: rows as T[] });
+        }
+        return Promise.resolve({ results: [] });
+      },
+      run(): Promise<{ success: boolean; meta?: { changes?: number } }> {
+        if (q.startsWith('INSERT INTO repositories')) {
+          const [id, owner_email, owner, name, description, is_private, created_at, updated_at] = params as Array<string | number | null>;
+          state.repos.push({ id, owner_email, owner, name, description, is_private, created_at, updated_at });
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('INSERT INTO user_access_tokens')) {
+          const [token_id, user_email, token_hash, tname, expires_at, created_at] = params as Array<string | number>;
+          state.tokens.push({ token_id, user_email, token_hash, name: tname, expires_at, last_used_at: null, created_at });
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('UPDATE user_access_tokens SET last_used_at')) {
+          const row = state.tokens.find((t) => t.token_hash === params[1]);
+          if (row) row.last_used_at = params[0];
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('DELETE FROM user_access_tokens WHERE token_id = ?')) {
+          const before = state.tokens.length;
+          state.tokens = state.tokens.filter((t) => !(t.token_id === params[0] && t.user_email === params[1]));
+          return Promise.resolve({ success: true, meta: { changes: before - state.tokens.length } });
+        }
+        if (q.startsWith('INSERT INTO issues')) {
+          const [id, repository_id, full_name, number, title, body, status, creator_email, created_at, updated_at] = params as Array<
+            string | number | null
+          >;
+          state.issues.push({ id, repository_id, full_name, number, title, body, status, creator_email, created_at, updated_at });
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('INSERT INTO users')) {
+          const [email, created_at] = params as Array<string | number>;
+          if (!state.users.some((u) => u.email === email)) state.users.push({ email, created_at });
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        return Promise.resolve({ success: true, meta: { changes: 0 } });
+      },
+    };
+  }
+
+  const db = {
+    ...state,
+    prepare(query: string) {
+      return { bind: (...params: unknown[]) => statement(query, params) };
+    },
+  };
+  return db as unknown as D1Queryable & typeof state;
+}
+
+describe('RepoService', () => {
+  it('creates, reads, and lists repos', async () => {
+    const db = createFakeDb();
+    const svc = new RepoService({ DB: db });
+    const { id } = await svc.createRepo('alice@example.com', 'alice', 'demo', 'hi', false);
+    expect(id).toBeTruthy();
+    await expect(svc.getByOwnerAndName('alice', 'demo')).resolves.toMatchObject({ owner: 'alice', name: 'demo' });
+    await expect(svc.listByOwnerEmail('alice@example.com')).resolves.toHaveLength(1);
+    await expect(svc.requireOwner('alice', 'demo', 'alice@example.com')).resolves.toMatchObject({ id });
+  });
+
+  it('rejects duplicates, invalid names, and over-limit owners', async () => {
+    const db = createFakeDb();
+    const svc = new RepoService({ DB: db, MAX_REPOS_PER_USER: '1' });
+    await svc.createRepo('alice@example.com', 'alice', 'one', null, false);
+    await expect(svc.createRepo('alice@example.com', 'alice', 'one', null, false)).rejects.toThrow('already exists');
+    await expect(svc.createRepo('alice@example.com', 'alice', 'two', null, false)).rejects.toThrow('Maximum 1');
+    await expect(svc.createRepo('alice@example.com', 'bad owner!', 'x', null, false)).rejects.toThrow('Invalid');
+    await expect(svc.requireOwner('alice', 'missing', 'alice@example.com')).rejects.toThrow('not found');
+    await expect(svc.requireOwner('alice', 'one', 'mallory@example.com')).rejects.toThrow('owner');
+  });
+});
+
+describe('IssueService', () => {
+  it('numbers issues per repo and lists newest first', async () => {
+    const db = createFakeDb();
+    const svc = new IssueService({ DB: db });
+    const first = await svc.createIssue({ repositoryId: 'r1', fullName: 'alice/demo', title: 'First', creatorEmail: 'a@x.co' });
+    const second = await svc.createIssue({ repositoryId: 'r1', fullName: 'alice/demo', title: 'Second', body: 'b', creatorEmail: 'a@x.co' });
+    expect(first.number).toBe(1);
+    expect(second.number).toBe(2);
+    const listed = await svc.listByRepo('r1');
+    expect(listed.map((i) => i.number)).toEqual([2, 1]);
+  });
+});
+
+describe('TokenService lifecycle', () => {
+  it('mints, authenticates, lists, and revokes', async () => {
+    const db = createFakeDb();
+    const svc = new TokenService({ DB: db });
+    const created = await svc.createToken('alice@example.com', 'laptop');
+    expect(created.token).toBeTruthy();
+    await expect(svc.authenticateWithPAT(created.token)).resolves.toBe('alice@example.com');
+    await expect(svc.listTokens('alice@example.com')).resolves.toHaveLength(1);
+    await svc.deleteToken(created.tokenId, 'alice@example.com');
+    await expect(svc.listTokens('alice@example.com')).resolves.toHaveLength(0);
+    await expect(svc.authenticateWithPAT('bogus')).rejects.toThrow();
+  });
+
+  it('enforces expiry and per-user limits', async () => {
+    const db = createFakeDb();
+    const svc = new TokenService({ DB: db, MAX_TOKENS_PER_USER: '1', MAX_TOKEN_EXPIRY_DAYS: '7' });
+    await svc.createToken('alice@example.com', 'one');
+    await expect(svc.createToken('alice@example.com', 'two')).rejects.toThrow('Maximum 1');
+    await expect(svc.createToken('bob@example.com', 'long', 30)).rejects.toThrow('exceed');
+  });
+});
+
+describe('UserService', () => {
+  it('upserts idempotently', async () => {
+    const db = createFakeDb();
+    const svc = new UserService({ DB: db });
+    await svc.upsertUser('Alice@Example.com');
+    await svc.upsertUser('alice@example.com');
+    expect(db.users).toHaveLength(1);
+  });
+});
+
+describe('Config', () => {
+  it('parses env values with defaults', () => {
+    expect(EnvParser.positiveInt({}, 'MISSING', '5')).toBe(5);
+    expect(EnvParser.positiveInt({ K: '3' }, 'K', '5')).toBe(3);
+    expect(EnvParser.boolean({ B: 'true' }, 'B', 'false')).toBe(true);
+    expect(ConfigurationManager.token.getMaxPerUser({})).toBe(5);
+    expect(ConfigurationManager.repo.getMaxPerUser({ MAX_REPOS_PER_USER: '7' })).toBe(7);
+    const app = AppConfiguration.fromEnv({ SITE_URL: 'https://git.example.com/' });
+    expect(app.getSiteUrl()).toBe('https://git.example.com');
+    expect(app.isDemoMode()).toBe(false);
+  });
+});
+
+describe('D1 utils', () => {
+  it('retries retryable failures then succeeds', async () => {
+    let attempts = 0;
+    const result = await executeD1WithRetry(
+      () => {
+        attempts += 1;
+        if (attempts < 3) throw new Error('database is locked');
+        return Promise.resolve({ success: true });
+      },
+      'flaky op',
+      { baseDelayMs: 1 },
+    );
+    expect(result.success).toBe(true);
+    expect(attempts).toBe(3);
+  });
+
+  it('throws DatabaseError for non-retryable failures', async () => {
+    await expect(executeD1WithRetry(() => Promise.resolve({ success: false, error: 'UNIQUE constraint failed' }), 'dup')).rejects.toBeInstanceOf(
+      DatabaseError,
+    );
+    expect(isD1ErrorRetryable('database is locked')).toBe(true);
+    expect(isD1ErrorRetryable('UNIQUE constraint failed')).toBe(false);
+    expect(isD1ErrorRetryable('')).toBe(false);
+  });
+
+  it('round-trips cursors', () => {
+    expect(CursorUtil.decode(CursorUtil.encode({ a: 1 }))).toEqual({ a: 1 });
+    expect(CursorUtil.decode('!!!')).toBeUndefined();
+    expect(CursorUtil.decode(undefined)).toBeUndefined();
+  });
+});

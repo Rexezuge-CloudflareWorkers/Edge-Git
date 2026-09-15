@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "allowJs": false,
+    "checkJs": false,
+    "noEmit": true,
+    "isolatedModules": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@edge-git/background": ["../../apps/background/src"],
+      "@edge-git/background/*": ["../../apps/background/src/*"],
+      "@edge-git/backend-data": ["../../packages/backend-data/src"],
+      "@edge-git/backend-data/*": ["../../packages/backend-data/src/*"],
+      "@edge-git/backend-errors": ["../../packages/backend-errors/src"],
+      "@edge-git/backend-errors/*": ["../../packages/backend-errors/src/*"],
+      "@edge-git/backend-runtime": ["../../packages/backend-runtime/src"],
+      "@edge-git/backend-runtime/*": ["../../packages/backend-runtime/src/*"],
+      "@edge-git/backend-services": ["../../packages/backend-services/src"],
+      "@edge-git/backend-services/*": ["../../packages/backend-services/src/*"],
+      "@edge-git/git-protocol": ["../../packages/git-protocol/src"],
+      "@edge-git/git-protocol/*": ["../../packages/git-protocol/src/*"],
+      "@edge-git/git-service": ["../../packages/git-service/src"],
+      "@edge-git/git-service/*": ["../../packages/git-service/src/*"],
+      "@edge-git/shared": ["../../packages/shared/src"],
+      "@edge-git/shared/*": ["../../packages/shared/src/*"]
+    }
+  },
+  "include": ["../../worker-configuration.d.ts", "../../packages/backend-runtime/src/env.d.ts", "src/**/*.ts"],
+  "exclude": ["node_modules"]
+}

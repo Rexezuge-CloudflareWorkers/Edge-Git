@@ -1,0 +1,67 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "edge-git",
+  "main": "apps/api/src/index.ts",
+  "compatibility_date": "2025-11-29",
+  "compatibility_flags": [],
+  "preview_urls": false,
+  "workers_dev": false,
+  "minify": true,
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true,
+      "persist": true
+    }
+  },
+  "routes": [],
+  "placement": {
+    "mode": "off"
+  },
+  "assets": {
+    "directory": "./apps/web/dist/"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "REPO",
+        "class_name": "RepoWorker"
+      },
+      {
+        "name": "CRON_TASKS",
+        "class_name": "CronTasksWorker"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1000000000",
+      "new_sqlite_classes": ["RepoWorker", "CronTasksWorker"]
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_name": "edge-git-db"
+    }
+  ],
+  "triggers": {
+    "crons": ["*/10 * * * *"]
+  },
+  "vars": {
+    "DEBUG_MODE": "false",
+    "SITE_URL": "",
+    "SERVE_SPA_FROM_WORKER": "true",
+    "POLICY_AUD": "",
+    "TEAM_DOMAIN": "",
+    "MAX_REPOS_PER_USER": "100",
+    "MAX_TOKENS_PER_USER": "5",
+    "MAX_TOKEN_EXPIRY_DAYS": "90",
+    "MAX_PACK_OBJECTS": "10000",
+    "GIT_CACHE_TTL_SECONDS": "3600",
+    "BACKGROUND_TASK_RUN_RETENTION_DAYS": "30",
+    "AUDIT_LOG_RETENTION_DAYS": "90"
+  }
+}
