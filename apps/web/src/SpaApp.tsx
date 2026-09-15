@@ -10,10 +10,15 @@ import { DashboardView } from './views/DashboardView';
 import { NewRepoView } from './views/NewRepoView';
 import { RepoView } from './views/RepoView';
 
+function TopHeader({ userEmail }: { userEmail: string | null }) {
+  const isRepoPage = useMatch('/:owner/:repo') !== null;
+  if (isRepoPage) return null;
+  return <Header userEmail={userEmail} />;
+}
+
 export default function SpaApp() {
   const { notice, showNotice } = useNotice();
   const { user, authorized } = useCurrentUser();
-  const isRepoPage = useMatch('/:owner/:repo') !== null;
 
   if (authorized === null) {
     return (
@@ -27,7 +32,7 @@ export default function SpaApp() {
 
   return (
     <div className="min-h-screen bg-[var(--color-surface-base)] text-[var(--color-text-primary)]">
-      {!isRepoPage && <Header userEmail={user?.email ?? null} />}
+      <TopHeader userEmail={user?.email ?? null} />
       {notice && <NoticeBar notice={notice} />}
 
       <Routes>
