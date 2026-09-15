@@ -123,21 +123,17 @@ function createEnv(db: D1Queryable) {
 const ctx = { waitUntil: () => undefined, passThroughOnException: () => undefined };
 
 describe('EdgeGitWorker HTTP surface', () => {
-  it('serves health and redirects', async () => {
+  it('serves health, shell, and redirects', async () => {
     const worker = new EdgeGitWorker();
     const env = createEnv(createApiFakeDb());
-    const health = await (worker as unknown as { onRequest(r: Request, e: unknown, c: unknown): Promise<Response> }).onRequest(
-      new Request('https://git.example.com/health'),
-      env,
-      ctx,
-    );
+    const onRequest = (worker as unknown as { onRequest(r: Request, e: unknown, c: unknown): Promise<Response> }).onRequest.bind(worker);
+    const health = await onRequest(new Request('https://git.example.com/health'), env, ctx);
     expect(health.status).toBe(200);
-    const root = await (worker as unknown as { onRequest(r: Request, e: unknown, c: unknown): Promise<Response> }).onRequest(
-      new Request('https://git.example.com/'),
-      env,
-      ctx,
-    );
-    expect(root.status).toBe(302);
+    const root = await onRequest(new Request('https://git.example.com/'), env, ctx);
+    expect(root.status).toBe(200);
+    expect(root.headers.get('content-type')).toContain('text/html');
+    const userRedirect = await onRequest(new Request('https://git.example.com/user'), env, ctx);
+    expect(userRedirect.status).toBe(302);
   });
 
   it('manages repos, tokens, and issues for an authenticated user', async () => {
@@ -203,6 +199,53 @@ describe('EdgeGitWorker HTTP surface', () => {
     const worker = new EdgeGitWorker() as unknown as { onRequest(r: Request, e: unknown, c: unknown): Promise<Response> };
     const env = createEnv(createApiFakeDb());
     expect((await worker.onRequest(new Request('https://git.example.com/user/unknown-route'), env, ctx)).status).toBe(200);
+  });
+
+  it('serves public repo reads anonymously and gates private repos', async () => {
+    const worker = new EdgeGitWorker() as unknown as { onRequest(r: Request, e: unknown, c: unknown): Promise<Response> };
+    const db = createApiFakeDb();
+    const authedEnv = createEnv(db);
+    const anonEnv = { ...authedEnv, DEV_AUTH_EMAIL: undefined };
+    const authed = (path: string, init?: RequestInit): Promise<Response> =>
+      worker.onRequest(new Request(`https://git.example.com${path}`, init), authedEnv, ctx);
+    const anon = (path: string, init?: RequestInit): Promise<Response> =>
+      worker.onRequest(new Request(`https://git.example.com${path}`, init), anonEnv, ctx);
+
+    const json = { 'Content-Type': 'application/json' };
+    expect((await authed('/user/repos', { method: 'POST', headers: json, body: JSON.stringify({ name: 'pub' }) })).status).toBe(201);
+    expect(
+      (await authed('/user/repos', { method: 'POST', headers: json, body: JSON.stringify({ name: 'sec', isPrivate: true }) })).status,
+    ).toBe(201);
+
+    for (const path of ['/repos/alice/pub', '/repos/alice/pub/branches', '/repos/alice/pub/tree', '/repos/alice/pub/commits', '/repos/alice/pub/issues']) {
+      expect(await anon(path).then((r) => r.status)).toBe(200);
+    }
+    expect(await anon('/repos/alice/pub/blob?path=f.txt').then((r) => r.status)).toBe(200);
+
+    expect(await anon('/repos/alice/sec').then((r) => r.status)).toBe(404);
+    expect(await anon('/repos/alice/sec/branches').then((r) => r.status)).toBe(404);
+    expect(await anon('/repos/alice/missing').then((r) => r.status)).toBe(404);
+
+    expect(await authed('/repos/alice/sec').then((r) => r.status)).toBe(200);
+  });
+
+  it('serves the repo-home shell for owner/repo paths without shadowing git', async () => {
+    const worker = new EdgeGitWorker() as unknown as { onRequest(r: Request, e: unknown, c: unknown): Promise<Response> };
+    const db = createApiFakeDb();
+    const authedEnv = createEnv(db);
+    const anonEnv = { ...authedEnv, DEV_AUTH_EMAIL: undefined };
+    await worker.onRequest(
+      new Request('https://git.example.com/user/repos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'pub' }) }),
+      authedEnv,
+      ctx,
+    );
+    const shell = await worker.onRequest(new Request('https://git.example.com/alice/pub'), anonEnv, ctx);
+    expect(shell.status).toBe(200);
+    expect(shell.headers.get('content-type')).toContain('text/html');
+    // Git smart-http still takes precedence on its exact paths.
+    const refs = await worker.onRequest(new Request('https://git.example.com/alice/pub/info/refs?service=git-upload-pack'), anonEnv, ctx);
+    expect(refs.status).toBe(200);
+    expect(refs.headers.get('content-type')).not.toContain('text/html');
   });
 });
 
