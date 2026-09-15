@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  dofs@0.1.0: a4e0c9784c0152850a43458069a84082829bcd7315a96a2c3a9f323f7e1d5fed
+
 importers:
 
   .:
@@ -302,7 +305,7 @@ importers:
         version: link:../shared
       dofs:
         specifier: ^0.1.0
-        version: 0.1.0(hono@4.13.7)
+        version: 0.1.0(patch_hash=a4e0c9784c0152850a43458069a84082829bcd7315a96a2c3a9f323f7e1d5fed)(hono@4.13.7)
       isomorphic-git:
         specifier: ^1.36.1
         version: 1.42.2
@@ -4419,7 +4422,7 @@ snapshots:
 
   diff3@0.0.3: {}
 
-  dofs@0.1.0(hono@4.13.7):
+  dofs@0.1.0(patch_hash=a4e0c9784c0152850a43458069a84082829bcd7315a96a2c3a9f323f7e1d5fed)(hono@4.13.7):
     dependencies:
       commander: 14.0.3
       hono: 4.13.7
