@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import type { Repo } from '../types';
 import { loadRepoAuthed, loadRepoPublic } from '../services/repoService';
 import { RepoHeader, type RepoTab } from '../components/repo/RepoHeader';
 import { CodeTab } from '../components/repo/CodeTab';
 import { IssuesTab } from '../components/repo/IssuesTab';
-import { TokensTab } from '../components/repo/TokensTab';
+import { RepoSettingsTab } from '../components/repo/RepoSettingsTab';
 import { Card } from '../components/ui/Card';
 import Unauthorized from '../components/layout/Unauthorized';
 
@@ -17,6 +17,7 @@ export function RepoView({
   showNotice: (type: 'success' | 'error', text: string) => void;
 }) {
   const { owner = '', repo = '' } = useParams<{ owner: string; repo: string }>();
+  const navigate = useNavigate();
   const [repoData, setRepoData] = useState<Repo | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'missing' | 'forbidden'>('loading');
   const [tab, setTab] = useState<RepoTab>('code');
@@ -87,16 +88,28 @@ export function RepoView({
     );
   }
 
+  const canManage = repoData?.viewerCanManage === true;
+  const visibleTab: RepoTab = tab === 'settings' && !canManage ? 'code' : tab;
+
   return (
     <div>
-      <RepoHeader repo={repoData} activeTab={tab} issueCount={issueCount} onTabChange={setTab} />
+      <RepoHeader repo={repoData} activeTab={visibleTab} issueCount={issueCount} showSettings={canManage} onTabChange={setTab} />
       <div className="max-w-7xl mx-auto px-6 py-6">
-        {tab === 'code' && <CodeTab owner={owner} repo={repo} repoMeta={repoData} showNotice={showNotice} />}
-        {tab === 'issues' && (
+        {visibleTab === 'code' && <CodeTab owner={owner} repo={repo} repoMeta={repoData} showNotice={showNotice} />}
+        {visibleTab === 'issues' && (
           <IssuesTab owner={owner} repo={repo} canWrite={authorized ?? false} showNotice={showNotice} onCountChange={setIssueCount} />
         )}
-        {tab === 'settings' &&
-          (authorized ? <TokensTab showNotice={showNotice} /> : <Unauthorized message="Sign In To Manage Access Tokens." />)}
+        {visibleTab === 'settings' && (
+          <RepoSettingsTab
+            key={`${repoData.description ?? ''}:${repoData.isPrivate}`}
+            owner={owner}
+            repo={repo}
+            repoMeta={repoData}
+            showNotice={showNotice}
+            onUpdated={setRepoData}
+            onDeleted={() => navigate('/')}
+          />
+        )}
       </div>
     </div>
   );

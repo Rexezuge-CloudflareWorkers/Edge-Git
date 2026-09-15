@@ -9,6 +9,7 @@ import { LandingView } from './views/LandingView';
 import { DashboardView } from './views/DashboardView';
 import { NewRepoView } from './views/NewRepoView';
 import { RepoView } from './views/RepoView';
+import { SettingsView } from './views/SettingsView';
 
 function TopHeader({ userEmail }: { userEmail: string | null }) {
   const isRepoPage = useMatch('/:owner/:repo') !== null;
@@ -50,6 +51,18 @@ export default function SpaApp() {
           }
         />
         <Route path="/:owner/:repo" element={<RepoView authorized={authorized} showNotice={showNotice} />} />
+        <Route
+          path="/settings"
+          element={
+            user ? (
+              <SettingsView user={user} showNotice={showNotice} />
+            ) : (
+              <div className="max-w-7xl mx-auto px-6 py-8">
+                <Unauthorized message="Sign In To Manage Settings." />
+              </div>
+            )
+          }
+        />
         <Route
           path="*"
           element={

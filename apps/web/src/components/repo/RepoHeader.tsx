@@ -16,13 +16,16 @@ export function RepoHeader({
   repo,
   activeTab,
   issueCount,
+  showSettings,
   onTabChange,
 }: {
   repo: Repo;
   activeTab: RepoTab;
   issueCount?: number;
+  showSettings?: boolean;
   onTabChange: (tab: RepoTab) => void;
 }) {
+  const tabs = showSettings ? TABS : TABS.filter((t) => t.id !== 'settings');
   return (
     <div className="sticky top-0 z-40 border-b border-[var(--color-border)] bg-[var(--color-surface-1)]/95 backdrop-blur">
       <div className="max-w-7xl mx-auto px-6 pt-6">
@@ -51,7 +54,7 @@ export function RepoHeader({
         </div>
 
         <nav className="flex items-center gap-0.5 mt-4">
-          {TABS.map((t) => (
+          {tabs.map((t) => (
             <button
               key={t.id}
               type="button"

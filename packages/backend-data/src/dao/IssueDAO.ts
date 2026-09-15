@@ -79,6 +79,21 @@ class IssueDAO extends BaseDAO {
     );
   }
 
+  public async deleteByRepo(repositoryId: string): Promise<void> {
+    await this.withRetry(
+      () =>
+        this.database
+          .prepare('DELETE FROM comments WHERE issue_id IN (SELECT id FROM issues WHERE repository_id = ?)')
+          .bind(repositoryId)
+          .run(),
+      'delete comments by repo',
+    );
+    await this.withRetry(
+      () => this.database.prepare('DELETE FROM issues WHERE repository_id = ?').bind(repositoryId).run(),
+      'delete issues by repo',
+    );
+  }
+
   public async addComment(id: string, issueId: string, authorEmail: string, body: string, now: number): Promise<void> {
     await this.withRetry(
       () => this.database.prepare('INSERT INTO comments (id, issue_id, author_email, body, created_at) VALUES (?, ?, ?, ?, ?)').bind(id, issueId, authorEmail, body, now).run(),

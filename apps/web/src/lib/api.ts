@@ -37,3 +37,7 @@ export async function apiPost<T>(path: string, body?: unknown, method = 'POST'):
 export async function apiDelete<T>(path: string): Promise<T> {
   return readJson<T>(await fetch(path, { method: 'DELETE' }));
 }
+
+export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
+  return apiPost<T>(path, body, 'PATCH');
+}

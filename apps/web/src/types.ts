@@ -11,6 +11,7 @@ export interface Repo {
   isPrivate: boolean;
   createdAt: number;
   updatedAt: number;
+  viewerCanManage?: boolean;
 }
 
 export interface BranchesResponse {

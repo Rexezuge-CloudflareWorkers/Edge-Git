@@ -9,6 +9,7 @@ import { advertiseUploadPack, advertiseReceivePack, getBasicCredentials, getBear
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { RepoServiceFactory } from '@edge-git/backend-services/repo';
 import { IssueServiceFactory } from '@edge-git/backend-services/issue';
+import { ServiceError } from '@edge-git/backend-errors';
 import { AccessAuthServiceFactory, TokenServiceFactory } from '@edge-git/backend-services/auth';
 import type { AccessIdentityContext } from '@edge-git/backend-services/auth';
 import { RepoService } from '@edge-git/backend-services/repo';
@@ -76,6 +77,16 @@ async function withPublicRepo(c: RequestContext, fn: (row: RepositoryRow, fullNa
   const row = await requireVisibleRepo(c.env, owner, repoName, viewerEmail);
   if (!row) return c.json({ error: 'Not found' }, 404);
   return fn(row, `${owner}/${repoName}`);
+}
+
+function toServiceStatus(error: unknown): 400 | 403 | 404 | 500 {
+  if (error instanceof ServiceError) {
+    const code = error.getErrorCode();
+    if (([400, 403, 404] as readonly number[]).includes(code)) {
+      return code as 400 | 403 | 404;
+    }
+  }
+  return 500;
 }
 
 class EdgeGitWorker extends AbstractEntrypointWorker {
@@ -262,14 +273,48 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     });
 
     app.get('/user/repos/:owner/:repo', async (c) => {
-      const row = await requireVisibleRepo(
-        c.env,
-        c.req.param('owner'),
-        RepoService.normalizeRepo(c.req.param('repo')),
-        c.get('AuthenticatedUserEmailAddress'),
-      );
+      const email = c.get('AuthenticatedUserEmailAddress');
+      const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
       if (!row) return c.json({ error: 'Not found' }, 404);
-      return c.json(toRepoJson(row));
+      return c.json({ ...(toRepoJson(row) as Record<string, unknown>), viewerCanManage: row.owner_email === email });
+    });
+
+    app.patch('/user/repos/:owner/:repo', async (c) => {
+      const email = c.get('AuthenticatedUserEmailAddress');
+      const owner = c.req.param('owner');
+      const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+      const body = (await c.req.json().catch(() => ({}))) as { description?: string | null; isPrivate?: boolean };
+      const patch: { description?: string | null; isPrivate?: boolean } = {};
+      if ('description' in body) patch.description = body.description ?? null;
+      if ('isPrivate' in body) patch.isPrivate = body.isPrivate;
+      if (patch.description === undefined && patch.isPrivate === undefined) {
+        return c.json({ error: 'Nothing to update' }, 400);
+      }
+      try {
+        const updated = await RepoServiceFactory.create({ DB: c.env.DB }).updateRepo(owner, repoName, email, patch);
+        return c.json({ ...(toRepoJson(updated) as Record<string, unknown>), viewerCanManage: true });
+      } catch (error) {
+        return c.json({ error: error instanceof Error ? error.message : 'Failed to update repo' }, toServiceStatus(error));
+      }
+    });
+
+    app.delete('/user/repos/:owner/:repo', async (c) => {
+      const email = c.get('AuthenticatedUserEmailAddress');
+      const owner = c.req.param('owner');
+      const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+      try {
+        const { id } = await RepoServiceFactory.create({ DB: c.env.DB }).deleteRepo(owner, repoName, email);
+        // Purge git objects from the Durable Object (best-effort; D1 is source of truth).
+        const fullName = `${owner}/${repoName}`;
+        try {
+          await getRepoStub(c.env, fullName).deleteRepo();
+        } catch (error) {
+          console.error('Failed to purge repo DO', fullName, error);
+        }
+        return c.json({ ok: true, id });
+      } catch (error) {
+        return c.json({ error: error instanceof Error ? error.message : 'Failed to delete repo' }, toServiceStatus(error));
+      }
     });
 
     const openapi: AppRouter = fromHono(app, { docs_url: '/docs' });
@@ -386,7 +431,7 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
         return c.notFound();
       }
       const path: string = new URL(c.req.url).pathname;
-      if (path === '/' || path.startsWith('/user/')) {
+      if (path === '/' || path === '/settings' || path === '/new' || path.startsWith('/user/')) {
         return c.html(SPA_HTML);
       }
       if (/^\/[^/]+\/[^/]+\/?$/.test(path)) {

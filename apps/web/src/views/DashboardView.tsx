@@ -57,7 +57,7 @@ export function DashboardView({ showNotice }: { showNotice: (type: 'success' | '
           <p className="text-sm text-[var(--color-text-secondary)]">
             Authenticated push and private fetch use a personal access token as the password:{' '}
             <code className="font-mono text-xs">https://&lt;owner&gt;:&lt;PAT&gt;@host/owner/repo</code>. Public repos allow anonymous
-            fetch.
+            fetch. Manage tokens in <Link to="/settings" className="text-[var(--color-accent)] hover:underline">Settings</Link>.
           </p>
         </div>
       </Card>
