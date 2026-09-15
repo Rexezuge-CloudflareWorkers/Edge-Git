@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
-import { DofsFs, GitService, IsoGitFs } from '@edge-git/git-service';
+import { DofsFs, GitService, IsoGitFs, PackLimitError } from '@edge-git/git-service';
 import {
+  buildFetchErrorResponse,
   buildFetchResponse,
   buildLsRefsResponse,
   buildReportStatus,
@@ -8,7 +9,10 @@ import {
   parseFetchRequest,
   parseReceivePackRequest,
   shouldSendPackfileForFetch,
+  validateFetchRequestCounts,
+  validateReceivePackCounts,
 } from '@edge-git/git-protocol';
+import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { createLogger } from '@edge-git/backend-runtime/logger';
 
 const logger = createLogger('RepoWorker');
@@ -122,22 +126,55 @@ class RepoWorker extends DurableObject<Env> {
     await this.loadFullNameIfNeeded();
     this.ensureDeviceSize();
     await this.ensureRepoInitialized();
+    this.git.ensureFreshCache(ConfigurationManager.repo.getCacheTtlSeconds(this.env));
+  }
+
+  private getLimits(): {
+    maxWants: number;
+    maxHaves: number;
+    maxCommands: number;
+    maxObjects: number;
+    maxPackBytes: number;
+    maxFetchBodyBytes: number;
+  } {
+    return {
+      maxWants: ConfigurationManager.repo.getMaxFetchWants(this.env),
+      maxHaves: ConfigurationManager.repo.getMaxFetchHaves(this.env),
+      maxCommands: ConfigurationManager.repo.getMaxPushCommands(this.env),
+      maxObjects: ConfigurationManager.repo.getMaxPackObjects(this.env),
+      maxPackBytes: ConfigurationManager.repo.getMaxPackBytes(this.env),
+      maxFetchBodyBytes: ConfigurationManager.repo.getMaxFetchBodyBytes(this.env),
+    };
   }
 
   public async receivePack(data: Uint8Array): Promise<Response> {
+    const limits = this.getLimits();
     const { commands, packfile, capabilities } = parseReceivePackRequest(data);
 
     if (commands.length === 0) {
       return buildReportStatus([{ ref: '*', ok: false, error: 'no commands' }], false);
     }
 
-    const packFilePath = `/repo/objects/pack/pack-${Date.now()}.pack`;
-    await this.isoGitFs.promises.writeFile(packFilePath, packfile);
+    const limitError = validateReceivePackCounts(commands.length, packfile.byteLength, {
+      maxCommands: limits.maxCommands,
+      maxPackBytes: limits.maxPackBytes,
+    });
+    if (limitError) {
+      logger.error(`(receive-pack) Rejected ${this.fullNameValue ?? 'unknown repo'}: ${limitError}`);
+      return buildReportStatus([{ ref: '*', ok: false, error: limitError }], false);
+    }
 
+    const packFilePath = `/repo/objects/pack/pack-${Date.now()}.pack`;
+    let wrotePack = false;
     try {
+      await this.isoGitFs.promises.writeFile(packFilePath, packfile);
+      wrotePack = true;
       await this.git.indexPack(packFilePath.replace('/repo/', ''));
     } catch (error) {
       logger.error('(receive-pack) Failed to index packfile: ', error);
+      if (wrotePack) {
+        await this.isoGitFs.promises.unlink(packFilePath).catch(() => undefined);
+      }
       return buildReportStatus(
         [
           {
@@ -152,11 +189,19 @@ class RepoWorker extends DurableObject<Env> {
 
     const atomic = capabilities.includes('atomic');
     const results = await this.git.applyRefUpdates(commands, atomic);
+    this.git.clearCache();
 
     return buildReportStatus(results, true);
   }
 
   public async uploadPack(data: Uint8Array): Promise<Response> {
+    const limits = this.getLimits();
+    this.git.ensureFreshCache(ConfigurationManager.repo.getCacheTtlSeconds(this.env));
+    if (data.byteLength > limits.maxFetchBodyBytes) {
+      const message = `fetch request too large: ${data.byteLength} > ${limits.maxFetchBodyBytes} bytes`;
+      logger.error(`(upload-pack-fetch) Rejected ${this.fullNameValue ?? 'unknown repo'}: ${message}`);
+      return buildFetchErrorResponse(message, 413);
+    }
     const { command, args } = parseCommand(data);
 
     if (command === 'ls-refs') {
@@ -177,7 +222,23 @@ class RepoWorker extends DurableObject<Env> {
         });
       }
 
-      const commonCommits = await this.git.findCommonCommits(fetchRequest.haves);
+      const countError = validateFetchRequestCounts(fetchRequest, {
+        maxWants: limits.maxWants,
+        maxHaves: limits.maxHaves,
+      });
+      if (countError) {
+        logger.error(`(upload-pack-fetch) Rejected ${this.fullNameValue ?? 'unknown repo'}: ${countError}`);
+        return buildFetchErrorResponse(countError, 400);
+      }
+
+      let commonCommits: string[];
+      try {
+        commonCommits = await this.git.findCommonCommits(fetchRequest.haves, limits.maxHaves);
+      } catch (error) {
+        const message = error instanceof PackLimitError ? error.message : (error as Error).message;
+        logger.error(`(upload-pack-fetch) Rejected ${this.fullNameValue ?? 'unknown repo'}: ${message}`);
+        return buildFetchErrorResponse(message, 400);
+      }
 
       // wait-for-done: never send ready/packfile until the client says done.
       // Otherwise (classic stateless negotiation) send ACK+ready+packfile in the
@@ -206,6 +267,7 @@ class RepoWorker extends DurableObject<Env> {
             since,
             exclude: excludeOids,
             filter: fetchRequest.filterSpec,
+            maxObjects: limits.maxObjects,
           });
 
           // include-tag: also send annotated tags pointing at packed commits.
@@ -213,10 +275,19 @@ class RepoWorker extends DurableObject<Env> {
           if (fetchRequest.capabilities.includeTag) {
             oidsToPack = await this.expandWithTags(oidsToPack);
           }
+          if (oidsToPack.length > limits.maxObjects) {
+            throw new PackLimitError(`too many objects: limit is ${limits.maxObjects}`);
+          }
 
           logger.info(`(upload-pack-fetch) Packing ${oidsToPack.length} objects for wants: ${fetchRequest.wants.join(', ')}`);
 
-          packfileData = await this.git.packObjects(oidsToPack);
+          const packed = await this.git.packObjects(oidsToPack);
+          if (packed && packed.byteLength > 0) {
+            if (packed.byteLength > limits.maxPackBytes) {
+              throw new PackLimitError(`pack too large: ${packed.byteLength} > ${limits.maxPackBytes} bytes`);
+            }
+            packfileData = packed;
+          }
           if (depth !== undefined || since !== undefined) {
             shallow = boundary;
             // Client-sent shallow lines now fulfilled are unshallowed.
@@ -227,7 +298,10 @@ class RepoWorker extends DurableObject<Env> {
           }
         } catch (error) {
           logger.error('(upload-pack-fetch) Failed to pack objects: ', error);
-          return new Response(`ERR pack-objects failed: ${(error as Error).message}`, { status: 500 });
+          if (error instanceof PackLimitError) {
+            return buildFetchErrorResponse(error.message, 413);
+          }
+          return buildFetchErrorResponse(`pack-objects failed: ${(error as Error).message}`, 500);
         }
       }
 

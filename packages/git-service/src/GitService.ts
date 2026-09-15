@@ -8,15 +8,35 @@ const logger = {
   error: (...args: unknown[]): void => console.error('[ERROR] [GitService]', ...args),
 };
 
+export class PackLimitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PackLimitError';
+  }
+}
+
 export class GitService {
   private readonly fs: ReturnType<IsoGitFs['getPromiseFsClient']>;
   private readonly gitdir: string;
 
-  private readonly cache: object = {};
+  private cache: object = {};
+  private cacheCreatedAt = Date.now();
 
   constructor(fs: ReturnType<IsoGitFs['getPromiseFsClient']>, gitdir: string) {
     this.fs = fs;
     this.gitdir = gitdir;
+  }
+
+  public clearCache(): void {
+    this.cache = {};
+    this.cacheCreatedAt = Date.now();
+  }
+
+  public ensureFreshCache(ttlSeconds: number): void {
+    if (!Number.isFinite(ttlSeconds) || ttlSeconds <= 0) return;
+    if (Date.now() - this.cacheCreatedAt > ttlSeconds * 1000) {
+      this.clearCache();
+    }
   }
 
   async initRepo() {
@@ -218,7 +238,7 @@ export class GitService {
   async collectObjectsForPack(
     wants: string[],
     haves: string[],
-    opts: { depth?: number; since?: number; exclude?: string[]; filter?: string } = {},
+    opts: { depth?: number; since?: number; exclude?: string[]; filter?: string; maxObjects?: number } = {},
   ): Promise<{ oids: string[]; shallow: string[] }> {
     const objectsToSend = new Set<string>();
     const visited = new Set<string>();
@@ -227,6 +247,16 @@ export class GitService {
     const shallowBoundary = new Set<string>();
     const maxDepth = opts.depth;
     const since = opts.since;
+    const maxObjects = opts.maxObjects;
+    const maxVisited = (maxObjects ?? 10_000) * 4 + 1000;
+    const assertObjectBudget = (): void => {
+      if (maxObjects !== undefined && objectsToSend.size > maxObjects) {
+        throw new PackLimitError(`too many objects: limit is ${maxObjects}`);
+      }
+      if (visited.size > maxVisited || objectsToSend.size > maxVisited) {
+        throw new PackLimitError('rev-walk too large');
+      }
+    };
     const filter = opts.filter?.trim() ?? '';
     const filterBlobs = filter === 'blob:none';
     const blobLimitMatch = /^blob:limit=(\d+)$/.exec(filter);
@@ -243,12 +273,16 @@ export class GitService {
     const queue: Array<{ oid: string; depth: number }> = wants.map((oid) => ({ oid, depth: 0 }));
 
     while (queue.length > 0) {
+      if (queue.length > maxVisited) {
+        throw new PackLimitError('rev-walk too large');
+      }
       const item = queue.shift();
       if (!item) continue;
       const { oid, depth } = item;
       if (!oid || visited.has(oid)) continue;
 
       visited.add(oid);
+      assertObjectBudget();
 
       // If the client already has this object (or it's explicitly excluded via
       // deepen-not), don't include it or traverse further.
@@ -285,6 +319,7 @@ export class GitService {
           // If content read fails, fall through and include the oid.
         }
         objectsToSend.add(oid);
+        assertObjectBudget();
         continue;
       }
 
@@ -293,6 +328,7 @@ export class GitService {
 
       // Add this object to the set of objects to send
       objectsToSend.add(oid);
+      assertObjectBudget();
 
       try {
         if (objType === 'commit') {
@@ -404,7 +440,10 @@ export class GitService {
     }
   }
 
-  async findCommonCommits(haves: string[]): Promise<string[]> {
+  async findCommonCommits(haves: string[], maxHaves?: number): Promise<string[]> {
+    if (maxHaves !== undefined && haves.length > maxHaves) {
+      throw new PackLimitError(`too many haves: ${haves.length} > ${maxHaves}`);
+    }
     const common: string[] = [];
 
     for (const oid of haves) {
