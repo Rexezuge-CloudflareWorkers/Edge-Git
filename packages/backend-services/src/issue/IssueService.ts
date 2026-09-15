@@ -7,11 +7,26 @@ interface IssueServiceEnv {
   DB: D1Queryable;
 }
 
+interface IssueServiceDeps {
+  issueDAO?: () => Promise<IssueDAO>;
+}
+
 class IssueService {
-  constructor(private readonly env: IssueServiceEnv) {}
+  private readonly deps: Required<IssueServiceDeps>;
+
+  constructor(
+    private readonly env: IssueServiceEnv,
+    deps: IssueServiceDeps = {},
+  ) {
+    this.deps = {
+      issueDAO: () => Promise.resolve(new IssueDAO(env.DB)),
+      ...deps,
+    };
+  }
 
   public async listByRepo(repositoryId: string, limit = 50): Promise<IssueRow[]> {
-    return new IssueDAO(this.env.DB).listByRepo(repositoryId, limit);
+    const dao = await this.deps.issueDAO();
+    return dao.listByRepo(repositoryId, limit);
   }
 
   public async createIssue(input: {
@@ -21,7 +36,7 @@ class IssueService {
     body?: string | null;
     creatorEmail: string;
   }): Promise<{ id: string; number: number }> {
-    const dao = new IssueDAO(this.env.DB);
+    const dao = await this.deps.issueDAO();
     const number = await dao.nextNumber(input.repositoryId);
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const id = UUIDUtil.getRandomUUID();
@@ -39,6 +54,9 @@ class IssueService {
   }
 }
 
+/**
+@deprecated Prefer `createRequestScope(env).get(Tokens.IssueService)`; this thin wrapper only preserves backward compatibility.
+*/
 class IssueServiceFactory {
   public static create(env: IssueServiceEnv): IssueService {
     return new IssueService(env);
@@ -46,4 +64,4 @@ class IssueServiceFactory {
 }
 
 export { IssueService, IssueServiceFactory };
-export type { IssueServiceEnv };
+export type { IssueServiceDeps, IssueServiceEnv };

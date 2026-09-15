@@ -13,8 +13,24 @@ interface RepoServiceEnv {
 const OWNER_RE = /^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$/i;
 const REPO_RE = /^[\w.-]{1,100}$/i;
 
+interface RepoServiceDeps {
+  repositoryDAO?: () => Promise<RepositoryDAO>;
+  issueDAO?: () => Promise<IssueDAO>;
+}
+
 class RepoService {
-  constructor(private readonly env: RepoServiceEnv) {}
+  private readonly deps: Required<RepoServiceDeps>;
+
+  constructor(
+    private readonly env: RepoServiceEnv,
+    deps: RepoServiceDeps = {},
+  ) {
+    this.deps = {
+      repositoryDAO: () => Promise.resolve(new RepositoryDAO(env.DB)),
+      issueDAO: () => Promise.resolve(new IssueDAO(env.DB)),
+      ...deps,
+    };
+  }
 
   public static normalizeOwner(owner: string): string {
     return owner.trim();
@@ -38,7 +54,7 @@ class RepoService {
     description: string | null,
     isPrivate: boolean,
   ): Promise<{ id: string }> {
-    const dao = new RepositoryDAO(this.env.DB);
+    const dao = await this.deps.repositoryDAO();
     RepoService.validateNames(owner, name);
     const existing = await dao.getByOwnerAndName(owner, name);
     if (existing) {
@@ -56,7 +72,7 @@ class RepoService {
   }
 
   public async getRepo(owner: string, name: string): Promise<RepositoryRow | null> {
-    const dao = new RepositoryDAO(this.env.DB);
+    const dao = await this.deps.repositoryDAO();
     return dao.getByOwnerAndName(owner, name);
   }
 
@@ -65,11 +81,12 @@ class RepoService {
   }
 
   public async listByOwnerEmail(ownerEmail: string, limit = 100): Promise<RepositoryRow[]> {
-    return new RepositoryDAO(this.env.DB).listByOwnerEmail(ownerEmail, limit);
+    const dao = await this.deps.repositoryDAO();
+    return dao.listByOwnerEmail(ownerEmail, limit);
   }
 
   public async requireOwner(owner: string, name: string, userEmail: string): Promise<RepositoryRow> {
-    const dao = new RepositoryDAO(this.env.DB);
+    const dao = await this.deps.repositoryDAO();
     const repo = await dao.getByOwnerAndName(owner, name);
     if (!repo) {
       throw new NotFoundError('Repository not found');
@@ -93,7 +110,7 @@ class RepoService {
     if (patch.isPrivate !== undefined && typeof patch.isPrivate !== 'boolean') {
       throw new BadRequestError('isPrivate must be a boolean');
     }
-    const dao = new RepositoryDAO(this.env.DB);
+    const dao = await this.deps.repositoryDAO();
     await dao.update(repo.id, { description: patch.description, isPrivate: patch.isPrivate, now: TimestampUtil.getCurrentUnixTimestampInSeconds() });
     const updated = await dao.getById(repo.id);
     if (!updated) {
@@ -104,12 +121,17 @@ class RepoService {
 
   public async deleteRepo(owner: string, name: string, userEmail: string): Promise<{ id: string }> {
     const repo = await this.requireOwner(owner, name, userEmail);
-    await new IssueDAO(this.env.DB).deleteByRepo(repo.id);
-    await new RepositoryDAO(this.env.DB).deleteById(repo.id);
+    const issueDAO = await this.deps.issueDAO();
+    await issueDAO.deleteByRepo(repo.id);
+    const repositoryDAO = await this.deps.repositoryDAO();
+    await repositoryDAO.deleteById(repo.id);
     return { id: repo.id };
   }
 }
 
+/**
+@deprecated Prefer `createRequestScope(env).get(Tokens.RepoService)`; this thin wrapper only preserves backward compatibility.
+*/
 class RepoServiceFactory {
   public static create(env: RepoServiceEnv): RepoService {
     return new RepoService(env);
@@ -117,4 +139,4 @@ class RepoServiceFactory {
 }
 
 export { RepoService, RepoServiceFactory };
-export type { RepoServiceEnv };
+export type { RepoServiceDeps, RepoServiceEnv };

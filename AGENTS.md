@@ -7,6 +7,8 @@ Edge-Git: Cloudflare Workers git server (`@edge-git/monorepo`, `pnpm@11.2.2`).
 - **Auth**: `/user/*` Cloudflare Access (`AccessAuthService`: DEMO→DEV→JWT→`ctx.access` fallback; never trust `Cf-Access-Authenticated-User-Email`); git anon (public fetch) + PAT Basic/Bearer (`TokenService`, sha256 `edge-git-pat:` prefix, `MAX_TOKENS_PER_USER=5`).
 - **API**: `apps/api` Hono+Chanfana `EdgeGitWorker` (`/:owner/:repo/info/refs|git-upload-pack|git-receive-pack` + `/user/me|repos|tokens|issues` + `/health`, `/docs`); `apps/api/src/index.ts` re-exports DOs for bindings.
 - **Web**: `apps/web` Vite SPA, build embeds `dist/index.html` → `apps/api/src/generated/spa-shell.ts`.
+- **Composition**: per-request `*Factory.create({ DB })` / `(env)` from `@edge-git/backend-services/composition`; `Container` + `createServiceContext` + `AppConfiguration` in `@edge-git/backend-runtime/di+config` are the DI foundation (`scope.get(Tokens.X)` is Otter-parity target, not yet wired). See `docs/agents/runtime/AGENTS.md`.
+- **i18n**: not yet implemented (no `packages/shared/src/i18n`, no web locales); English UI text uses Title Case. See `apps/web/AGENTS.md`.
 
 ## Commands
 
@@ -31,6 +33,34 @@ backend-services → 0-2 (not apps)
 background → 0-3
 api → 0-3 + background (no DAO value imports in endpoints)
 ```
+
+## Import Direction
+
+```
+Layer 0: shared, backend-errors          — zero @edge-git/* deps
+Layer 1: backend-runtime                 → layer 0 only
+Layer 2: backend-data, git-protocol      → layer 0 only
+Layer 2-3: git-service                   → layers 0–2 (not backend-services/apps)
+Layer 3: backend-services                → layers 0–2 (not apps)
+(no Layer 4 by design)
+Layer 5: apps/background                 → layers 0–3 + git-* (not apps/api)
+         apps/api                        → layers 0–3 + background (NOT git-service directly; NOT backend-data/dao except type-only)
+```
+
+Enforced by ESLint `no-restricted-imports` in `eslint.config.mjs`: `apps/api` blocks `→ @edge-git/git-service` (all imports) and `→ @edge-git/backend-data/dao` (`allowTypeImports: true`). `apps/api → apps/background` re-export is allowed (`src/index.ts` re-exports `CronTasksWorker`, `RepoWorker` for bindings).
+
+## Index
+
+| Area | Guide |
+| ---- | ----- |
+| API worker, auth, routes | `apps/api/AGENTS.md` |
+| Background worker, cron phases, task visibility | `apps/background/AGENTS.md` |
+| Web SPA, router, i18n/Title Case conventions | `apps/web/AGENTS.md` |
+| Business logic, service domain map | `packages/backend-services/AGENTS.md` |
+| D1/DAO layer | `packages/backend-data/AGENTS.md` |
+| Git pkt-line/protocol roles | `packages/git-protocol/AGENTS.md` |
+| Bindings, wrangler, env vars, DI | `docs/agents/runtime/AGENTS.md` |
+| Tests, thresholds, mock patterns | `docs/agents/testing/AGENTS.md` |
 
 ## Commit Policy
 

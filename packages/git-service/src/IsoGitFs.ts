@@ -5,6 +5,7 @@
  */
 
 import type { Fs } from 'dofs';
+import { ErrorNormalizer, normalizePath } from './ErrorNormalizer';
 
 type TextEncoding = 'utf8' | 'buffer';
 
@@ -37,78 +38,17 @@ interface StatsLike {
 }
 
 /**
- * Normalizes a given path, resolving '..' and '.' segments and ensuring a leading slash.
- * @param p - The path to normalize.
- * @returns The normalized path.
- */
-function normalizePath(p: string): string {
-  let path = p;
-  if (!path) return '/';
-  // Strip query/hash (shouldn't appear, but be safe)
-  path = path.split('?', 1)[0].split('#', 1)[0];
-  // Replace backslashes and ensure leading slash so we treat all as absolute inside DO
-  path = path.replaceAll('\\', '/');
-  if (!path.startsWith('/')) path = `/${path}`;
-  // Split and resolve '.' and '..'
-  const out: string[] = [];
-  for (const rawSeg of path.split('/')) {
-    const seg = rawSeg.trim();
-    if (!seg || seg === '.') continue; // skip empty & current dir
-    if (seg === '..') {
-      if (out.length > 0) out.pop();
-      continue;
-    }
-    out.push(seg);
-  }
-  return `/${out.join('/')}`;
-}
-
-/**
- * Custom Error class that includes a `code` property, similar to Node.js system errors.
- */
-class ErrorWithCode extends Error {
-  code?: string;
-  path?: string;
-  syscall?: string;
-  constructor(message: string, code?: string, path?: string, syscall?: string) {
-    super(message);
-    this.code = code;
-    this.path = path;
-    this.syscall = syscall;
-  }
-}
-
-/**
- * A file system abstraction layer that wraps a dofs (Durable Object File System) instance
- * to provide a Node.js-like `fs.promises` API, suitable for use with isomorphic-git.
+ * A file system abstraction layer that wraps a dofs instance
+ * to provide a Node.js-like `fs.promises` API for isomorphic-git.
  */
 export class IsoGitFs {
   private readonly dofs: Fs;
-  private readonly KNOWN_CODES = new Set([
-    'ENOENT',
-    'ENOTDIR',
-    'EISDIR',
-    'EEXIST',
-    'EPERM',
-    'EACCES',
-    'EINVAL',
-    'EBUSY',
-    'ENOSPC',
-    'ENOTEMPTY',
-  ]);
+  private readonly normalizer = new ErrorNormalizer();
 
-  /**
-   * Creates an instance of IsoGitFs.
-   * @param dofs - The dofs Fs instance to wrap.
-   */
   constructor(dofs: Fs) {
     this.dofs = dofs;
   }
 
-  /**
-   * Returns an object that mimics the Node.js `fs.promises` API.
-   * @returns An object with promisified file system methods.
-   */
   getPromiseFsClient() {
     const fs = {
       promises: {
@@ -127,73 +67,6 @@ export class IsoGitFs {
     return fs;
   }
 
-  /**
-   * Ensures that an error object has a `code` property, attempting to infer it from the message if missing.
-   * @param error - The error object to process.
-   * @returns The error object with a `code` property, or undefined if no code could be determined.
-   */
-  private ensureErrCode(error: Error) {
-    const e = new ErrorWithCode(error.message);
-    if ((e as { code?: string }).code) return e;
-    const msg = e.message.trim();
-    if (this.KNOWN_CODES.has(msg)) {
-      e.code = msg;
-      return e;
-    }
-    const parts = msg.replaceAll(':', ' ').split(' ');
-    for (const part of parts) {
-      if (this.KNOWN_CODES.has(part)) {
-        e.code = part;
-        return e;
-      }
-    }
-    // Default to ENOENT so isomorphic-git treats missing paths as absent
-    // instead of swallowing the error (previous version returned undefined).
-    if (!e.code) e.code = 'ENOENT';
-    return e;
-  }
-
-  /**
-   * Annotates an error with syscall and path information and then throws it.
-   * @param error - The original error.
-   * @param syscall - The name of the system call that failed.
-   * @param path - The path involved in the system call.
-   * @throws The annotated error.
-   */
-  private annotateAndThrow(error: unknown, syscall: string, path: string): never {
-    if (error instanceof Error) {
-      const e = this.ensureErrCode(error);
-      e.path = path;
-      e.syscall = syscall;
-      throw e;
-    }
-    throw error;
-  }
-
-  /**
-   * Annotates an error and returns it as a rejected promise, preserving the
-   * `fs.promises` rejection contract for the synchronous `dofs` backend.
-   * @param error - The original error.
-   * @param syscall - The name of the system call that failed.
-   * @param path - The path involved in the system call.
-   * @returns A rejected promise with the annotated error.
-   */
-  private annotateAndReject(error: unknown, syscall: string, path: string): Promise<never> {
-    try {
-      this.annotateAndThrow(error, syscall, path);
-    } catch (annotated) {
-      return Promise.reject(annotated instanceof Error ? annotated : new Error(String(annotated)));
-    }
-    // Unreachable: annotateAndThrow always throws, but keep TS control-flow happy.
-    throw error;
-  }
-
-  /**
-   * Reads the content of a file.
-   * @param path - The path to the file.
-   * @param options - Encoding options.
-   * @returns The content of the file as a Buffer or string.
-   */
   readFile(path: string, options?: TextEncoding | { encoding?: TextEncoding }): Promise<Uint8Array | string> {
     const encoding = typeof options === 'string' ? options : options?.encoding;
     const normalizedPath = normalizePath(path);
@@ -207,16 +80,10 @@ export class IsoGitFs {
       if (!encoding || encoding === 'buffer') return Promise.resolve(bytes);
       return Promise.resolve(new TextDecoder('utf-8').decode(bytes));
     } catch (error) {
-      return this.annotateAndReject(error, 'readFile', normalizedPath);
+      return this.normalizer.annotateAndReject(error, 'readFile', normalizedPath);
     }
   }
 
-  /**
-   * Writes data to a file.
-   * @param filepath - The path to the file.
-   * @param data - The data to write.
-   * @param options - Encoding options.
-   */
   async writeFile(filepath: string, data: string | ArrayBufferView | ArrayBuffer, options?: TextEncoding | { encoding?: TextEncoding }) {
     const encoding = typeof options === 'string' ? options : options?.encoding;
     let arrayLike: ArrayBuffer | string;
@@ -232,75 +99,50 @@ export class IsoGitFs {
     try {
       await this.dofs.writeFile(normalizedPath, arrayLike, { encoding });
     } catch (error) {
-      this.annotateAndThrow(error, 'writeFile', normalizedPath);
+      this.normalizer.annotateAndThrow(error, 'writeFile', normalizedPath);
     }
   }
 
-  /**
-   * Deletes a file.
-   * @param path - The path to the file to delete.
-   */
   unlink(path: string): Promise<void> {
     const normalizedPath = normalizePath(path);
     try {
       this.dofs.unlink(normalizedPath);
       return Promise.resolve();
     } catch (error) {
-      return this.annotateAndReject(error, 'unlink', normalizedPath);
+      return this.normalizer.annotateAndReject(error, 'unlink', normalizedPath);
     }
   }
 
-  /**
-   * Reads the contents of a directory.
-   * @param path - The path to the directory.
-   * @returns An array of the names of the files in the directory (excluding '.' and '..').
-   */
   readdir(path: string): Promise<string[]> {
     const normalizedPath = normalizePath(path);
     try {
       const names = this.dofs.listDir(normalizedPath, {});
       return Promise.resolve(names.filter((n) => n !== '.' && n !== '..'));
     } catch (error) {
-      return this.annotateAndReject(error, 'readdir', normalizedPath);
+      return this.normalizer.annotateAndReject(error, 'readdir', normalizedPath);
     }
   }
 
-  /**
-   * Creates a directory.
-   * @param path - The path to the directory to create.
-   * @param options - Options for creating the directory, including `recursive` and `mode`.
-   */
   mkdir(path: string, options?: { recursive?: boolean; mode?: number }): Promise<void> {
     const normalizedPath = normalizePath(path);
     try {
       this.dofs.mkdir(normalizedPath, { recursive: true, ...options });
       return Promise.resolve();
     } catch (error) {
-      return this.annotateAndReject(error, 'mkdir', normalizedPath);
+      return this.normalizer.annotateAndReject(error, 'mkdir', normalizedPath);
     }
   }
 
-  /**
-   * Removes a directory.
-   * @param path - The path to the directory to remove.
-   * @param options - Options for removing the directory, including `recursive`.
-   */
   rmdir(path: string, options?: { recursive?: boolean }): Promise<void> {
     const normalizedPath = normalizePath(path);
     try {
       this.dofs.rmdir(normalizedPath, { recursive: true, ...options });
       return Promise.resolve();
     } catch (error) {
-      return this.annotateAndReject(error, 'rmdir', normalizedPath);
+      return this.normalizer.annotateAndReject(error, 'rmdir', normalizedPath);
     }
   }
 
-  /**
-   * Core stat function used by both `stat` and `lstat`.
-   * @param path - The path to the file or directory.
-   * @param detectSymlink - Whether to detect if the path is a symlink.
-   * @returns A Node.js-like `Stats` object.
-   */
   statCore(path: string, detectSymlink: boolean): Promise<StatsLike> {
     let isSymlink = false;
     const normalizedPath = normalizePath(path);
@@ -312,7 +154,7 @@ export class IsoGitFs {
         if (error instanceof Error && error.message === 'ENOENT') {
           isSymlink = false;
         } else {
-          return this.annotateAndReject(error, 'lstat', normalizedPath);
+          return this.normalizer.annotateAndReject(error, 'lstat', normalizedPath);
         }
       }
     }
@@ -354,52 +196,32 @@ export class IsoGitFs {
 
       return Promise.resolve(nodeStat);
     } catch (error) {
-      return this.annotateAndReject(error, detectSymlink ? 'lstat' : 'stat', normalizedPath);
+      return this.normalizer.annotateAndReject(error, detectSymlink ? 'lstat' : 'stat', normalizedPath);
     }
   }
 
-  /**
-   * Returns information about a file or directory. If the path is a symbolic link, then the link itself is stat-ed, not the file that it refers to.
-   * @param path - The path to the file or directory.
-   * @returns A Node.js-like `Stats` object.
-   */
   stat(path: string): Promise<StatsLike> {
     return this.statCore(path, false);
   }
 
-  /**
-   * Returns information about a file or directory. If the path is a symbolic link, then the link itself is stat-ed, not the file that it refers to.
-   * @param path - The path to the file or directory.
-   * @returns A Node.js-like `Stats` object.
-   */
   lstat(path: string): Promise<StatsLike> {
     return this.statCore(path, true);
   }
 
-  /**
-   * Reads the value of a symbolic link.
-   * @param path - The path to the symbolic link.
-   * @returns The path to which the symbolic link points.
-   */
   readlink(path: string): Promise<string> {
     try {
       return Promise.resolve(this.dofs.readlink(path));
     } catch (error) {
-      return this.annotateAndReject(error, 'readlink', path);
+      return this.normalizer.annotateAndReject(error, 'readlink', path);
     }
   }
 
-  /**
-   * Creates a symbolic link.
-   * @param target - The target path of the link.
-   * @param path - The path where the symbolic link will be created.
-   */
   symlink(target: string, path: string): Promise<void> {
     try {
       this.dofs.symlink(target, path);
       return Promise.resolve();
     } catch (error) {
-      return this.annotateAndReject(error, 'symlink', path);
+      return this.normalizer.annotateAndReject(error, 'symlink', path);
     }
   }
 }

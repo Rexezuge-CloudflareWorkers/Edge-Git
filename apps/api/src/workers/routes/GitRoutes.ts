@@ -1,0 +1,79 @@
+import type { Hono } from 'hono';
+import { gitAuthForRepo } from '@/middleware';
+import { getRepoStub } from '../repoStub';
+import { advertiseUploadPack, advertiseReceivePack } from '@edge-git/git-protocol';
+import { RepoService } from '@edge-git/backend-services/repo';
+import { ConfigurationManager } from '@edge-git/backend-runtime/config';
+
+type GitApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
+
+// Git Smart HTTP — must stay outside Access auth (PAT/anonymous).
+function registerGitRoutes(app: GitApp): void {
+  app.get('/:owner/:repo/info/refs', async (c) => {
+    const owner = c.req.param('owner');
+    const repoParam = c.req.param('repo');
+    const repoName = RepoService.normalizeRepo(repoParam);
+    const service = new URL(c.req.url).searchParams.get('service');
+    if (service !== 'git-upload-pack' && service !== 'git-receive-pack') {
+      return c.text('Invalid service', 400);
+    }
+    const auth = await gitAuthForRepo(c as never, owner, repoName, service);
+    if (auth instanceof Response) return auth;
+    if (service === 'git-upload-pack') {
+      return advertiseUploadPack();
+    }
+    const fullName = `${owner}/${repoName}`;
+    const stub = getRepoStub(c.env, fullName);
+    return advertiseReceivePack(() => stub.listRefs());
+  });
+
+  app.post('/:owner/:repo/git-upload-pack', async (c) => {
+    const owner = c.req.param('owner');
+    const repoParam = c.req.param('repo');
+    const repoName = RepoService.normalizeRepo(repoParam);
+    const auth = await gitAuthForRepo(c as never, owner, repoName, 'git-upload-pack');
+    if (auth instanceof Response) return auth;
+    const maxFetchBodyBytes = ConfigurationManager.repo.getMaxFetchBodyBytes(c.env);
+    const contentLength = Number(c.req.header('Content-Length'));
+    if (Number.isSafeInteger(contentLength) && contentLength > maxFetchBodyBytes) {
+      return c.text(`ERR fetch request too large: ${contentLength} > ${maxFetchBodyBytes} bytes`, 413);
+    }
+    const fullName = `${owner}/${repoName}`;
+    const stub = getRepoStub(c.env, fullName);
+    const body = new Uint8Array(await c.req.arrayBuffer());
+    if (body.byteLength > maxFetchBodyBytes) {
+      return c.text(`ERR fetch request too large: ${body.byteLength} > ${maxFetchBodyBytes} bytes`, 413);
+    }
+    const res = await stub.fetch(new Request('https://do/git-upload-pack', { method: 'POST', body: body as unknown as BodyInit }));
+    return new Response(res.body, {
+      status: res.status,
+      headers: { 'Content-Type': 'application/x-git-upload-pack-result', 'Cache-Control': 'no-cache' },
+    });
+  });
+
+  app.post('/:owner/:repo/git-receive-pack', async (c) => {
+    const owner = c.req.param('owner');
+    const repoParam = c.req.param('repo');
+    const repoName = RepoService.normalizeRepo(repoParam);
+    const auth = await gitAuthForRepo(c as never, owner, repoName, 'git-receive-pack');
+    if (auth instanceof Response) return auth;
+    const maxPackBytes = ConfigurationManager.repo.getMaxPackBytes(c.env);
+    const contentLength = Number(c.req.header('Content-Length'));
+    if (Number.isSafeInteger(contentLength) && contentLength > maxPackBytes) {
+      return c.text(`ERR pack too large: ${contentLength} > ${maxPackBytes} bytes`, 413);
+    }
+    const fullName = `${owner}/${repoName}`;
+    const stub = getRepoStub(c.env, fullName);
+    const body = new Uint8Array(await c.req.arrayBuffer());
+    if (body.byteLength > maxPackBytes) {
+      return c.text(`ERR pack too large: ${body.byteLength} > ${maxPackBytes} bytes`, 413);
+    }
+    const res = await stub.fetch(new Request('https://do/git-receive-pack', { method: 'POST', body: body as unknown as BodyInit }));
+    return new Response(res.body, {
+      status: res.status,
+      headers: { 'Content-Type': 'application/x-git-receive-pack-result', 'Cache-Control': 'no-cache' },
+    });
+  });
+}
+
+export { registerGitRoutes };
