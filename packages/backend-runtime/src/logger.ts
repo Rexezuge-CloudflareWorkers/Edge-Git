@@ -8,7 +8,7 @@ const LOG_LEVELS: Record<LogLevel, number> = {
 } as const;
 
 function isLogLevel(level: string): level is LogLevel {
-  return level === 'debug' || level === 'info' || level === 'warn' || level === 'error';
+  return (['debug', 'info', 'warn', 'error'] as const).includes(level as LogLevel);
 }
 
 function resolveLogLevel(): LogLevel {

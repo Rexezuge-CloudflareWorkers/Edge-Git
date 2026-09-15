@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { createLogger } from '@edge-git/backend-runtime/logger';
-import { CRON_TASK_DEFINITIONS, runScheduledTasks } from './scheduled/TaskRegistry';
+import { runScheduledTasks } from './scheduled/TaskRegistry';
 
 const logger = createLogger('CronTasksWorker');
 

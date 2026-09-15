@@ -29,9 +29,10 @@ const CRON_TASK_DEFINITIONS: ScheduledTask[] = [
   {
     name: 'BackgroundTaskRunPruningTask',
     phase: 2,
-    run: async (env: Env) => {
+    run: (env: Env) => {
       const retention = ConfigurationManager.processing.getTaskRunRetentionDays(env);
       logger.info(`Background task retention ${retention}d (no-op v1)`);
+      return Promise.resolve();
     },
   },
 ];

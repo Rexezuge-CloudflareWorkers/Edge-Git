@@ -13,6 +13,7 @@ function useMe(): string | null {
   const [email, setEmail] = useState<string | null>(null);
   useEffect(() => {
     fetch('/user/me')
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
       .then((r) => (r.ok ? (r.json() as Promise<{ email?: string }>) : null))
       .then((d) => setEmail(d?.email ?? null))
       .catch(() => setEmail(null));
@@ -29,7 +30,9 @@ function App(): React.JSX.Element {
 
   const load = (): void => {
     fetch('/user/repos')
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
       .then((r) => (r.ok ? (r.json() as Promise<{ repos?: Repo[] }>) : { repos: [] }))
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
       .then((d) => setRepos((d as { repos?: Repo[] }).repos ?? []))
       .catch(() => undefined);
   };
@@ -62,12 +65,14 @@ function App(): React.JSX.Element {
       <section>
         <h2>Clone</h2>
         <pre>
-          git clone {typeof window === 'undefined' ? '' : window.location.origin}
-          /{'<owner>/<repo>'}
+          git clone {globalThis.location?.origin ?? ''}/{'<owner>/<repo>'}
         </pre>
         <p>
-          Auth: <code>git clone https://{'<owner>'}:{'<PAT>'}@host/owner/repo</code> — use PAT as password. Public repos allow
-          anonymous fetch.
+          Auth:{' '}
+          <code>
+            git clone https://{'<owner>'}:{'<PAT>'}@host/owner/repo
+          </code>{' '}
+          — use PAT as password. Public repos allow anonymous fetch.
         </p>
       </section>
       <section>
@@ -105,6 +110,7 @@ function TokenManager(): React.JSX.Element {
   const [lastCreated, setLastCreated] = useState<string | null>(null);
   const load = (): void => {
     fetch('/user/tokens')
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
       .then((r) => r.json() as Promise<{ tokens?: Array<{ tokenId: string; name: string; expiresAt: number }> }>)
       .then((d) => setTokens(d.tokens ?? []))
       .catch(() => undefined);
@@ -117,6 +123,7 @@ function TokenManager(): React.JSX.Element {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
     });
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
     const data = (await res.json()) as { token?: string; error?: string };
     if (res.ok) {
       setLastCreated(data.token as string);
@@ -143,7 +150,9 @@ function TokenManager(): React.JSX.Element {
             {t.name} — expires {new Date(t.expiresAt * 1000).toISOString()}
             <button
               onClick={() => {
-                fetch(`/user/tokens/${t.tokenId}`, { method: 'DELETE' }).then(load).catch(() => undefined);
+                fetch(`/user/tokens/${t.tokenId}`, { method: 'DELETE' })
+                  .then(load)
+                  .catch(() => undefined);
               }}
             >
               revoke
@@ -155,7 +164,7 @@ function TokenManager(): React.JSX.Element {
   );
 }
 
-const root = document.getElementById('root');
+const root = document.querySelector('#root');
 if (root) {
   createRoot(root).render(<App />);
 }

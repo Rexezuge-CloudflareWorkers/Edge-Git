@@ -1,37 +1,32 @@
 /**
  * Represents a flush packet, indicating the end of a message.
  */
-export type FlushPkt = { type: "flush" };
+export type FlushPkt = { type: 'flush' };
 
 /**
  * Represents a delimiter packet, separating sections of a message.
  */
-export type DelimiterPkt = { type: "delim" };
+export type DelimiterPkt = { type: 'delim' };
 
 /**
  * Represents a response end packet, indicating the end of a response for stateless connections.
  */
-export type ResponseEndPkt = { type: "response-end" };
+export type ResponseEndPkt = { type: 'response-end' };
 
 /**
  * Represents a data packet containing a Uint8Array payload.
  */
-export type DataPkt = { type: "data"; data: Uint8Array };
+export type DataPkt = { type: 'data'; data: Uint8Array };
 
 /**
  * Represents an error packet with a message.
  */
-export type ErrorPkt = { type: "error"; message: string };
+export type ErrorPkt = { type: 'error'; message: string };
 
 /**
  * Represents a union of all possible packet types.
  */
-export type Packet =
-  | FlushPkt
-  | DelimiterPkt
-  | ResponseEndPkt
-  | DataPkt
-  | ErrorPkt;
+export type Packet = FlushPkt | DelimiterPkt | ResponseEndPkt | DataPkt | ErrorPkt;
 
 /**
  * Git pkt-line parser for Git wire protocol version 2.
@@ -44,30 +39,46 @@ export type Packet =
  * @see https://git-scm.com/docs/gitprotocol-pack
  */
 export class PktLine {
-  /** Flush packet - indicates end of message */
-  static readonly FLUSH = "0000";
+  /**
+  Flush packet - indicates end of message
+  */
+  static readonly FLUSH = '0000';
 
-  /** Delimiter packet - separates sections of a message */
-  static readonly DELIM = "0001";
+  /**
+  Delimiter packet - separates sections of a message
+  */
+  static readonly DELIM = '0001';
 
-  /** Response end packet - indicates end of response for stateless connections */
-  static readonly RESPONSE_END = "0002";
+  /**
+  Response end packet - indicates end of response for stateless connections
+  */
+  static readonly RESPONSE_END = '0002';
 
-  /** Maximum total packet size (4-byte header + payload) */
+  /**
+  Maximum total packet size (4-byte header + payload)
+  */
   static readonly MAX_PKT_SIZE = 65_520;
 
-  /** Maximum payload size (MAX_PKT_SIZE - 4 byte header) */
+  /**
+  Maximum payload size (MAX_PKT_SIZE - 4 byte header)
+  */
   static readonly MAX_PAYLOAD_SIZE = 65_516;
 
-  /** Error packet prefix */
-  private static readonly ERR_PREFIX = "ERR ";
+  /**
+  Error packet prefix
+  */
+  private static readonly ERR_PREFIX = 'ERR ';
 
-  /** Side-band channels */
+  /**
+  Side-band channels
+  */
   static readonly SIDEBAND_CHANNEL_PACKFILE = 1;
   static readonly SIDEBAND_CHANNEL_PROGRESS = 2;
   static readonly SIDEBAND_CHANNEL_ERROR = 3;
 
-  /** Maximum side-band payload size (MAX_PKT_SIZE - 4 byte header - 1 byte for channel) */
+  /**
+  Maximum side-band payload size (MAX_PKT_SIZE - 4 byte header - 1 byte for channel)
+  */
   static readonly MAX_SIDEBAND_PAYLOAD = 65_515;
 
   /**
@@ -79,16 +90,14 @@ export class PktLine {
    * @throws Error if payload exceeds maximum size
    */
   static encode(data: Uint8Array | string): Uint8Array {
-    const payload = typeof data === "string" ? PktLine.encodeText(data) : data;
+    const payload = typeof data === 'string' ? this.encodeText(data) : data;
 
-    if (payload.length > PktLine.MAX_PAYLOAD_SIZE) {
-      throw new Error(
-        `Payload size ${payload.length} exceeds maximum ${PktLine.MAX_PAYLOAD_SIZE}`
-      );
+    if (payload.length > this.MAX_PAYLOAD_SIZE) {
+      throw new Error(`Payload size ${payload.length} exceeds maximum ${this.MAX_PAYLOAD_SIZE}`);
     }
 
     const len = payload.byteLength + 4; // length includes the 4-byte header
-    const header = new TextEncoder().encode(PktLine.formatPktLength(len));
+    const header = new TextEncoder().encode(this.formatPktLength(len));
     const out = new Uint8Array(header.byteLength + payload.byteLength);
     out.set(header, 0);
     out.set(payload, header.byteLength);
@@ -103,7 +112,7 @@ export class PktLine {
    * @returns Flush packet as Uint8Array
    */
   static encodeFlush(): Uint8Array {
-    return PktLine.encodeText(PktLine.FLUSH);
+    return this.encodeText(this.FLUSH);
   }
 
   /**
@@ -113,7 +122,7 @@ export class PktLine {
    * @returns Delimiter packet as Uint8Array
    */
   static encodeDelim(): Uint8Array {
-    return PktLine.encodeText(PktLine.DELIM);
+    return this.encodeText(this.DELIM);
   }
 
   /**
@@ -123,7 +132,7 @@ export class PktLine {
    * @returns Response-end packet as Uint8Array
    */
   static encodeResponseEnd(): Uint8Array {
-    return PktLine.encodeText(PktLine.RESPONSE_END);
+    return this.encodeText(this.RESPONSE_END);
   }
 
   /**
@@ -136,17 +145,15 @@ export class PktLine {
    * @throws Error if payload exceeds maximum size
    */
   static encodeSideband(channel: 1 | 2 | 3, data: Uint8Array): Uint8Array {
-    if (data.length > PktLine.MAX_SIDEBAND_PAYLOAD) {
-      throw new Error(
-        `Sideband payload exceeds ${PktLine.MAX_SIDEBAND_PAYLOAD} bytes`
-      );
+    if (data.length > this.MAX_SIDEBAND_PAYLOAD) {
+      throw new Error(`Sideband payload exceeds ${this.MAX_SIDEBAND_PAYLOAD} bytes`);
     }
 
     const packet = new Uint8Array(1 + data.length);
     packet[0] = channel;
     packet.set(data, 1);
 
-    return PktLine.encode(packet);
+    return this.encode(packet);
   }
 
   /**
@@ -156,10 +163,7 @@ export class PktLine {
    * @returns Encoded side-band progress packet
    */
   static encodeProgress(message: string): Uint8Array {
-    return PktLine.encodeSideband(
-      PktLine.SIDEBAND_CHANNEL_PROGRESS,
-      PktLine.encodeText(message)
-    );
+    return this.encodeSideband(this.SIDEBAND_CHANNEL_PROGRESS, this.encodeText(message));
   }
 
   /**
@@ -169,10 +173,7 @@ export class PktLine {
    * @returns Encoded side-band error packet
    */
   static encodeSidebandError(message: string): Uint8Array {
-    return PktLine.encodeSideband(
-      PktLine.SIDEBAND_CHANNEL_ERROR,
-      PktLine.encodeText(message)
-    );
+    return this.encodeSideband(this.SIDEBAND_CHANNEL_ERROR, this.encodeText(message));
   }
 
   /**
@@ -185,32 +186,28 @@ export class PktLine {
    */
   static decode(buffer: Uint8Array): Packet {
     if (buffer.length < 4) {
-      throw new Error(
-        `Buffer too short: ${buffer.length} bytes (need at least 4)`
-      );
+      throw new Error(`Buffer too short: ${buffer.length} bytes (need at least 4)`);
     }
 
     // Parse length header
-    const lengthHex = PktLine.decodeText(buffer.slice(0, 4));
+    const lengthHex = this.decodeText(buffer.slice(0, 4));
 
     // Check for special packets
-    if (lengthHex === PktLine.FLUSH) {
-      return { type: "flush" };
+    if (lengthHex === this.FLUSH) {
+      return { type: 'flush' };
     }
-    if (lengthHex === PktLine.DELIM) {
-      return { type: "delim" };
+    if (lengthHex === this.DELIM) {
+      return { type: 'delim' };
     }
-    if (lengthHex === PktLine.RESPONSE_END) {
-      return { type: "response-end" };
+    if (lengthHex === this.RESPONSE_END) {
+      return { type: 'response-end' };
     }
 
     // Parse length
-    const length = PktLine.parsePktLength(buffer.slice(0, 4));
+    const length = this.parsePktLength(buffer.slice(0, 4));
 
     if (buffer.length < length) {
-      throw new Error(
-        `Buffer too short: ${buffer.length} bytes (need ${length})`
-      );
+      throw new Error(`Buffer too short: ${buffer.length} bytes (need ${length})`);
     }
 
     // Extract payload
@@ -218,14 +215,14 @@ export class PktLine {
 
     // Check for error packet (starts with "ERR ")
     if (data.length >= 4) {
-      const prefix = PktLine.decodeText(data.slice(0, 4));
-      if (prefix === PktLine.ERR_PREFIX) {
-        const message = PktLine.decodeText(data.slice(4));
-        return { type: "error", message };
+      const prefix = this.decodeText(data.slice(0, 4));
+      if (prefix === this.ERR_PREFIX) {
+        const message = this.decodeText(data.slice(4));
+        return { type: 'error', message };
       }
     }
 
-    return { type: "data", data };
+    return { type: 'data', data };
   }
 
   /**
@@ -277,26 +274,22 @@ export class PktLine {
    */
   private static parsePktLength(header: Uint8Array): number {
     if (header.length !== 4) {
-      throw new Error(
-        `Invalid length header: expected 4 bytes, got ${header.length}`
-      );
+      throw new Error(`Invalid length header: expected 4 bytes, got ${header.length}`);
     }
 
-    const hex = PktLine.decodeText(header);
+    const hex = this.decodeText(header);
     const length = Number.parseInt(hex, 16);
 
     if (Number.isNaN(length)) {
-      throw new Error(`Invalid hexadecimal length: ${hex}`);
+      throw new TypeError(`Invalid hexadecimal length: ${hex}`);
     }
 
     if (length < 4) {
       throw new Error(`Invalid length: ${length} (must be at least 4)`);
     }
 
-    if (length > PktLine.MAX_PKT_SIZE) {
-      throw new Error(
-        `Length ${length} exceeds maximum ${PktLine.MAX_PKT_SIZE}`
-      );
+    if (length > this.MAX_PKT_SIZE) {
+      throw new Error(`Length ${length} exceeds maximum ${this.MAX_PKT_SIZE}`);
     }
 
     return length;
@@ -310,12 +303,10 @@ export class PktLine {
    * @throws Error if length is invalid
    */
   private static formatPktLength(length: number): string {
-    if (length < 0 || length > PktLine.MAX_PKT_SIZE) {
-      throw new Error(
-        `Invalid length: ${length} (must be 0-${PktLine.MAX_PKT_SIZE})`
-      );
+    if (length < 0 || length > this.MAX_PKT_SIZE) {
+      throw new Error(`Invalid length: ${length} (must be 0-${this.MAX_PKT_SIZE})`);
     }
 
-    return length.toString(16).padStart(4, "0");
+    return length.toString(16).padStart(4, '0');
   }
 }

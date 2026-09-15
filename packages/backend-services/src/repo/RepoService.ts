@@ -11,7 +11,7 @@ interface RepoServiceEnv {
 }
 
 const OWNER_RE = /^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$/i;
-const REPO_RE = /^[a-z0-9._-]{1,100}$/i;
+const REPO_RE = /^[\w.-]{1,100}$/i;
 
 class RepoService {
   constructor(private readonly env: RepoServiceEnv) {}
@@ -31,7 +31,13 @@ class RepoService {
     }
   }
 
-  public async createRepo(userEmail: string, owner: string, name: string, description: string | null, isPrivate: boolean): Promise<{ id: string }> {
+  public async createRepo(
+    userEmail: string,
+    owner: string,
+    name: string,
+    description: string | null,
+    isPrivate: boolean,
+  ): Promise<{ id: string }> {
     const dao = new RepositoryDAO(this.env.DB);
     RepoService.validateNames(owner, name);
     const existing = await dao.getByOwnerAndName(owner, name);

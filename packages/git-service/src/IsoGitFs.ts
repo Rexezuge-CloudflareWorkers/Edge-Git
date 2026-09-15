@@ -4,9 +4,9 @@
  * @see https://github.com/benallfree/dofs/
  */
 
-import type { Fs } from "dofs";
+import type { Fs } from 'dofs';
 
-type TextEncoding = 'utf8' | 'utf-8' | 'buffer';
+type TextEncoding = 'utf8' | 'buffer';
 
 interface StatsLike {
   isFile(): boolean;
@@ -43,24 +43,24 @@ interface StatsLike {
  */
 function normalizePath(p: string): string {
   let path = p;
-  if (!path) return "/";
+  if (!path) return '/';
   // Strip query/hash (shouldn't appear, but be safe)
-  path = path.split("?")[0].split("#")[0];
+  path = path.split('?', 1)[0].split('#', 1)[0];
   // Replace backslashes and ensure leading slash so we treat all as absolute inside DO
-  path = path.replace(/\\/g, "/");
-  if (!path.startsWith("/")) path = `/${path}`;
+  path = path.replaceAll('\\', '/');
+  if (!path.startsWith('/')) path = `/${path}`;
   // Split and resolve '.' and '..'
   const out: string[] = [];
-  for (const rawSeg of path.split("/")) {
+  for (const rawSeg of path.split('/')) {
     const seg = rawSeg.trim();
-    if (!seg || seg === ".") continue; // skip empty & current dir
-    if (seg === "..") {
-      if (out.length) out.pop();
+    if (!seg || seg === '.') continue; // skip empty & current dir
+    if (seg === '..') {
+      if (out.length > 0) out.pop();
       continue;
     }
     out.push(seg);
   }
-  return `/${out.join("/")}`;
+  return `/${out.join('/')}`;
 }
 
 /**
@@ -85,16 +85,16 @@ class ErrorWithCode extends Error {
 export class IsoGitFs {
   private readonly dofs: Fs;
   private readonly KNOWN_CODES = new Set([
-    "ENOENT",
-    "ENOTDIR",
-    "EISDIR",
-    "EEXIST",
-    "EPERM",
-    "EACCES",
-    "EINVAL",
-    "EBUSY",
-    "ENOSPC",
-    "ENOTEMPTY",
+    'ENOENT',
+    'ENOTDIR',
+    'EISDIR',
+    'EEXIST',
+    'EPERM',
+    'EACCES',
+    'EINVAL',
+    'EBUSY',
+    'ENOSPC',
+    'ENOTEMPTY',
   ]);
 
   /**
@@ -140,7 +140,7 @@ export class IsoGitFs {
       e.code = msg;
       return e;
     }
-    const parts = msg.split(":").join(" ").split(" ");
+    const parts = msg.replaceAll(':', ' ').split(' ');
     for (const part of parts) {
       if (this.KNOWN_CODES.has(part)) {
         e.code = part;
@@ -173,19 +173,20 @@ export class IsoGitFs {
    * @param options - Encoding options.
    * @returns The content of the file as a Buffer or string.
    */
-  async readFile(
-    path: string,
-    options: { encoding?: TextEncoding } | TextEncoding
-  ) {
-    const encoding = typeof options === "string" ? options : options?.encoding;
+  readFile(path: string, options: TextEncoding | { encoding?: TextEncoding }) {
+    const encoding = typeof options === 'string' ? options : options?.encoding;
     const normalizedPath = normalizePath(path);
     try {
-      const data = this.dofs.read(normalizedPath, { encoding });
-      const bytes = data instanceof Uint8Array ? data : new TextEncoder().encode(String(data));
-      if (!encoding || encoding === "buffer") return bytes;
-      return new TextDecoder(encoding === 'utf8' ? 'utf-8' : encoding).decode(bytes);
+      const data: unknown = this.dofs.read(normalizedPath, { encoding });
+      if (typeof data === 'string') {
+        if (!encoding || encoding === 'buffer') return new TextEncoder().encode(data);
+        return data;
+      }
+      const bytes = data instanceof Uint8Array ? data : new Uint8Array(data as ArrayBuffer);
+      if (!encoding || encoding === 'buffer') return bytes;
+      return new TextDecoder('utf-8').decode(bytes);
     } catch (error) {
-      this.annotateAndThrow(error, "readFile", normalizedPath);
+      this.annotateAndThrow(error, 'readFile', normalizedPath);
     }
   }
 
@@ -195,19 +196,13 @@ export class IsoGitFs {
    * @param data - The data to write.
    * @param options - Encoding options.
    */
-  async writeFile(
-    filepath: string,
-    data: string | ArrayBufferView | ArrayBuffer,
-    options?: { encoding?: TextEncoding } | TextEncoding
-  ) {
-    const encoding = typeof options === "string" ? options : options?.encoding;
+  async writeFile(filepath: string, data: string | ArrayBufferView | ArrayBuffer, options?: TextEncoding | { encoding?: TextEncoding }) {
+    const encoding = typeof options === 'string' ? options : options?.encoding;
     let arrayLike: ArrayBuffer | string;
-    if (typeof data === "string") {
-      arrayLike = data;
-    } else if (data instanceof ArrayBuffer) {
+    if (typeof data === 'string' || data instanceof ArrayBuffer) {
       arrayLike = data;
     } else {
-      const view = data as ArrayBufferView;
+      const view = data;
       const copy = new Uint8Array(view.byteLength);
       copy.set(new Uint8Array(view.buffer, view.byteOffset, view.byteLength));
       arrayLike = copy.buffer;
@@ -216,7 +211,7 @@ export class IsoGitFs {
     try {
       await this.dofs.writeFile(normalizedPath, arrayLike, { encoding });
     } catch (error) {
-      this.annotateAndThrow(error, "writeFile", normalizedPath);
+      this.annotateAndThrow(error, 'writeFile', normalizedPath);
     }
   }
 
@@ -224,12 +219,12 @@ export class IsoGitFs {
    * Deletes a file.
    * @param path - The path to the file to delete.
    */
-  async unlink(path: string) {
+  unlink(path: string) {
     const normalizedPath = normalizePath(path);
     try {
       this.dofs.unlink(normalizedPath);
     } catch (error) {
-      this.annotateAndThrow(error, "unlink", normalizedPath);
+      this.annotateAndThrow(error, 'unlink', normalizedPath);
     }
   }
 
@@ -238,13 +233,13 @@ export class IsoGitFs {
    * @param path - The path to the directory.
    * @returns An array of the names of the files in the directory (excluding '.' and '..').
    */
-  async readdir(path: string) {
+  readdir(path: string) {
     const normalizedPath = normalizePath(path);
     try {
       const names = this.dofs.listDir(normalizedPath, {});
-      return names.filter((n) => n !== "." && n !== "..");
+      return names.filter((n) => n !== '.' && n !== '..');
     } catch (error) {
-      this.annotateAndThrow(error, "readdir", normalizedPath);
+      this.annotateAndThrow(error, 'readdir', normalizedPath);
       return []; // to satisfy TS
     }
   }
@@ -254,12 +249,12 @@ export class IsoGitFs {
    * @param path - The path to the directory to create.
    * @param options - Options for creating the directory, including `recursive` and `mode`.
    */
-  async mkdir(path: string, options?: { recursive?: boolean; mode?: number }) {
+  mkdir(path: string, options?: { recursive?: boolean; mode?: number }) {
     const normalizedPath = normalizePath(path);
     try {
       this.dofs.mkdir(normalizedPath, { recursive: true, ...options });
     } catch (error) {
-      this.annotateAndThrow(error, "mkdir", normalizedPath);
+      this.annotateAndThrow(error, 'mkdir', normalizedPath);
     }
   }
 
@@ -268,12 +263,12 @@ export class IsoGitFs {
    * @param path - The path to the directory to remove.
    * @param options - Options for removing the directory, including `recursive`.
    */
-  async rmdir(path: string, options?: { recursive?: boolean }) {
+  rmdir(path: string, options?: { recursive?: boolean }) {
     const normalizedPath = normalizePath(path);
     try {
       this.dofs.rmdir(normalizedPath, { recursive: true, ...options });
     } catch (error) {
-      this.annotateAndThrow(error, "rmdir", normalizedPath);
+      this.annotateAndThrow(error, 'rmdir', normalizedPath);
     }
   }
 
@@ -291,10 +286,10 @@ export class IsoGitFs {
         this.dofs.readlink(normalizedPath);
         isSymlink = true;
       } catch (error) {
-        if (error instanceof Error && error.message === "ENOENT") {
+        if (error instanceof Error && error.message === 'ENOENT') {
           isSymlink = false;
         } else {
-          this.annotateAndThrow(error, "lstat", normalizedPath);
+          this.annotateAndThrow(error, 'lstat', normalizedPath);
         }
       }
     }
@@ -336,11 +331,7 @@ export class IsoGitFs {
 
       return nodeStat;
     } catch (error) {
-      this.annotateAndThrow(
-        error,
-        detectSymlink ? "lstat" : "stat",
-        normalizedPath
-      );
+      this.annotateAndThrow(error, detectSymlink ? 'lstat' : 'stat', normalizedPath);
     }
   }
 
@@ -349,7 +340,7 @@ export class IsoGitFs {
    * @param path - The path to the file or directory.
    * @returns A Node.js-like `Stats` object.
    */
-  async stat(path: string) {
+  stat(path: string) {
     return this.statCore(path, false);
   }
 
@@ -358,7 +349,7 @@ export class IsoGitFs {
    * @param path - The path to the file or directory.
    * @returns A Node.js-like `Stats` object.
    */
-  async lstat(path: string) {
+  lstat(path: string) {
     return this.statCore(path, true);
   }
 
@@ -367,11 +358,11 @@ export class IsoGitFs {
    * @param path - The path to the symbolic link.
    * @returns The path to which the symbolic link points.
    */
-  async readlink(path: string) {
+  readlink(path: string) {
     try {
       return this.dofs.readlink(path);
     } catch (error) {
-      this.annotateAndThrow(error, "readlink", path);
+      this.annotateAndThrow(error, 'readlink', path);
     }
   }
 
@@ -380,11 +371,11 @@ export class IsoGitFs {
    * @param target - The target path of the link.
    * @param path - The path where the symbolic link will be created.
    */
-  async symlink(target: string, path: string) {
+  symlink(target: string, path: string) {
     try {
       return this.dofs.symlink(target, path);
     } catch (error) {
-      this.annotateAndThrow(error, "symlink", path);
+      this.annotateAndThrow(error, 'symlink', path);
     }
   }
 }

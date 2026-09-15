@@ -6,7 +6,7 @@ export interface AdvertiseRefs {
   symbolicHead: string | null;
 }
 
-export async function advertiseUploadPack(): Promise<Response> {
+export function advertiseUploadPack(): Response {
   const lines = [
     PktLine.encode('version 2\n'),
     PktLine.encode('agent=edge-git/0.1.0\n'),
@@ -91,8 +91,8 @@ export function parseReceivePackRequest(data: Uint8Array): { commands: Command[]
       const line = PktLine.decodeText(packet.data).trim();
 
       const nullIdx = line.indexOf('\0');
-      const refLine = nullIdx >= 0 ? line.substring(0, nullIdx) : line;
-      const caps = nullIdx >= 0 ? line.substring(nullIdx + 1).split(' ') : [];
+      const refLine = nullIdx === -1 ? line : line.slice(0, Math.max(0, nullIdx));
+      const caps = nullIdx === -1 ? [] : line.slice(Math.max(0, nullIdx + 1)).split(' ');
 
       const parts = refLine.split(' ');
       if (parts.length >= 3) {
@@ -114,7 +114,7 @@ export function parseReceivePackRequest(data: Uint8Array): { commands: Command[]
   return { commands, capabilities, packfile };
 }
 
-export async function buildReportStatus(results: RefUpdateResult[], unpackOk: boolean): Promise<Response> {
+export function buildReportStatus(results: RefUpdateResult[], unpackOk: boolean): Response {
   const lines: Uint8Array[] = [];
 
   if (unpackOk) {
@@ -184,8 +184,8 @@ export function parseCommand(data: Uint8Array): { command: string; args: string[
 
   if (!command) {
     const text = PktLine.decodeText(data);
-    const match = text.match(/command=([a-z-]+)/);
-    command = match ? match[1] : '';
+    const match = /command=([a-z-]+)/.exec(text);
+    command = match?.[1] ?? '';
   }
 
   return { command, args };
@@ -212,6 +212,49 @@ export type FetchRequest = {
   filterSpec?: string;
 };
 
+function applyExactFetchArg(
+  arg: string,
+  state: {
+    capabilities: { thinPack: boolean; noProgress: boolean; includeTag: boolean; ofsDelta: boolean; sidebandAll: boolean };
+    setDone: (value: boolean) => void;
+    setDeepenRelative: (value: boolean) => void;
+  },
+): boolean {
+  switch (arg) {
+    case 'done': {
+      state.setDone(true);
+      return true;
+    }
+    case 'thin-pack': {
+      state.capabilities.thinPack = true;
+      return true;
+    }
+    case 'no-progress': {
+      state.capabilities.noProgress = true;
+      return true;
+    }
+    case 'include-tag': {
+      state.capabilities.includeTag = true;
+      return true;
+    }
+    case 'ofs-delta': {
+      state.capabilities.ofsDelta = true;
+      return true;
+    }
+    case 'sideband-all': {
+      state.capabilities.sidebandAll = true;
+      return true;
+    }
+    case 'deepen-relative': {
+      state.setDeepenRelative(true);
+      return true;
+    }
+    default: {
+      return false;
+    }
+  }
+}
+
 export function parseFetchRequest(_data: Uint8Array, args: string[]): FetchRequest {
   const wants: string[] = [];
   const haves: string[] = [];
@@ -233,28 +276,31 @@ export function parseFetchRequest(_data: Uint8Array, args: string[]): FetchReque
   for (const arg of args) {
     if (arg.startsWith('want ')) {
       wants.push(arg.slice('want '.length));
-    } else if (arg.startsWith('have ')) {
+      continue;
+    }
+    if (arg.startsWith('have ')) {
       haves.push(arg.slice('have '.length));
-    } else if (arg === 'done') {
-      done = true;
-    } else if (arg === 'thin-pack') {
-      capabilities.thinPack = true;
-    } else if (arg === 'no-progress') {
-      capabilities.noProgress = true;
-    } else if (arg === 'include-tag') {
-      capabilities.includeTag = true;
-    } else if (arg === 'ofs-delta') {
-      capabilities.ofsDelta = true;
-    } else if (arg === 'sideband-all') {
-      capabilities.sidebandAll = true;
-    } else if (arg.startsWith('shallow ')) {
+      continue;
+    }
+    if (
+      applyExactFetchArg(arg, {
+        capabilities,
+        setDone: (value) => {
+          done = value;
+        },
+        setDeepenRelative: (value) => {
+          deepenRelative = value;
+        },
+      })
+    ) {
+      continue;
+    }
+    if (arg.startsWith('shallow ')) {
       shallow.push(arg.slice('shallow '.length));
     } else if (arg.startsWith('deepen ')) {
-      deepen = Number.parseInt(arg.slice('deepen '.length), 10);
-    } else if (arg === 'deepen-relative') {
-      deepenRelative = true;
+      deepen = Math.trunc(Number(arg.slice('deepen '.length)));
     } else if (arg.startsWith('deepen-since ')) {
-      deepenSince = Number.parseInt(arg.slice('deepen-since '.length), 10);
+      deepenSince = Math.trunc(Number(arg.slice('deepen-since '.length)));
     } else if (arg.startsWith('deepen-not ')) {
       deepenNot.push(arg.slice('deepen-not '.length));
     } else if (arg.startsWith('filter ')) {
@@ -263,7 +309,7 @@ export function parseFetchRequest(_data: Uint8Array, args: string[]): FetchReque
   }
 
   const shallowOptions =
-    shallow.length > 0 || deepen || deepenRelative || deepenSince || deepenNot.length > 0
+    deepen !== undefined || deepenRelative || deepenSince !== undefined || shallow.length > 0 || deepenNot.length > 0
       ? {
           shallow,
           deepen,
@@ -305,10 +351,7 @@ export async function buildLsRefsResponse(
     }
   }
 
-  let filteredRefs = refs;
-  if (refPrefixes.length > 0) {
-    filteredRefs = refs.filter((ref) => refPrefixes.some((prefix) => ref.ref.startsWith(prefix)));
-  }
+  const filteredRefs = refPrefixes.length > 0 ? refs.filter((ref) => refPrefixes.some((prefix) => ref.ref.startsWith(prefix))) : refs;
 
   for (const { ref, oid } of filteredRefs) {
     let line = `${oid} ${ref}`;
@@ -323,8 +366,8 @@ export async function buildLsRefsResponse(
       const obj = await readObject(oid);
       if (obj && obj.type === 'tag') {
         const tagContent = typeof obj.object === 'string' ? obj.object : new TextDecoder().decode(obj.object);
-        const objectMatch = tagContent.match(/^object ([0-9a-f]{40})/m);
-        if (objectMatch) {
+        const objectMatch = /^object ([0-9a-f]{40})/m.exec(tagContent);
+        if (objectMatch?.[1]) {
           const peeledOid = objectMatch[1];
           lines.push(PktLine.encode(`${peeledOid} ${ref}^{}\n`));
         }
@@ -367,7 +410,7 @@ export type FetchResponseOptions = {
   objectCount?: number;
 };
 
-export async function buildFetchResponse(options: FetchResponseOptions): Promise<Response> {
+export function buildFetchResponse(options: FetchResponseOptions): Response {
   const lines: Uint8Array[] = [];
   const { commonCommits, packfileData, noProgress, done } = options;
 
@@ -382,8 +425,7 @@ export async function buildFetchResponse(options: FetchResponseOptions): Promise
       }
     }
 
-    lines.push(PktLine.encode('ready\n'));
-    lines.push(PktLine.encodeDelim());
+    lines.push(PktLine.encode('ready\n'), PktLine.encodeDelim());
   }
 
   if (packfileData && packfileData.length > 0) {
@@ -392,8 +434,10 @@ export async function buildFetchResponse(options: FetchResponseOptions): Promise
     const objectCount = options.objectCount ?? parsePackfileObjectCount(packfileData);
 
     if (!noProgress && objectCount !== null) {
-      lines.push(PktLine.encodeProgress(`remote: Counting objects: ${objectCount}, done.\r\n`));
-      lines.push(PktLine.encodeProgress(`remote: Compressing objects: 100% (${objectCount}/${objectCount}), done.\r\n`));
+      lines.push(
+        PktLine.encodeProgress(`remote: Counting objects: ${objectCount}, done.\r\n`),
+        PktLine.encodeProgress(`remote: Compressing objects: 100% (${objectCount}/${objectCount}), done.\r\n`),
+      );
     }
 
     for (let offset = 0; offset < packfileData.length; offset += PktLine.MAX_SIDEBAND_PAYLOAD) {
@@ -423,7 +467,7 @@ export async function buildFetchResponse(options: FetchResponseOptions): Promise
 
 export function getBasicCredentials(req: Request): { username: string; password: string } | null {
   const header = req.headers.get('Authorization') || '';
-  const match = /^Basic\s+(.+)$/i.exec(header);
+  const match = /^Basic\s+(\S+)$/i.exec(header);
   if (!match) return null;
   try {
     const decoded = atob(match[1]);
@@ -439,6 +483,6 @@ export function getBasicCredentials(req: Request): { username: string; password:
 
 export function getBearerToken(req: Request): string | null {
   const header = req.headers.get('Authorization') || '';
-  const match = /^Bearer\s+(.+)$/i.exec(header);
-  return match ? match[1].trim() : null;
+  const match = /^Bearer\s+(\S+)\s*$/i.exec(header);
+  return match?.[1] ? match[1].trim() : null;
 }

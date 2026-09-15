@@ -64,12 +64,12 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
       }
       const auth = await gitAuthForRepo(c as never, owner, repoName, service);
       if (auth instanceof Response) return auth;
-      const fullName = `${owner}/${repoName}`;
-      const stub = getRepoStub(c.env, fullName);
       if (service === 'git-upload-pack') {
         return advertiseUploadPack();
       }
-      return advertiseReceivePack(() => stub.listRefs() as Promise<{ refs: Array<{ ref: string; oid: string }>; symbolicHead: string | null }>);
+      const fullName = `${owner}/${repoName}`;
+      const stub = getRepoStub(c.env, fullName);
+      return advertiseReceivePack(() => stub.listRefs());
     });
 
     app.post('/:owner/:repo/git-upload-pack', async (c) => {
@@ -107,7 +107,7 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     // Protected UI/API surface
     app.use('/user/*', MiddlewareHandlers.userAuthentication());
 
-    app.get('/user/me', async (c) => {
+    app.get('/user/me', (c) => {
       const email = c.get('AuthenticatedUserEmailAddress');
       return c.json({ email });
     });
@@ -120,8 +120,13 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
 
     app.post('/user/repos', async (c) => {
       const email = c.get('AuthenticatedUserEmailAddress');
-      const body = (await c.req.json().catch(() => ({}))) as { owner?: string; name?: string; description?: string | null; isPrivate?: boolean };
-      const owner = (body.owner ?? email.split('@')[0]).trim();
+      const body = (await c.req.json().catch(() => ({}))) as {
+        owner?: string;
+        name?: string;
+        description?: string | null;
+        isPrivate?: boolean;
+      };
+      const owner = (body.owner ?? email.split('@', 1)[0]).trim();
       const name = (body.name ?? '').trim();
       if (!name) return c.json({ error: 'name is required' }, 400);
       try {
@@ -190,16 +195,22 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
       if (!row) return c.json({ error: 'Not found' }, 404);
       const stub = getRepoStub(c.env, `${owner}/${repoName}`);
       const depth = url.searchParams.get('depth');
-      return c.json(
-        await stub.getCommits({ ref: url.searchParams.get('ref') ?? undefined, depth: depth ? Number(depth) : undefined }),
-      );
+      return c.json(await stub.getCommits({ ref: url.searchParams.get('ref') ?? undefined, depth: depth ? Number(depth) : undefined }));
     });
 
     app.get('/user/tokens', async (c) => {
       const email = c.get('AuthenticatedUserEmailAddress');
       const svc = TokenServiceFactory.create({ DB: c.env.DB });
       const tokens = await svc.listTokens(email);
-      return c.json({ tokens: tokens.map((t) => ({ tokenId: t.tokenId, name: t.name, expiresAt: t.expiresAt, lastUsedAt: t.lastUsedAt, createdAt: t.createdAt })) });
+      return c.json({
+        tokens: tokens.map((t) => ({
+          tokenId: t.tokenId,
+          name: t.name,
+          expiresAt: t.expiresAt,
+          lastUsedAt: t.lastUsedAt,
+          createdAt: t.createdAt,
+        })),
+      });
     });
 
     app.post('/user/tokens', async (c) => {
