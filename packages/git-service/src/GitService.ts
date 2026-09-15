@@ -242,6 +242,7 @@ export class GitService {
   ): Promise<{ oids: string[]; shallow: string[] }> {
     const objectsToSend = new Set<string>();
     const visited = new Set<string>();
+    const wantSet = new Set(wants);
     const haveSet = new Set(haves);
     const excludeSet = opts.exclude ? new Set(opts.exclude) : new Set<string>();
     const shallowBoundary = new Set<string>();
@@ -302,7 +303,8 @@ export class GitService {
         continue;
       }
 
-      // Filter support: blob:none / blob:limit=N skip blob payloads.
+      // Filter support: blob:none / blob:limit=N skip blob payloads, except for
+      // explicitly wanted objects (promisor lazy-fetch names blobs directly).
       if (objType === 'blob') {
         try {
           const obj = await git.readObject({
@@ -314,7 +316,7 @@ export class GitService {
           });
           const content = obj.object;
           const size = typeof content === 'string' ? content.length : (content as Uint8Array).length;
-          if (shouldSkipBlob(size)) continue;
+          if (shouldSkipBlob(size) && !wantSet.has(oid)) continue;
         } catch {
           // If content read fails, fall through and include the oid.
         }
@@ -323,8 +325,9 @@ export class GitService {
         continue;
       }
 
-      // tree:0 filter drops trees and blobs but keeps commits/tags.
-      if (filter === 'tree:0' && objType === 'tree') continue;
+      // tree:0 filter drops trees and blobs but keeps commits/tags, except for
+      // explicitly wanted objects.
+      if (filter === 'tree:0' && objType === 'tree' && !wantSet.has(oid)) continue;
 
       // Add this object to the set of objects to send
       objectsToSend.add(oid);

@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import * as git from 'isomorphic-git';
+import { afterEach, describe, expect, it } from 'vitest';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config/ConfigurationManager';
 import { AppConfiguration } from '@edge-git/backend-runtime/config/AppConfiguration';
 import {
@@ -138,5 +142,66 @@ describe('GitService limits and cache', () => {
 
   it('uses a deterministic oid fixture', () => {
     expect(OID).toHaveLength(40);
+  });
+});
+
+describe('partial-clone filters with explicit wants', () => {
+  const tmpDirs: string[] = [];
+  afterEach(async () => {
+    while (tmpDirs.length > 0) {
+      const dir = tmpDirs.pop();
+      if (dir) await fs.promises.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  async function makeRepo(): Promise<{ gitdir: string; commitOid: string; treeOid: string; blobOid: string }> {
+    const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'edge-git-filter-'));
+    tmpDirs.push(dir);
+    await git.init({ fs, dir });
+    await fs.promises.writeFile(path.join(dir, 'hello.txt'), 'hello partial\n');
+    await git.add({ fs, dir, filepath: 'hello.txt' });
+    const commitOid = await git.commit({
+      fs,
+      dir,
+      author: { name: 'tester', email: 'tester@example.com' },
+      message: 'init',
+    });
+    const commit = await git.readCommit({ fs, dir, oid: commitOid });
+    const { oid: blobOid } = await git.readBlob({ fs, dir, oid: commitOid, filepath: 'hello.txt' });
+    return { gitdir: path.join(dir, '.git'), commitOid, treeOid: commit.commit.tree, blobOid };
+  }
+
+  it('omits traversal-discovered blobs under blob:none', async () => {
+    const { gitdir, commitOid, blobOid } = await makeRepo();
+    const svc = new GitService(fs as never, gitdir);
+    const { oids } = await svc.collectObjectsForPack([commitOid], [], { filter: 'blob:none' });
+    expect(oids).toContain(commitOid);
+    expect(oids).not.toContain(blobOid);
+  });
+
+  it('sends explicitly wanted blobs despite blob:none (promisor lazy-fetch)', async () => {
+    const { gitdir, blobOid } = await makeRepo();
+    const svc = new GitService(fs as never, gitdir);
+    const { oids } = await svc.collectObjectsForPack([blobOid], [], { filter: 'blob:none' });
+    expect(oids).toContain(blobOid);
+  });
+
+  it('sends explicitly wanted blobs despite blob:limit', async () => {
+    const { gitdir, commitOid, blobOid } = await makeRepo();
+    const svc = new GitService(fs as never, gitdir);
+    const filtered = await svc.collectObjectsForPack([commitOid], [], { filter: 'blob:limit=1' });
+    expect(filtered.oids).not.toContain(blobOid);
+    const explicit = await svc.collectObjectsForPack([blobOid], [], { filter: 'blob:limit=1' });
+    expect(explicit.oids).toContain(blobOid);
+  });
+
+  it('sends explicitly wanted trees despite tree:0', async () => {
+    const { gitdir, commitOid, treeOid } = await makeRepo();
+    const svc = new GitService(fs as never, gitdir);
+    const filtered = await svc.collectObjectsForPack([commitOid], [], { filter: 'tree:0' });
+    expect(filtered.oids).toContain(commitOid);
+    expect(filtered.oids).not.toContain(treeOid);
+    const explicit = await svc.collectObjectsForPack([treeOid], [], { filter: 'tree:0' });
+    expect(explicit.oids).toContain(treeOid);
   });
 });
