@@ -170,6 +170,13 @@ class RepoWorker extends DurableObject<Env> {
     return this.readModel.getBranches();
   }
 
+  public async getTags(): Promise<
+    Array<{ name: string; ref: string; oid: string; peeledOid: string | null; type: 'lightweight' | 'annotated' }>
+  > {
+    await this.prepare();
+    return this.readModel.getTags();
+  }
+
   public async getTree(args: { ref?: string; path?: string }): Promise<unknown> {
     await this.prepare();
     return this.readModel.getTree(args);

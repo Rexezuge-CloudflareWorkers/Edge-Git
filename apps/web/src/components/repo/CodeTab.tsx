@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { File, Folder, GitBranch, History } from 'lucide-react';
-import type { GitCommit, Repo, TreeEntry } from '../../types';
-import { decodeBlobContent, loadBlob, loadBranches, loadCommits, loadTree } from '../../services/repoService';
+import { File, Folder, GitBranch, History, Tag } from 'lucide-react';
+import type { GitCommit, Repo, TagInfo, TreeEntry } from '../../types';
+import { decodeBlobContent, loadBlob, loadBranches, loadCommits, loadTags, loadTree } from '../../services/repoService';
 import { firstLine, formatCommitDate, formatTimestamp } from '../../lib/format';
 import { formatDateLocale } from '../../lib/locale';
 import { Card } from '../ui/Card';
@@ -13,6 +13,7 @@ import { Markdown } from '../shared/Markdown';
 import { RefreshButton } from '../shared/RefreshButton';
 import { CloneButton } from './CloneButton';
 import { ForkButton } from './ForkButton';
+import { TagPicker, TagsCard } from './TagsCard';
 
 const README_NAMES = new Set(['README.md', 'README.markdown', 'README.mdown', 'README.txt', 'README']);
 
@@ -34,6 +35,7 @@ export function CodeTab({
   const { t } = useTranslation();
   const [branches, setBranches] = useState<string[]>([]);
   const [defaultBranch, setDefaultBranch] = useState<string | null>(null);
+  const [tags, setTags] = useState<TagInfo[]>([]);
   const [ref, setRef] = useState('');
   const [path, setPath] = useState('');
   const [entries, setEntries] = useState<TreeEntry[]>([]);
@@ -59,10 +61,19 @@ export function CodeTab({
         const b = await loadBranches(owner, repo);
         setBranches(b.branches);
         setDefaultBranch(b.currentBranch ?? b.branches[0] ?? null);
+        let loadedTags: TagInfo[] = [];
+        try {
+          loadedTags = await loadTags(owner, repo);
+        } catch {
+          loadedTags = [];
+        }
+        setTags(loadedTags);
+        const tagRefs = new Set(loadedTags.map((tg) => tg.ref));
         // If the current selection no longer exists (e.g. after switching
         // repos while `ref` still holds the previous repo's branch), fall
-        // back to the new repo's default branch.
-        const resolvedRef = ref && b.branches.includes(ref) ? ref : (b.currentBranch ?? b.branches[0] ?? 'HEAD');
+        // back to the new repo's default branch. Known tag refs are kept.
+        const isKnownRef = (ref.startsWith('refs/tags/') && tagRefs.has(ref)) || (ref !== '' && b.branches.includes(ref));
+        const resolvedRef = isKnownRef ? ref : (b.currentBranch ?? b.branches[0] ?? 'HEAD');
         if (ref !== '' && resolvedRef !== ref) {
           setRef(resolvedRef === 'HEAD' ? '' : resolvedRef);
         }
@@ -151,6 +162,19 @@ export function CodeTab({
             </option>
           ))}
         </Select>
+        <TagPicker
+          tags={tags}
+          value={ref.startsWith('refs/tags/') ? ref : ''}
+          onChange={(tagRef) => {
+            setLoading(true);
+            setRef(tagRef);
+            setPath('');
+            setBlobPath(null);
+            setBlobText(null);
+            setBlobBinary(false);
+            setReadme(null);
+          }}
+        />
         {path && (
           <nav className="text-sm text-[var(--color-text-secondary)]">
             <button type="button" className="text-[var(--color-accent)] hover:underline" onClick={() => setPath('')}>
@@ -303,6 +327,15 @@ export function CodeTab({
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-2">
+                <dt className="text-[var(--color-text-muted)] inline-flex items-center gap-1.5">
+                  <Tag className="h-3.5 w-3.5" />
+                  {t('repos.tags', 'Tags')}
+                </dt>
+                <dd>
+                  <Badge variant="neutral">{tags.length}</Badge>
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-2">
                 <dt className="text-[var(--color-text-muted)]">Default</dt>
                 <dd className="font-mono text-xs text-[var(--color-text-primary)] truncate">{defaultBranch ?? '—'}</dd>
               </div>
@@ -341,6 +374,19 @@ export function CodeTab({
               </ul>
             )}
           </Card>
+
+          <TagsCard
+            tags={tags}
+            onSelect={(tagRef) => {
+              setLoading(true);
+              setRef(tagRef);
+              setPath('');
+              setBlobPath(null);
+              setBlobText(null);
+              setBlobBinary(false);
+              setReadme(null);
+            }}
+          />
         </aside>
       </div>
     </div>

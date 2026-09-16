@@ -61,6 +61,14 @@ export interface BranchesResponse {
   currentBranch: string | null;
 }
 
+export interface TagInfo {
+  name: string;
+  ref: string;
+  oid: string;
+  peeledOid: string | null;
+  type: 'lightweight' | 'annotated';
+}
+
 export interface TreeEntry {
   path: string;
   mode: string;

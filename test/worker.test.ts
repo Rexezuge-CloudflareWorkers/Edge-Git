@@ -165,6 +165,10 @@ function createStub() {
     deleteRepo: () => Promise.resolve(),
     listRefs: () => Promise.resolve({ refs: [{ ref: 'refs/heads/main', oid: 'a'.repeat(40) }], symbolicHead: 'refs/heads/main' }),
     getBranches: () => Promise.resolve({ branches: ['main'], currentBranch: 'main' }),
+    getTags: () =>
+      Promise.resolve([
+        { name: 'v1.0.0', ref: 'refs/tags/v1.0.0', oid: 'b'.repeat(40), peeledOid: null, type: 'lightweight' as const },
+      ]),
     getTree: () => Promise.resolve([]),
     getBlob: () => Promise.resolve(null),
     getCommits: () => Promise.resolve([]),
@@ -234,6 +238,9 @@ describe('EdgeGitWorker HTTP surface', () => {
     await expect(call('/user/repos/alice/demo/issues').then((r) => r.json())).resolves.toMatchObject({ issues: [{ title: 'Bug' }] });
 
     await expect(call('/user/repos/alice/demo/branches').then((r) => r.json())).resolves.toMatchObject({ branches: ['main'] });
+    await expect(call('/user/repos/alice/demo/tags').then((r) => r.json())).resolves.toEqual([
+      { name: 'v1.0.0', ref: 'refs/tags/v1.0.0', oid: 'b'.repeat(40), peeledOid: null, type: 'lightweight' },
+    ]);
     expect((await call('/user/repos/alice/demo/tree')).status).toBe(200);
     expect((await call('/user/repos/alice/demo/blob?path=f.txt')).status).toBe(200);
     expect((await call('/user/repos/alice/demo/commits')).status).toBe(200);
@@ -399,6 +406,9 @@ describe('EdgeGitWorker HTTP surface', () => {
     for (const path of ['/repos/alice/pub', '/repos/alice/pub/branches', '/repos/alice/pub/tree', '/repos/alice/pub/commits', '/repos/alice/pub/issues']) {
       expect(await anon(path).then((r) => r.status)).toBe(200);
     }
+    await expect(anon('/repos/alice/pub/tags').then((r) => r.json())).resolves.toEqual([
+      { name: 'v1.0.0', ref: 'refs/tags/v1.0.0', oid: 'b'.repeat(40), peeledOid: null, type: 'lightweight' },
+    ]);
     expect(await anon('/repos/alice/pub/blob?path=f.txt').then((r) => r.status)).toBe(200);
 
     expect(await anon('/repos/alice/sec').then((r) => r.status)).toBe(404);

@@ -1,4 +1,4 @@
-import type { BlobResponse, BranchesResponse, GitCommit, Repo, TreeEntry } from '../types';
+import type { BlobResponse, BranchesResponse, GitCommit, Repo, TagInfo, TreeEntry } from '../types';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../lib/api';
 
 function authedBase(owner: string, repo: string): string {
@@ -46,6 +46,10 @@ async function tryAuthedFirst<T>(owner: string, repo: string, authedPath: string
 
 export async function loadBranches(owner: string, repo: string): Promise<BranchesResponse> {
   return tryAuthedFirst(owner, repo, `${authedBase(owner, repo)}/branches`, `${publicBase(owner, repo)}/branches`);
+}
+
+export async function loadTags(owner: string, repo: string): Promise<TagInfo[]> {
+  return tryAuthedFirst(owner, repo, `${authedBase(owner, repo)}/tags`, `${publicBase(owner, repo)}/tags`);
 }
 
 export async function loadTree(owner: string, repo: string, ref?: string, path?: string): Promise<TreeEntry[]> {

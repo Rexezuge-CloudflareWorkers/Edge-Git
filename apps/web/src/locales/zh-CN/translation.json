@@ -95,7 +95,11 @@
     "public": "公开",
     "private": "私有",
     "open": "开启",
-    "closed": "关闭"
+    "closed": "关闭",
+    "tags": "标签",
+    "noTags": "暂无标签。",
+    "annotated": "附注",
+    "lightweight": "轻量"
   },
   "issues": {
     "newIssue": "新建议题",
@@ -283,6 +287,7 @@
     "failedToAddComment": "添加评论失败。",
     "failedToUpdateIssue": "更新议题失败。",
     "failedToLoadFiles": "加载仓库文件失败。",
+    "failedToLoadTags": "加载标签失败。",
     "failedToLoadFile": "加载文件失败。",
     "failedToLoadPull": "加载合并请求失败。",
     "failedToLoadPulls": "加载合并请求列表失败。",
