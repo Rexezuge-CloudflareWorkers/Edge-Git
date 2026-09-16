@@ -1,6 +1,7 @@
 import { Context, Next } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import type { AccessIdentityContext } from '@edge-git/backend-services/auth';
+import type { AccessIdentityContext, AuthenticatedToken } from '@edge-git/backend-services/auth';
+import { coversScope } from '@edge-git/backend-services/auth';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { getBasicCredentials, getBearerToken } from '@edge-git/git-protocol';
 import { UnauthorizedError, ForbiddenError } from '@edge-git/backend-errors';
@@ -34,6 +35,7 @@ export interface GitAuthResult {
   userEmail: string | null;
   repo: RepositoryRow;
   role: 'admin' | 'write' | 'read';
+  scopes: string[];
 }
 
 function unauthorizedGit(): Response {
@@ -43,7 +45,7 @@ function unauthorizedGit(): Response {
   });
 }
 
-async function resolvePatToEmail(env: Env, pat: string): Promise<string> {
+async function resolvePatToEmail(env: Env, pat: string): Promise<AuthenticatedToken> {
   return createRequestScope(env).get(Tokens.TokenService).authenticateWithPAT(pat);
 }
 
@@ -77,13 +79,21 @@ async function gitAuthForRepo(
     // Anonymous: allowed only for public fetch/clone (read).
     const role = await permission.getRole(null, repo);
     if (role && service === 'git-upload-pack') {
-      return { userEmail: null, repo, role };
+      return { userEmail: null, repo, role, scopes: [] };
     }
     return unauthorizedGit();
   }
 
   try {
-    const userEmail = await resolvePatToEmail(env, pat);
+    const identity = await resolvePatToEmail(env, pat);
+    const userEmail = identity.email;
+    // PATs are git-scoped: fetch needs repo:read, push needs repo:write.
+    // Insufficient scope is 403 (the token authenticated, so unlike the
+    // no-role case there is no existence oracle to protect).
+    const requiredScope = service === 'git-upload-pack' ? 'repo:read' : 'repo:write';
+    if (!coversScope(identity.scopes, requiredScope)) {
+      return new Response('Forbidden', { status: 403 });
+    }
     const role = await permission.getRole(userEmail, repo);
     if (!role) return unauthorizedGit();
     const rank = role === 'admin' ? 3 : role === 'write' ? 2 : 1;
@@ -91,7 +101,7 @@ async function gitAuthForRepo(
     if (rank < need) {
       return new Response('Forbidden', { status: 403 });
     }
-    return { userEmail, repo, role };
+    return { userEmail, repo, role, scopes: identity.scopes };
   } catch {
     return unauthorizedGit();
   }

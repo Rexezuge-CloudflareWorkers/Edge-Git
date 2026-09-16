@@ -37,6 +37,18 @@ async function requireWriteRole(
   }
 }
 
+// Direct web commits to a `require_pr` branch must go through a pull
+// request instead. Returns a 403 response when blocked, else null.
+async function checkProtectedBranch(
+  env: Env,
+  repoId: string,
+  branch: string,
+): Promise<{ error: string } | null> {
+  const rule = await createRequestScope(env).get(Tokens.BranchProtectionService).matchForRepo(repoId, branch).catch(() => null);
+  if (rule?.requirePr) return { error: `branch "${branch}" is protected: open a pull request instead` };
+  return null;
+}
+
 // Best-effort code search indexing for web file writes. Push indexing is
 // covered by the SearchBackfillTask cron; this keeps editor saves searchable
 // immediately without ever failing the write itself.
@@ -127,6 +139,8 @@ function registerFileWriteRoutes(app: RepoApp): void {
     try {
       const gate = await requireWriteRole(c.env, owner, repoName, email);
       if (!gate.ok) return c.json({ error: gate.status === 404 ? 'Not found' : 'Forbidden' }, gate.status);
+      const blocked = await checkProtectedBranch(c.env, gate.repo.id, branch);
+      if (blocked) return c.json({ error: blocked.error }, 403);
       const rawMessage = typeof body.message === 'string' ? body.message.trim() : '';
       const message = (rawMessage || `Update ${filePath}`).slice(0, 1000);
       const result = (await getRepoStub(c.env, `${owner}/${repoName}`).commitFile({
@@ -164,6 +178,8 @@ function registerFileWriteRoutes(app: RepoApp): void {
     try {
       const gate = await requireWriteRole(c.env, owner, repoName, email);
       if (!gate.ok) return c.json({ error: gate.status === 404 ? 'Not found' : 'Forbidden' }, gate.status);
+      const blocked = await checkProtectedBranch(c.env, gate.repo.id, branch);
+      if (blocked) return c.json({ error: blocked.error }, 403);
       const rawMessage = (params.get('message') ?? '').trim();
       const message = (rawMessage || `Delete ${filePath}`).slice(0, 1000);
       const result = (await getRepoStub(c.env, `${owner}/${repoName}`).commitFile({

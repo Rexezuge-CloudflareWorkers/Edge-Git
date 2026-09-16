@@ -1,6 +1,6 @@
 import { BaseDAO } from './BaseDAO';
 import type { D1Queryable } from '../utils/D1Types';
-import type { UserAccessTokenMetadata } from '@edge-git/shared';
+import type { TokenScope, UserAccessTokenMetadata } from '@edge-git/shared';
 
 export interface TokenRow {
   token_id: string;
@@ -10,6 +10,20 @@ export interface TokenRow {
   expires_at: number;
   last_used_at: number | null;
   created_at: number;
+  scopes?: string | null;
+}
+
+function parseScopes(raw: string | null | undefined): TokenScope[] {
+  const full: TokenScope[] = ['repo:read', 'repo:write', 'admin'];
+  if (raw === null || raw === undefined) return full;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return full;
+    const valid = parsed.filter((s): s is TokenScope => typeof s === 'string' && (['repo:read', 'repo:write', 'admin'] as const).includes(s as TokenScope));
+    return valid.length > 0 ? valid : full;
+  } catch {
+    return full;
+  }
 }
 
 function toMetadata(row: TokenRow): UserAccessTokenMetadata {
@@ -21,6 +35,7 @@ function toMetadata(row: TokenRow): UserAccessTokenMetadata {
     expiresAt: row.expires_at,
     lastUsedAt: row.last_used_at,
     createdAt: row.created_at,
+    scopes: parseScopes(row.scopes),
   };
 }
 
@@ -29,7 +44,33 @@ class UserAccessTokenDAO extends BaseDAO {
     super(database);
   }
 
-  public async create(tokenId: string, userEmail: string, tokenHash: string, name: string, expiresAt: number, now: number): Promise<void> {
+  public async create(
+    tokenId: string,
+    userEmail: string,
+    tokenHash: string,
+    name: string,
+    expiresAt: number,
+    now: number,
+    scopes?: readonly TokenScope[] | null,
+  ): Promise<void> {
+    const serialized = scopes && scopes.length > 0 ? JSON.stringify([...scopes]) : null;
+    if (serialized !== null) {
+      try {
+        await this.withRetry(
+          () =>
+            this.database
+              .prepare(
+                'INSERT INTO user_access_tokens (token_id, user_email, token_hash, name, expires_at, last_used_at, created_at, scopes) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)',
+              )
+              .bind(tokenId, userEmail.toLowerCase(), tokenHash, name, expiresAt, now, serialized)
+              .run(),
+          'create access token',
+        );
+        return;
+      } catch {
+        // Fallback for DBs without the 0007 scopes column: retry without it.
+      }
+    }
     await this.withRetry(
       () =>
         this.database

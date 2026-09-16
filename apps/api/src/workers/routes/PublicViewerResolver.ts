@@ -71,7 +71,9 @@ async function resolvePublicViewer(c: RequestContext): Promise<string | null> {
   const pat = creds?.password || bearer || null;
   if (!pat) return null;
   try {
-    return await scope.get(Tokens.TokenService).authenticateWithPAT(pat);
+    // PATs are git-scoped; public read-model resolution only needs identity.
+    const identity = await scope.get(Tokens.TokenService).authenticateWithPAT(pat);
+    return identity.email;
   } catch {
     return null;
   }

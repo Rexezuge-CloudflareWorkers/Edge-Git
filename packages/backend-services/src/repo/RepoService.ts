@@ -1,4 +1,5 @@
 import {
+  BranchProtectionDAO,
   IssueDAO,
   NamespaceDAO,
   OrganizationDAO,
@@ -27,6 +28,7 @@ interface RepoServiceDeps {
   repositoryDAO?: () => Promise<RepositoryDAO>;
   issueDAO?: () => Promise<IssueDAO>;
   pullRequestDAO?: () => Promise<PullRequestDAO>;
+  branchProtectionDAO?: () => Promise<BranchProtectionDAO>;
   userDAO?: () => Promise<UserDAO>;
   organizationDAO?: () => Promise<OrganizationDAO>;
   organizationMemberDAO?: () => Promise<OrganizationMemberDAO>;
@@ -45,6 +47,7 @@ class RepoService {
       repositoryDAO: () => Promise.resolve(new RepositoryDAO(env.DB)),
       issueDAO: () => Promise.resolve(new IssueDAO(env.DB)),
       pullRequestDAO: () => Promise.resolve(new PullRequestDAO(env.DB)),
+      branchProtectionDAO: () => Promise.resolve(new BranchProtectionDAO(env.DB)),
       userDAO: () => Promise.resolve(new UserDAO(env.DB)),
       organizationDAO: () => Promise.resolve(new OrganizationDAO(env.DB)),
       organizationMemberDAO: () => Promise.resolve(new OrganizationMemberDAO(env.DB)),
@@ -314,6 +317,12 @@ class RepoService {
       await pullRequestDAO.deleteByRepo(repo.id);
     } catch {
       // ignore — legacy DBs without pull_requests tables
+    }
+    try {
+      const protectionDAO = await this.deps.branchProtectionDAO();
+      await protectionDAO.deleteByRepo(repo.id);
+    } catch {
+      // ignore — legacy DBs without branch_protection_rules table
     }
     try {
       const collabDao = await this.deps.repoCollaboratorDAO();

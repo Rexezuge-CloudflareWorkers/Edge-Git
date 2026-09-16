@@ -1,5 +1,14 @@
 import type { GitService, IsoGitFs } from '@edge-git/git-service';
-import { buildReportStatus, parseReceivePackRequest, validateReceivePackCommands, validateReceivePackCounts } from '@edge-git/git-protocol';
+import {
+  branchNameFromRef,
+  buildReportStatus,
+  checkStaticPushProtection,
+  isZeroOid,
+  parseReceivePackRequest,
+  validateReceivePackCommands,
+  validateReceivePackCounts,
+} from '@edge-git/git-protocol';
+import type { ProtectedRefRule } from '@edge-git/git-protocol';
 import { createLogger } from '@edge-git/backend-runtime/logger';
 
 const logger = createLogger('PushHandler');
@@ -17,10 +26,20 @@ interface PushHandlerDeps {
 
 // Handles `git-receive-pack` (push): unpack validation, pack indexing,
 // and atomic/non-atomic ref updates.
+//
+// Branch protection (`protections`, resolved by the API from D1 and passed
+// in because the DO cannot read D1):
+// - deletion / direct-push (`require_pr`) gates are pure and evaluated first;
+// - force-push detection needs ancestry (`isAncestor`) after the pack is
+//   indexed (the new objects must exist locally first).
+// - violations fail only those refs (`ng <ref> <reason>`, `unpack ok`) so
+//   unrelated branches in the same push still land — except atomic pushes,
+//   where partial application would violate atomicity and the whole push is
+//   rejected instead.
 class PushHandler {
   constructor(private readonly deps: PushHandlerDeps) {}
 
-  public async receivePack(data: Uint8Array, limits: PushLimits): Promise<Response> {
+  public async receivePack(data: Uint8Array, limits: PushLimits, protections: ProtectedRefRule[] = []): Promise<Response> {
     const { isoGitFs, git, getFullName } = this.deps;
     const { commands, packfile, capabilities } = parseReceivePackRequest(data);
 
@@ -47,6 +66,30 @@ class PushHandler {
       logger.info(`(receive-pack) Ignoring push-options for ${getFullName() ?? 'unknown repo'}: no hooks to consume them`);
     }
 
+    const byRef = new Map(protections.map((p) => [p.ref, p]));
+    const blocked = new Map<string, string>();
+    for (const cmd of commands) {
+      const staticError = checkStaticPushProtection(cmd, byRef.get(cmd.ref));
+      if (staticError) blocked.set(cmd.ref, staticError);
+    }
+
+    const atomic = capabilities.includes('atomic');
+    if (atomic && blocked.size > 0) {
+      // Atomicity forbids partial application: reject every ref so the
+      // client retries as a whole. Blocked refs keep their reason.
+      const results = commands.map((cmd) => ({
+        ref: cmd.ref,
+        ok: false as const,
+        error: blocked.get(cmd.ref) ?? 'push rejected: protected branch update declined',
+      }));
+      return buildReportStatus(results, true);
+    }
+
+    const allowed = commands.filter((cmd) => !blocked.has(cmd.ref));
+    if (allowed.length === 0) {
+      return buildReportStatus(commands.map((cmd) => ({ ref: cmd.ref, ok: false as const, error: blocked.get(cmd.ref) ?? 'push rejected' })), true);
+    }
+
     const packFilePath = `/repo/objects/pack/pack-${Date.now()}.pack`;
     let wrotePack = false;
     try {
@@ -70,11 +113,47 @@ class PushHandler {
       );
     }
 
-    const atomic = capabilities.includes('atomic');
-    const results = await git.applyRefUpdates(commands, atomic);
+    // Force-push detection runs after indexing so ancestry covers the new objects.
+    const forceBlocked = new Map<string, string>();
+    for (const cmd of allowed) {
+      const rule = byRef.get(cmd.ref);
+      if (!rule?.blockForcePush) continue;
+      if (!branchNameFromRef(cmd.ref)) continue;
+      if (isZeroOid(cmd.oldOid) || isZeroOid(cmd.newOid)) continue;
+      if (cmd.oldOid === cmd.newOid) continue;
+      let fastForward = false;
+      try {
+        fastForward = await git.isAncestor(cmd.oldOid, cmd.newOid);
+      } catch {
+        fastForward = false;
+      }
+      if (!fastForward) {
+        const branch = branchNameFromRef(cmd.ref) ?? cmd.ref;
+        forceBlocked.set(cmd.ref, `non-fast-forward push to protected branch "${branch}" is blocked`);
+      }
+    }
+    if (atomic && forceBlocked.size > 0) {
+      const results = commands.map((cmd) => ({
+        ref: cmd.ref,
+        ok: false as const,
+        error: blocked.get(cmd.ref) ?? forceBlocked.get(cmd.ref) ?? 'push rejected: protected branch update declined',
+      }));
+      return buildReportStatus(results, true);
+    }
+
+    const appliable = allowed.filter((cmd) => !forceBlocked.has(cmd.ref));
+    const results = await git.applyRefUpdates(appliable, atomic);
     git.clearCache();
 
-    return buildReportStatus(results, true);
+    const byResultRef = new Map(results.map((r) => [r.ref, r]));
+    const combined = commands.map((cmd) => {
+      const staticBlock = blocked.get(cmd.ref);
+      if (staticBlock) return { ref: cmd.ref, ok: false as const, error: staticBlock };
+      const forceBlock = forceBlocked.get(cmd.ref);
+      if (forceBlock) return { ref: cmd.ref, ok: false as const, error: forceBlock };
+      return byResultRef.get(cmd.ref) ?? { ref: cmd.ref, ok: false as const, error: 'push rejected' };
+    });
+    return buildReportStatus(combined, true);
   }
 }
 

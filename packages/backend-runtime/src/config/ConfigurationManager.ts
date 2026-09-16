@@ -12,6 +12,7 @@ import {
   DEFAULT_MAX_PACK_OBJECTS,
   DEFAULT_MAX_PUSH_COMMANDS,
   DEFAULT_MAX_REPOS_PER_USER,
+  DEFAULT_MAX_RULES_PER_REPO,
   DEFAULT_MAX_TOKENS_PER_USER,
   DEFAULT_MAX_TOKEN_EXPIRY_DAYS,
   DEFAULT_SERVE_SPA_FROM_WORKER,
@@ -41,6 +42,7 @@ class ConfigurationManager {
       EnvParser.positiveInt(env, 'MAX_FETCH_BODY_BYTES', DEFAULT_MAX_FETCH_BODY_BYTES),
     getMaxMergeDiffFiles: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_MERGE_DIFF_FILES', DEFAULT_MAX_MERGE_DIFF_FILES),
     getMaxFileBytes: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_FILE_BYTES', DEFAULT_MAX_FILE_BYTES),
+    getMaxRulesPerRepo: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_RULES_PER_REPO', DEFAULT_MAX_RULES_PER_REPO),
   };
 
   public static readonly spa = {

@@ -95,8 +95,17 @@ function createFakeDb(seed: { now?: number } = {}): D1Queryable & {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO user_access_tokens')) {
-          const [token_id, user_email, token_hash, tname, expires_at, created_at] = params as Array<string | number>;
-          state.tokens.push({ token_id, user_email, token_hash, name: tname, expires_at, last_used_at: null, created_at });
+          const [token_id, user_email, token_hash, tname, expires_at, created_at, scopes] = params as Array<string | number>;
+          state.tokens.push({
+            token_id,
+            user_email,
+            token_hash,
+            name: tname,
+            expires_at,
+            last_used_at: null,
+            created_at,
+            scopes: typeof scopes === 'string' ? scopes : null,
+          });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE user_access_tokens SET last_used_at')) {
@@ -278,7 +287,8 @@ describe('TokenService lifecycle', () => {
     const svc = new TokenService({ DB: db });
     const created = await svc.createToken('alice@example.com', 'laptop');
     expect(created.token).toBeTruthy();
-    await expect(svc.authenticateWithPAT(created.token)).resolves.toBe('alice@example.com');
+    expect(created.scopes).toEqual(['repo:read', 'repo:write', 'admin']);
+    await expect(svc.authenticateWithPAT(created.token)).resolves.toMatchObject({ email: 'alice@example.com' });
     await expect(svc.listTokens('alice@example.com')).resolves.toHaveLength(1);
     await svc.deleteToken(created.tokenId, 'alice@example.com');
     await expect(svc.listTokens('alice@example.com')).resolves.toHaveLength(0);

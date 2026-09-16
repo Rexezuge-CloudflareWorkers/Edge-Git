@@ -101,6 +101,29 @@
     "annotated": "Annotated",
     "lightweight": "Lightweight"
   },
+  "rules": {
+    "branchProtection": "Branch Protection",
+    "patternPlaceholder": "Pattern (e.g. main, release/*)",
+    "requiredApprovals": "Required Approvals",
+    "addRule": "Add Rule",
+    "requirePr": "Require Pull Request",
+    "blockForcePush": "Block Force Push",
+    "blockDeletion": "Block Deletion",
+    "prRequired": "PR Required",
+    "directPushOk": "Direct Push Allowed",
+    "approvals": "{{count}} Approvals",
+    "noForcePush": "No Force Push",
+    "noDelete": "No Delete",
+    "noRules": "No Protection Rules Yet.",
+    "ruleCreated": "Protection Rule Created.",
+    "ruleDeleted": "Protection Rule Deleted.",
+    "deleteRule": "Delete Protection Rule",
+    "failedToLoad": "Failed To Load Protection Rules.",
+    "failedToCreate": "Failed To Create Protection Rule.",
+    "failedToDelete": "Failed To Delete Protection Rule.",
+    "invalidApprovals": "Approvals Must Be An Integer 0-6.",
+    "adminNote": "Rules Apply To Everyone Including Admins. Delete A Rule To Push Directly."
+  },
   "branches": {
     "newBranch": "New Branch",
     "branchName": "Branch Name",
@@ -234,7 +257,12 @@
     "revoke": "Revoke",
     "revokeToken": "Revoke Token",
     "tokenCreated": "Token Created. Copy It Now — It Will Not Be Shown Again.",
-    "tokenRevoked": "Token Revoked."
+    "tokenRevoked": "Token Revoked.",
+    "scopes": "Scopes (Git Only)",
+    "scopesHint": "Fetch Needs repo:read. Push Needs repo:write. Admin Covers Both.",
+    "selectAtLeastOneScope": "Select At Least One Scope.",
+    "expiryPlaceholder": "Expiry (days)",
+    "invalidExpiry": "Expiry Must Be A Positive Number Of Days."
   },
   "profile": {
     "user": "User",

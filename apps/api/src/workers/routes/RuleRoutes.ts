@@ -1,0 +1,74 @@
+import type { Hono } from 'hono';
+import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { RepoService } from '@edge-git/backend-services/repo';
+import { toServiceStatus } from './PublicViewerResolver';
+
+type RuleApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
+
+// Branch protection rules — list needs `read+`, create/delete need `admin`.
+// Rules apply to everyone including admins: to push directly to a protected
+// branch, delete the rule first (or open a pull request).
+function registerRuleRoutes(app: RuleApp): void {
+  app.get('/user/repos/:owner/:repo/rules', async (c) => {
+    const email = c.get('AuthenticatedUserEmailAddress');
+    const owner = c.req.param('owner');
+    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    try {
+      const scope = createRequestScope(c.env);
+      const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'read');
+      const rules = await scope.get(Tokens.BranchProtectionService).listRules(repo.id);
+      return c.json({ rules });
+    } catch (error) {
+      return c.json({ error: error instanceof Error ? error.message : 'Failed to list rules' }, toServiceStatus(error));
+    }
+  });
+
+  app.post('/user/repos/:owner/:repo/rules', async (c) => {
+    const email = c.get('AuthenticatedUserEmailAddress');
+    const owner = c.req.param('owner');
+    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const body = (await c.req.json().catch(() => ({}))) as {
+      pattern?: string;
+      requirePr?: boolean;
+      requiredApprovals?: number;
+      blockForcePush?: boolean;
+      blockDeletion?: boolean;
+      requireStatusChecks?: unknown;
+    };
+    if (typeof body.pattern !== 'string' || !body.pattern.trim()) return c.json({ error: 'pattern is required' }, 400);
+    try {
+      const scope = createRequestScope(c.env);
+      const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
+      const rule = await scope.get(Tokens.BranchProtectionService).createRule({
+        repositoryId: repo.id,
+        pattern: body.pattern,
+        requirePr: body.requirePr,
+        requiredApprovals: body.requiredApprovals,
+        blockForcePush: body.blockForcePush,
+        blockDeletion: body.blockDeletion,
+        requireStatusChecks: body.requireStatusChecks,
+        createdBy: email,
+      });
+      return c.json({ rule }, 201);
+    } catch (error) {
+      return c.json({ error: error instanceof Error ? error.message : 'Failed to create rule' }, toServiceStatus(error));
+    }
+  });
+
+  app.delete('/user/repos/:owner/:repo/rules/:id', async (c) => {
+    const email = c.get('AuthenticatedUserEmailAddress');
+    const owner = c.req.param('owner');
+    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const id = c.req.param('id');
+    try {
+      const scope = createRequestScope(c.env);
+      const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
+      await scope.get(Tokens.BranchProtectionService).deleteRule(repo.id, id);
+      return c.json({ ok: true });
+    } catch (error) {
+      return c.json({ error: error instanceof Error ? error.message : 'Failed to delete rule' }, toServiceStatus(error));
+    }
+  });
+}
+
+export { registerRuleRoutes };

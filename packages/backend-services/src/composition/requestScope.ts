@@ -1,4 +1,4 @@
-import { IssueDAO, NamespaceDAO, OrganizationDAO, OrganizationMemberDAO, PullRequestDAO, RepoCollaboratorDAO, RepositoryDAO, SearchDAO, UserAccessTokenDAO, UserDAO } from '@edge-git/backend-data/dao';
+import { BranchProtectionDAO, IssueDAO, NamespaceDAO, OrganizationDAO, OrganizationMemberDAO, PullRequestDAO, RepoCollaboratorDAO, RepositoryDAO, SearchDAO, UserAccessTokenDAO, UserDAO } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { Container } from '@edge-git/backend-runtime/di';
 import { AppConfiguration } from '@edge-git/backend-runtime/config';
@@ -7,6 +7,7 @@ import { AppConfiguration } from '@edge-git/backend-runtime/config';
 // (`vi.mock('@edge-git/backend-services/repo', ...)`) keep working
 // after migration to `scope.get(...)`. Runtime behavior is identical.
 import { AccessAuthService, TokenService } from '@edge-git/backend-services/auth';
+import { BranchProtectionService } from '@edge-git/backend-services/protection';
 import { ForkService } from '@edge-git/backend-services/fork';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { UserService } from '@edge-git/backend-services/user';
@@ -63,6 +64,7 @@ function createRequestScope(env: RequestScopeEnv): Container {
   const organizationDAO = memoize(() => Promise.resolve(new OrganizationDAO(env.DB)));
   const organizationMemberDAO = memoize(() => Promise.resolve(new OrganizationMemberDAO(env.DB)));
   const repoCollaboratorDAO = memoize(() => Promise.resolve(new RepoCollaboratorDAO(env.DB)));
+  const branchProtectionDAO = memoize(() => Promise.resolve(new BranchProtectionDAO(env.DB)));
   const searchDAO = memoize(() => Promise.resolve(new SearchDAO(env.DB)));
   scope.bindValue(Tokens.UserDAO, userDAO);
   scope.bindValue(Tokens.RepositoryDAO, repositoryDAO);
@@ -73,17 +75,19 @@ function createRequestScope(env: RequestScopeEnv): Container {
   scope.bindValue(Tokens.OrganizationDAO, organizationDAO);
   scope.bindValue(Tokens.OrganizationMemberDAO, organizationMemberDAO);
   scope.bindValue(Tokens.RepoCollaboratorDAO, repoCollaboratorDAO);
+  scope.bindValue(Tokens.BranchProtectionDAO, branchProtectionDAO);
   scope.bindValue(Tokens.SearchDAO, searchDAO);
 
   scope.bind(Tokens.AccessAuthService, () => new AccessAuthService(env as never));
   scope.bind(Tokens.TokenService, () => new TokenService(env as never, { tokenDAO }));
+  scope.bind(Tokens.BranchProtectionService, () => new BranchProtectionService(env as never, { branchProtectionDAO }));
   scope.bind(
     Tokens.ForkService,
     () => new ForkService(env as never, { repositoryDAO, userDAO, organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO }),
   );
   scope.bind(
     Tokens.RepoService,
-    () => new RepoService(env as never, { repositoryDAO, issueDAO, pullRequestDAO, userDAO, organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO }),
+    () => new RepoService(env as never, { repositoryDAO, issueDAO, pullRequestDAO, branchProtectionDAO, userDAO, organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO }),
   );
   scope.bind(Tokens.UserService, () => new UserService(env as never, { userDAO, namespaceDAO, organizationDAO, repositoryDAO }));
   scope.bind(Tokens.IssueService, () => new IssueService(env as never, { issueDAO }));

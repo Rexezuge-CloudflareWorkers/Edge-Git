@@ -16,8 +16,12 @@ export {
   validateFilterSpec,
   validateReceivePackCounts,
   validateReceivePackCommands,
+  ZERO_OID,
+  isZeroOid,
+  branchNameFromRef,
+  checkStaticPushProtection,
   getBasicCredentials,
   getBearerToken,
 } from './protocol';
 export type { AdvertiseRefs, Command, FetchCountLimits, FetchRequest, FetchResponseOptions, ReceiveCountLimits } from './protocol';
-export type { RefUpdateResult } from './types';
+export type { ProtectedRefRule, RefUpdateResult } from './types';

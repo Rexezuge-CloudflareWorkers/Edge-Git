@@ -16,6 +16,7 @@ const daoMocks = vi.hoisted(() => ({
   OrganizationDAO: vi.fn(),
   OrganizationMemberDAO: vi.fn(),
   RepoCollaboratorDAO: vi.fn(),
+  BranchProtectionDAO: vi.fn(),
   SearchDAO: vi.fn(),
 }));
 
@@ -28,6 +29,7 @@ vi.mock('@edge-git/backend-data/dao', () => ({
   OrganizationDAO: daoMocks.OrganizationDAO,
   OrganizationMemberDAO: daoMocks.OrganizationMemberDAO,
   RepoCollaboratorDAO: daoMocks.RepoCollaboratorDAO,
+  BranchProtectionDAO: daoMocks.BranchProtectionDAO,
   SearchDAO: daoMocks.SearchDAO,
 }));
 
@@ -44,9 +46,11 @@ const EXPECTED_TOKENS = [
   'OrganizationDAO',
   'OrganizationMemberDAO',
   'RepoCollaboratorDAO',
+  'BranchProtectionDAO',
   'SearchDAO',
   'AccessAuthService',
   'TokenService',
+  'BranchProtectionService',
   'RepoService',
   'UserService',
   'IssueService',
@@ -90,6 +94,9 @@ beforeEach(() => {
   });
   daoMocks.RepoCollaboratorDAO.mockImplementation(function (this: unknown, db: unknown) {
     return { kind: 'RepoCollaboratorDAO', db };
+  });
+  daoMocks.BranchProtectionDAO.mockImplementation(function (this: unknown, db: unknown) {
+    return { kind: 'BranchProtectionDAO', db };
   });
   daoMocks.SearchDAO.mockImplementation(function (this: unknown, db: unknown) {
     return { kind: 'SearchDAO', db };
@@ -143,6 +150,7 @@ describe('createRequestScope', () => {
       [Tokens.OrganizationDAO, daoMocks.OrganizationDAO],
       [Tokens.OrganizationMemberDAO, daoMocks.OrganizationMemberDAO],
       [Tokens.RepoCollaboratorDAO, daoMocks.RepoCollaboratorDAO],
+      [Tokens.BranchProtectionDAO, daoMocks.BranchProtectionDAO],
       [Tokens.SearchDAO, daoMocks.SearchDAO],
     ] as const;
     for (const [token, ctor] of pairs) {
