@@ -48,6 +48,18 @@ describe('receive-pack parsing', () => {
     expect(capabilities).toEqual(['report-status', 'atomic']);
   });
 
+  it('drops command lines that do not split into exactly three parts', () => {
+    const zero = '0'.repeat(40);
+    const buf = PktLine.mergeLines([
+      PktLine.encode(`${zero} ${'1'.repeat(40)} refs/heads/has space\0report-status\n`),
+      PktLine.encodeFlush(),
+    ]);
+    const { commands } = parseReceivePackRequest(buf);
+    // Ref names cannot contain spaces: fail closed instead of updating the
+    // truncated `refs/heads/has`.
+    expect(commands).toHaveLength(0);
+  });
+
   it('reports unpack failure', async () => {
     const res = await buildReportStatus([{ ref: '*', ok: false, error: 'boom' }], false);
     expect(await res.text()).toContain('unpack boom');
