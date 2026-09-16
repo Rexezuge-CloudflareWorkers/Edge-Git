@@ -8,6 +8,7 @@ import { DashboardView } from '../../views/DashboardView';
 import { NewRepoView } from '../../views/NewRepoView';
 import { ProfileView } from '../../views/ProfileView';
 import { RepoView } from '../../views/RepoView';
+import { SearchView } from '../../views/SearchView';
 import { CommitView } from '../../views/CommitView';
 import { CompareView } from '../../views/CompareView';
 import { CommitsView } from '../../views/CommitsView';
@@ -45,6 +46,7 @@ function SpaViewRouter({ user, setUser, authorized, showNotice, defaultOwner }: 
         }
       />
       <Route path="/:owner/:repo/issues/:number" element={<IssueDetailView authorized={authorized} showNotice={showNotice} />} />
+      <Route path="/search" element={<SearchView showNotice={showNotice} />} />
       <Route path="/:owner/:repo/pulls/:number" element={<PullDetailView authorized={authorized} showNotice={showNotice} />} />
       <Route path="/:owner/:repo/commit/:oid" element={<CommitView authorized={authorized} showNotice={showNotice} />} />
       <Route path="/:owner/:repo/compare" element={<CompareView authorized={authorized} showNotice={showNotice} />} />

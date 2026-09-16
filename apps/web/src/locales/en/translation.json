@@ -342,6 +342,17 @@
     "failedToLoadCommits": "Failed To Load Commits.",
     "fileNotFound": "File Not Found.",
     "languageLoadFailed": "Unable To Load Language.",
-    "languageSaveFailed": "Unable To Save Language."
+    "languageSaveFailed": "Unable To Save Language.",
+    "failedToSearch": "Failed To Load Search Results."
+  },
+  "search": {
+    "placeholder": "Search Repositories And Issues…",
+    "repos": "Repositories",
+    "issues": "Issues",
+    "hint": "Type At Least 2 Characters To Search.",
+    "noRepos": "No Repositories Found.",
+    "noIssues": "No Issues Found.",
+    "code": "Code",
+    "noCode": "No Code Matches Found."
   }
 }

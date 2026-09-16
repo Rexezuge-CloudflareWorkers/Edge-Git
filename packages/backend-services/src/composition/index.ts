@@ -38,3 +38,7 @@ export { OrganizationService, OrganizationServiceFactory } from '../org/Organiza
 @deprecated Prefer `createRequestScope(env).get(Tokens.PermissionService)`; kept for backward compatibility during migration.
 */
 export { PermissionService, PermissionServiceFactory } from '../permission/PermissionService';
+/**
+@deprecated Prefer `createRequestScope(env).get(Tokens.SearchService)`; kept for backward compatibility during migration.
+*/
+export { SearchService, SearchServiceFactory } from '../search/SearchService';

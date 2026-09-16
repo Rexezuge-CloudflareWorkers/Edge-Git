@@ -4,6 +4,7 @@ import { createLogger } from '@edge-git/backend-runtime/logger';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { BaseScheduledTask } from './IScheduledTask';
 import type { ScheduledTask } from './IScheduledTask';
+import { SearchBackfillTask } from './SearchBackfillTask';
 
 const logger = createLogger('CronTasks');
 
@@ -32,7 +33,7 @@ class BackgroundTaskRunPruningTask extends BaseScheduledTask {
   }
 }
 
-const CRON_TASK_DEFINITIONS: ScheduledTask[] = [new ExpiredTokenPruningTask(), new BackgroundTaskRunPruningTask()];
+const CRON_TASK_DEFINITIONS: ScheduledTask[] = [new ExpiredTokenPruningTask(), new BackgroundTaskRunPruningTask(), new SearchBackfillTask()];
 
 async function runScheduledTasks(env: Env, cron: string, scheduledTime: number): Promise<void> {
   logger.info(`Running scheduled tasks for ${cron} at ${scheduledTime}`);
@@ -43,4 +44,5 @@ async function runScheduledTasks(env: Env, cron: string, scheduledTime: number):
 }
 
 export { CRON_TASK_DEFINITIONS, runScheduledTasks, ExpiredTokenPruningTask, BackgroundTaskRunPruningTask };
+export { SearchBackfillTask } from './SearchBackfillTask';
 export type { ScheduledTask } from './IScheduledTask';

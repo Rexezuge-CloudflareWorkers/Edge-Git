@@ -239,6 +239,20 @@ class RepositoryDAO extends BaseDAO {
   public async deleteById(id: string): Promise<void> {
     await this.withRetry(() => this.database.prepare('DELETE FROM repositories WHERE id = ?').bind(id).run(), 'delete repository');
   }
+
+  // Backfill support: most-recently-updated repos first. Offset pagination is
+  // fine here (cron iterates slowly, exact cursors unnecessary).
+  public async listRecent(limit = 50, offset = 0): Promise<RepositoryRow[]> {
+    try {
+      const result = await this.database
+        .prepare('SELECT * FROM repositories ORDER BY updated_at DESC LIMIT ? OFFSET ?')
+        .bind(limit, offset)
+        .all<RepositoryRow>();
+      return result.results ?? [];
+    } catch {
+      return [];
+    }
+  }
 }
 
 export { RepositoryDAO };

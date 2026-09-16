@@ -21,6 +21,8 @@ import type { IssueService } from '../issue/IssueService';
 import type { PullRequestService } from '../pull/PullRequestService';
 import type { OrganizationService } from '../org/OrganizationService';
 import type { PermissionService } from '../permission/PermissionService';
+import type { SearchService } from '../search/SearchService';
+import type { SearchDAO } from '@edge-git/backend-data/dao';
 
 // Central token registry for the per-request composition root
 // (`requestScope.ts`). Call sites resolve services via
@@ -51,6 +53,7 @@ const Tokens = {
   OrganizationDAO: Symbol('OrganizationDAO') as Token<() => Promise<OrganizationDAO>>,
   OrganizationMemberDAO: Symbol('OrganizationMemberDAO') as Token<() => Promise<OrganizationMemberDAO>>,
   RepoCollaboratorDAO: Symbol('RepoCollaboratorDAO') as Token<() => Promise<RepoCollaboratorDAO>>,
+  SearchDAO: Symbol('SearchDAO') as Token<() => Promise<SearchDAO>>,
   AccessAuthService: Symbol('AccessAuthService') as Token<AccessAuthService>,
   TokenService: Symbol('TokenService') as Token<TokenService>,
   ForkService: Symbol('ForkService') as Token<ForkService>,
@@ -60,6 +63,7 @@ const Tokens = {
   PullRequestService: Symbol('PullRequestService') as Token<PullRequestService>,
   OrganizationService: Symbol('OrganizationService') as Token<OrganizationService>,
   PermissionService: Symbol('PermissionService') as Token<PermissionService>,
+  SearchService: Symbol('SearchService') as Token<SearchService>,
 } satisfies Record<string, Token<unknown>>;
 
 export { Tokens };

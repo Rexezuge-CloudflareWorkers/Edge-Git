@@ -16,6 +16,7 @@ const daoMocks = vi.hoisted(() => ({
   OrganizationDAO: vi.fn(),
   OrganizationMemberDAO: vi.fn(),
   RepoCollaboratorDAO: vi.fn(),
+  SearchDAO: vi.fn(),
 }));
 
 vi.mock('@edge-git/backend-data/dao', () => ({
@@ -27,6 +28,7 @@ vi.mock('@edge-git/backend-data/dao', () => ({
   OrganizationDAO: daoMocks.OrganizationDAO,
   OrganizationMemberDAO: daoMocks.OrganizationMemberDAO,
   RepoCollaboratorDAO: daoMocks.RepoCollaboratorDAO,
+  SearchDAO: daoMocks.SearchDAO,
 }));
 
 const EXPECTED_TOKENS = [
@@ -42,6 +44,7 @@ const EXPECTED_TOKENS = [
   'OrganizationDAO',
   'OrganizationMemberDAO',
   'RepoCollaboratorDAO',
+  'SearchDAO',
   'AccessAuthService',
   'TokenService',
   'RepoService',
@@ -49,6 +52,7 @@ const EXPECTED_TOKENS = [
   'IssueService',
   'OrganizationService',
   'PermissionService',
+  'SearchService',
 ] as const;
 
 function makeEnv() {
@@ -86,6 +90,9 @@ beforeEach(() => {
   });
   daoMocks.RepoCollaboratorDAO.mockImplementation(function (this: unknown, db: unknown) {
     return { kind: 'RepoCollaboratorDAO', db };
+  });
+  daoMocks.SearchDAO.mockImplementation(function (this: unknown, db: unknown) {
+    return { kind: 'SearchDAO', db };
   });
 });
 
@@ -136,6 +143,7 @@ describe('createRequestScope', () => {
       [Tokens.OrganizationDAO, daoMocks.OrganizationDAO],
       [Tokens.OrganizationMemberDAO, daoMocks.OrganizationMemberDAO],
       [Tokens.RepoCollaboratorDAO, daoMocks.RepoCollaboratorDAO],
+      [Tokens.SearchDAO, daoMocks.SearchDAO],
     ] as const;
     for (const [token, ctor] of pairs) {
       const factory = scope.get(token);
