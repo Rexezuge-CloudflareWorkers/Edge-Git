@@ -95,7 +95,11 @@
     "public": "Public",
     "private": "Private",
     "open": "Open",
-    "closed": "Closed"
+    "closed": "Closed",
+    "tags": "Tags",
+    "noTags": "No Tags Yet.",
+    "annotated": "Annotated",
+    "lightweight": "Lightweight"
   },
   "issues": {
     "newIssue": "New Issue",
@@ -282,7 +286,8 @@
     "failedToLoadComments": "Failed To Load Comments.",
     "failedToAddComment": "Failed To Add Comment.",
     "failedToUpdateIssue": "Failed To Update Issue.",
-    "failedToLoadFiles": "Failed To Load Repository Files.",
+      "failedToLoadFiles": "Failed To Load Repository Files.",
+      "failedToLoadTags": "Failed To Load Tags.",
     "failedToLoadPull": "Failed To Load Pull Request.",
     "failedToLoadPulls": "Failed To Load Pull Requests.",
     "failedToCreatePull": "Failed To Create Pull Request.",

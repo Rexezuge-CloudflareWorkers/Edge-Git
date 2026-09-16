@@ -21,6 +21,10 @@ function registerRepoRoutes(app: RepoApp): void {
     return withPublicRepo(c as never, async (_row, fullName) => c.json(await getRepoStub(c.env, fullName).getBranches()));
   });
 
+  app.get('/repos/:owner/:repo/tags', async (c) => {
+    return withPublicRepo(c as never, async (_row, fullName) => c.json(await getRepoStub(c.env, fullName).getTags()));
+  });
+
   app.get('/repos/:owner/:repo/tree', async (c) => {
     return withPublicRepo(c as never, async (_row, fullName) => {
       const url = new URL(c.req.url);
@@ -182,6 +186,12 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     return withVisibleRepo(c as never, owner, repoName, async (fullName) => c.json(await getRepoStub(c.env, fullName).getBranches()));
+  });
+
+  app.get('/user/repos/:owner/:repo/tags', async (c) => {
+    const owner = c.req.param('owner');
+    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    return withVisibleRepo(c as never, owner, repoName, async (fullName) => c.json(await getRepoStub(c.env, fullName).getTags()));
   });
 
   app.get('/user/repos/:owner/:repo/tree', async (c) => {

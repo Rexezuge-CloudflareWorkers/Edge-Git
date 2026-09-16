@@ -24,6 +24,22 @@ class ReadModelService {
     return { branches, currentBranch: currentBranch ?? null };
   }
 
+  public async getTags(): Promise<
+    Array<{ name: string; ref: string; oid: string; peeledOid: string | null; type: 'lightweight' | 'annotated' }>
+  > {
+    const tags = await this.git.listTags();
+    const enriched = await Promise.all(
+      tags.map(async (t) => {
+        const name = t.ref.startsWith('refs/tags/') ? t.ref.slice('refs/tags/'.length) : t.ref;
+        const peeledOid: string | null = await this.git.peelTag(t.oid);
+        const type: 'lightweight' | 'annotated' = peeledOid === null ? 'lightweight' : 'annotated';
+        return { name, ref: t.ref, oid: t.oid, peeledOid, type };
+      }),
+    );
+    enriched.sort((a, b) => a.name.localeCompare(b.name));
+    return enriched;
+  }
+
   public async getTree(args: { ref?: string; path?: string }): Promise<unknown> {
     const { ref, path } = args;
     const resolvedRef = await this.git.resolveRef(ref);
