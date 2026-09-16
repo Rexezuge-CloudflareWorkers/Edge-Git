@@ -61,6 +61,28 @@ function registerRepoRoutes(app: RepoApp): void {
       );
     });
   });
+
+  app.get('/repos/:owner/:repo/commits/:oid', async (c) => {
+    const oid = c.req.param('oid');
+    if (!/^[0-9a-f]{40}$/i.test(oid)) return c.json({ error: 'Invalid commit oid' }, 400);
+    return withPublicRepo(c as never, async (_row, fullName) => {
+      const diff = (await getRepoStub(c.env, fullName).getCommitDiff(oid)) as { commit: unknown } | null;
+      if (!diff || !diff.commit) return c.json({ error: 'Not found' }, 404);
+      return c.json(diff);
+    });
+  });
+
+  app.get('/repos/:owner/:repo/compare', async (c) => {
+    return withPublicRepo(c as never, async (_row, fullName) => {
+      const url = new URL(c.req.url);
+      const baseRef = url.searchParams.get('base') ?? '';
+      const headRef = url.searchParams.get('head') ?? '';
+      if (!baseRef || !headRef) return c.json({ error: 'base and head query params are required' }, 400);
+      const diff = await getRepoStub(c.env, fullName).getCompare({ baseRef, headRef });
+      if (!diff) return c.json({ error: 'Not found' }, 404);
+      return c.json(diff);
+    });
+  });
 }
 
 // Protected repo CRUD behind /user/* Access auth (plus /user/me identity).
@@ -232,6 +254,32 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
       async (fullName) =>
         c.json(await getRepoStub(c.env, fullName).getCommits({ ref: url.searchParams.get('ref') ?? undefined, depth: depth ? Number(depth) : undefined })),
     );
+  });
+
+  app.get('/user/repos/:owner/:repo/commits/:oid', async (c) => {
+    const oid = c.req.param('oid');
+    if (!/^[0-9a-f]{40}$/i.test(oid)) return c.json({ error: 'Invalid commit oid' }, 400);
+    const owner = c.req.param('owner');
+    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    return withVisibleRepo(c as never, owner, repoName, async (fullName) => {
+      const diff = (await getRepoStub(c.env, fullName).getCommitDiff(oid)) as { commit: unknown } | null;
+      if (!diff || !diff.commit) return c.json({ error: 'Not found' }, 404);
+      return c.json(diff);
+    });
+  });
+
+  app.get('/user/repos/:owner/:repo/compare', async (c) => {
+    const owner = c.req.param('owner');
+    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const url = new URL(c.req.url);
+    const baseRef = url.searchParams.get('base') ?? '';
+    const headRef = url.searchParams.get('head') ?? '';
+    if (!baseRef || !headRef) return c.json({ error: 'base and head query params are required' }, 400);
+    return withVisibleRepo(c as never, owner, repoName, async (fullName) => {
+      const diff = await getRepoStub(c.env, fullName).getCompare({ baseRef, headRef });
+      if (!diff) return c.json({ error: 'Not found' }, 404);
+      return c.json(diff);
+    });
   });
 }
 

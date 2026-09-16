@@ -1,5 +1,7 @@
 import * as git from 'isomorphic-git';
 import type { IsoGitFs } from './IsoGitFs';
+import { diffText } from './DiffHunks';
+import type { DiffHunk } from './DiffHunks';
 
 const logger = {
   warn: (...args: unknown[]): void => console.warn('[WARN] [GitService]', ...args),
@@ -8,6 +10,23 @@ const logger = {
 };
 
 type PromiseFsClient = ReturnType<IsoGitFs['getPromiseFsClient']>;
+
+type TextFile = { isBinary: boolean; content: string | null };
+
+type FileStateChange = {
+  type: 'add' | 'modify' | 'remove';
+  path: string;
+  old: TextFile | null;
+  new: TextFile | null;
+};
+
+export interface FileDiffWithHunks {
+  path: string;
+  type: 'add' | 'modify' | 'remove';
+  binary: boolean;
+  tooLarge: boolean;
+  hunks: DiffHunk[];
+}
 
 export class HistoryService {
   private readonly fs: PromiseFsClient;
@@ -236,5 +255,57 @@ export class HistoryService {
         changes: [],
       };
     }
+  }
+
+  private async resolveDiffRef(ref: string): Promise<string | null> {
+    try {
+      return await git.resolveRef({ fs: this.fs, gitdir: this.gitdir, ref });
+    } catch {
+      return null;
+    }
+  }
+
+  private toFileDiff(change: FileStateChange): FileDiffWithHunks {
+    const binary = (change.old?.isBinary ?? false) || (change.new?.isBinary ?? false);
+    if (binary) {
+      return { path: change.path, type: change.type, binary: true, tooLarge: false, hunks: [] };
+    }
+    const { tooLarge, hunks } = diffText(change.old?.content ?? null, change.new?.content ?? null);
+    return { path: change.path, type: change.type, binary: false, tooLarge, hunks };
+  }
+
+  // Single-commit view: commit metadata plus per-file unified hunks
+  // (vs the first parent, or vs the empty tree for root commits).
+  async getCommitDiff(commitOid: string, maxFiles: number) {
+    const { commit, changes } = (await this.getCommit(commitOid)) as { commit: unknown; changes: FileStateChange[] };
+    if (!commit) return { commit: null, truncated: false, files: [] };
+    return {
+      commit,
+      truncated: changes.length > maxFiles,
+      files: changes.slice(0, maxFiles).map((c) => this.toFileDiff(c)),
+    };
+  }
+
+  // Compare view: three-dot diff of `headRef` against the merge-base with
+  // `baseRef` (falls back to two-dot when no common history exists).
+  async getCompareDiff(baseRef: string, headRef: string, maxFiles: number) {
+    const [baseOid, headOid] = await Promise.all([this.resolveDiffRef(baseRef), this.resolveDiffRef(headRef)]);
+    if (!baseOid || !headOid) return null;
+    let mergeBase: string | null = null;
+    try {
+      const bases = await git.findMergeBase({ fs: this.fs, gitdir: this.gitdir, oids: [baseOid, headOid], cache: this.cache });
+      mergeBase = bases[0] ?? null;
+    } catch {
+      mergeBase = null;
+    }
+    const diffBase = mergeBase ?? baseOid;
+    const changes = (await this.getFileStateChanges(diffBase, headOid)) as FileStateChange[];
+    return {
+      baseOid,
+      headOid,
+      mergeBase,
+      truncated: changes.length > maxFiles,
+      files: changes.slice(0, maxFiles).map((c) => this.toFileDiff(c)),
+    };
   }
 }

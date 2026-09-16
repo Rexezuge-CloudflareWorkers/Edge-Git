@@ -192,6 +192,16 @@ class RepoWorker extends DurableObject<Env> {
     return this.readModel.getCommit(commitOid);
   }
 
+  public async getCommitDiff(commitOid: string): Promise<unknown> {
+    await this.prepare();
+    return this.readModel.getCommitDiff(commitOid, ConfigurationManager.repo.getMaxMergeDiffFiles(this.env));
+  }
+
+  public async getCompare(args: { baseRef: string; headRef: string }): Promise<unknown> {
+    await this.prepare();
+    return this.readModel.getCompare(args.baseRef, args.headRef, ConfigurationManager.repo.getMaxMergeDiffFiles(this.env));
+  }
+
   public async getMergePreview(args: { baseRef: string; headRef: string }): Promise<unknown> {
     await this.prepare();
     return this.readModel.getMergePreview(args.baseRef, args.headRef);

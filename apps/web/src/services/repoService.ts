@@ -1,4 +1,4 @@
-import type { BlobResponse, BranchesResponse, GitCommit, Repo, TagInfo, TreeEntry } from '../types';
+import type { BlobResponse, BranchesResponse, CommitDiffResult, CompareResult, GitCommit, Repo, TagInfo, TreeEntry } from '../types';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../lib/api';
 
 function authedBase(owner: string, repo: string): string {
@@ -76,6 +76,19 @@ export async function loadCommits(owner: string, repo: string, ref?: string, dep
     repo,
     `${authedBase(owner, repo)}/commits${toQuery({ ref, depth: String(depth) })}`,
     `${publicBase(owner, repo)}/commits${toQuery({ ref, depth: String(depth) })}`,
+  );
+}
+
+export async function loadCommit(owner: string, repo: string, oid: string): Promise<CommitDiffResult> {
+  return tryAuthedFirst(owner, repo, `${authedBase(owner, repo)}/commits/${encodeURIComponent(oid)}`, `${publicBase(owner, repo)}/commits/${encodeURIComponent(oid)}`);
+}
+
+export async function loadCompare(owner: string, repo: string, base: string, head: string): Promise<CompareResult> {
+  return tryAuthedFirst(
+    owner,
+    repo,
+    `${authedBase(owner, repo)}/compare${toQuery({ base, head })}`,
+    `${publicBase(owner, repo)}/compare${toQuery({ base, head })}`,
   );
 }
 

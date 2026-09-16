@@ -103,6 +103,43 @@ export interface BlobResponse {
   contentBase64?: string;
 }
 
+export interface DiffLine {
+  kind: 'context' | 'add' | 'remove';
+  text: string;
+  oldNo: number | null;
+  newNo: number | null;
+}
+
+export interface DiffHunk {
+  oldStart: number;
+  oldLines: number;
+  newStart: number;
+  newLines: number;
+  lines: DiffLine[];
+}
+
+export interface FileDiff {
+  path: string;
+  type: 'add' | 'modify' | 'remove';
+  binary: boolean;
+  tooLarge: boolean;
+  hunks: DiffHunk[];
+}
+
+export interface CommitDiffResult {
+  commit: GitCommit | null;
+  truncated: boolean;
+  files: FileDiff[];
+}
+
+export interface CompareResult {
+  baseOid: string;
+  headOid: string;
+  mergeBase: string | null;
+  truncated: boolean;
+  files: FileDiff[];
+}
+
 export interface Issue {
   id: string;
   repository_id: string;

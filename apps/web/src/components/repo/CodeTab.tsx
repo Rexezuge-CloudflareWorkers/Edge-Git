@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { File, Folder, GitBranch, History, Tag } from 'lucide-react';
+import { File, Folder, GitBranch, Tag } from 'lucide-react';
 import type { GitCommit, Repo, TagInfo, TreeEntry } from '../../types';
 import { decodeBlobContent, loadBlob, loadBranches, loadCommits, loadTags, loadTree } from '../../services/repoService';
 import { firstLine, formatCommitDate, formatTimestamp } from '../../lib/format';
@@ -13,6 +13,7 @@ import { Markdown } from '../shared/Markdown';
 import { RefreshButton } from '../shared/RefreshButton';
 import { CloneButton } from './CloneButton';
 import { ForkButton } from './ForkButton';
+import { RecentCommitsCard } from './RecentCommitsCard';
 import { TagPicker, TagsCard } from './TagsCard';
 
 const README_NAMES = new Set(['README.md', 'README.markdown', 'README.mdown', 'README.txt', 'README']);
@@ -137,7 +138,6 @@ export function CodeTab({
 
   const crumbs = path ? path.split('/') : [];
   const latestCommit = commits[0];
-  const sidebarCommits = commits.slice(0, 5);
 
   return (
     <div className="space-y-4">
@@ -313,7 +313,9 @@ export function CodeTab({
             {repoMeta.forkedFrom && (
               <p className="mt-2 text-xs text-[var(--color-text-muted)]">
                 {t('forks.forkedFrom', 'Forked From')}{' '}
-                <Link className="text-[var(--color-accent)] hover:underline font-mono" to={`/${repoMeta.forkedFrom}`}>{repoMeta.forkedFrom}</Link>
+                <Link className="text-[var(--color-accent)] hover:underline font-mono" to={`/${repoMeta.forkedFrom}`}>
+                  {repoMeta.forkedFrom}
+                </Link>
               </p>
             )}
             <dl className="mt-4 space-y-2.5 text-sm">
@@ -350,30 +352,7 @@ export function CodeTab({
             </dl>
           </Card>
 
-          <Card>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1.5">
-                <History className="h-4 w-4 text-[var(--color-text-muted)]" />
-                Recent commits
-              </h2>
-              <Badge variant="neutral">{commits.length}</Badge>
-            </div>
-            {sidebarCommits.length === 0 ? (
-              <p className="text-sm text-[var(--color-text-muted)]">No commits yet.</p>
-            ) : (
-              <ul className="space-y-3">
-                {sidebarCommits.map((c) => (
-                  <li key={c.oid} className="text-sm min-w-0">
-                    <p className="text-[var(--color-text-primary)] truncate">{firstLine(c.commit.message)}</p>
-                    <p className="text-xs text-[var(--color-text-muted)]">
-                      {c.commit.author.name} · {formatTimestamp(c.commit.author.timestamp)} ·{' '}
-                      <code className="font-mono">{c.oid.slice(0, 7)}</code>
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
+          <RecentCommitsCard commits={commits} owner={owner} repo={repo} />
 
           <TagsCard
             tags={tags}

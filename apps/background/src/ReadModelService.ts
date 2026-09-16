@@ -85,6 +85,14 @@ class ReadModelService {
     return this.git.getCommit(commitOid);
   }
 
+  public async getCommitDiff(commitOid: string, maxFiles: number): Promise<unknown> {
+    return this.git.getCommitDiff(commitOid, maxFiles);
+  }
+
+  public async getCompare(baseRef: string, headRef: string, maxFiles: number): Promise<unknown> {
+    return this.git.getCompareDiff(baseRef, headRef, maxFiles);
+  }
+
   public async getMergePreview(baseRef: string, headRef: string): Promise<unknown> {
     return this.git.getMergePreview(baseRef, headRef);
   }

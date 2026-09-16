@@ -92,6 +92,15 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
       if (/^\/[^/]+\/[^/]+\/pulls\/[^/]+\/?$/.test(path)) {
         return c.html(SPA_HTML);
       }
+      if (/^\/[^/]+\/[^/]+\/commit\/[^/]+\/?$/.test(path)) {
+        return c.html(SPA_HTML);
+      }
+      if (/^\/[^/]+\/[^/]+\/compare\/?$/.test(path)) {
+        return c.html(SPA_HTML);
+      }
+      if (/^\/[^/]+\/[^/]+\/commits\/?$/.test(path)) {
+        return c.html(SPA_HTML);
+      }
       return c.notFound();
     });
 
