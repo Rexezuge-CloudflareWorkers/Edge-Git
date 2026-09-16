@@ -4,10 +4,11 @@ import type { Repo } from '../../types';
 import { VisibilityBadge } from '../ui/Badge';
 import { cn } from '../../lib/utils';
 
-export type RepoTab = 'code' | 'issues' | 'settings';
+export type RepoTab = 'code' | 'pulls' | 'issues' | 'settings';
 
 const TABS: Array<{ id: RepoTab; label: string }> = [
   { id: 'code', label: 'Code' },
+  { id: 'pulls', label: 'Pulls' },
   { id: 'issues', label: 'Issues' },
   { id: 'settings', label: 'Settings' },
 ];
@@ -16,12 +17,14 @@ export function RepoHeader({
   repo,
   activeTab,
   issueCount,
+  pullCount,
   showSettings,
   onTabChange,
 }: {
   repo: Repo;
   activeTab: RepoTab;
   issueCount?: number;
+  pullCount?: number;
   showSettings?: boolean;
   onTabChange: (tab: RepoTab) => void;
 }) {
@@ -73,6 +76,9 @@ export function RepoHeader({
               {t.label}
               {t.id === 'issues' && issueCount !== undefined && (
                 <span className="ml-1.5 text-xs text-[var(--color-text-muted)]">{issueCount}</span>
+              )}
+              {t.id === 'pulls' && pullCount !== undefined && (
+                <span className="ml-1.5 text-xs text-[var(--color-text-muted)]">{pullCount}</span>
               )}
             </button>
           ))}

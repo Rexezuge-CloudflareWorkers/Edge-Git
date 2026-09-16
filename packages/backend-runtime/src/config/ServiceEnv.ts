@@ -23,6 +23,7 @@ interface ServiceEnv {
   MAX_PUSH_COMMANDS?: string;
   MAX_PACK_BYTES?: string;
   MAX_FETCH_BODY_BYTES?: string;
+  MAX_MERGE_DIFF_FILES?: string;
   BACKGROUND_TASK_RUN_RETENTION_DAYS?: string;
   AUDIT_LOG_RETENTION_DAYS?: string;
   LOG_LEVEL?: string;

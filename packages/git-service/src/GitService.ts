@@ -4,6 +4,7 @@ import { RefService } from './RefService';
 import { ObjectReader } from './ObjectReader';
 import { PackCollector } from './PackCollector';
 import { HistoryService } from './HistoryService';
+import { MergeService } from './MergeService';
 
 export { PackLimitError } from './PackCollector';
 
@@ -16,6 +17,7 @@ export class GitService {
   private readonly objects: ObjectReader;
   private readonly packs: PackCollector;
   private readonly history: HistoryService;
+  private readonly merger: MergeService;
 
   private cache: object = {};
   private cacheCreatedAt = Date.now();
@@ -27,6 +29,7 @@ export class GitService {
     this.objects = new ObjectReader(fs, gitdir);
     this.packs = new PackCollector(fs, gitdir);
     this.history = new HistoryService(fs, gitdir);
+    this.merger = new MergeService(fs, gitdir);
   }
 
   public clearCache(): void {
@@ -35,6 +38,7 @@ export class GitService {
     this.objects.clearCache();
     this.packs.clearCache();
     this.history.clearCache();
+    this.merger.clearCache();
   }
 
   public ensureFreshCache(ttlSeconds: number): void {
@@ -146,5 +150,21 @@ export class GitService {
 
   async applyRefUpdates(commands: Array<{ oldOid: string; newOid: string; ref: string }>, atomic: boolean): Promise<RefUpdateResult[]> {
     return this.refs.applyRefUpdates(commands, atomic);
+  }
+
+  async findMergeBase(oids: string[]): Promise<string | null> {
+    return this.merger.findMergeBase(oids);
+  }
+
+  async getMergePreview(baseRef: string, headRef: string) {
+    return this.merger.getPreview(baseRef, headRef);
+  }
+
+  async mergeBranches(input: { baseBranch: string; headOid: string; author: { name: string; email: string }; message?: string }) {
+    return this.merger.mergeBranches(input);
+  }
+
+  async deleteBranch(branch: string): Promise<void> {
+    await this.merger.deleteBranch(branch);
   }
 }

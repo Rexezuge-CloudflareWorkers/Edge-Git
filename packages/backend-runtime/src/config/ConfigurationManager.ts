@@ -6,6 +6,7 @@ import {
   DEFAULT_MAX_FETCH_BODY_BYTES,
   DEFAULT_MAX_FETCH_HAVES,
   DEFAULT_MAX_FETCH_WANTS,
+  DEFAULT_MAX_MERGE_DIFF_FILES,
   DEFAULT_MAX_PACK_BYTES,
   DEFAULT_MAX_PACK_OBJECTS,
   DEFAULT_MAX_PUSH_COMMANDS,
@@ -37,6 +38,7 @@ class ConfigurationManager {
     getMaxPackBytes: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_PACK_BYTES', DEFAULT_MAX_PACK_BYTES),
     getMaxFetchBodyBytes: (env: unknown): number =>
       EnvParser.positiveInt(env, 'MAX_FETCH_BODY_BYTES', DEFAULT_MAX_FETCH_BODY_BYTES),
+    getMaxMergeDiffFiles: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_MERGE_DIFF_FILES', DEFAULT_MAX_MERGE_DIFF_FILES),
   };
 
   public static readonly spa = {

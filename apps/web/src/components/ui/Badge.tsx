@@ -31,3 +31,8 @@ export function VisibilityBadge({ isPrivate }: { isPrivate: boolean }) {
 export function IssueStatusBadge({ status }: { status: string }) {
   return <Badge variant={status === 'open' ? 'success' : 'neutral'}>{status === 'open' ? 'Open' : 'Closed'}</Badge>;
 }
+
+export function PullStatusBadge({ status }: { status: string }) {
+  if (status === 'merged') return <Badge variant="info">Merged</Badge>;
+  return <Badge variant={status === 'open' ? 'success' : 'neutral'}>{status === 'open' ? 'Open' : 'Closed'}</Badge>;
+}

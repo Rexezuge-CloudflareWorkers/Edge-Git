@@ -14,6 +14,8 @@
     "./user/*": "./src/user/*.ts",
     "./issue": "./src/issue/index.ts",
     "./issue/*": "./src/issue/*.ts",
+    "./pull": "./src/pull/index.ts",
+    "./pull/*": "./src/pull/*.ts",
     "./org": "./src/org/index.ts",
     "./org/*": "./src/org/*.ts",
     "./permission": "./src/permission/index.ts",
