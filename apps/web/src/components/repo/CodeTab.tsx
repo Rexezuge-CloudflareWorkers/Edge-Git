@@ -38,13 +38,27 @@ export function CodeTab({
 
   const [reloadKey, setReloadKey] = useState(0);
 
+  // `ref` is the explicit user selection (`''` = follow the default branch).
+  // `selectedRef` is what is displayed and used for fetching, so the dropdown
+  // shows the actual branch name (e.g. `main`) instead of a generic placeholder.
+  const selectedRef = ref || defaultBranch || branches[0] || '';
+  const emptyBranchesLabel = loading ? 'Loading...' : 'No Branches';
+  const placeholderLabel = branches.length === 0 ? emptyBranchesLabel : selectedRef;
+
   useEffect(() => {
     const run = async () => {
       try {
         const b = await loadBranches(owner, repo);
         setBranches(b.branches);
         setDefaultBranch(b.currentBranch ?? b.branches[0] ?? null);
-        const effectiveRef = ref || b.currentBranch || b.branches[0] || 'HEAD';
+        // If the current selection no longer exists (e.g. after switching
+        // repos while `ref` still holds the previous repo's branch), fall
+        // back to the new repo's default branch.
+        const resolvedRef = ref && b.branches.includes(ref) ? ref : (b.currentBranch ?? b.branches[0] ?? 'HEAD');
+        if (ref !== '' && resolvedRef !== ref) {
+          setRef(resolvedRef === 'HEAD' ? '' : resolvedRef);
+        }
+        const effectiveRef = resolvedRef;
         const [tree, log] = await Promise.all([
           loadTree(owner, repo, effectiveRef === 'HEAD' ? undefined : effectiveRef, path || undefined),
           loadCommits(owner, repo, effectiveRef === 'HEAD' ? undefined : effectiveRef, 10),
@@ -66,7 +80,7 @@ export function CodeTab({
   useEffect(() => {
     if (!readmeEntry) return;
     let cancelled = false;
-    loadBlob(owner, repo, readmeEntry.path, ref || undefined)
+    loadBlob(owner, repo, readmeEntry.path, selectedRef || undefined)
       .then((blob) => {
         if (cancelled || !blob || blob.isBinary) return;
         const text = decodeBlobContent(blob);
@@ -76,7 +90,8 @@ export function CodeTab({
     return () => {
       cancelled = true;
     };
-  }, [owner, repo, ref, readmeEntry]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [owner, repo, selectedRef, readmeEntry?.path]);
 
   const visibleReadme = readmeEntry && readme && readme.path === readmeEntry.path ? readme.text : null;
 
@@ -88,7 +103,7 @@ export function CodeTab({
   const openBlob = async (entryPath: string) => {
     const fullPath = path ? `${path}/${entryPath}` : entryPath;
     try {
-      const blob = await loadBlob(owner, repo, fullPath, ref || undefined);
+      const blob = await loadBlob(owner, repo, fullPath, selectedRef || undefined);
       if (!blob) {
         showNotice('error', 'File Not Found.');
         return;
@@ -109,14 +124,19 @@ export function CodeTab({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <Select
-          value={ref}
+          value={selectedRef}
           onChange={(e) => {
             setLoading(true);
             setRef(e.target.value);
+            setBlobPath(null);
+            setBlobText(null);
+            setBlobBinary(false);
+            setReadme(null);
           }}
           aria-label="Branch"
+          disabled={branches.length === 0}
         >
-          {!branches.includes(ref) && <option value="">{ref || 'Default branch'}</option>}
+          {!branches.includes(selectedRef) && <option value="">{placeholderLabel}</option>}
           {branches.map((b) => (
             <option key={b} value={b}>
               {b}

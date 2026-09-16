@@ -95,9 +95,18 @@ export function RepoView({
 
   return (
     <div>
-      <RepoHeader repo={repoData} activeTab={visibleTab} issueCount={issueCount} pullCount={pullCount} showSettings={canManage} onTabChange={setTab} />
+      <RepoHeader
+        repo={repoData}
+        activeTab={visibleTab}
+        issueCount={issueCount}
+        pullCount={pullCount}
+        showSettings={canManage}
+        onTabChange={setTab}
+      />
       <div className="max-w-7xl mx-auto px-6 py-6">
-        {visibleTab === 'code' && <CodeTab owner={owner} repo={repo} repoMeta={repoData} showNotice={showNotice} />}
+        {visibleTab === 'code' && (
+          <CodeTab key={`${owner}/${repo}`} owner={owner} repo={repo} repoMeta={repoData} showNotice={showNotice} />
+        )}
         {visibleTab === 'pulls' && (
           <PullsTab owner={owner} repo={repo} canWrite={authorized ?? false} showNotice={showNotice} onCountChange={setPullCount} />
         )}
