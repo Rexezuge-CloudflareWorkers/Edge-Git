@@ -35,6 +35,11 @@ function createApiFakeDb() {
           const max = state.issues.filter((i) => i.repository_id === params[0]).reduce((m, i) => Math.max(m, i.number as number), 0);
           return Promise.resolve({ max_n: max } as unknown as T);
         }
+        if (q.includes('FROM issues WHERE repository_id = ? AND number = ?')) {
+          return Promise.resolve(
+            (state.issues.find((i) => i.repository_id === params[0] && i.number === params[1]) ?? null) as T | null,
+          );
+        }
         return Promise.resolve(null);
       },
       all<T>(): Promise<{ results: T[] }> {
@@ -46,6 +51,13 @@ function createApiFakeDb() {
             results: state.issues
               .filter((i) => i.repository_id === params[0])
               .sort((a, b) => (b.number as number) - (a.number as number)) as T[],
+          });
+        }
+        if (q.includes('FROM comments WHERE issue_id = ?')) {
+          return Promise.resolve({
+            results: state.comments
+              .filter((c) => c.issue_id === params[0])
+              .sort((a, b) => (a.created_at as number) - (b.created_at as number)) as T[],
           });
         }
         if (q.includes('FROM user_access_tokens WHERE user_email = ?')) {
@@ -84,6 +96,20 @@ function createApiFakeDb() {
             string | number | null
           >;
           state.issues.push({ id, repository_id, full_name, number, title, body, status, creator_email, created_at, updated_at });
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('UPDATE issues SET status = ?')) {
+          const [status, updated_at, id] = params as Array<string | number>;
+          const row = state.issues.find((i) => i.id === id);
+          if (row) {
+            row.status = status;
+            row.updated_at = updated_at;
+          }
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('INSERT INTO comments')) {
+          const [id, issue_id, author_email, body, created_at] = params as Array<string | number>;
+          state.comments.push({ id, issue_id, author_email, body, created_at });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO users')) {
@@ -271,6 +297,68 @@ describe('EdgeGitWorker HTTP surface', () => {
     expect((await call('/user/repos/alice/mine')).status).toBe(404);
     expect(db.issues).toHaveLength(0);
     expect((await call('/user/repos/alice/mine', { method: 'DELETE' })).status).toBe(404);
+  });
+
+  it('reads, closes, and comments on individual issues', async () => {
+    const worker = new EdgeGitWorker() as unknown as { onRequest(r: Request, e: unknown, c: unknown): Promise<Response> };
+    const db = createApiFakeDb();
+    const env = createEnv(db);
+    const bobEnv = { ...env, DEV_AUTH_EMAIL: 'bob@example.com' };
+    const anonEnv = { ...env, DEV_AUTH_EMAIL: undefined };
+    const json = { 'Content-Type': 'application/json' };
+    const call = (path: string, init?: RequestInit): Promise<Response> => worker.onRequest(new Request(`https://git.example.com${path}`, init), env, ctx);
+    const callAsBob = (path: string, init?: RequestInit): Promise<Response> =>
+      worker.onRequest(new Request(`https://git.example.com${path}`, init), bobEnv, ctx);
+    const callAnon = (path: string, init?: RequestInit): Promise<Response> =>
+      worker.onRequest(new Request(`https://git.example.com${path}`, init), anonEnv, ctx);
+
+    expect((await call('/user/repos', { method: 'POST', headers: json, body: JSON.stringify({ name: 'demo' }) })).status).toBe(201);
+    expect(
+      (await call('/user/repos/alice/demo/issues', { method: 'POST', headers: json, body: JSON.stringify({ title: 'Bug', body: '**bold**' }) }))
+        .status,
+    ).toBe(201);
+
+    await expect(call('/user/repos/alice/demo/issues/1').then((r) => r.json())).resolves.toMatchObject({ issue: { number: 1 } });
+    await expect(callAnon('/repos/alice/demo/issues/1').then((r) => r.json())).resolves.toMatchObject({ issue: { number: 1 } });
+    expect((await call('/user/repos/alice/demo/issues/99')).status).toBe(404);
+    expect((await callAnon('/repos/alice/demo/issues/99')).status).toBe(404);
+    expect((await callAnon('/repos/alice/missing/issues/1')).status).toBe(404);
+
+    const comment = await call('/user/repos/alice/demo/issues/1/comments', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ body: '  first  ' }),
+    });
+    expect(comment.status).toBe(201);
+    await expect(call('/user/repos/alice/demo/issues/1/comments').then((r) => r.json())).resolves.toMatchObject({
+      comments: [{ body: 'first' }],
+    });
+    await expect(callAnon('/repos/alice/demo/issues/1/comments').then((r) => r.json())).resolves.toMatchObject({
+      comments: [{ body: 'first' }],
+    });
+    expect(
+      (await call('/user/repos/alice/demo/issues/1/comments', { method: 'POST', headers: json, body: JSON.stringify({ body: '   ' }) })).status,
+    ).toBe(400);
+    expect((await call('/user/repos/alice/demo/issues/99/comments', { method: 'POST', headers: json, body: JSON.stringify({ body: 'x' }) })).status).toBe(
+      404,
+    );
+
+    const closed = await call('/user/repos/alice/demo/issues/1', { method: 'PATCH', headers: json, body: JSON.stringify({ status: 'closed' }) });
+    expect(closed.status).toBe(200);
+    await expect(closed.json()).resolves.toMatchObject({ issue: { status: 'closed' } });
+    await expect(callAnon('/repos/alice/demo/issues/1').then((r) => r.json())).resolves.toMatchObject({ issue: { status: 'closed' } });
+    const reopened = await call('/user/repos/alice/demo/issues/1', { method: 'PATCH', headers: json, body: JSON.stringify({ status: 'open' }) });
+    expect(reopened.status).toBe(200);
+
+    expect((await call('/user/repos/alice/demo/issues/1', { method: 'PATCH', headers: json, body: JSON.stringify({ status: 'bogus' }) })).status).toBe(
+      400,
+    );
+    expect((await call('/user/repos/alice/demo/issues/99', { method: 'PATCH', headers: json, body: JSON.stringify({ status: 'closed' }) })).status).toBe(
+      404,
+    );
+    expect(
+      (await callAsBob('/user/repos/alice/demo/issues/1', { method: 'PATCH', headers: json, body: JSON.stringify({ status: 'closed' }) })).status,
+    ).toBe(403);
   });
 
   it('serves the SPA shell for /settings and /new', async () => {
