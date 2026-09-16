@@ -13,7 +13,7 @@ function badQuery(c: { json: (body: unknown, status?: number) => Response }, mes
 
 // Public global search — anonymous OK for public content (private rows are
 // filtered by SearchService via PermissionService, never leaked).
-// GET /search?q=...&type=repos|issues&owner=&repo=&limit=
+// GET /search?q=...&type=repos|issues|code&owner=&repo=&limit=
 function registerSearchRoutes(app: SearchApp): void {
   app.get('/search', async (c) => {
     const url = new URL(c.req.url);
@@ -42,12 +42,20 @@ function registerSearchRoutes(app: SearchApp): void {
           const issues = await svc.searchIssues(q, viewerEmail, { limit, repoId: row.id });
           return c.json({ type, query: q, issues });
         }
+        if (type === 'code') {
+          const code = await svc.searchCode(q, viewerEmail, { limit, repoId: row.id });
+          return c.json({ type, query: q, code });
+        }
         const repos = await svc.searchRepos(q, viewerEmail, limit);
         return c.json({ type, query: q, repos: repos.filter((r) => r.id === row.id).map((r) => toRepoJson(r)) });
       }
       if (type === 'issues') {
         const issues = await svc.searchIssues(q, viewerEmail, { limit });
         return c.json({ type, query: q, issues });
+      }
+      if (type === 'code') {
+        const code = await svc.searchCode(q, viewerEmail, { limit });
+        return c.json({ type, query: q, code });
       }
       const repos = await svc.searchRepos(q, viewerEmail, limit);
       return c.json({ type, query: q, repos: repos.map((r) => toRepoJson(r)) });

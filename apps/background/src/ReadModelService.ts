@@ -60,6 +60,52 @@ class ReadModelService {
     return data;
   }
 
+  // Recursive file listing for the code search indexer. Breadth-first walk
+  // capped by maxFiles (+ a dir-visit cap) so giant repos cannot blow the
+  // DO wall-clock. Returns repo-relative paths with blob oids.
+  public async listAllFiles(args: { ref?: string; maxFiles?: number }): Promise<Array<{ path: string; oid: string }>> {
+    const maxFiles = Math.min(Math.max(args.maxFiles ?? 200, 1), 500);
+    const resolvedRef = await this.git.resolveRef(args.ref);
+    if (!resolvedRef) return [];
+    const files: Array<{ path: string; oid: string }> = [];
+    const queue: string[] = [''];
+    let dirsVisited = 0;
+    while (queue.length > 0 && files.length < maxFiles && dirsVisited < 200) {
+      const dir = queue.shift();
+      if (dir === undefined) break;
+      dirsVisited += 1;
+      const entries = await this.readTreeEntries(resolvedRef, dir);
+      ReadModelService.collectEntries(entries, dir, queue, files, maxFiles);
+    }
+    return files;
+  }
+
+  private async readTreeEntries(resolvedRef: string, dir: string): Promise<Array<{ path: string; type: string; oid: string }>> {
+    try {
+      return await this.git.getTree(resolvedRef, dir);
+    } catch {
+      return [];
+    }
+  }
+
+  private static collectEntries(
+    entries: Array<{ path: string; type: string; oid: string }>,
+    dir: string,
+    queue: string[],
+    files: Array<{ path: string; oid: string }>,
+    maxFiles: number,
+  ): void {
+    for (const entry of entries) {
+      if (files.length >= maxFiles) return;
+      const fullPath = dir ? `${dir}/${entry.path}` : entry.path;
+      if (entry.type === 'tree') {
+        queue.push(fullPath);
+      } else if (entry.type === 'blob') {
+        files.push({ path: fullPath, oid: entry.oid });
+      }
+    }
+  }
+
   public async getBlob(args: { ref?: string; filepath: string }): Promise<unknown> {
     const { ref, filepath } = args;
     const resolvedRef = await this.git.resolveRef(ref);

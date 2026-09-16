@@ -38,7 +38,7 @@ export function Header({
             className="hidden md:block"
             onSubmit={(e) => {
               e.preventDefault();
-              if (search.trim()) navigate(`/search?q=${encodeURIComponent(search.trim())}`);
+              if (search.trim()) void navigate(`/search?q=${encodeURIComponent(search.trim())}`);
             }}
           >
             <input

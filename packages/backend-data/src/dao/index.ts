@@ -18,4 +18,4 @@ export type { OrganizationMemberRow, OrgMemberRole } from './OrganizationMemberD
 export { RepoCollaboratorDAO } from './RepoCollaboratorDAO';
 export type { RepoCollaboratorRow, RepoRole } from './RepoCollaboratorDAO';
 export { SearchDAO } from './SearchDAO';
-export type { SearchOptions } from './SearchDAO';
+export type { CodeHit, SearchOptions } from './SearchDAO';

@@ -1,7 +1,8 @@
 import { IssueDAO, RepositoryDAO, SearchDAO } from '@edge-git/backend-data/dao';
-import type { IssueRow, RepositoryRow } from '@edge-git/backend-data/dao';
+import type { CodeHit, IssueRow, RepositoryRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError } from '@edge-git/backend-errors';
+import { TimestampUtil } from '@edge-git/shared/utils';
 import { PermissionService } from '../permission/PermissionService';
 
 interface SearchServiceEnv {
@@ -17,8 +18,9 @@ interface SearchServiceDeps {
 
 const MAX_QUERY_LENGTH = 200;
 const MAX_LIMIT = 50;
+const MAX_INDEX_BYTES = 20_000;
 
-type SearchType = 'repos' | 'issues';
+type SearchType = 'repos' | 'issues' | 'code';
 
 class SearchService {
   private readonly deps: Required<SearchServiceDeps>;
@@ -50,7 +52,23 @@ class SearchService {
   }
 
   public static parseType(raw: unknown): SearchType {
-    return raw === 'issues' ? 'issues' : 'repos';
+    if (raw === 'issues') return 'issues';
+    if (raw === 'code') return 'code';
+    return 'repos';
+  }
+
+  public static isIndexablePath(path: string): boolean {
+    const p = path.trim();
+    if (!p || p.length > 512) return false;
+    if (p.includes('..') || p.startsWith('/') || p.includes(String.fromCodePoint(0))) return false;
+    // Skip vendored/minified/lock artifacts to keep the index small.
+    if (p.startsWith('node_modules/') || p.includes('/node_modules/')) return false;
+    if (p === 'pnpm-lock.yaml' || p === 'package-lock.json' || p.endsWith('.min.js') || p.endsWith('.map')) return false;
+    return true;
+  }
+
+  public static truncateForIndex(content: string): string {
+    return content.length > MAX_INDEX_BYTES ? content.slice(0, MAX_INDEX_BYTES) : content;
   }
 
   private permissionServiceSync(): PermissionService {
@@ -98,6 +116,66 @@ class SearchService {
       if (visible.length >= limit) break;
     }
     return visible;
+  }
+
+  public async searchCode(
+    query: string,
+    viewerEmail: string | null,
+    opts: { limit?: number; repoId?: string } = {},
+  ): Promise<Array<CodeHit & { snippet: string }>> {
+    const q = SearchService.sanitizeQuery(query);
+    const limit = SearchService.clampLimit(opts.limit ?? 20);
+    const dao = await this.deps.searchDAO();
+    const candidates = await dao.searchCode(q, { limit: Math.min(limit * 3, MAX_LIMIT), repoId: opts.repoId });
+    const permission = await this.deps.permissionService().catch(() => this.permissionServiceSync());
+    const repositoryDAO = await this.deps.repositoryDAO().catch(() => null);
+    const repoCache = new Map<string, RepositoryRow | null>();
+    const firstToken = q.split(' ', 1)[0].toLowerCase();
+    const visible: Array<CodeHit & { snippet: string }> = [];
+    for (const hit of candidates) {
+      let repo: RepositoryRow | null | undefined = repoCache.get(hit.repo_id);
+      if (repo === undefined) {
+        repo = repositoryDAO ? await repositoryDAO.getById(hit.repo_id).catch(() => null) : null;
+        repoCache.set(hit.repo_id, repo ?? null);
+      }
+      if (!repo) continue;
+      const role = await permission.getRole(viewerEmail, repo).catch(() => null);
+      if (!role) continue;
+      visible.push({ ...hit, snippet: SearchService.buildSnippet(hit.content, firstToken) });
+      if (visible.length >= limit) break;
+    }
+    return visible;
+  }
+
+  private static buildSnippet(content: string, token: string): string {
+    const idx = content.toLowerCase().indexOf(token);
+    if (idx === -1) return content.slice(0, 200);
+    const start = Math.max(0, idx - 80);
+    return content.slice(start, start + 200);
+  }
+
+  public async indexFile(input: { repoId: string; path: string; oid: string | null; content: string }): Promise<boolean> {
+    if (!SearchService.isIndexablePath(input.path)) return false;
+    if (input.content.includes(String.fromCodePoint(0))) return false;
+    const dao = await this.deps.searchDAO();
+    await dao.upsertCodeFile({
+      repoId: input.repoId,
+      path: input.path,
+      oid: input.oid,
+      content: SearchService.truncateForIndex(input.content),
+      now: TimestampUtil.getCurrentUnixTimestampInSeconds(),
+    });
+    return true;
+  }
+
+  public async removeFile(repoId: string, path: string): Promise<void> {
+    const dao = await this.deps.searchDAO();
+    await dao.deleteCodeFile(repoId, path);
+  }
+
+  public async clearRepo(repoId: string): Promise<void> {
+    const dao = await this.deps.searchDAO();
+    await dao.deleteCodeByRepo(repoId);
   }
 }
 

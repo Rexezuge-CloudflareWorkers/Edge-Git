@@ -189,6 +189,11 @@ function registerUserRepoRoutes(app: RepoApp): void {
       } catch (error) {
         console.error('Failed to purge repo DO', fullName, error);
       }
+      try {
+        await createRequestScope(c.env).get(Tokens.SearchService).clearRepo(id);
+      } catch (error) {
+        console.error('Failed to purge code index', fullName, error);
+      }
       return c.json({ ok: true, id });
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'Failed to delete repo' }, toServiceStatus(error));

@@ -1,4 +1,5 @@
 import type { Hono } from 'hono';
+import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { getRepoStub } from '../repoStub';
 import { requireVisibleRepo, toServiceStatus } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
@@ -20,14 +21,49 @@ function toFileResponse(
   return { body: result, status: successStatus };
 }
 
-async function requireWriteRole(env: Env, owner: string, repoName: string, email: string): Promise<{ ok: true } | { ok: false; status: 403 | 404 }> {
+async function requireWriteRole(
+  env: Env,
+  owner: string,
+  repoName: string,
+  email: string,
+): Promise<{ ok: true; repo: RepositoryRow } | { ok: false; status: 403 | 404 }> {
   const row = await requireVisibleRepo(env, owner, repoName, email);
   if (!row) return { ok: false, status: 404 };
   try {
     await createRequestScope(env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
-    return { ok: true };
+    return { ok: true, repo: row };
   } catch {
     return { ok: false, status: 403 };
+  }
+}
+
+// Best-effort code search indexing for web file writes. Push indexing is
+// covered by the SearchBackfillTask cron; this keeps editor saves searchable
+// immediately without ever failing the write itself.
+function decodeIndexableText(contentBase64: string): string | null {
+  try {
+    const binary = atob(contentBase64.replaceAll(/\s/g, ''));
+    if (binary.length > 20_000) return null;
+    const bytes = Uint8Array.from(binary, (c) => c.codePointAt(0) ?? 0);
+    if (bytes.includes(0)) return null;
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return null;
+  }
+}
+
+async function indexWrittenFile(env: Env, repoId: string, path: string, contentBase64: string, commitOid: unknown): Promise<void> {
+  const text = decodeIndexableText(contentBase64);
+  if (text === null) return;
+  try {
+    await createRequestScope(env).get(Tokens.SearchService).indexFile({
+      repoId,
+      path,
+      oid: typeof commitOid === 'string' ? commitOid : null,
+      content: text,
+    });
+  } catch {
+    // Index failures must never fail the file write.
   }
 }
 
@@ -103,6 +139,9 @@ function registerFileWriteRoutes(app: RepoApp): void {
         authorEmail: email,
       })) as FileResult;
       const { body: out, status } = toFileResponse(result, result.ok && (result as { created?: boolean }).created ? 201 : 200);
+      if (result.ok) {
+        void indexWrittenFile(c.env, gate.repo.id, filePath, body.contentBase64, (result as { commitOid?: unknown }).commitOid);
+      }
       return c.json(out, status);
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'Failed to save file' }, toServiceStatus(error));
@@ -137,6 +176,13 @@ function registerFileWriteRoutes(app: RepoApp): void {
         authorEmail: email,
       })) as FileResult;
       const { body: out, status } = toFileResponse(result, 200);
+      if (result.ok) {
+        try {
+          await createRequestScope(c.env).get(Tokens.SearchService).removeFile(gate.repo.id, filePath);
+        } catch {
+          // Index failures must never fail the file delete.
+        }
+      }
       return c.json(out, status);
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'Failed to delete file' }, toServiceStatus(error));
