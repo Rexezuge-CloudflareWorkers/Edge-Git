@@ -103,6 +103,21 @@ export interface BlobResponse {
   contentBase64?: string;
 }
 
+export interface OverviewReadme extends BlobResponse {
+  path: string;
+  truncated?: boolean;
+}
+
+export interface OverviewResponse {
+  branches: string[];
+  currentBranch: string | null;
+  resolvedRef: string | null;
+  tags: TagInfo[];
+  tree: TreeEntry[];
+  commits: GitCommit[];
+  readme: OverviewReadme | null;
+}
+
 export interface FileCommitResult {
   ok: boolean;
   commitOid: string;

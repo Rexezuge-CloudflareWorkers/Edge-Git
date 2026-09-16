@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { GitBranch, Tag } from 'lucide-react';
 import type { GitCommit, Repo, TagInfo, TreeEntry } from '../../types';
-import { decodeBlobContent, loadBlob, loadBranches, loadCommits, loadTags, loadTree } from '../../services/repoService';
+import { decodeBlobContent, loadBlob, loadOverview, loadTree } from '../../services/repoService';
 import { formatTimestamp } from '../../lib/format';
 import { formatDateLocale } from '../../lib/locale';
 import { Card } from '../ui/Card';
@@ -23,6 +23,15 @@ import { TagPicker, TagsCard } from './TagsCard';
 const README_NAMES = new Set(['README.md', 'README.markdown', 'README.mdown', 'README.txt', 'README']);
 // Upper bound for in-browser editing; larger files stay git-only.
 const MAX_EDIT_CHARS = 262_144;
+
+// Resolve the selected ref against freshly loaded branches/tags, falling back
+// to the default branch when the selection no longer exists (e.g. a deleted
+// branch). Known tag refs are kept. Extracted to module scope so the CodeTab
+// effect stays within the complexity lint budget.
+function resolveSelectedRef(ref: string, branches: string[], currentBranch: string | null, tagRefs: Set<string>): string {
+  const isKnownRef = (ref.startsWith('refs/tags/') && tagRefs.has(ref)) || (ref !== '' && branches.includes(ref));
+  return isKnownRef ? ref : (currentBranch ?? branches[0] ?? 'HEAD');
+}
 
 // Merge lazily enriched last-commit info into the fast tree by path+oid.
 // Extracted to module scope so the CodeTab effect stays within the
@@ -105,36 +114,28 @@ export function CodeTab({
     const authOpt = useAuthed ? { isAuthed: true as const } : { isAuthed: false as const };
     const run = async () => {
       try {
-        const [b, loadedTags] = await Promise.all([
-          loadBranches(owner, repo, authOpt),
-          loadTags(owner, repo, authOpt).catch(() => [] as TagInfo[]),
-        ]);
+        // Single aggregate read (one DO RPC): branches + tags + fast tree
+        // + commits + README. Replaces the sequential branches/tags/tree/
+        // commits/blob waterfall that serialized on the DO input gate.
+        const overview = await loadOverview(owner, repo, ref || undefined, path || undefined, { ...authOpt, depth: 10 });
         if (cancelled) return;
-        setBranches(b.branches);
-        setDefaultBranch(b.currentBranch ?? b.branches[0] ?? null);
-        setTags(loadedTags);
-        const tagRefs = new Set(loadedTags.map((tg) => tg.ref));
-        // If the current selection no longer exists (e.g. after switching
-        // repos while `ref` still holds the previous repo's branch), fall
-        // back to the new repo's default branch. Known tag refs are kept.
-        const isKnownRef = (ref.startsWith('refs/tags/') && tagRefs.has(ref)) || (ref !== '' && b.branches.includes(ref));
-        const resolvedRef = isKnownRef ? ref : (b.currentBranch ?? b.branches[0] ?? 'HEAD');
+        setBranches(overview.branches);
+        setDefaultBranch(overview.currentBranch ?? overview.branches[0] ?? null);
+        setTags(overview.tags);
+        const tagRefs = new Set(overview.tags.map((tg) => tg.ref));
+        const resolvedRef = resolveSelectedRef(ref, overview.branches, overview.currentBranch ?? overview.branches[0] ?? null, tagRefs);
         if (ref !== '' && resolvedRef !== ref) {
           setRef(resolvedRef === 'HEAD' ? '' : resolvedRef);
+          return;
         }
         const effectiveRef = resolvedRef;
         const treeRef = effectiveRef === 'HEAD' ? undefined : effectiveRef;
         const dir = path || undefined;
-        // Fast path: tree without per-file last-commit (avoids the DO N+1
-        // getLog-per-entry) alongside the commit list, so the file list
-        // paints early. Enrichment follows lazily below.
-        const [tree, log] = await Promise.all([
-          loadTree(owner, repo, treeRef, dir, { ...authOpt, withLastCommit: false }),
-          loadCommits(owner, repo, treeRef, 10, authOpt),
-        ]);
-        if (cancelled) return;
-        setEntries(tree);
-        setCommits(log);
+        setEntries(overview.tree);
+        setCommits(overview.commits);
+        const isBinaryReadme = overview.readme?.isBinary ?? false;
+        const readmeText = isBinaryReadme ? null : decodeBlobContent(overview.readme ?? null);
+        setReadme(readmeText !== null && overview.readme ? { path: overview.readme.path, text: readmeText } : null);
         setLoading(false);
         // Lazy enrichment: re-fetch with last-commit and merge by path+oid.
         // Fire-and-forget relative to loading state so slow histories never
@@ -158,24 +159,6 @@ export function CodeTab({
   }, [owner, repo, ref, path, showNotice, reloadKey, useAuthed]);
 
   const readmeEntry = path === '' ? entries.find((e) => e.type === 'blob' && README_NAMES.has(e.path)) : undefined;
-
-  // Auto-load README at the repo root
-  useEffect(() => {
-    if (!readmeEntry) return;
-    let cancelled = false;
-    const authOpt = useAuthed ? { isAuthed: true as const } : { isAuthed: false as const };
-    loadBlob(owner, repo, readmeEntry.path, selectedRef || undefined, authOpt)
-      .then((blob) => {
-        if (cancelled || !blob || blob.isBinary) return;
-        const text = decodeBlobContent(blob);
-        if (text !== null) setReadme({ path: readmeEntry.path, text });
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [owner, repo, selectedRef, readmeEntry?.path, useAuthed]);
 
   const visibleReadme = readmeEntry && readme && readme.path === readmeEntry.path ? readme.text : null;
 

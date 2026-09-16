@@ -5,6 +5,7 @@ import type {
   CompareResult,
   FileCommitResult,
   GitCommit,
+  OverviewResponse,
   Repo,
   TagInfo,
   TreeEntry,
@@ -152,6 +153,26 @@ export async function loadCommits(
     `${publicBase(owner, repo)}/commits${toQuery({ ref, depth: String(depth) })}`,
     opts?.isAuthed,
   );
+}
+
+// Aggregate code-page read: branches + tags + fast tree + commits + README
+// in one backend round-trip (single DO RPC). Replaces the sequential
+// branches/tags/tree/commits/blob waterfall on owner/repo load.
+export async function loadOverview(
+  owner: string,
+  repo: string,
+  ref?: string,
+  path?: string,
+  opts?: { isAuthed?: boolean | null; depth?: number; includeTags?: boolean; includeReadme?: boolean },
+): Promise<OverviewResponse> {
+  const query = toQuery({
+    ref,
+    path,
+    depth: opts?.depth === undefined ? undefined : String(opts.depth),
+    includeTags: opts?.includeTags === false ? '0' : opts?.includeTags === true ? '1' : undefined,
+    includeReadme: opts?.includeReadme === false ? '0' : opts?.includeReadme === true ? '1' : undefined,
+  });
+  return tryAuthedFirst(`${authedBase(owner, repo)}/overview${query}`, `${publicBase(owner, repo)}/overview${query}`, opts?.isAuthed);
 }
 
 export async function loadCommit(owner: string, repo: string, oid: string, opts?: { isAuthed?: boolean | null }): Promise<CommitDiffResult> {

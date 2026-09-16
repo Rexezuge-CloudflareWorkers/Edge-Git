@@ -1,5 +1,14 @@
 import type { GitService } from '@edge-git/git-service';
 
+// README candidates at the repo root, mirroring the web CodeTab list so the
+// overview response can inline the same file the UI would fetch separately.
+const README_NAMES = new Set(['README.md', 'README.markdown', 'README.mdown', 'README.txt', 'README']);
+
+// Upper bound for inlining README bytes into the overview payload. Larger or
+// binary READMEs stay null so the aggregate call never becomes a blob pipe;
+// the UI can still load them on demand via getBlob.
+const MAX_OVERVIEW_README_BYTES = 512 * 1024;
+
 // Read-model queries served over DO RPC (branches/tree/blob/commits).
 // Lifecycle (ensure initialized, cache refresh) stays with RepoWorker via
 // prepare(); this service only runs git queries.
@@ -117,6 +126,71 @@ class ReadModelService {
     }
     const blob = await this.git.getBlob(resolvedRef, filepath);
     if (!blob) return null;
+    return ReadModelService.serializeBlob(blob);
+  }
+
+  /**
+   * Aggregate read for the repo code page: branches + tags + fast tree
+   * (no per-file last-commit) + recent commits + root README, sharing one
+   * ref resolution. Replaces 5 sequential DO RPCs (branches, tags,
+   * tree?withLastCommit=0, commits, blob) with a single RPC so the DO input
+   * gate is paid once instead of per call.
+   */
+  public async getOverview(args: {
+    ref?: string;
+    path?: string;
+    depth?: number;
+    includeTags?: boolean;
+    includeReadme?: boolean;
+  }): Promise<{
+    branches: string[];
+    currentBranch: string | null;
+    resolvedRef: string | null;
+    tags: Array<{ name: string; ref: string; oid: string; peeledOid: string | null; type: 'lightweight' | 'annotated' }>;
+    tree: unknown;
+    commits: unknown;
+    readme: ({ path: string } & Record<string, unknown>) | null;
+  }> {
+    const ref = args.ref || undefined;
+    const dir = args.path || '';
+    const depth = Math.min(Math.max(args.depth ?? 10, 1), 50);
+    const branches = await this.git.listBranches();
+    const currentBranch = (await this.git.currentBranch()) ?? null;
+    const tags = args.includeTags === false ? [] : await this.getTags();
+    const resolvedRef = await this.git.resolveRef(ref ?? 'HEAD');
+    if (!resolvedRef) {
+      return { branches, currentBranch, resolvedRef: null, tags, tree: [], commits: [], readme: null };
+    }
+    const rawTree = (await this.git.getTree(resolvedRef, dir)) as Array<{
+      path: string;
+      type: string;
+      mode?: string;
+      oid: string;
+    }>;
+    const tree = rawTree.map((item) => ({ ...item, lastCommit: null }));
+    const refForLog = ref ?? 'HEAD';
+    const latestCommit = (await this.git.getLastCommit(refForLog)) as { oid: string } | null | undefined;
+    const commits = latestCommit ? await this.git.getLog({ ref: refForLog, depth }) : [];
+    let readme: ({ path: string } & Record<string, unknown>) | null = null;
+    if (dir === '' && args.includeReadme !== false) {
+      const entry = rawTree.find((item) => item.type === 'blob' && README_NAMES.has(item.path));
+      if (entry) {
+        const blob = await this.git.getBlob(resolvedRef, entry.path);
+        if (blob && typeof (blob as { size?: number }).size === 'number' && (blob as { size: number }).size <= MAX_OVERVIEW_README_BYTES) {
+          readme = { path: entry.path, ...(ReadModelService.serializeBlob(blob) as Record<string, unknown>) };
+        } else if (blob) {
+          // Oversized README: return metadata without bytes so the UI can
+          // fall back to an on-demand blob fetch instead of a huge payload.
+          const meta = { ...(blob as Record<string, unknown>) };
+          delete meta.content;
+          readme = { path: entry.path, ...meta, contentBase64: undefined, truncated: true };
+        }
+      }
+    }
+    return { branches, currentBranch, resolvedRef, tags, tree, commits, readme };
+  }
+
+  private static serializeBlob(blob: object): unknown {
     // Serialize Uint8Array safely as base64
     const content = (blob as { content?: Uint8Array }).content;
     if (content instanceof Uint8Array) {
@@ -125,7 +199,7 @@ class ReadModelService {
       for (let i = 0; i < content.length; i += chunk) {
         binary += String.fromCodePoint(...content.subarray(i, i + chunk));
       }
-      return { ...(blob as object), contentBase64: btoa(binary) };
+      return { ...blob, contentBase64: btoa(binary) };
     }
     return blob;
   }

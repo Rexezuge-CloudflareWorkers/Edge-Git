@@ -240,6 +240,17 @@ class RepoWorker extends DurableObject<Env> {
     return this.readModel.getBlob(args);
   }
 
+  public async getOverview(args: {
+    ref?: string;
+    path?: string;
+    depth?: number;
+    includeTags?: boolean;
+    includeReadme?: boolean;
+  }): Promise<unknown> {
+    await this.prepare();
+    return this.readModel.getOverview(args);
+  }
+
   public async listAllFiles(args: { ref?: string; maxFiles?: number }): Promise<Array<{ path: string; oid: string }>> {
     await this.prepare();
     return this.readModel.listAllFiles(args);
