@@ -17,8 +17,8 @@ Scope: `apps/api/**`. Parent index: `../../AGENTS.md`.
 ## Routes
 
 - Git (`EdgeGitWorker`, exact matches so SPA catch-all never intercepts): `GET /:owner/:repo/info/refs?service=git-upload-pack|git-receive-pack` · `POST /:owner/:repo/git-upload-pack` (413 over fetch limit) · `POST /:owner/:repo/git-receive-pack` (413 over pack limit).
-- Public: `GET /repos/:owner/:repo|/branches|/tree|/blob|/commits|/issues` · `GET /health` · `/docs` (Chanfana `fromHono`).
-- Protected (`/user/*`): `GET /user/me` · `GET|POST /user/repos` · `GET|PATCH|DELETE /user/repos/:owner/:repo` (+ `/branches|/tree|/blob|/commits` DO passthroughs) · `GET|POST|DELETE /user/tokens` · `GET|POST /user/repos/:owner/:repo/issues`.
+- Public: `GET /repos/:owner/:repo|/branches|/tree|/blob|/commits|/issues|/issues/:number|/issues/:number/comments` · `GET /health` · `/docs` (Chanfana `fromHono`).
+- Protected (`/user/*`): `GET /user/me` · `GET|POST /user/repos` · `GET|PATCH|DELETE /user/repos/:owner/:repo` (+ `/branches|/tree|/blob|/commits` DO passthroughs) · `GET|POST|DELETE /user/tokens` · `GET|POST /user/repos/:owner/:repo/issues` · `GET|PATCH /user/repos/:owner/:repo/issues/:number` · `GET|POST /user/repos/:owner/:repo/issues/:number/comments`.
 - SPA: `/` + `/user/` redirect + `*` catch-all serves `SPA_HTML` only when `SERVE_SPA_FROM_WORKER`, else `404`; `/:owner/:repo` serves shell, unknown paths `404`.
 
 ## Composition
