@@ -23,6 +23,10 @@ export { UserService, UserServiceFactory } from '../user/UserService';
 */
 export { IssueService, IssueServiceFactory } from '../issue/IssueService';
 /**
+@deprecated Prefer `createRequestScope(env).get(Tokens.PullRequestService)`; kept for backward compatibility during migration.
+*/
+export { PullRequestService, PullRequestServiceFactory } from '../pull/PullRequestService';
+/**
 @deprecated Prefer `createRequestScope(env).get(Tokens.OrganizationService)`; kept for backward compatibility during migration.
 */
 export { OrganizationService, OrganizationServiceFactory } from '../org/OrganizationService';

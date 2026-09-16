@@ -68,6 +68,22 @@ class ReadModelService {
   public async getCommit(commitOid: string): Promise<unknown> {
     return this.git.getCommit(commitOid);
   }
+
+  public async getMergePreview(baseRef: string, headRef: string): Promise<unknown> {
+    return this.git.getMergePreview(baseRef, headRef);
+  }
+
+  public async getPullDiff(baseOid: string | null, headOid: string, maxFiles: number): Promise<unknown> {
+    if (!baseOid) {
+      const commit = (await this.git.getCommit(headOid)) as { changes?: unknown } | null;
+      const changes = Array.isArray((commit as { changes?: unknown })?.changes) ? ((commit as { changes: unknown[] }).changes) : [];
+      return { mergeBase: null, truncated: changes.length > maxFiles, changes: changes.slice(0, maxFiles) };
+    }
+    const mergeBase = await this.git.findMergeBase([baseOid, headOid]);
+    const diffBase = mergeBase ?? baseOid;
+    const changes = (await this.git.getFileStateChanges(diffBase, headOid)) as unknown[];
+    return { mergeBase, truncated: changes.length > maxFiles, changes: changes.slice(0, maxFiles) };
+  }
 }
 
 export { ReadModelService };

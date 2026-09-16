@@ -3,6 +3,7 @@ import type {
   NamespaceDAO,
   OrganizationDAO,
   OrganizationMemberDAO,
+  PullRequestDAO,
   RepoCollaboratorDAO,
   RepositoryDAO,
   UserAccessTokenDAO,
@@ -16,6 +17,7 @@ import type { TokenService } from '../auth/TokenService';
 import type { RepoService } from '../repo/RepoService';
 import type { UserService } from '../user/UserService';
 import type { IssueService } from '../issue/IssueService';
+import type { PullRequestService } from '../pull/PullRequestService';
 import type { OrganizationService } from '../org/OrganizationService';
 import type { PermissionService } from '../permission/PermissionService';
 
@@ -43,6 +45,7 @@ const Tokens = {
   RepositoryDAO: Symbol('RepositoryDAO') as Token<() => Promise<RepositoryDAO>>,
   UserAccessTokenDAO: Symbol('UserAccessTokenDAO') as Token<() => Promise<UserAccessTokenDAO>>,
   IssueDAO: Symbol('IssueDAO') as Token<() => Promise<IssueDAO>>,
+  PullRequestDAO: Symbol('PullRequestDAO') as Token<() => Promise<PullRequestDAO>>,
   NamespaceDAO: Symbol('NamespaceDAO') as Token<() => Promise<NamespaceDAO>>,
   OrganizationDAO: Symbol('OrganizationDAO') as Token<() => Promise<OrganizationDAO>>,
   OrganizationMemberDAO: Symbol('OrganizationMemberDAO') as Token<() => Promise<OrganizationMemberDAO>>,
@@ -52,6 +55,7 @@ const Tokens = {
   RepoService: Symbol('RepoService') as Token<RepoService>,
   UserService: Symbol('UserService') as Token<UserService>,
   IssueService: Symbol('IssueService') as Token<IssueService>,
+  PullRequestService: Symbol('PullRequestService') as Token<PullRequestService>,
   OrganizationService: Symbol('OrganizationService') as Token<OrganizationService>,
   PermissionService: Symbol('PermissionService') as Token<PermissionService>,
 } satisfies Record<string, Token<unknown>>;

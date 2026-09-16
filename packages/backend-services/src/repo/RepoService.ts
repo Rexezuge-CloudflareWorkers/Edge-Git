@@ -3,6 +3,7 @@ import {
   NamespaceDAO,
   OrganizationDAO,
   OrganizationMemberDAO,
+  PullRequestDAO,
   RepoCollaboratorDAO,
   RepositoryDAO,
   UserDAO,
@@ -25,6 +26,7 @@ const REPO_RE = /^[\w.-]{1,100}$/i;
 interface RepoServiceDeps {
   repositoryDAO?: () => Promise<RepositoryDAO>;
   issueDAO?: () => Promise<IssueDAO>;
+  pullRequestDAO?: () => Promise<PullRequestDAO>;
   userDAO?: () => Promise<UserDAO>;
   organizationDAO?: () => Promise<OrganizationDAO>;
   organizationMemberDAO?: () => Promise<OrganizationMemberDAO>;
@@ -42,6 +44,7 @@ class RepoService {
     this.deps = {
       repositoryDAO: () => Promise.resolve(new RepositoryDAO(env.DB)),
       issueDAO: () => Promise.resolve(new IssueDAO(env.DB)),
+      pullRequestDAO: () => Promise.resolve(new PullRequestDAO(env.DB)),
       userDAO: () => Promise.resolve(new UserDAO(env.DB)),
       organizationDAO: () => Promise.resolve(new OrganizationDAO(env.DB)),
       organizationMemberDAO: () => Promise.resolve(new OrganizationMemberDAO(env.DB)),
@@ -298,6 +301,12 @@ class RepoService {
     const repo = await this.requireOwner(owner, name, userEmail);
     const issueDAO = await this.deps.issueDAO();
     await issueDAO.deleteByRepo(repo.id);
+    try {
+      const pullRequestDAO = await this.deps.pullRequestDAO();
+      await pullRequestDAO.deleteByRepo(repo.id);
+    } catch {
+      // ignore — legacy DBs without pull_requests tables
+    }
     try {
       const collabDao = await this.deps.repoCollaboratorDAO();
       await collabDao.deleteByRepo(repo.id);

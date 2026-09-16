@@ -9,6 +9,7 @@ import { registerGitRoutes } from './routes/GitRoutes';
 import { registerRepoRoutes, registerUserRepoRoutes, registerUserRepoReadModelRoutes } from './routes/RepoRoutes';
 import { registerTokenRoutes } from './routes/TokenRoutes';
 import { registerIssueRoutes, registerUserIssueRoutes } from './routes/IssueRoutes';
+import { registerPullRoutes, registerUserPullRoutes } from './routes/PullRoutes';
 import { registerUserProfileRoutes, registerUserSettingsRoutes } from './routes/UserRoutes';
 import { registerOrgRoutes } from './routes/OrgRoutes';
 
@@ -42,6 +43,7 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     registerGitRoutes(app);
     registerRepoRoutes(app);
     registerIssueRoutes(app);
+    registerPullRoutes(app);
     registerUserProfileRoutes(app);
 
     // Protected UI/API surface
@@ -56,6 +58,7 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     registerUserRepoReadModelRoutes(app);
     registerTokenRoutes(app);
     registerUserIssueRoutes(app);
+    registerUserPullRoutes(app);
 
     // SPA catch-all — public shell for user home (/), profile home
     // (/:username, GitHub-style), repo home (/:owner/:repo), and the legacy
@@ -80,6 +83,9 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
         return c.html(SPA_HTML);
       }
       if (/^\/[^/]+\/[^/]+\/issues\/[^/]+\/?$/.test(path)) {
+        return c.html(SPA_HTML);
+      }
+      if (/^\/[^/]+\/[^/]+\/pulls\/[^/]+\/?$/.test(path)) {
         return c.html(SPA_HTML);
       }
       return c.notFound();

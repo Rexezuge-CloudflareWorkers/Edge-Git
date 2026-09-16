@@ -184,6 +184,49 @@ class RepoWorker extends DurableObject<Env> {
     await this.prepare();
     return this.readModel.getCommit(commitOid);
   }
+
+  public async getMergePreview(args: { baseRef: string; headRef: string }): Promise<unknown> {
+    await this.prepare();
+    return this.readModel.getMergePreview(args.baseRef, args.headRef);
+  }
+
+  public async getPullDiff(args: { baseOid: string | null; headOid: string }): Promise<unknown> {
+    await this.prepare();
+    return this.readModel.getPullDiff(args.baseOid, args.headOid, ConfigurationManager.repo.getMaxMergeDiffFiles(this.env));
+  }
+
+  public async mergePull(args: {
+    baseBranch: string;
+    headBranch?: string;
+    headOid: string;
+    authorName: string;
+    authorEmail: string;
+    message?: string;
+    deleteHead?: boolean;
+  }): Promise<unknown> {
+    await this.prepare();
+    const outcome = await this.git.mergeBranches({
+      baseBranch: args.baseBranch,
+      headOid: args.headOid,
+      author: { name: args.authorName, email: args.authorEmail },
+      message: args.message,
+    });
+    if (outcome.type !== 'conflict') {
+      this.git.clearCache();
+    }
+    let deletedHead = false;
+    if (args.deleteHead && outcome.type !== 'conflict' && args.headBranch && args.headBranch !== args.baseBranch) {
+      try {
+        await this.git.deleteBranch(args.headBranch);
+        deletedHead = true;
+        this.git.clearCache();
+      } catch {
+        // Best-effort: head may already be gone or checked out. Merge still counts.
+        deletedHead = false;
+      }
+    }
+    return { ...outcome, deletedHead };
+  }
 }
 
 export { RepoWorker };

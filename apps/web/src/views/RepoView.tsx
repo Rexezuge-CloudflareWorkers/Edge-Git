@@ -5,6 +5,7 @@ import { loadRepoAuthed, loadRepoPublic } from '../services/repoService';
 import { RepoHeader, type RepoTab } from '../components/repo/RepoHeader';
 import { CodeTab } from '../components/repo/CodeTab';
 import { IssuesTab } from '../components/repo/IssuesTab';
+import { PullsTab } from '../components/repo/PullsTab';
 import { RepoSettingsTab } from '../components/repo/RepoSettingsTab';
 import { Card } from '../components/ui/Card';
 import Unauthorized from '../components/layout/Unauthorized';
@@ -22,6 +23,7 @@ export function RepoView({
   const [status, setStatus] = useState<'loading' | 'ready' | 'missing' | 'forbidden'>('loading');
   const [tab, setTab] = useState<RepoTab>('code');
   const [issueCount, setIssueCount] = useState<number | undefined>(undefined);
+  const [pullCount, setPullCount] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     if (authorized === null) return;
@@ -93,9 +95,12 @@ export function RepoView({
 
   return (
     <div>
-      <RepoHeader repo={repoData} activeTab={visibleTab} issueCount={issueCount} showSettings={canManage} onTabChange={setTab} />
+      <RepoHeader repo={repoData} activeTab={visibleTab} issueCount={issueCount} pullCount={pullCount} showSettings={canManage} onTabChange={setTab} />
       <div className="max-w-7xl mx-auto px-6 py-6">
         {visibleTab === 'code' && <CodeTab owner={owner} repo={repo} repoMeta={repoData} showNotice={showNotice} />}
+        {visibleTab === 'pulls' && (
+          <PullsTab owner={owner} repo={repo} canWrite={authorized ?? false} showNotice={showNotice} onCountChange={setPullCount} />
+        )}
         {visibleTab === 'issues' && (
           <IssuesTab owner={owner} repo={repo} canWrite={authorized ?? false} showNotice={showNotice} onCountChange={setIssueCount} />
         )}
