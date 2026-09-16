@@ -28,11 +28,12 @@ export function RepoView({
   const [pullCount, setPullCount] = useState<number | undefined>(undefined);
 
   useEffect(() => {
-    if (authorized === null) return;
     let cancelled = false;
     const run = async () => {
-      // Authenticated first (own + shared repos), then anonymous public.
-      if (authorized) {
+      // Speculative public load: never wait for Access auth to render public
+      // repos. When auth resolves to true we upgrade to the authed payload
+      // (viewerRole/viewerCanManage) in the same effect via `authorized`.
+      if (authorized === true) {
         try {
           const data = await loadRepoAuthed(owner, repo);
           if (!cancelled) {
@@ -53,6 +54,9 @@ export function RepoView({
         }
       } catch (error) {
         if (cancelled) return;
+        // Private repos 404 on public while auth is still resolving — stay in
+        // loading until `authorized` settles instead of flashing Not Found.
+        if (authorized === null) return;
         const message = error instanceof Error ? error.message : '';
         setStatus(message.includes('404') || message.includes('Not found') ? 'missing' : 'forbidden');
       }
@@ -63,7 +67,7 @@ export function RepoView({
     };
   }, [owner, repo, authorized]);
 
-  if (status === 'loading' || authorized === null) {
+  if (status === 'loading' && !repoData) {
     return (
       <div className="min-h-64 flex items-center justify-center">
         <div className="h-10 w-10 rounded-full border-2 border-[var(--color-accent)] border-t-transparent animate-spin" />
@@ -117,6 +121,7 @@ export function RepoView({
             canWrite={repoData.viewerRole === 'admin' || repoData.viewerRole === 'write'}
             forkOwner={defaultOwner || owner}
             showNotice={showNotice}
+            authorized={authorized}
           />
         )}
         {visibleTab === 'pulls' && (

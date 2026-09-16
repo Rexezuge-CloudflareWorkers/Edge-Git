@@ -41,14 +41,6 @@ export default function SpaApp() {
     setUser,
   });
 
-  if (authorized === null) {
-    return (
-      <div className="min-h-screen bg-[var(--color-surface-base)] flex items-center justify-center">
-        <div className="h-10 w-10 rounded-full border-2 border-[var(--color-accent)] border-t-transparent animate-spin" />
-      </div>
-    );
-  }
-
   const ownerFromEmail = user ? user.email.split('@', 1)[0] : '';
   const defaultOwner = user?.username?.trim() ? user.username : ownerFromEmail;
 

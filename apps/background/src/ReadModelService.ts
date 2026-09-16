@@ -40,13 +40,16 @@ class ReadModelService {
     return enriched;
   }
 
-  public async getTree(args: { ref?: string; path?: string }): Promise<unknown> {
-    const { ref, path } = args;
+  public async getTree(args: { ref?: string; path?: string; withLastCommit?: boolean }): Promise<unknown> {
+    const { ref, path, withLastCommit = true } = args;
     const resolvedRef = await this.git.resolveRef(ref);
     if (!resolvedRef) {
       return [];
     }
     const tree = await this.git.getTree(resolvedRef, path);
+    if (withLastCommit === false) {
+      return (tree as Array<Record<string, unknown>>).map((item) => ({ ...item, lastCommit: null }));
+    }
     const data = await Promise.all(
       (tree as Array<{ path: string }>).map(async (item) => {
         const lastCommit = (await this.git.getLog({

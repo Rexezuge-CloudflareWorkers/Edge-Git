@@ -12,10 +12,9 @@ export function useRepoData(owner: string, repo: string, authorized: boolean | n
   const [status, setStatus] = useState<RepoShellStatus>('loading');
 
   useEffect(() => {
-    if (authorized === null) return;
     let cancelled = false;
     const run = async () => {
-      if (authorized) {
+      if (authorized === true) {
         try {
           const data = await loadRepoAuthed(owner, repo);
           if (!cancelled) {
@@ -35,6 +34,7 @@ export function useRepoData(owner: string, repo: string, authorized: boolean | n
         }
       } catch (error) {
         if (cancelled) return;
+        if (authorized === null) return;
         const message = error instanceof Error ? error.message : '';
         setStatus(message.includes('404') || message.includes('Not found') ? 'missing' : 'forbidden');
       }
