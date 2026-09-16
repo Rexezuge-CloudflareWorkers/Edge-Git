@@ -3,6 +3,7 @@ import { requireVisibleRepo, toServiceStatus } from './PublicViewerResolver';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { PullRequestService } from '@edge-git/backend-services/pull';
+import { BranchProtectionService } from '@edge-git/backend-services/protection';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { getCrossRepoPreview, isPackLimitError, resolveHeadRepo } from './CrossFork';
 import { parsePullNumber } from './PullShared';
@@ -168,6 +169,12 @@ function registerUserPullMergeRoutes(app: PullApp): void {
     // Fail fast on blocking reviews before touching git.
     const reviews = await scope.get(Tokens.PullRequestService).listReviews(row.id, number);
     if (PullRequestService.isBlockedByReviews(reviews)) return c.json({ error: 'pull request has unresolved change requests' }, 409);
+    // Branch protection: the base branch may require N approvals (excluding
+    // the PR creator). Applies to same-repo and cross-fork merges alike.
+    // Missing protection table on legacy DBs means no rule (fall through).
+    const rule = await scope.get(Tokens.BranchProtectionService).matchForRepo(row.id, pull.base_branch).catch(() => null);
+    const gate = BranchProtectionService.checkMergeBlocked({ rule, reviews, creatorEmail: pull.creator_email });
+    if (gate.blocked) return c.json({ error: gate.reason ?? 'pull request is blocked by branch protection' }, 409);
     const body = (await c.req.json().catch(() => ({}))) as { message?: string; deleteHead?: boolean };
     const rawMessage = typeof body.message === 'string' ? body.message.trim() : '';
     const message = rawMessage ? rawMessage.slice(0, 1000) : `Merge pull request #${number}: ${pull.title}`;

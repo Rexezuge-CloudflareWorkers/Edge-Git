@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Repo } from '../../types';
 import { deleteRepo, loadBranches, setDefaultBranch, updateRepo } from '../../services/repoService';
+import { BranchProtectionCard } from './BranchProtectionCard';
 import { CollaboratorsCard } from './CollaboratorsCard';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
@@ -137,6 +138,8 @@ export function RepoSettingsTab({
       </Card>
 
       <CollaboratorsCard owner={owner} repo={repo} showNotice={showNotice} />
+
+      <BranchProtectionCard owner={owner} repo={repo} showNotice={showNotice} />
 
       <Card>
         <CardHeader>

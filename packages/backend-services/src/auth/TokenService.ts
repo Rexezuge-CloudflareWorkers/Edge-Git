@@ -2,8 +2,9 @@ import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { UserAccessTokenDAO } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError, UnauthorizedError } from '@edge-git/backend-errors';
-import type { UserAccessTokenMetadata } from '@edge-git/shared';
+import type { TokenScope, UserAccessTokenMetadata } from '@edge-git/shared';
 import { TimestampUtil, UUIDUtil, CryptoUtil } from '@edge-git/shared/utils';
+import { DEFAULT_TOKEN_SCOPES, coversScope, normalizeTokenScopes } from './TokenScopes';
 
 interface TokenServiceEnv {
   DB: D1Queryable;
@@ -16,6 +17,12 @@ interface CreatedToken {
   token: string;
   name: string;
   expiresAt: number;
+  scopes: TokenScope[];
+}
+
+interface AuthenticatedToken {
+  email: string;
+  scopes: TokenScope[];
 }
 
 interface TokenServiceDeps {
@@ -39,19 +46,23 @@ class TokenService {
     return CryptoUtil.sha256Hex(`edge-git-pat:${token}`);
   }
 
-  public async authenticateWithPAT(token: string): Promise<string> {
+  public async authenticateWithPAT(token: string): Promise<AuthenticatedToken> {
     const dao = await this.deps.tokenDAO();
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const tokenHash = await TokenService.hashToken(token);
     const tokenData: UserAccessTokenMetadata | undefined = await dao.getByTokenHash(tokenHash, now);
     if (tokenData) {
       await dao.updateLastUsedByHash(tokenHash, now);
-      return tokenData.userEmail.toLowerCase();
+      return { email: tokenData.userEmail.toLowerCase(), scopes: tokenData.scopes };
     }
     throw new UnauthorizedError('Your personal access token is invalid or has expired.');
   }
 
-  public async createToken(userEmail: string, name: string, expiresInDays?: number): Promise<CreatedToken> {
+  public static coversScope(held: readonly TokenScope[], required: TokenScope): boolean {
+    return coversScope(held, required);
+  }
+
+  public async createToken(userEmail: string, name: string, expiresInDays?: number, scopes?: unknown): Promise<CreatedToken> {
     const dao = await this.deps.tokenDAO();
     const normalized = userEmail.toLowerCase();
     const maxTokens: number = ConfigurationManager.token.getMaxPerUser(this.env);
@@ -64,13 +75,14 @@ class TokenService {
     if (effectiveExpiryInDays > maxExpiryInDays) {
       throw new BadRequestError(`Token expiry cannot exceed ${maxExpiryInDays} days`);
     }
+    const effectiveScopes: TokenScope[] = scopes === undefined ? [...DEFAULT_TOKEN_SCOPES] : normalizeTokenScopes(scopes);
     const tokenId: string = UUIDUtil.getRandomUUID();
     const token: string = UUIDUtil.getRandomUUIDNoDash() + UUIDUtil.getRandomUUIDNoDash();
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const expiresAt: number = TimestampUtil.addDays(now, effectiveExpiryInDays);
     const tokenHash = await TokenService.hashToken(token);
-    await dao.create(tokenId, normalized, tokenHash, name, expiresAt, now);
-    return { tokenId, token, name, expiresAt };
+    await dao.create(tokenId, normalized, tokenHash, name, expiresAt, now, effectiveScopes);
+    return { tokenId, token, name, expiresAt, scopes: effectiveScopes };
   }
 
   public async listTokens(userEmail: string): Promise<UserAccessTokenMetadata[]> {
@@ -94,4 +106,4 @@ class TokenServiceFactory {
 }
 
 export { TokenService, TokenServiceFactory };
-export type { CreatedToken, TokenServiceDeps, TokenServiceEnv };
+export type { CreatedToken, AuthenticatedToken, TokenServiceDeps, TokenServiceEnv };

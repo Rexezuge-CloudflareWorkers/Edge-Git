@@ -1,4 +1,5 @@
 import type {
+  BranchProtectionDAO,
   IssueDAO,
   NamespaceDAO,
   OrganizationDAO,
@@ -14,6 +15,7 @@ import type { Token } from '@edge-git/backend-runtime/di';
 import type { AppConfiguration } from '@edge-git/backend-runtime/config';
 import type { AccessAuthService } from '../auth/AccessAuthService';
 import type { TokenService } from '../auth/TokenService';
+import type { BranchProtectionService } from '../protection/BranchProtectionService';
 import type { ForkService } from '../fork/ForkService';
 import type { RepoService } from '../repo/RepoService';
 import type { UserService } from '../user/UserService';
@@ -53,9 +55,11 @@ const Tokens = {
   OrganizationDAO: Symbol('OrganizationDAO') as Token<() => Promise<OrganizationDAO>>,
   OrganizationMemberDAO: Symbol('OrganizationMemberDAO') as Token<() => Promise<OrganizationMemberDAO>>,
   RepoCollaboratorDAO: Symbol('RepoCollaboratorDAO') as Token<() => Promise<RepoCollaboratorDAO>>,
+  BranchProtectionDAO: Symbol('BranchProtectionDAO') as Token<() => Promise<BranchProtectionDAO>>,
   SearchDAO: Symbol('SearchDAO') as Token<() => Promise<SearchDAO>>,
   AccessAuthService: Symbol('AccessAuthService') as Token<AccessAuthService>,
   TokenService: Symbol('TokenService') as Token<TokenService>,
+  BranchProtectionService: Symbol('BranchProtectionService') as Token<BranchProtectionService>,
   ForkService: Symbol('ForkService') as Token<ForkService>,
   RepoService: Symbol('RepoService') as Token<RepoService>,
   UserService: Symbol('UserService') as Token<UserService>,

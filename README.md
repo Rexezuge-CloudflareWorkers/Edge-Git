@@ -4,7 +4,8 @@ Self-hosted Git forge on Cloudflare Workers + Durable Objects + D1, structured l
 
 - **Git Smart HTTP**: `GET /:owner/:repo/info/refs`, `POST /:owner/:repo/git-upload-pack`, `POST /:owner/:repo/git-receive-pack` (v2 upload, v0 receive, sideband-64k).
 - **Storage**: one Durable Object (`RepoWorker`) per repo, virtual FS (`dofs` 512KB chunks, 5GB) + `isomorphic-git`; metadata in D1 (`users`, `repositories`, `user_access_tokens`, `issues`, `comments`).
-- **Auth**: `/user/*` via Cloudflare Access (`cf-access-jwt-assertion` → `POLICY_AUD`/`TEAM_DOMAIN`, `ctx.access` fallback, `DEV_AUTH_EMAIL` local bypass); git via anonymous (public fetch only) or PAT Basic/Bearer (owner-only v1). PATs minted at `/user/tokens`.
+- **Auth**: `/user/*` via Cloudflare Access (`cf-access-jwt-assertion` → `POLICY_AUD`/`TEAM_DOMAIN`, `ctx.access` fallback, `DEV_AUTH_EMAIL` local bypass); git via anonymous (public fetch only) or scoped PAT Basic/Bearer (owner-only v1). PATs minted at `/user/tokens` with scopes `repo:read` (fetch), `repo:write` (push), `admin` (both; hierarchy `admin` > `write` > `read`). Legacy tokens without scopes keep full access.
+- **Branch protection**: per-repo rules (`POST /user/repos/:owner/:repo/rules`, `admin`-only) with `*` glob patterns, `require_pr`, `required_approvals` (0-6, PR creator self-approval never counts), `block_force_push` (ancestry-checked in the DO), `block_deletion`. Rules apply to everyone including admins (delete the rule to push directly); `require_status_checks` is stored-but-ignored until CI exists. Merges into protected bases require the approval quorum (409 otherwise); direct pushes to `require_pr` branches fail per-ref in `report-status`.
 - **UI**: Vite SPA served from the Worker (`/user/`), repo create/list, PAT manager, clone instructions.
 
 ## Quick start

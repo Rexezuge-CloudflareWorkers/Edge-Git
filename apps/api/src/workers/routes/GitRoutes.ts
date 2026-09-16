@@ -1,7 +1,10 @@
 import type { Hono } from 'hono';
 import { gitAuthForRepo } from '@/middleware';
 import { getRepoStub } from '../repoStub';
-import { advertiseUploadPack, advertiseReceivePack } from '@edge-git/git-protocol';
+import { advertiseUploadPack, advertiseReceivePack, branchNameFromRef, parseReceivePackRequest } from '@edge-git/git-protocol';
+import type { ProtectedRefRule } from '@edge-git/git-protocol';
+import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { BranchProtectionService } from '@edge-git/backend-services/protection';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 
@@ -68,12 +71,39 @@ function registerGitRoutes(app: GitApp): void {
     if (body.byteLength > maxPackBytes) {
       return c.text(`ERR pack too large: ${body.byteLength} > ${maxPackBytes} bytes`, 413);
     }
-    const res = await stub.fetch(new Request('https://do/git-receive-pack', { method: 'POST', body: body as unknown as BodyInit }));
+    // Branch protection is resolved here (D1) and passed into the DO (which
+    // owns git truth but cannot read D1). Unresolvable (legacy DBs) means
+    // no rules — the DO then behaves as before.
+    const protections = await resolvePushProtections(c.env, auth.repo.id, body).catch(() => []);
+    const res = await stub.receivePack(body, protections);
     return new Response(res.body, {
       status: res.status,
       headers: { 'Content-Type': 'application/x-git-receive-pack-result', 'Cache-Control': 'no-cache' },
     });
   });
+}
+
+// Map this push's branch commands to their longest-matching protection
+// rules. Tags and other non-branch refs never match.
+async function resolvePushProtections(env: Env, repositoryId: string, body: Uint8Array): Promise<ProtectedRefRule[]> {
+  const { commands } = parseReceivePackRequest(body);
+  const branches = new Set<string>();
+  for (const cmd of commands) {
+    const branch = branchNameFromRef(cmd.ref);
+    if (branch) branches.add(branch);
+  }
+  if (branches.size === 0) return [];
+  const scope = createRequestScope(env);
+  const rules = await scope.get(Tokens.BranchProtectionService).listRules(repositoryId);
+  if (rules.length === 0) return [];
+  const protections: ProtectedRefRule[] = [];
+  for (const branch of branches) {
+    const rule = BranchProtectionService.matchRule(rules, branch);
+    if (rule) {
+      protections.push({ ref: `refs/heads/${branch}`, requirePr: rule.requirePr, blockForcePush: rule.blockForcePush, blockDeletion: rule.blockDeletion });
+    }
+  }
+  return protections;
 }
 
 export { registerGitRoutes };

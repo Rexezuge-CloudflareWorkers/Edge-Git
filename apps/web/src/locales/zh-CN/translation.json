@@ -101,6 +101,29 @@
     "annotated": "附注",
     "lightweight": "轻量"
   },
+  "rules": {
+    "branchProtection": "分支保护",
+    "patternPlaceholder": "匹配模式（例如 main、release/*）",
+    "requiredApprovals": "所需审核数",
+    "addRule": "添加规则",
+    "requirePr": "需要拉取请求",
+    "blockForcePush": "禁止强制推送",
+    "blockDeletion": "禁止删除",
+    "prRequired": "需要 PR",
+    "directPushOk": "允许直接推送",
+    "approvals": "{{count}} 个审核",
+    "noForcePush": "禁止强制推送",
+    "noDelete": "禁止删除",
+    "noRules": "还没有保护规则。",
+    "ruleCreated": "保护规则已创建。",
+    "ruleDeleted": "保护规则已删除。",
+    "deleteRule": "删除保护规则",
+    "failedToLoad": "加载保护规则失败。",
+    "failedToCreate": "创建保护规则失败。",
+    "failedToDelete": "删除保护规则失败。",
+    "invalidApprovals": "审核数必须是 0-6 的整数。",
+    "adminNote": "规则适用于包括管理员在内的所有人。如需直接推送，请先删除规则。"
+  },
   "branches": {
     "newBranch": "新建分支",
     "branchName": "分支名称",
@@ -234,7 +257,12 @@
     "revoke": "撤销",
     "revokeToken": "撤销令牌",
     "tokenCreated": "令牌已创建。请立即复制——之后将不再显示。",
-    "tokenRevoked": "令牌已撤销。"
+    "tokenRevoked": "令牌已撤销。",
+    "scopes": "权限范围（仅 Git）",
+    "scopesHint": "拉取需要 repo:read。推送需要 repo:write。Admin 包含两者。",
+    "selectAtLeastOneScope": "请至少选择一个权限范围。",
+    "expiryPlaceholder": "有效期（天）",
+    "invalidExpiry": "有效期必须是正整数天数。"
   },
   "profile": {
     "user": "用户",

@@ -244,12 +244,15 @@ export interface MergePreview {
   canFastForward: boolean;
 }
 
+export type TokenScope = 'repo:read' | 'repo:write' | 'admin';
+
 export interface TokenMetadata {
   tokenId: string;
   name: string;
   expiresAt: number;
   lastUsedAt: number | null;
   createdAt: number;
+  scopes: TokenScope[];
 }
 
 export interface CreatedToken {
@@ -257,4 +260,18 @@ export interface CreatedToken {
   token: string;
   name: string;
   expiresAt: number;
+  scopes: TokenScope[];
+}
+
+export interface BranchProtectionRule {
+  id: string;
+  repositoryId: string;
+  pattern: string;
+  requirePr: boolean;
+  requiredApprovals: number;
+  blockForcePush: boolean;
+  blockDeletion: boolean;
+  requireStatusChecks: string[];
+  createdBy: string;
+  createdAt: number;
 }

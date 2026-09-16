@@ -10,6 +10,8 @@ export interface RepositoryMetadata {
   updatedAt: number;
 }
 
+export type TokenScope = 'repo:read' | 'repo:write' | 'admin';
+
 export interface UserAccessTokenMetadata {
   tokenId: string;
   userEmail: string;
@@ -17,6 +19,24 @@ export interface UserAccessTokenMetadata {
   name: string;
   expiresAt: number;
   lastUsedAt: number | null;
+  createdAt: number;
+  scopes: TokenScope[];
+}
+
+export interface BranchProtectionRuleMetadata {
+  id: string;
+  repositoryId: string;
+  pattern: string;
+  requirePr: boolean;
+  requiredApprovals: number;
+  blockForcePush: boolean;
+  blockDeletion: boolean;
+  /*
+   * Stored-but-ignored in v1 (no CI yet); kept so payloads stay
+   * forward-compatible.
+   */
+  requireStatusChecks: string[];
+  createdBy: string;
   createdAt: number;
 }
 

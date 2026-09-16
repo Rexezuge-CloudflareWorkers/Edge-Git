@@ -64,4 +64,36 @@ describe('PAT lifecycle on real D1', () => {
     expect(listed.tokens.map((t) => t.tokenId)).not.toContain(created.tokenId);
     expect((await api(path, { headers: { Authorization: `Bearer ${created.token}` } })).status).toBe(401);
   });
+
+  it('enforces PAT scopes on git endpoints', async () => {
+    const mint = async (name: string, scopes?: string[]): Promise<{ tokenId: string; token: string; scopes: string[] }> =>
+      (await (
+        await api('/user/tokens', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, scopes }),
+        })
+      ).json()) as { tokenId: string; token: string; scopes: string[] };
+    const fetchPath = `/${OWNER}/${REPO}/info/refs?service=git-upload-pack`;
+    const pushPath = `/${OWNER}/${REPO}/info/refs?service=git-receive-pack`;
+
+    const readOnly = await mint('read-only', ['repo:read']);
+    expect(readOnly.scopes).toEqual(['repo:read']);
+    expect((await api(fetchPath, { headers: { Authorization: `Bearer ${readOnly.token}` } })).status).toBe(200);
+    expect((await api(pushPath, { headers: { Authorization: `Bearer ${readOnly.token}` } })).status).toBe(403);
+
+    // `admin` implies read/write via the scope hierarchy.
+    const adminOnly = await mint('admin-only', ['admin']);
+    expect((await api(fetchPath, { headers: { Authorization: `Bearer ${adminOnly.token}` } })).status).toBe(200);
+
+    const writer = await mint('writer', ['repo:write']);
+    expect((await api(fetchPath, { headers: { Authorization: `Bearer ${writer.token}` } })).status).toBe(200);
+
+    const bad = await api('/user/tokens', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'bad-scopes', scopes: ['nope'] }),
+    });
+    expect(bad.status).toBe(400);
+  });
 });

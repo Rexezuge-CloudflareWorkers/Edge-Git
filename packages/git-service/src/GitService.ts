@@ -188,6 +188,10 @@ export class GitService {
     return this.merger.findMergeBase(oids);
   }
 
+  async isAncestor(ancestor: string, oid: string): Promise<boolean> {
+    return this.merger.isAncestor(ancestor, oid);
+  }
+
   async getMergePreview(baseRef: string, headRef: string) {
     return this.merger.getPreview(baseRef, headRef);
   }

@@ -12,3 +12,4 @@ export {
 } from './FetchResponseBuilder';
 export type { FetchResponseOptions } from './FetchResponseBuilder';
 export { getBasicCredentials, getBearerToken } from './AuthHeaders';
+export { ZERO_OID, isZeroOid, branchNameFromRef, checkStaticPushProtection } from './ProtectionPolicy';

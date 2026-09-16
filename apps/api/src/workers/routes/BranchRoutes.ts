@@ -67,6 +67,14 @@ function registerBranchRoutes(app: RepoApp): void {
     try {
       const gate = await requireWriteRole(c.env, owner, repoName, email);
       if (!gate.ok) return c.json({ error: gate.status === 404 ? 'Not found' : 'Forbidden' }, gate.status);
+      // Branch protection applies to everyone including admins: delete the
+      // rule first, then the branch.
+      const scope = createRequestScope(c.env);
+      const row = await scope.get(Tokens.RepoService).getByOwnerAndName(owner, repoName);
+      if (row) {
+        const rule = await scope.get(Tokens.BranchProtectionService).matchForRepo(row.id, branch).catch(() => null);
+        if (rule?.blockDeletion) return c.json({ error: `branch "${branch}" is protected against deletion` }, 403);
+      }
       const fullName = `${owner}/${repoName}`;
       const result = (await getRepoStub(c.env, fullName).deleteBranchRef(branch)) as BranchResult;
       const { body: out, status } = toBranchResponse(result, 200);

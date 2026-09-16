@@ -1,5 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { DofsFs, GitService, IsoGitFs, PackLimitError } from '@edge-git/git-service';
+import type { ProtectedRefRule } from '@edge-git/git-protocol';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { FetchHandler } from './FetchHandler';
 import type { FetchLimits } from './FetchHandler';
@@ -147,8 +148,8 @@ class RepoWorker extends DurableObject<Env> {
     };
   }
 
-  public async receivePack(data: Uint8Array): Promise<Response> {
-    return this.pushHandler.receivePack(data, this.getLimits());
+  public async receivePack(data: Uint8Array, protections: ProtectedRefRule[] = []): Promise<Response> {
+    return this.pushHandler.receivePack(data, this.getLimits(), protections);
   }
 
   public async uploadPack(data: Uint8Array): Promise<Response> {

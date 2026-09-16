@@ -17,5 +17,7 @@ export { OrganizationMemberDAO } from './OrganizationMemberDAO';
 export type { OrganizationMemberRow, OrgMemberRole } from './OrganizationMemberDAO';
 export { RepoCollaboratorDAO } from './RepoCollaboratorDAO';
 export type { RepoCollaboratorRow, RepoRole } from './RepoCollaboratorDAO';
+export { BranchProtectionDAO } from './BranchProtectionDAO';
+export type { BranchProtectionRuleRow } from './BranchProtectionDAO';
 export { SearchDAO } from './SearchDAO';
 export type { CodeHit, SearchOptions } from './SearchDAO';

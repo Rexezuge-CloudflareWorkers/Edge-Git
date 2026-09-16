@@ -11,6 +11,10 @@ export { AccessAuthService, AccessAuthServiceFactory } from '../auth/AccessAuthS
 */
 export { TokenService, TokenServiceFactory } from '../auth/TokenService';
 /**
+@deprecated Prefer `createRequestScope(env).get(Tokens.BranchProtectionService)`; kept for backward compatibility during migration.
+*/
+export { BranchProtectionService, BranchProtectionServiceFactory } from '../protection/BranchProtectionService';
+/**
 @deprecated Prefer `createRequestScope(env).get(Tokens.ForkService)`; kept for backward compatibility during migration.
 */
 export { ForkService, ForkServiceFactory } from '../fork/ForkService';
