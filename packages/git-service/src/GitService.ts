@@ -107,7 +107,15 @@ export class GitService {
   async collectObjectsForPack(
     wants: string[],
     haves: string[],
-    opts: { depth?: number; since?: number; exclude?: string[]; filter?: string; maxObjects?: number } = {},
+    opts: {
+      depth?: number;
+      since?: number;
+      exclude?: string[];
+      filter?: string;
+      maxObjects?: number;
+      deepenRelative?: boolean;
+      relativeTo?: string[];
+    } = {},
   ): Promise<{ oids: string[]; shallow: string[] }> {
     return this.packs.collectObjectsForPack(wants, haves, opts);
   }

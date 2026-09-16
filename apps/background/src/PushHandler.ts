@@ -1,5 +1,5 @@
 import type { GitService, IsoGitFs } from '@edge-git/git-service';
-import { buildReportStatus, parseReceivePackRequest, validateReceivePackCounts } from '@edge-git/git-protocol';
+import { buildReportStatus, parseReceivePackRequest, validateReceivePackCommands, validateReceivePackCounts } from '@edge-git/git-protocol';
 import { createLogger } from '@edge-git/backend-runtime/logger';
 
 const logger = createLogger('PushHandler');
@@ -35,6 +35,16 @@ class PushHandler {
     if (limitError) {
       logger.error(`(receive-pack) Rejected ${getFullName() ?? 'unknown repo'}: ${limitError}`);
       return buildReportStatus([{ ref: '*', ok: false, error: limitError }], false);
+    }
+
+    const commandError = validateReceivePackCommands(commands);
+    if (commandError) {
+      logger.error(`(receive-pack) Rejected ${getFullName() ?? 'unknown repo'}: ${commandError}`);
+      return buildReportStatus([{ ref: '*', ok: false, error: commandError }], false);
+    }
+
+    if (capabilities.includes('push-options')) {
+      logger.info(`(receive-pack) Ignoring push-options for ${getFullName() ?? 'unknown repo'}: no hooks to consume them`);
     }
 
     const packFilePath = `/repo/objects/pack/pack-${Date.now()}.pack`;

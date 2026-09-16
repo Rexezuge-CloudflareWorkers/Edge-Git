@@ -52,7 +52,15 @@ export class PackCollector {
   async collectObjectsForPack(
     wants: string[],
     haves: string[],
-    opts: { depth?: number; since?: number; exclude?: string[]; filter?: string; maxObjects?: number } = {},
+    opts: {
+      depth?: number;
+      since?: number;
+      exclude?: string[];
+      filter?: string;
+      maxObjects?: number;
+      deepenRelative?: boolean;
+      relativeTo?: string[];
+    } = {},
   ): Promise<{ oids: string[]; shallow: string[] }> {
     const objectsToSend = new Set<string>();
     const visited = new Set<string>();
@@ -60,7 +68,12 @@ export class PackCollector {
     const haveSet = new Set(haves);
     const excludeSet = opts.exclude ? new Set(opts.exclude) : new Set<string>();
     const shallowBoundary = new Set<string>();
-    const maxDepth = opts.depth;
+    const maxDepth = await this.resolveMaxDepth(opts.depth, {
+      deepenRelative: opts.deepenRelative,
+      relativeTo: opts.relativeTo,
+      wants,
+      maxObjects: opts.maxObjects,
+    });
     const since = opts.since;
     const maxObjects = opts.maxObjects;
     const maxVisited = (maxObjects ?? 10_000) * 4 + 1000;
@@ -215,6 +228,53 @@ export class PackCollector {
         break;
       }
     }
+  }
+
+  // deepen-relative: measure the client shallow boundary's depth from the
+  // tips and extend the cutoff by the requested depth. Falls back to the
+  // absolute depth when the boundary is not reachable from the wants.
+  private async resolveMaxDepth(
+    depth: number | undefined,
+    opts: { deepenRelative?: boolean; relativeTo?: string[]; wants: string[]; maxObjects?: number },
+  ): Promise<number | undefined> {
+    if (depth === undefined || !opts.deepenRelative || !opts.relativeTo || opts.relativeTo.length === 0) {
+      return depth;
+    }
+    const targets = new Set(opts.relativeTo);
+    const depths = await this.measureCommitDepths(opts.wants, targets, (opts.maxObjects ?? 10_000) * 4 + 1000);
+    let deepest = -1;
+    for (const target of targets) {
+      const found = depths.get(target);
+      if (found !== undefined && found > deepest) deepest = found;
+    }
+    if (deepest < 0) {
+      logger.warn('(collect-objects) deepen-relative boundary unreachable; using absolute depth');
+      return depth;
+    }
+    return deepest + depth + 1;
+  }
+
+  // BFS over commit parents from `starts`; returns tip-relative depths for
+  // the reachable subset of `targets`.
+  private async measureCommitDepths(starts: string[], targets: Set<string>, budget: number): Promise<Map<string, number>> {
+    const depths = new Map<string, number>();
+    const visited = new Set<string>();
+    const queue: Array<{ oid: string; depth: number }> = starts.map((oid) => ({ oid, depth: 0 }));
+    while (queue.length > 0 && depths.size < targets.size && visited.size < budget) {
+      const item = queue.shift();
+      if (!item || visited.has(item.oid)) continue;
+      visited.add(item.oid);
+      if (targets.has(item.oid)) depths.set(item.oid, item.depth);
+      try {
+        const commit = await git.readCommit({ fs: this.fs, gitdir: this.gitdir, oid: item.oid, cache: this.cache });
+        for (const parent of commit.commit.parent) {
+          if (!visited.has(parent)) queue.push({ oid: parent, depth: item.depth + 1 });
+        }
+      } catch {
+        // Non-commit wants (tags/trees) have no parents to measure through.
+      }
+    }
+    return depths;
   }
 
   async packObjects(oids: string[]) {

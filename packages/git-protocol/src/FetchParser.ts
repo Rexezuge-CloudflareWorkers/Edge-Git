@@ -219,6 +219,9 @@ export function validateFetchRequestCounts(
     if ((shallowOptions.deepenNot?.length ?? 0) > limits.maxHaves) {
       return `too many deepen-not: ${shallowOptions.deepenNot?.length} > ${limits.maxHaves}`;
     }
+    if ((shallowOptions.shallow?.length ?? 0) > limits.maxHaves) {
+      return `too many shallow lines: ${shallowOptions.shallow?.length} > ${limits.maxHaves}`;
+    }
     const deepen = shallowOptions.deepen;
     if (deepen !== undefined && (!Number.isSafeInteger(deepen) || deepen <= 0 || deepen > MAX_DEEPEN)) {
       return `invalid deepen: ${String(deepen)}`;
@@ -235,4 +238,36 @@ export function validateFetchRequestCounts(
     }
   }
   return null;
+}
+
+const OID_RE = /^[0-9a-f]{40}$/i;
+
+// want/have/shallow lines must reference full object ids. Malformed oids
+// previously fell through to empty packs; reject them instead.
+export function validateFetchRequestOids(fetchRequest: Pick<FetchRequest, 'wants' | 'haves' | 'shallowOptions'>): string | null {
+  const shallowLines = fetchRequest.shallowOptions?.shallow ?? [];
+  for (const oid of fetchRequest.wants) {
+    if (!OID_RE.test(oid)) return `invalid want oid: ${oid}`;
+  }
+  for (const oid of fetchRequest.haves) {
+    if (!OID_RE.test(oid)) return `invalid have oid: ${oid}`;
+  }
+  for (const oid of shallowLines) {
+    if (!OID_RE.test(oid)) return `invalid shallow oid: ${oid}`;
+  }
+  return null;
+}
+
+const BLOB_LIMIT_RE = /^blob:limit=(\d+)$/;
+const SUPPORTED_FILTERS = new Set(['blob:none', 'tree:0']);
+
+// Only filters the pack collector implements. Unknown filters previously
+// fell through to an unfiltered pack while the client believed it held a
+// partial clone; reject them instead.
+export function validateFilterSpec(filterSpec: string | undefined): string | null {
+  const filter = filterSpec?.trim() ?? '';
+  if (filter === '' || SUPPORTED_FILTERS.has(filter)) return null;
+  const limitMatch = BLOB_LIMIT_RE.exec(filter);
+  if (limitMatch && Number.isSafeInteger(Number(limitMatch[1]))) return null;
+  return `unsupported filter: ${filterSpec ?? ''}`;
 }
