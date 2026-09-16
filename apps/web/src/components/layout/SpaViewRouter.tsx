@@ -7,6 +7,7 @@ import { LandingView } from '../../views/LandingView';
 import { DashboardView } from '../../views/DashboardView';
 import { NewRepoView } from '../../views/NewRepoView';
 import { RepoView } from '../../views/RepoView';
+import { IssueDetailView } from '../../views/IssueDetailView';
 import { SettingsView } from '../../views/SettingsView';
 
 interface SpaViewRouterProps {
@@ -37,6 +38,7 @@ function SpaViewRouter({ user, authorized, showNotice, defaultOwner }: SpaViewRo
           )
         }
       />
+      <Route path="/:owner/:repo/issues/:number" element={<IssueDetailView authorized={authorized} showNotice={showNotice} />} />
       <Route path="/:owner/:repo" element={<RepoView authorized={authorized} showNotice={showNotice} />} />
       <Route
         path="/settings"
@@ -55,9 +57,7 @@ function SpaViewRouter({ user, authorized, showNotice, defaultOwner }: SpaViewRo
         element={
           <div className="max-w-7xl mx-auto px-6 py-8">
             <Card>
-              <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">
-                {t('errors.pageNotFound', 'Page Not Found')}
-              </h1>
+              <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('errors.pageNotFound', 'Page Not Found')}</h1>
               <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
                 {t('errors.pageNotFoundDescription', 'The Page You Requested Does Not Exist.')}
               </p>

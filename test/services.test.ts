@@ -18,9 +18,16 @@ function createFakeDb(seed: { now?: number } = {}): D1Queryable & {
   tokens: Array<Record<string, unknown>>;
   issues: Array<Record<string, unknown>>;
   users: Array<Record<string, unknown>>;
+  comments: Array<Record<string, unknown>>;
 } {
   const now = seed.now ?? 1_700_000_000;
-  const state = { repos: [] as Array<Record<string, unknown>>, tokens: [] as Array<Record<string, unknown>>, issues: [] as Array<Record<string, unknown>>, users: [] as Array<Record<string, unknown>> };
+  const state = {
+    repos: [] as Array<Record<string, unknown>>,
+    tokens: [] as Array<Record<string, unknown>>,
+    issues: [] as Array<Record<string, unknown>>,
+    users: [] as Array<Record<string, unknown>>,
+    comments: [] as Array<Record<string, unknown>>,
+  };
   void now;
 
   function statement(query: string, params: unknown[]) {
@@ -47,6 +54,10 @@ function createFakeDb(seed: { now?: number } = {}): D1Queryable & {
           const row = state.users.find((u) => u.email === params[0]);
           return Promise.resolve((row ?? null) as T | null);
         }
+        if (q.startsWith('SELECT * FROM issues WHERE repository_id = ? AND number = ?')) {
+          const row = state.issues.find((i) => i.repository_id === params[0] && i.number === params[1]);
+          return Promise.resolve((row ?? null) as T | null);
+        }
         return Promise.resolve(null);
       },
       all<T>(): Promise<{ results: T[] }> {
@@ -67,6 +78,12 @@ function createFakeDb(seed: { now?: number } = {}): D1Queryable & {
             .filter((i) => i.repository_id === params[0])
             .sort((a, b) => (b.number as number) - (a.number as number))
             .slice(0, params[1] as number);
+          return Promise.resolve({ results: rows as T[] });
+        }
+        if (q.startsWith('SELECT * FROM comments WHERE issue_id = ?')) {
+          const rows = state.comments
+            .filter((cmt) => cmt.issue_id === params[0])
+            .sort((a, b) => (a.created_at as number) - (b.created_at as number));
           return Promise.resolve({ results: rows as T[] });
         }
         return Promise.resolve({ results: [] });
@@ -97,6 +114,20 @@ function createFakeDb(seed: { now?: number } = {}): D1Queryable & {
             string | number | null
           >;
           state.issues.push({ id, repository_id, full_name, number, title, body, status, creator_email, created_at, updated_at });
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('UPDATE issues SET status = ?')) {
+          const [status, updated_at, id] = params as Array<string | number>;
+          const row = state.issues.find((i) => i.id === id);
+          if (row) {
+            row.status = status;
+            row.updated_at = updated_at;
+          }
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('INSERT INTO comments')) {
+          const [id, issue_id, author_email, body, created_at] = params as Array<string | number>;
+          state.comments.push({ id, issue_id, author_email, body, created_at });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO users')) {
@@ -196,6 +227,42 @@ describe('IssueService', () => {
     expect(second.number).toBe(2);
     const listed = await svc.listByRepo('r1');
     expect(listed.map((i) => i.number)).toEqual([2, 1]);
+  });
+
+  it('closes and reopens issues round-trip', async () => {
+    const db = createFakeDb();
+    const svc = new IssueService({ DB: db });
+    await svc.createIssue({ repositoryId: 'r1', fullName: 'alice/demo', title: 'Bug', creatorEmail: 'a@x.co' });
+    const closed = await svc.updateStatus({ repositoryId: 'r1', number: 1, status: 'closed' });
+    expect(closed.status).toBe('closed');
+    await expect(svc.getByNumber('r1', 1)).resolves.toMatchObject({ status: 'closed' });
+    const reopened = await svc.updateStatus({ repositoryId: 'r1', number: 1, status: 'open' });
+    expect(reopened.status).toBe('open');
+    await expect(svc.updateStatus({ repositoryId: 'r1', number: 1, status: 'invalid' })).rejects.toThrow();
+  });
+
+  it('adds and lists comments in ASC order', async () => {
+    const db = createFakeDb();
+    const svc = new IssueService({ DB: db });
+    await svc.createIssue({ repositoryId: 'r1', fullName: 'alice/demo', title: 'Bug', creatorEmail: 'a@x.co' });
+    const first = await svc.addComment({ repositoryId: 'r1', number: 1, authorEmail: 'a@x.co', body: '  first  ' });
+    expect(first.body).toBe('first');
+    expect(first.issue_id).toBeTruthy();
+    const second = await svc.addComment({ repositoryId: 'r1', number: 1, authorEmail: 'b@x.co', body: 'second' });
+    expect(second.body).toBe('second');
+    const listed = await svc.listComments('r1', 1);
+    expect(listed.map((c) => c.body)).toEqual(['first', 'second']);
+  });
+
+  it('rejects missing issues and empty comment bodies', async () => {
+    const db = createFakeDb();
+    const svc = new IssueService({ DB: db });
+    await expect(svc.getByNumber('r1', 99)).rejects.toThrow('not found');
+    await expect(svc.updateStatus({ repositoryId: 'r1', number: 99, status: 'closed' })).rejects.toThrow('not found');
+    await expect(svc.listComments('r1', 99)).rejects.toThrow('not found');
+    await svc.createIssue({ repositoryId: 'r1', fullName: 'alice/demo', title: 'Bug', creatorEmail: 'a@x.co' });
+    await expect(svc.addComment({ repositoryId: 'r1', number: 1, authorEmail: 'a@x.co', body: '   ' })).rejects.toThrow();
+    await expect(svc.addComment({ repositoryId: 'r1', number: 99, authorEmail: 'a@x.co', body: 'hi' })).rejects.toThrow('not found');
   });
 });
 

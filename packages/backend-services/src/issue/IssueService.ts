@@ -1,6 +1,7 @@
 import { IssueDAO } from '@edge-git/backend-data/dao';
-import type { IssueRow } from '@edge-git/backend-data/dao';
+import type { CommentRow, IssueRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
+import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 
 interface IssueServiceEnv {
@@ -51,6 +52,44 @@ class IssueService {
       now,
     });
     return { id, number };
+  }
+
+  public async getByNumber(repositoryId: string, number: number): Promise<IssueRow> {
+    const dao = await this.deps.issueDAO();
+    const row = await dao.getByNumber(repositoryId, number);
+    if (!row) throw new NotFoundError('Issue not found');
+    return row;
+  }
+
+  public async updateStatus(input: { repositoryId: string; number: number; status: string }): Promise<IssueRow> {
+    if (input.status !== 'open' && input.status !== 'closed') {
+      throw new BadRequestError('status must be open or closed');
+    }
+    const issue = await this.getByNumber(input.repositoryId, input.number);
+    const dao = await this.deps.issueDAO();
+    const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
+    await dao.setStatus(issue.id, input.status, now);
+    const updated = await dao.getByNumber(input.repositoryId, input.number);
+    if (!updated) throw new NotFoundError('Issue not found');
+    return updated;
+  }
+
+  public async addComment(input: { repositoryId: string; number: number; authorEmail: string; body: string }): Promise<CommentRow> {
+    const trimmed = input.body.trim();
+    if (!trimmed) throw new BadRequestError('body is required');
+    if (trimmed.length > 10_000) throw new BadRequestError('body must be at most 10000 characters');
+    const issue = await this.getByNumber(input.repositoryId, input.number);
+    const dao = await this.deps.issueDAO();
+    const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
+    const id = UUIDUtil.getRandomUUID();
+    await dao.addComment(id, issue.id, input.authorEmail, trimmed, now);
+    return { id, issue_id: issue.id, author_email: input.authorEmail, body: trimmed, created_at: now };
+  }
+
+  public async listComments(repositoryId: string, number: number): Promise<CommentRow[]> {
+    const issue = await this.getByNumber(repositoryId, number);
+    const dao = await this.deps.issueDAO();
+    return dao.listComments(issue.id);
   }
 }
 
