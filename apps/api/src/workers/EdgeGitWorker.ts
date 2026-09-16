@@ -6,10 +6,11 @@ import { MiddlewareHandlers } from '@/middleware';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { SPA_HTML } from '@/generated/spa-shell';
 import { registerGitRoutes } from './routes/GitRoutes';
+import { registerForkRoutes, registerUserForkRoutes } from './routes/ForkRoutes';
 import { registerRepoRoutes, registerUserRepoRoutes, registerUserRepoReadModelRoutes } from './routes/RepoRoutes';
 import { registerTokenRoutes } from './routes/TokenRoutes';
 import { registerIssueRoutes, registerUserIssueRoutes } from './routes/IssueRoutes';
-import { registerPullRoutes, registerUserPullRoutes } from './routes/PullRoutes';
+import { registerPullRoutes, registerUserPullMergeRoutes, registerUserPullRoutes } from './routes/PullRoutes';
 import { registerUserProfileRoutes, registerUserSettingsRoutes } from './routes/UserRoutes';
 import { registerOrgRoutes } from './routes/OrgRoutes';
 
@@ -42,6 +43,7 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
 
     registerGitRoutes(app);
     registerRepoRoutes(app);
+    registerForkRoutes(app);
     registerIssueRoutes(app);
     registerPullRoutes(app);
     registerUserProfileRoutes(app);
@@ -56,9 +58,11 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     const openapi: AppRouter = fromHono(app, { docs_url: '/docs' });
 
     registerUserRepoReadModelRoutes(app);
+    registerUserForkRoutes(app);
     registerTokenRoutes(app);
     registerUserIssueRoutes(app);
     registerUserPullRoutes(app);
+    registerUserPullMergeRoutes(app);
 
     // SPA catch-all — public shell for user home (/), profile home
     // (/:username, GitHub-style), repo home (/:owner/:repo), and the legacy

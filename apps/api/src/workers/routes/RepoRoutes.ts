@@ -11,7 +11,10 @@ type RepoApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress:
 // unless the caller presents Access identity or a PAT for the owner).
 function registerRepoRoutes(app: RepoApp): void {
   app.get('/repos/:owner/:repo', async (c) => {
-    return withPublicRepo(c as never, (row) => Promise.resolve(c.json(toRepoJson(row))));
+    return withPublicRepo(c as never, async (row) => {
+      const forksCount = await createRequestScope(c.env).get(Tokens.ForkService).countForks(row.id).catch(() => 0);
+      return c.json({ ...(toRepoJson(row) as Record<string, unknown>), forksCount });
+    });
   });
 
   app.get('/repos/:owner/:repo/branches', async (c) => {
@@ -124,7 +127,8 @@ function registerUserRepoRoutes(app: RepoApp): void {
     const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
     if (!row) return c.json({ error: 'Not found' }, 404);
     const role = await scope.get(Tokens.PermissionService).getRole(email, row).catch(() => null);
-    return c.json({ ...(toRepoJson(row, role) as Record<string, unknown>), viewerCanManage: role === 'admin', viewerRole: role });
+    const forksCount = await scope.get(Tokens.ForkService).countForks(row.id).catch(() => 0);
+    return c.json({ ...(toRepoJson(row, role) as Record<string, unknown>), viewerCanManage: role === 'admin', viewerRole: role, forksCount });
   });
 
   app.patch('/user/repos/:owner/:repo', async (c) => {

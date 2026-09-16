@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { GitPullRequest } from 'lucide-react';
-import type { PullRequest } from '../../types';
+import type { PullRequest, Repo } from '../../types';
 import { createPull, listPulls } from '../../services/pullService';
 import { loadBranches } from '../../services/repoService';
+import { listForks } from '../../services/forkService';
 import { formatTimestamp } from '../../lib/format';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
@@ -13,40 +14,77 @@ import { PullStatusBadge } from '../ui/Badge';
 import { RefreshButton } from '../shared/RefreshButton';
 import { Markdown } from '../shared/Markdown';
 
+export function headLabel(pull: PullRequest): string {
+  return pull.head_full_name && pull.head_full_name.toLowerCase() !== pull.full_name.toLowerCase()
+    ? `${pull.head_full_name}:${pull.head_branch}`
+    : pull.head_branch;
+}
+
+function sameRepoName(a: string, b: string): boolean {
+  return a.toLowerCase() === b.toLowerCase();
+}
+
+function mergeHeadRepoOptions(currentFull: string, parent: string | null | undefined, forks: Repo[], prev: string): { options: string[]; selected: string } {
+  const options = [currentFull];
+  if (parent && options.every((o) => !sameRepoName(o, parent))) {
+    options.push(parent);
+  }
+  for (const f of forks) {
+    if (options.every((o) => !sameRepoName(o, f.fullName))) options.push(f.fullName);
+  }
+  return { options, selected: options.some((o) => sameRepoName(o, prev)) ? prev : currentFull };
+}
+
 export function PullsTab({
   owner,
   repo,
+  repoMeta,
   canWrite,
   showNotice,
   onCountChange,
 }: {
   owner: string;
   repo: string;
+  repoMeta?: Repo | null;
   canWrite: boolean;
   showNotice: (type: 'success' | 'error', text: string) => void;
   onCountChange?: (count: number) => void;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const currentFull = `${owner}/${repo}`;
   const [pulls, setPulls] = useState<PullRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [branches, setBranches] = useState<string[]>([]);
+  const [headRepos, setHeadRepos] = useState<string[]>([currentFull]);
+  const [headRepo, setHeadRepo] = useState(currentFull);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [base, setBase] = useState('');
   const [head, setHead] = useState('');
   const [saving, setSaving] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [crossBranches, setCrossBranches] = useState<string[]>([]);
+
+  const isCrossRepo = headRepo.toLowerCase() !== currentFull.toLowerCase();
+  const headBranches = isCrossRepo ? crossBranches : branches;
 
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
       try {
-        const [list, b] = await Promise.all([listPulls(owner, repo), loadBranches(owner, repo).catch(() => ({ branches: [], currentBranch: null }))]);
+        const [list, b, forks] = await Promise.all([
+          listPulls(owner, repo),
+          loadBranches(owner, repo).catch(() => ({ branches: [], currentBranch: null })),
+          listForks(owner, repo).catch(() => ({ forks: [], count: 0 })),
+        ]);
         if (cancelled) return;
         setPulls(list);
         setBranches(b.branches);
         setBase((prev) => prev || b.currentBranch || b.branches[0] || '');
+        const merged = mergeHeadRepoOptions(currentFull, repoMeta?.forkedFrom, forks.forks, headRepo);
+        setHeadRepos(merged.options);
+        setHeadRepo(merged.selected);
       } catch (error) {
         if (!cancelled) showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadPulls', 'Failed To Load Pull Requests.'));
       } finally {
@@ -61,6 +99,26 @@ export function PullsTab({
   }, [owner, repo, reloadKey]);
 
   useEffect(() => {
+    if (!isCrossRepo) return;
+    const slash = headRepo.indexOf('/');
+    if (slash <= 0) return;
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const b = await loadBranches(headRepo.slice(0, slash), headRepo.slice(slash + 1));
+        if (!cancelled) setCrossBranches(b.branches);
+      } catch {
+        if (!cancelled) setCrossBranches([]);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [headRepo, isCrossRepo]);
+
+  useEffect(() => {
     onCountChange?.(pulls.length);
   }, [pulls.length, onCountChange]);
 
@@ -71,18 +129,25 @@ export function PullsTab({
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const headBranch = head || branches.find((b) => b !== base) || '';
+    const headBranch = head || headBranches.find((b) => (isCrossRepo ? true : b !== base)) || '';
     if (!base || !headBranch) {
       showNotice('error', t('errors.failedToCreatePull', 'Failed To Create Pull Request.'));
       return;
     }
-    if (base === headBranch) {
+    if (!isCrossRepo && base === headBranch) {
       showNotice('error', t('pulls.sameBranch', 'Base And Head Must Differ.'));
       return;
     }
     setSaving(true);
     try {
-      const created = await createPull(owner, repo, { title: title.trim(), body: body.trim() || undefined, baseBranch: base, headBranch });
+      const slash = headRepo.indexOf('/');
+      const created = await createPull(owner, repo, {
+        title: title.trim(),
+        body: body.trim() || undefined,
+        baseBranch: base,
+        headBranch,
+        ...(isCrossRepo && slash > 0 && { headOwner: headRepo.slice(0, slash), headRepo: headRepo.slice(slash + 1) }),
+      });
       setTitle('');
       setBody('');
       showNotice('success', t('pulls.pullCreated', 'Pull Request Created.'));
@@ -96,7 +161,7 @@ export function PullsTab({
 
   return (
     <div className="space-y-4">
-      {canWrite && branches.length >= 2 && (
+      {canWrite && (branches.length >= 2 || (isCrossRepo && branches.length > 0 && headBranches.length > 0)) && (
         <Card>
           <CardHeader>
             <CardTitle>{t('pulls.newPull', 'New Pull Request')}</CardTitle>
@@ -115,10 +180,20 @@ export function PullsTab({
                 </Select>
               </label>
               <label className="flex-1 min-w-36 text-sm">
+                <span className="text-[var(--color-text-muted)]">{t('pulls.headRepo', 'Head Repository')}</span>
+                <Select value={headRepo} onChange={(e) => { setHeadRepo(e.target.value); setHead(''); }}>
+                  {headRepos.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+              <label className="flex-1 min-w-36 text-sm">
                 <span className="text-[var(--color-text-muted)]">{t('pulls.head', 'Head')}</span>
                 <Select value={head} onChange={(e) => setHead(e.target.value)}>
                   <option value="">{t('pulls.selectHead', 'Select Head')}</option>
-                  {branches.filter((b) => b !== base).map((b) => (
+                  {headBranches.filter((b) => isCrossRepo || b !== base).map((b) => (
                     <option key={b} value={b}>
                       {b}
                     </option>
@@ -155,7 +230,7 @@ export function PullsTab({
                   </Link>
                   <span className="text-xs text-[var(--color-text-muted)]">#{p.number}</span>
                   <span className="text-xs text-[var(--color-text-muted)] font-mono">
-                    {p.base_branch} ← {p.head_branch}
+                    {p.base_branch} ← {headLabel(p)}
                   </span>
                 </div>
                 {p.body && (

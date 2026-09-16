@@ -73,6 +73,10 @@ class ReadModelService {
     return this.git.getMergePreview(baseRef, headRef);
   }
 
+  public async getMergePreviewByOids(baseOid: string, headOid: string): Promise<unknown> {
+    return this.git.getMergePreviewByOids(baseOid, headOid);
+  }
+
   public async getPullDiff(baseOid: string | null, headOid: string, maxFiles: number): Promise<unknown> {
     if (!baseOid) {
       const commit = (await this.git.getCommit(headOid)) as { changes?: unknown } | null;

@@ -3,6 +3,8 @@ import { requireVisibleRepo, toServiceStatus } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { PullRequestService } from '@edge-git/backend-services/pull';
 import { RepoService } from '@edge-git/backend-services/repo';
+import { ensureHeadObjects, getCrossRepoPreview, isPackLimitError, resolveHeadRepo } from './CrossFork';
+import { openCrossForkPull } from './PullMergeRoutes';
 import { parsePullNumber } from './PullShared';
 import type { MergePreviewShape, PullApp } from './PullShared';
 
@@ -18,24 +20,37 @@ function registerUserPullRoutes(app: PullApp): void {
 
   // Open a PR: any visible user (read+) may propose. Branches are resolved
   // via the RepoWorker DO so stored oids reflect git truth at creation time.
+  // Cross-fork PRs pass headOwner/headRepo (the fork); the head must also be
+  // visible to the opener, and head objects are materialized into the base DO.
   app.post('/user/repos/:owner/:repo/pulls', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return c.json({ error: 'Not found' }, 404);
-    const body = (await c.req.json().catch(() => ({}))) as { title?: string; body?: string; baseBranch?: string; headBranch?: string };
+    const body = (await c.req.json().catch(() => ({}))) as { title?: string; body?: string; baseBranch?: string; headBranch?: string; headOwner?: string; headRepo?: string };
     if (!body.title?.trim()) return c.json({ error: 'title is required' }, 400);
     if (!body.baseBranch?.trim() || !body.headBranch?.trim()) return c.json({ error: 'baseBranch and headBranch are required' }, 400);
     if (!PullRequestService.isValidBranchName(body.baseBranch.trim()) || !PullRequestService.isValidBranchName(body.headBranch.trim())) {
       return c.json({ error: 'invalid branch name' }, 400);
     }
+    const headOwnerRaw = body.headOwner?.trim() || '';
+    const headRepoRaw = body.headRepo ? RepoService.normalizeRepo(body.headRepo).trim() : '';
+    if ((headOwnerRaw === '') !== (headRepoRaw === '')) return c.json({ error: 'headOwner and headRepo must be provided together' }, 400);
     const fullName = `${owner}/${repoName}`;
+    const baseBranch = body.baseBranch.trim();
+    const headBranch = body.headBranch.trim();
+    const sameRepo = headOwnerRaw === '' || `${headOwnerRaw}/${headRepoRaw}`.toLowerCase() === fullName.toLowerCase();
+    if (sameRepo && baseBranch === headBranch) return c.json({ error: 'baseBranch and headBranch must differ' }, 400);
+    if (!sameRepo) {
+      const result = await openCrossForkPull(c.env, { email, rowId: row.id, fullName, baseBranch, headBranch, headOwner: headOwnerRaw, headRepo: headRepoRaw, title: body.title, body: body.body ?? null });
+      return c.json(result.body, result.status);
+    }
     let preview: MergePreviewShape | null = null;
     try {
       preview = (await getRepoStub(c.env, fullName).getMergePreview({
-        baseRef: `refs/heads/${body.baseBranch.trim()}`,
-        headRef: `refs/heads/${body.headBranch.trim()}`,
+        baseRef: `refs/heads/${baseBranch}`,
+        headRef: `refs/heads/${headBranch}`,
       })) as MergePreviewShape | null;
     } catch {
       preview = null;
@@ -49,8 +64,8 @@ function registerUserPullRoutes(app: PullApp): void {
           fullName,
           title: body.title,
           body: body.body ?? null,
-          baseBranch: body.baseBranch.trim(),
-          headBranch: body.headBranch.trim(),
+          baseBranch,
+          headBranch,
           baseOid: preview.baseOid,
           headOid: preview.headOid,
           mergeBaseOid: preview.mergeBase ?? null,
@@ -195,7 +210,19 @@ function registerUserPullRoutes(app: PullApp): void {
     try {
       const pull = await createRequestScope(c.env).get(Tokens.PullRequestService).getByNumber(row.id, number);
       if (!pull.head_oid) return c.json({ error: 'Pull request has no head commit' }, 400);
-      const diff = await getRepoStub(c.env, `${owner}/${repoName}`).getPullDiff({ baseOid: pull.base_oid, headOid: pull.head_oid });
+      const fullName = `${owner}/${repoName}`;
+      const head = await resolveHeadRepo(c.env, pull);
+      if (head) {
+        const headRole = await createRequestScope(c.env).get(Tokens.PermissionService).getRole(email, head.row).catch(() => null);
+        if (!headRole) return c.json({ error: 'Not found' }, 404);
+        try {
+          await ensureHeadObjects(c.env, fullName, head.fullName, pull.head_oid);
+        } catch (error) {
+          if (isPackLimitError(error)) return c.json({ error: error instanceof Error ? error.message : 'Repository too large' }, 413);
+          return c.json({ error: 'head commit not found' }, 400);
+        }
+      }
+      const diff = await getRepoStub(c.env, fullName).getPullDiff({ baseOid: pull.base_oid, headOid: pull.head_oid });
       return c.json({ diff });
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
@@ -212,7 +239,20 @@ function registerUserPullRoutes(app: PullApp): void {
     if (number === null) return c.json({ error: 'Not found' }, 404);
     try {
       const pull = await createRequestScope(c.env).get(Tokens.PullRequestService).getByNumber(row.id, number);
-      const preview = (await getRepoStub(c.env, `${owner}/${repoName}`).getMergePreview({
+      const fullName = `${owner}/${repoName}`;
+      const head = await resolveHeadRepo(c.env, pull);
+      if (head) {
+        const headRole = await createRequestScope(c.env).get(Tokens.PermissionService).getRole(email, head.row).catch(() => null);
+        if (!headRole) return c.json({ error: 'Not found' }, 404);
+        try {
+          const { preview } = await getCrossRepoPreview(c.env, fullName, pull.base_branch, head.fullName, pull.head_branch);
+          return c.json({ preview });
+        } catch (error) {
+          if (isPackLimitError(error)) return c.json({ error: error instanceof Error ? error.message : 'Repository too large' }, 413);
+          return c.json({ preview: null });
+        }
+      }
+      const preview = (await getRepoStub(c.env, fullName).getMergePreview({
         baseRef: `refs/heads/${pull.base_branch}`,
         headRef: `refs/heads/${pull.head_branch}`,
       })) as MergePreviewShape | null;
@@ -222,88 +262,7 @@ function registerUserPullRoutes(app: PullApp): void {
     }
   });
 
-  // Merge: write+ only. changes_requested reviews block the merge (409).
-  // Conflicts from the DO also surface as 409 with the file list.
-  app.post('/user/repos/:owner/:repo/pulls/:number/merge', async (c) => {
-    const email = c.get('AuthenticatedUserEmailAddress');
-    const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
-    try {
-      await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
-    } catch {
-      return c.json({ error: 'Forbidden' }, 403);
-    }
-    const number = parsePullNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Not found' }, 404);
-    const scope = createRequestScope(c.env);
-    let pull;
-    try {
-      pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
-    } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
-    }
-    if (pull.status === 'merged') return c.json({ error: 'pull request is already merged' }, 400);
-    if (pull.status === 'closed') return c.json({ error: 'closed pull requests cannot be merged' }, 400);
-    // Fail fast on blocking reviews before touching git.
-    const reviews = await scope.get(Tokens.PullRequestService).listReviews(row.id, number);
-    if (PullRequestService.isBlockedByReviews(reviews)) return c.json({ error: 'pull request has unresolved change requests' }, 409);
-    // Refresh oids from git truth (branches may have moved since PR creation).
-    let headOid = pull.head_oid;
-    try {
-      const preview = (await getRepoStub(c.env, `${owner}/${repoName}`).getMergePreview({
-        baseRef: `refs/heads/${pull.base_branch}`,
-        headRef: `refs/heads/${pull.head_branch}`,
-      })) as MergePreviewShape | null;
-      if (preview?.headOid) headOid = preview.headOid;
-      if (preview && (preview.baseOid || preview.headOid)) {
-        try {
-          await scope.get(Tokens.PullRequestService).refreshOids({
-            repositoryId: row.id,
-            number,
-            baseOid: preview.baseOid ?? null,
-            headOid: preview.headOid ?? null,
-            mergeBaseOid: preview.mergeBase ?? null,
-          });
-        } catch {
-          // Best-effort: stale stored oids must not block the merge itself.
-        }
-      }
-    } catch {
-      // fall through with stored oid
-    }
-    if (!headOid) return c.json({ error: 'head branch not found' }, 400);
-    const body = (await c.req.json().catch(() => ({}))) as { message?: string; deleteHead?: boolean };
-    const rawMessage = typeof body.message === 'string' ? body.message.trim() : '';
-    const message = rawMessage ? rawMessage.slice(0, 1000) : `Merge pull request #${number}: ${pull.title}`;
-    const deleteHead = body.deleteHead === true;
-    let outcome: { type?: string; commitOid?: string; conflicts?: string[]; reason?: string; deletedHead?: boolean };
-    try {
-      outcome = (await getRepoStub(c.env, `${owner}/${repoName}`).mergePull({
-        baseBranch: pull.base_branch,
-        headBranch: pull.head_branch,
-        headOid,
-        authorName: email.split('@', 1)[0] || email,
-        authorEmail: email,
-        message,
-        deleteHead,
-      })) as { type?: string; commitOid?: string; conflicts?: string[]; reason?: string; deletedHead?: boolean };
-    } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Merge failed' }, 500);
-    }
-    if (outcome.type === 'conflict') {
-      return c.json({ error: 'merge conflicts', conflicts: outcome.conflicts ?? [], reason: outcome.reason ?? null }, 409);
-    }
-    try {
-      const merged = await scope.get(Tokens.PullRequestService).markMerged({ repositoryId: row.id, number, mergedBy: email, commitOid: outcome.commitOid ?? headOid });
-      return c.json({ pull: merged, merge: outcome });
-    } catch (error) {
-      const failure = error instanceof Error ? error.message : 'Failed to record merge';
-      const status = failure.includes('unresolved change requests') ? 409 : toServiceStatus(error);
-      return c.json({ error: failure }, status === 500 ? 400 : status);
-    }
-  });
+
 }
 
 export { registerUserPullRoutes };

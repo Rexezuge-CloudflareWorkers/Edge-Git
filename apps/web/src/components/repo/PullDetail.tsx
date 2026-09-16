@@ -15,6 +15,7 @@ import {
 } from '../../services/pullService';
 import { formatTimestamp } from '../../lib/format';
 import { Markdown } from '../shared/Markdown';
+import { headLabel } from './PullsTab';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Select, Textarea } from '../ui/Input';
@@ -214,7 +215,7 @@ export function PullDetail({
           <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">{pull.title}</h1>
         </div>
         <p className="mt-1 text-xs text-[var(--color-text-muted)] font-mono">
-          {pull.base_branch} ← {pull.head_branch}
+          {pull.base_branch} ← {headLabel(pull)}
         </p>
         <p className="mt-1 text-xs text-[var(--color-text-muted)]">
           {t('pulls.openedBy', 'Opened By {{email}} · {{date}}', {
@@ -284,12 +285,12 @@ export function PullDetail({
               onChange={(e) => setMergeMessage(e.target.value)}
               rows={2}
             />
-            {pull.head_branch !== pull.base_branch && (
+            {(pull.head_full_name ?? pull.full_name).toLowerCase() !== pull.full_name.toLowerCase() || pull.head_branch !== pull.base_branch ? (
               <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
                 <input type="checkbox" checked={deleteHead} onChange={(e) => setDeleteHead(e.target.checked)} />
                 {t('pulls.deleteHeadAfterMerge', 'Delete Head Branch After Merge')}
               </label>
-            )}
+            ) : null}
             <Button type="button" variant="primary" size="sm" loading={merging} disabled={blockedByReview} onClick={() => void doMerge()}>
               {t('pulls.mergePull', 'Merge Pull Request')}
             </Button>

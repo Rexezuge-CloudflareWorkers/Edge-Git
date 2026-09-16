@@ -22,7 +22,7 @@ export async function listPulls(owner: string, repo: string): Promise<PullReques
 export async function createPull(
   owner: string,
   repo: string,
-  input: { title: string; body?: string; baseBranch: string; headBranch: string },
+  input: { title: string; body?: string; baseBranch: string; headBranch: string; headOwner?: string; headRepo?: string },
 ): Promise<{ id: string; number: number }> {
   return apiPost<{ id: string; number: number }>(authedBase(owner, repo), input);
 }

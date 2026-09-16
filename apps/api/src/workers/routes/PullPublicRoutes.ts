@@ -1,6 +1,7 @@
 import { getRepoStub } from '../repoStub';
-import { toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { resolvePublicViewer, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { ensureHeadObjects, getCrossRepoPreview, isPackLimitError, resolveHeadRepo } from './CrossFork';
 import { parsePullNumber } from './PullShared';
 import type { MergePreviewShape, PullApp } from './PullShared';
 
@@ -58,6 +59,19 @@ function registerPullRoutes(app: PullApp): void {
       try {
         const pull = await createRequestScope(c.env).get(Tokens.PullRequestService).getByNumber(row.id, number);
         if (!pull.head_oid) return c.json({ error: 'Pull request has no head commit' }, 400);
+        const head = await resolveHeadRepo(c.env, pull);
+        if (head) {
+          // A private fork's diff must not leak through a public base repo.
+          const viewerEmail = await resolvePublicViewer(c as never);
+          const headRole = await createRequestScope(c.env).get(Tokens.PermissionService).getRole(viewerEmail, head.row).catch(() => null);
+          if (!headRole) return c.json({ error: 'Not found' }, 404);
+          try {
+            await ensureHeadObjects(c.env, fullName, head.fullName, pull.head_oid);
+          } catch (error) {
+            if (isPackLimitError(error)) return c.json({ error: error instanceof Error ? error.message : 'Repository too large' }, 413);
+            return c.json({ error: 'head commit not found' }, 400);
+          }
+        }
         const diff = await getRepoStub(c.env, fullName).getPullDiff({ baseOid: pull.base_oid, headOid: pull.head_oid });
         return c.json({ diff });
       } catch (error) {
@@ -72,6 +86,19 @@ function registerPullRoutes(app: PullApp): void {
       if (number === null) return c.json({ error: 'Not found' }, 404);
       try {
         const pull = await createRequestScope(c.env).get(Tokens.PullRequestService).getByNumber(row.id, number);
+        const head = await resolveHeadRepo(c.env, pull);
+        if (head) {
+          const viewerEmail = await resolvePublicViewer(c as never);
+          const headRole = await createRequestScope(c.env).get(Tokens.PermissionService).getRole(viewerEmail, head.row).catch(() => null);
+          if (!headRole) return c.json({ error: 'Not found' }, 404);
+          try {
+            const { preview } = await getCrossRepoPreview(c.env, fullName, pull.base_branch, head.fullName, pull.head_branch);
+            return c.json({ preview });
+          } catch (error) {
+            if (isPackLimitError(error)) return c.json({ error: error instanceof Error ? error.message : 'Repository too large' }, 413);
+            return c.json({ preview: null });
+          }
+        }
         const preview = (await getRepoStub(c.env, fullName).getMergePreview({
           baseRef: `refs/heads/${pull.base_branch}`,
           headRef: `refs/heads/${pull.head_branch}`,

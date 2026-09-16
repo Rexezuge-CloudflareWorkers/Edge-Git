@@ -14,6 +14,7 @@ import type { Token } from '@edge-git/backend-runtime/di';
 import type { AppConfiguration } from '@edge-git/backend-runtime/config';
 import type { AccessAuthService } from '../auth/AccessAuthService';
 import type { TokenService } from '../auth/TokenService';
+import type { ForkService } from '../fork/ForkService';
 import type { RepoService } from '../repo/RepoService';
 import type { UserService } from '../user/UserService';
 import type { IssueService } from '../issue/IssueService';
@@ -52,6 +53,7 @@ const Tokens = {
   RepoCollaboratorDAO: Symbol('RepoCollaboratorDAO') as Token<() => Promise<RepoCollaboratorDAO>>,
   AccessAuthService: Symbol('AccessAuthService') as Token<AccessAuthService>,
   TokenService: Symbol('TokenService') as Token<TokenService>,
+  ForkService: Symbol('ForkService') as Token<ForkService>,
   RepoService: Symbol('RepoService') as Token<RepoService>,
   UserService: Symbol('UserService') as Token<UserService>,
   IssueService: Symbol('IssueService') as Token<IssueService>,

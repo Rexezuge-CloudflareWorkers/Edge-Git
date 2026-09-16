@@ -105,6 +105,16 @@ export class MergeService {
   public async getPreview(baseRef: string, headRef: string): Promise<MergePreview | null> {
     const [baseOid, headOid] = await Promise.all([this.resolveRef(baseRef), this.resolveRef(headRef)]);
     if (!baseOid || !headOid) return null;
+    return this.getPreviewByOids(baseOid, headOid);
+  }
+
+  /**
+   * Oid-based preview for cross-repo (cross-DO) pull requests, where the head
+   * ref lives in another Durable Object and its objects were materialized
+   * into this repo via `importPack` beforehand.
+   */
+  public async getPreviewByOids(baseOid: string, headOid: string): Promise<MergePreview | null> {
+    if (!/^[0-9a-f]{40}$/.test(baseOid) || !/^[0-9a-f]{40}$/.test(headOid)) return null;
     if (baseOid === headOid) {
       return { baseOid, headOid, mergeBase: baseOid, alreadyMerged: true, canFastForward: true };
     }

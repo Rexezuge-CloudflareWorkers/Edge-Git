@@ -100,6 +100,7 @@ class RepoService {
     name: string,
     description: string | null,
     isPrivate: boolean,
+    opts: { forkedFromRepoId?: string | null; forkedFromFullName?: string | null } = {},
   ): Promise<{ id: string }> {
     const normalizedOwner = RepoService.normalizeOwner(owner);
     const dao = await this.deps.repositoryDAO();
@@ -122,7 +123,7 @@ class RepoService {
 
     // Self-owned fast path (covers legacy fakes with no users/orgs tables).
     if (callerCi && ownerCi === callerCi) {
-      await dao.create({ id, ownerEmail: callerEmail, owner: normalizedOwner, name, description, isPrivate, now, ownerType: 'user', ownerUserEmail: callerEmail });
+      await dao.create({ id, ownerEmail: callerEmail, owner: normalizedOwner, name, description, isPrivate, now, ownerType: 'user', ownerUserEmail: callerEmail, forkedFromRepoId: opts.forkedFromRepoId ?? null, forkedFromFullName: opts.forkedFromFullName ?? null });
       return { id };
     }
 
@@ -155,6 +156,8 @@ class RepoService {
         now,
         ownerType: 'org',
         orgId: org.id,
+        forkedFromRepoId: opts.forkedFromRepoId ?? null,
+        forkedFromFullName: opts.forkedFromFullName ?? null,
       });
       return { id };
     }
@@ -172,7 +175,7 @@ class RepoService {
       if (error instanceof ForbiddenError) throw error;
       // missing namespaces table → allow legacy free-form owner
     }
-    await dao.create({ id, ownerEmail: callerEmail, owner: normalizedOwner, name, description, isPrivate, now, ownerType: 'user', ownerUserEmail: callerEmail });
+    await dao.create({ id, ownerEmail: callerEmail, owner: normalizedOwner, name, description, isPrivate, now, ownerType: 'user', ownerUserEmail: callerEmail, forkedFromRepoId: opts.forkedFromRepoId ?? null, forkedFromFullName: opts.forkedFromFullName ?? null });
     return { id };
   }
 
@@ -183,6 +186,11 @@ class RepoService {
 
   public async getByOwnerAndName(owner: string, name: string): Promise<RepositoryRow | null> {
     return this.getRepo(owner, name);
+  }
+
+  public async getById(id: string): Promise<RepositoryRow | null> {
+    const dao = await this.deps.repositoryDAO();
+    return dao.getById(id);
   }
 
   public async listByOwnerEmail(ownerEmail: string, limit = 100): Promise<RepositoryRow[]> {
