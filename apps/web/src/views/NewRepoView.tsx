@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { createRepo } from '../services/repoService';
+import { listMyOrgs } from '../services/profileService';
 import { Button } from '../components/ui/Button';
 import { Card, CardHeader, CardTitle } from '../components/ui/Card';
-import { Input, Label, Textarea } from '../components/ui/Input';
+import { Input, Label, Select, Textarea } from '../components/ui/Input';
 
 export function NewRepoView({
   defaultOwner,
@@ -13,11 +15,32 @@ export function NewRepoView({
   showNotice: (type: 'success' | 'error', text: string) => void;
 }) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [owner, setOwner] = useState(defaultOwner);
+  const [owners, setOwners] = useState<string[]>([defaultOwner]);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const orgs = await listMyOrgs();
+        if (cancelled) return;
+        const next = [defaultOwner, ...orgs.map((o) => o.username).filter((u) => u.toLowerCase() !== defaultOwner.toLowerCase())];
+        setOwners(next);
+        setOwner((prev) => prev || defaultOwner);
+      } catch {
+        if (!cancelled) setOwners([defaultOwner]);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [defaultOwner]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,7 +70,16 @@ export function NewRepoView({
         <form onSubmit={submit} className="space-y-4">
           <div>
             <Label className="mb-1.5">Owner</Label>
-            <Input placeholder="owner (default: you)" value={owner} onChange={(e) => setOwner(e.target.value)} />
+            <Select value={owner} onChange={(e) => setOwner(e.target.value)} className="w-full">
+              {owners.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </Select>
+            <p className="text-xs text-[var(--color-text-muted)] mt-1">
+              {t('repos.ownerHint', 'Personal Or Organization You Belong To. Manage Organizations From The Dashboard New Menu.')}
+            </p>
           </div>
           <div>
             <Label className="mb-1.5">Repository Name</Label>

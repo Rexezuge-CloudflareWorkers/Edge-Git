@@ -8,11 +8,13 @@ import { useSpaLanguage } from './hooks/useSpaLanguage';
 
 function TopHeader({
   userEmail,
+  username,
   language,
   onLanguageChange,
   languageDisabled,
 }: {
   userEmail: string | null;
+  username?: string | null;
   language: string;
   onLanguageChange: (lng: string) => void;
   languageDisabled: boolean;
@@ -22,6 +24,7 @@ function TopHeader({
   return (
     <Header
       userEmail={userEmail}
+      username={username}
       language={language}
       onLanguageChange={onLanguageChange}
       languageDisabled={languageDisabled}
@@ -52,6 +55,7 @@ export default function SpaApp() {
     <div className="min-h-screen bg-[var(--color-surface-base)] text-[var(--color-text-primary)]">
       <TopHeader
         userEmail={user?.email ?? null}
+        username={user?.username ?? null}
         language={languageStatus === 'error' ? 'unknown' : language}
         onLanguageChange={handleLanguageChange}
         languageDisabled={languagePending || languageStatus !== 'ready'}

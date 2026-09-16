@@ -6,11 +6,13 @@ import { LanguageSelector } from '../shared/LanguageSelector';
 
 export function Header({
   userEmail,
+  username,
   language,
   onLanguageChange,
   languageDisabled,
 }: {
   userEmail: string | null;
+  username?: string | null;
   language?: string;
   onLanguageChange?: (lng: string) => void;
   languageDisabled?: boolean;
@@ -70,7 +72,13 @@ export function Header({
           {onLanguageChange && (
             <LanguageSelector value={language} onChange={onLanguageChange} disabled={languageDisabled} />
           )}
-          <div className="text-sm text-[var(--color-text-muted)] truncate max-w-xs">{userEmail ?? ''}</div>
+          {username ? (
+            <Link to={`/${username}`} className="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-accent)] truncate max-w-xs">
+              {userEmail ?? ''}
+            </Link>
+          ) : (
+            <div className="text-sm text-[var(--color-text-muted)] truncate max-w-xs">{userEmail ?? ''}</div>
+          )}
         </div>
       </div>
     </header>

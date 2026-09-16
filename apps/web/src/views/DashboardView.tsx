@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { BookMarked, Plus } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { BookMarked, ChevronDown, Plus } from 'lucide-react';
 import type { Repo } from '../types';
 import { listMyRepos } from '../services/repoService';
 import { Button } from '../components/ui/Button';
@@ -8,10 +9,15 @@ import { Card, CardHeader, CardTitle } from '../components/ui/Card';
 import { VisibilityBadge } from '../components/ui/Badge';
 import { ReadOnlyField } from '../components/shared/ReadOnlyField';
 import { RefreshButton } from '../components/shared/RefreshButton';
+import { OrgCreateModal } from '../components/org/OrgCreateModal';
 
 export function DashboardView({ showNotice }: { showNotice: (type: 'success' | 'error', text: string) => void }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
   const [repos, setRepos] = useState<Repo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [newOpen, setNewOpen] = useState(false);
+  const [orgModal, setOrgModal] = useState(false);
 
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -33,18 +39,55 @@ export function DashboardView({ showNotice }: { showNotice: (type: 'success' | '
     setReloadKey((k) => k + 1);
   };
 
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!newOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setNewOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [newOpen]);
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-8 space-y-4">
       <Card className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 py-4">
-        <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">Dashboard</h1>
+        <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">{t('dashboard.title', 'Dashboard')}</h1>
         <div className="flex flex-wrap items-center gap-3">
           <RefreshButton onRefresh={refresh} loading={loading} />
-          <Link to="/new">
-            <Button variant="primary" size="sm">
+          <div className="relative" ref={menuRef}>
+            <Button variant="primary" size="sm" onClick={() => setNewOpen((v) => !v)} aria-haspopup="menu" aria-expanded={newOpen}>
               <Plus className="h-3.5 w-3.5" />
-              New Repository
+              {t('dashboard.new', 'New')}
+              <ChevronDown className="h-3.5 w-3.5" />
             </Button>
-          </Link>
+            {newOpen && (
+              <div role="menu" className="absolute right-0 mt-2 w-52 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-1)] p-1.5 shadow-xl z-30">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="w-full text-left px-3 py-2 rounded-lg text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-3)]"
+                  onClick={() => {
+                    setNewOpen(false);
+                    void navigate('/new');
+                  }}
+                >
+                  {t('dashboard.newRepository', 'New Repository')}
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="w-full text-left px-3 py-2 rounded-lg text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-3)]"
+                  onClick={() => {
+                    setNewOpen(false);
+                    setOrgModal(true);
+                  }}
+                >
+                  {t('orgs.newOrg', 'New Organization')}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </Card>
 
@@ -88,6 +131,16 @@ export function DashboardView({ showNotice }: { showNotice: (type: 'success' | '
           </ul>
         )}
       </Card>
+      {orgModal && (
+        <OrgCreateModal
+          showNotice={showNotice}
+          onClose={() => setOrgModal(false)}
+          onCreated={(username) => {
+            setOrgModal(false);
+            void navigate(`/${username}`);
+          }}
+        />
+      )}
     </div>
   );
 }

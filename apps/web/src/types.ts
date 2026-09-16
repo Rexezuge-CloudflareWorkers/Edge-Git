@@ -1,5 +1,7 @@
 export interface CurrentUser {
   email: string;
+  username?: string | null;
+  displayName?: string | null;
   /**
    * Preferred UI language (BCP 47 tag). Optional: the backend does not persist
    * it yet, so the SPA treats a missing value as "use localStorage > navigator
@@ -19,6 +21,37 @@ export interface Repo {
   createdAt: number;
   updatedAt: number;
   viewerCanManage?: boolean;
+  viewerRole?: 'admin' | 'write' | 'read' | null;
+}
+
+export type ProfileType = 'user' | 'org';
+
+export interface UserOrOrgProfile {
+  type: ProfileType;
+  username: string;
+  displayName: string | null;
+  repoCount?: number | null;
+  orgCount?: number | null;
+  memberCount?: number | null;
+  viewerIsSelf?: boolean;
+  viewerIsMember?: boolean;
+  viewerIsOwner?: boolean;
+}
+
+export interface OrgSummary {
+  username: string;
+  displayName: string | null;
+}
+
+export interface OrgMember {
+  email: string;
+  username: string | null;
+  role: 'owner' | 'member';
+}
+
+export interface Collaborator {
+  email: string;
+  role: 'admin' | 'write' | 'read';
 }
 
 export interface BranchesResponse {
