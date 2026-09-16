@@ -28,8 +28,8 @@ function createApiFakeDb() {
             (state.tokens.find((t) => t.token_hash === params[0] && (t.expires_at as number) > (params[1] as number)) ?? null) as T | null,
           );
         }
-        if (q.includes('FROM users WHERE email = ?')) {
-          return Promise.resolve((state.users.find((u) => u.email === params[0]) ?? null) as T | null);
+        if (q.includes('FROM users WHERE email = ?') || q.includes('FROM users WHERE lower(email)')) {
+          return Promise.resolve((state.users.find((u) => String(u.email).toLowerCase() === String(params[0]).toLowerCase()) ?? null) as T | null);
         }
         if (q.includes('COALESCE(MAX(number)')) {
           const max = state.issues.filter((i) => i.repository_id === params[0]).reduce((m, i) => Math.max(m, i.number as number), 0);
@@ -43,8 +43,8 @@ function createApiFakeDb() {
         return Promise.resolve(null);
       },
       all<T>(): Promise<{ results: T[] }> {
-        if (q.includes('FROM repositories WHERE owner_email = ?')) {
-          return Promise.resolve({ results: state.repos.filter((r) => r.owner_email === params[0]) as T[] });
+        if (q.includes('FROM repositories WHERE owner_email = ?') || q.includes('FROM repositories WHERE lower(owner_email)')) {
+          return Promise.resolve({ results: state.repos.filter((r) => String(r.owner_email).toLowerCase() === String(params[0]).toLowerCase()) as T[] });
         }
         if (q.includes('FROM issues WHERE repository_id = ?')) {
           return Promise.resolve({
@@ -60,8 +60,10 @@ function createApiFakeDb() {
               .sort((a, b) => (a.created_at as number) - (b.created_at as number)) as T[],
           });
         }
-        if (q.includes('FROM user_access_tokens WHERE user_email = ?')) {
-          return Promise.resolve({ results: state.tokens.filter((t) => t.user_email === params[0]) as T[] });
+        if (q.includes('FROM user_access_tokens WHERE') && q.includes('user_email')) {
+          return Promise.resolve({
+            results: state.tokens.filter((t) => String(t.user_email).toLowerCase() === String(params[0]).toLowerCase()) as T[],
+          });
         }
         return Promise.resolve({ results: [] });
       },
@@ -82,7 +84,9 @@ function createApiFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('DELETE FROM user_access_tokens WHERE token_id = ?')) {
-          state.tokens = state.tokens.filter((t) => !(t.token_id === params[0] && t.user_email === params[1]));
+          state.tokens = state.tokens.filter(
+            (t) => !(t.token_id === params[0] && String(t.user_email).toLowerCase() === String(params[1]).toLowerCase()),
+          );
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.includes('DELETE FROM user_access_tokens') && q.includes('expires_at < ?')) {

@@ -113,12 +113,13 @@ class RepoService {
 
     const ownerCi = normalizedOwner.toLowerCase();
     const callerCi = await this.resolveCallerUsernameCi(userEmail);
+    const callerEmail = userEmail.toLowerCase();
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const id = UUIDUtil.getRandomUUID();
 
     // Self-owned fast path (covers legacy fakes with no users/orgs tables).
     if (callerCi && ownerCi === callerCi) {
-      await dao.create({ id, ownerEmail: userEmail, owner: normalizedOwner, name, description, isPrivate, now, ownerType: 'user', ownerUserEmail: userEmail });
+      await dao.create({ id, ownerEmail: callerEmail, owner: normalizedOwner, name, description, isPrivate, now, ownerType: 'user', ownerUserEmail: callerEmail });
       return { id };
     }
 
@@ -134,7 +135,7 @@ class RepoService {
       let membership: { role: string } | null = null;
       try {
         const memberDao = await this.deps.organizationMemberDAO();
-        membership = await memberDao.get(org.id, userEmail);
+        membership = await memberDao.get(org.id, callerEmail);
       } catch {
         membership = null;
       }
@@ -143,7 +144,7 @@ class RepoService {
       }
       await dao.create({
         id,
-        ownerEmail: userEmail,
+        ownerEmail: callerEmail,
         owner: org.username,
         name,
         description,
@@ -161,14 +162,14 @@ class RepoService {
     try {
       const nsDao = await this.deps.namespaceDAO();
       const ns = await nsDao.get(ownerCi);
-      if (ns && ns.user_email !== userEmail.toLowerCase()) {
+      if (ns?.user_email && ns.user_email.toLowerCase() !== callerEmail) {
         throw new ForbiddenError('Only the repository owner can perform this action');
       }
     } catch (error) {
       if (error instanceof ForbiddenError) throw error;
       // missing namespaces table → allow legacy free-form owner
     }
-    await dao.create({ id, ownerEmail: userEmail, owner: normalizedOwner, name, description, isPrivate, now, ownerType: 'user', ownerUserEmail: userEmail });
+    await dao.create({ id, ownerEmail: callerEmail, owner: normalizedOwner, name, description, isPrivate, now, ownerType: 'user', ownerUserEmail: callerEmail });
     return { id };
   }
 

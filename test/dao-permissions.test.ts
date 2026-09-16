@@ -25,22 +25,22 @@ function createPermFakeDb() {
         if (q.includes('FROM organizations WHERE id = ?')) {
           return Promise.resolve((state.orgs.find((o) => o.id === params[0]) ?? null) as T | null);
         }
-        if (q.includes('FROM organization_members WHERE org_id = ? AND user_email = ?')) {
+        if (q.includes('FROM organization_members WHERE org_id = ? AND') && q.includes('user_email')) {
           return Promise.resolve(
-            (state.members.find((m) => m.org_id === params[0] && m.user_email === params[1]) ?? null) as T | null,
+            (state.members.find((m) => m.org_id === params[0] && String(m.user_email).toLowerCase() === String(params[1]).toLowerCase()) ?? null) as T | null,
           );
         }
         if (q.includes('COUNT(*) AS n FROM organization_members')) {
           const n = state.members.filter((m) => m.org_id === params[0] && m.role === 'owner').length;
           return Promise.resolve({ n } as unknown as T);
         }
-        if (q.includes('FROM repo_collaborators WHERE repo_id = ? AND user_email = ?')) {
+        if (q.includes('FROM repo_collaborators WHERE repo_id = ? AND') && q.includes('user_email')) {
           return Promise.resolve(
-            (state.collabs.find((c) => c.repo_id === params[0] && c.user_email === params[1]) ?? null) as T | null,
+            (state.collabs.find((c) => c.repo_id === params[0] && String(c.user_email).toLowerCase() === String(params[1]).toLowerCase()) ?? null) as T | null,
           );
         }
-        if (q.includes('FROM users WHERE email = ?')) {
-          return Promise.resolve((state.users.find((u) => u.email === params[0]) ?? null) as T | null);
+        if (q.includes('FROM users WHERE email = ?') || q.includes('FROM users WHERE lower(email)')) {
+          return Promise.resolve((state.users.find((u) => String(u.email).toLowerCase() === String(params[0]).toLowerCase()) ?? null) as T | null);
         }
         if (q.includes('FROM users WHERE lower(username) = ?')) {
           return Promise.resolve(
@@ -64,20 +64,26 @@ function createPermFakeDb() {
         if (q.includes('FROM organization_members WHERE org_id = ?')) {
           return Promise.resolve({ results: state.members.filter((m) => m.org_id === params[0]) as T[] });
         }
-        if (q.includes('FROM organization_members WHERE user_email = ?')) {
-          return Promise.resolve({ results: state.members.filter((m) => m.user_email === params[0]) as T[] });
+        if (q.includes('FROM organization_members WHERE') && q.includes('user_email')) {
+          return Promise.resolve({
+            results: state.members.filter((m) => String(m.user_email).toLowerCase() === String(params[0]).toLowerCase()) as T[],
+          });
         }
         if (q.includes('FROM repo_collaborators WHERE repo_id = ?')) {
           return Promise.resolve({ results: state.collabs.filter((c) => c.repo_id === params[0]) as T[] });
         }
-        if (q.includes('FROM repo_collaborators WHERE user_email = ?')) {
-          return Promise.resolve({ results: state.collabs.filter((c) => c.user_email === params[0]) as T[] });
+        if (q.includes('FROM repo_collaborators WHERE') && q.includes('user_email')) {
+          return Promise.resolve({
+            results: state.collabs.filter((c) => String(c.user_email).toLowerCase() === String(params[0]).toLowerCase()) as T[],
+          });
         }
         if (q.includes('FROM repositories WHERE org_id = ?')) {
           return Promise.resolve({ results: state.repos.filter((r) => r.org_id === params[0]) as T[] });
         }
         if (q.includes('JOIN repo_collaborators')) {
-          const ids = new Set(state.collabs.filter((c) => c.user_email === params[0]).map((c) => c.repo_id));
+          const ids = new Set(
+            state.collabs.filter((c) => String(c.user_email).toLowerCase() === String(params[0]).toLowerCase()).map((c) => c.repo_id),
+          );
           return Promise.resolve({ results: state.repos.filter((r) => ids.has(r.id)) as T[] });
         }
         if (q.includes('FROM repositories WHERE lower(owner) = ?')) {
@@ -86,8 +92,10 @@ function createPermFakeDb() {
         if (q.includes('FROM repositories WHERE owner = ?')) {
           return Promise.resolve({ results: state.repos.filter((r) => r.owner === params[0]) as T[] });
         }
-        if (q.includes('FROM repositories WHERE owner_email = ?')) {
-          return Promise.resolve({ results: state.repos.filter((r) => r.owner_email === params[0]) as T[] });
+        if (q.includes('FROM repositories WHERE owner_email = ?') || q.includes('FROM repositories WHERE lower(owner_email)')) {
+          return Promise.resolve({
+            results: state.repos.filter((r) => String(r.owner_email).toLowerCase() === String(params[0]).toLowerCase()) as T[],
+          });
         }
         return Promise.resolve({ results: [] });
       },
@@ -133,13 +141,26 @@ function createPermFakeDb() {
         }
         if (q.startsWith('INSERT INTO organization_members')) {
           const [org_id, user_email, role, created_at] = params as Array<string | number>;
-          const existing = state.members.find((m) => m.org_id === org_id && m.user_email === user_email);
+          const normalized = String(user_email).toLowerCase();
+          // Collapse legacy case-variant duplicates like the real DAO.
+          state.members = state.members.filter(
+            (m) => !(m.org_id === org_id && String(m.user_email).toLowerCase() === normalized && m.user_email !== normalized),
+          );
+          const existing = state.members.find((m) => m.org_id === org_id && m.user_email === normalized);
           if (existing) existing.role = role;
-          else state.members.push({ org_id, user_email, role, created_at });
+          else state.members.push({ org_id, user_email: normalized, role, created_at });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
-        if (q.startsWith('DELETE FROM organization_members WHERE org_id = ? AND user_email = ?')) {
-          state.members = state.members.filter((m) => !(m.org_id === params[0] && m.user_email === params[1]));
+        if (q.startsWith('DELETE FROM organization_members WHERE org_id = ? AND') && q.includes('user_email')) {
+          if (params.length >= 3) {
+            state.members = state.members.filter(
+              (m) => !(m.org_id === params[0] && String(m.user_email).toLowerCase() === String(params[1]).toLowerCase() && m.user_email !== params[2]),
+            );
+          } else {
+            state.members = state.members.filter(
+              (m) => !(m.org_id === params[0] && String(m.user_email).toLowerCase() === String(params[1]).toLowerCase()),
+            );
+          }
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('DELETE FROM organization_members WHERE org_id = ?')) {
@@ -148,15 +169,28 @@ function createPermFakeDb() {
         }
         if (q.startsWith('INSERT INTO repo_collaborators')) {
           const [repo_id, user_email, role, granted_by, created_at] = params as Array<string | number | null>;
-          const existing = state.collabs.find((c) => c.repo_id === repo_id && c.user_email === user_email);
+          const normalized = String(user_email).toLowerCase();
+          const normalizedGrant = granted_by == null ? null : String(granted_by).toLowerCase();
+          state.collabs = state.collabs.filter(
+            (c) => !(c.repo_id === repo_id && String(c.user_email).toLowerCase() === normalized && c.user_email !== normalized),
+          );
+          const existing = state.collabs.find((c) => c.repo_id === repo_id && c.user_email === normalized);
           if (existing) {
             existing.role = role;
-            existing.granted_by = granted_by;
-          } else state.collabs.push({ repo_id, user_email, role, granted_by, created_at });
+            existing.granted_by = normalizedGrant;
+          } else state.collabs.push({ repo_id, user_email: normalized, role, granted_by: normalizedGrant, created_at });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
-        if (q.startsWith('DELETE FROM repo_collaborators WHERE repo_id = ? AND user_email = ?')) {
-          state.collabs = state.collabs.filter((c) => !(c.repo_id === params[0] && c.user_email === params[1]));
+        if (q.startsWith('DELETE FROM repo_collaborators WHERE repo_id = ? AND') && q.includes('user_email')) {
+          if (params.length >= 3) {
+            state.collabs = state.collabs.filter(
+              (c) => !(c.repo_id === params[0] && String(c.user_email).toLowerCase() === String(params[1]).toLowerCase() && c.user_email !== params[2]),
+            );
+          } else {
+            state.collabs = state.collabs.filter(
+              (c) => !(c.repo_id === params[0] && String(c.user_email).toLowerCase() === String(params[1]).toLowerCase()),
+            );
+          }
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('DELETE FROM repo_collaborators WHERE repo_id = ?')) {
@@ -265,6 +299,20 @@ describe('OrganizationMemberDAO', () => {
     await expect(dao.countOwners('o1')).resolves.toBe(1);
     await dao.deleteByOrg('o1');
     await expect(dao.listByOrg('o1')).resolves.toHaveLength(0);
+  });
+
+  it('matches emails case-insensitively and collapses case variants', async () => {
+    const { db } = createPermFakeDb();
+    const dao = new OrganizationMemberDAO(db);
+    await dao.upsert('o1', 'Owner@X.Co', 'owner', 1);
+    await expect(dao.get('o1', 'owner@x.co')).resolves.toMatchObject({ role: 'owner' });
+    await expect(dao.get('o1', 'OWNER@X.CO')).resolves.toMatchObject({ role: 'owner' });
+    await expect(dao.listOrgsByUser('OWNER@x.co')).resolves.toHaveLength(1);
+    await dao.upsert('o1', 'owner@x.co', 'member', 2);
+    await expect(dao.listByOrg('o1')).resolves.toHaveLength(1);
+    await expect(dao.get('o1', 'OWNER@X.CO')).resolves.toMatchObject({ role: 'member' });
+    await dao.remove('o1', 'OWNER@X.CO');
+    await expect(dao.get('o1', 'owner@x.co')).resolves.toBeNull();
   });
 });
 

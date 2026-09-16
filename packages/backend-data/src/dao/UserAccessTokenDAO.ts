@@ -36,7 +36,7 @@ class UserAccessTokenDAO extends BaseDAO {
           .prepare(
             'INSERT INTO user_access_tokens (token_id, user_email, token_hash, name, expires_at, last_used_at, created_at) VALUES (?, ?, ?, ?, ?, NULL, ?)',
           )
-          .bind(tokenId, userEmail, tokenHash, name, expiresAt, now)
+          .bind(tokenId, userEmail.toLowerCase(), tokenHash, name, expiresAt, now)
           .run(),
       'create access token',
     );
@@ -52,7 +52,7 @@ class UserAccessTokenDAO extends BaseDAO {
 
   public async getByUserEmail(userEmail: string): Promise<UserAccessTokenMetadata[]> {
     const result = await this.database
-      .prepare('SELECT * FROM user_access_tokens WHERE user_email = ? ORDER BY created_at DESC')
+      .prepare('SELECT * FROM user_access_tokens WHERE lower(user_email) = lower(?) ORDER BY created_at DESC')
       .bind(userEmail)
       .all<TokenRow>();
     return (result.results ?? []).map(toMetadata);
@@ -67,7 +67,7 @@ class UserAccessTokenDAO extends BaseDAO {
 
   public async delete(tokenId: string, userEmail: string): Promise<void> {
     await this.withRetry(
-      () => this.database.prepare('DELETE FROM user_access_tokens WHERE token_id = ? AND user_email = ?').bind(tokenId, userEmail).run(),
+      () => this.database.prepare('DELETE FROM user_access_tokens WHERE token_id = ? AND lower(user_email) = lower(?)').bind(tokenId, userEmail).run(),
       'delete access token',
     );
   }

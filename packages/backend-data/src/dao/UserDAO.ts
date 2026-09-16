@@ -47,7 +47,7 @@ class UserDAO extends BaseDAO {
   }
 
   public async getByEmail(email: string): Promise<UserRow | null> {
-    return this.database.prepare('SELECT * FROM users WHERE email = ? LIMIT 1').bind(email).first<UserRow>();
+    return this.database.prepare('SELECT * FROM users WHERE lower(email) = lower(?) LIMIT 1').bind(email).first<UserRow>();
   }
 
   public async getByUsernameCi(usernameCi: string): Promise<UserRow | null> {

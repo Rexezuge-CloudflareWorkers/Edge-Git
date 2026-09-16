@@ -26,7 +26,8 @@ function registerUserProfileRoutes(app: UserApp): void {
   app.get('/users/:username', async (c) => {
     const username = c.req.param('username');
     const scope = createRequestScope(c.env);
-    const viewerEmail = await resolvePublicViewer(c as never).catch(() => null);
+    const rawViewer = await resolvePublicViewer(c as never).catch(() => null);
+    const viewerEmail = rawViewer?.toLowerCase() ?? null;
     const user = await scope.get(Tokens.UserService).getByUsername(username).catch(() => null);
     if (user?.username) {
       const permission = scope.get(Tokens.PermissionService);
@@ -136,7 +137,8 @@ function registerUserProfileRoutes(app: UserApp): void {
     const username = c.req.param('username');
     const limit = parseLimit(c.req.url);
     const scope = createRequestScope(c.env);
-    const viewerEmail = await resolvePublicViewer(c as never).catch(() => null);
+    const rawViewer = await resolvePublicViewer(c as never).catch(() => null);
+    const viewerEmail = rawViewer?.toLowerCase() ?? null;
     const permission = scope.get(Tokens.PermissionService);
     const user = await scope.get(Tokens.UserService).getByUsername(username).catch(() => null);
     if (user?.username) {
@@ -181,7 +183,8 @@ function registerUserProfileRoutes(app: UserApp): void {
   app.get('/users/:username/orgs', async (c) => {
     const username = c.req.param('username');
     const scope = createRequestScope(c.env);
-    const viewerEmail = await resolvePublicViewer(c as never).catch(() => null);
+    const rawViewer = await resolvePublicViewer(c as never).catch(() => null);
+    const viewerEmail = rawViewer?.toLowerCase() ?? null;
     const user = await scope.get(Tokens.UserService).getByUsername(username).catch(() => null);
     if (!user?.username) return c.json({ error: 'Not found' }, 404);
     const orgService = scope.get(Tokens.OrganizationService);

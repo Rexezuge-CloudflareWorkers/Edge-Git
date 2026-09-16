@@ -24,8 +24,9 @@ export async function createOrg(input: { username: string; displayName?: string 
   return apiPost<OrgSummary>('/user/orgs', input);
 }
 
-export async function loadOrgAuthed(org: string): Promise<{ username: string; displayName: string | null; members: OrgMember[] }> {
-  return apiGet(`/user/orgs/${encodeURIComponent(org)}`);
+export async function loadOrgAuthed(org: string): Promise<{ id?: string; username: string; displayName: string | null; members: OrgMember[]; viewerRole: 'owner' | 'member' | null }> {
+  const data = await apiGet<{ id?: string; username: string; displayName: string | null; members?: OrgMember[]; viewerRole?: 'owner' | 'member' | null }>(`/user/orgs/${encodeURIComponent(org)}`);
+  return { id: data.id, username: data.username, displayName: data.displayName ?? null, members: data.members ?? [], viewerRole: data.viewerRole ?? null };
 }
 
 export async function updateOrg(org: string, patch: { displayName?: string | null; username?: string }): Promise<OrgSummary> {
