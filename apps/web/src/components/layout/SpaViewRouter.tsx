@@ -13,6 +13,7 @@ import { SettingsView } from '../../views/SettingsView';
 
 interface SpaViewRouterProps {
   user: CurrentUser | null;
+  setUser: (user: CurrentUser) => void;
   authorized: boolean | null;
   showNotice: (type: 'success' | 'error', text: string) => void;
   defaultOwner: string;
@@ -22,7 +23,7 @@ interface SpaViewRouterProps {
  * Route switch extracted from `SpaApp` so the shell stays a thin composition
  * root. Props are the already-composed hook slices; no data fetching here.
  */
-function SpaViewRouter({ user, authorized, showNotice, defaultOwner }: SpaViewRouterProps) {
+function SpaViewRouter({ user, setUser, authorized, showNotice, defaultOwner }: SpaViewRouterProps) {
   const { t } = useTranslation();
   return (
     <Routes>
@@ -46,7 +47,7 @@ function SpaViewRouter({ user, authorized, showNotice, defaultOwner }: SpaViewRo
         path="/settings"
         element={
           user ? (
-            <SettingsView user={user} showNotice={showNotice} />
+            <SettingsView user={user} setUser={setUser} showNotice={showNotice} />
           ) : (
             <div className="max-w-7xl mx-auto px-6 py-8">
               <Unauthorized message={t('errors.signInToManage', 'Sign In To Manage Settings.')} />

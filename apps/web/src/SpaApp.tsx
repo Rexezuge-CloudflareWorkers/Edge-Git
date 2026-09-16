@@ -49,7 +49,8 @@ export default function SpaApp() {
     );
   }
 
-  const defaultOwner = user ? user.email.split('@', 1)[0] : '';
+  const ownerFromEmail = user ? user.email.split('@', 1)[0] : '';
+  const defaultOwner = user?.username?.trim() ? user.username : ownerFromEmail;
 
   return (
     <div className="min-h-screen bg-[var(--color-surface-base)] text-[var(--color-text-primary)]">
@@ -62,7 +63,7 @@ export default function SpaApp() {
       />
       {notice && <NoticeBar notice={notice} />}
 
-      <SpaViewRouter user={user} authorized={authorized} showNotice={showNotice} defaultOwner={defaultOwner} />
+      <SpaViewRouter user={user} setUser={setUser} authorized={authorized} showNotice={showNotice} defaultOwner={defaultOwner} />
     </div>
   );
 }

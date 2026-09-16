@@ -121,7 +121,15 @@
   "settings": {
     "userSettings": "用户设置",
     "profile": "个人资料",
-    "email": "邮箱"
+    "email": "邮箱",
+    "general": "通用",
+    "displayName": "显示名称",
+    "displayNamePlaceholder": "你的显示名称",
+    "username": "用户名",
+    "usernamePlaceholder": "your-username",
+    "renameHint": "重命名将更改你名下所有仓库地址。",
+    "settingsUpdated": "个人资料已更新。",
+    "failedToUpdate": "更新个人资料失败。"
   },
   "tokens": {
     "personalAccessTokens": "个人访问令牌",

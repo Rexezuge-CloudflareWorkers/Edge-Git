@@ -121,7 +121,15 @@
   "settings": {
     "userSettings": "User Settings",
     "profile": "Profile",
-    "email": "Email"
+    "email": "Email",
+    "general": "General",
+    "displayName": "Display Name",
+    "displayNamePlaceholder": "Your Display Name",
+    "username": "Username",
+    "usernamePlaceholder": "your-username",
+    "renameHint": "Renaming Changes All Repository URLs Under Your Account.",
+    "settingsUpdated": "Profile Settings Updated.",
+    "failedToUpdate": "Failed To Update Profile."
   },
   "tokens": {
     "personalAccessTokens": "Personal Access Tokens",
