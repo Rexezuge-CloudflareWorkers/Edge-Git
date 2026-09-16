@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { CompareResult } from '../types';
@@ -27,14 +27,21 @@ export function CompareView({
   const [missing, setMissing] = useState(false);
 
   const useAuthed = authorized === true;
+  const repoIsPrivate = repoData?.isPrivate === true;
+  // Same-key auth-upgrade skip as CommitsView.
+  const loadedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (status !== 'ready' || !base || !head) return;
+    const key = `${owner}/${repo}/${base}/${head}`;
+    if (useAuthed && !repoIsPrivate && loadedKeyRef.current === key) return;
     let cancelled = false;
     const authOpt = useAuthed ? { isAuthed: true as const } : { isAuthed: false as const };
     loadCompare(owner, repo, base, head, authOpt)
       .then((d) => {
-        if (!cancelled) setDiff(d);
+        if (cancelled) return;
+        loadedKeyRef.current = key;
+        setDiff(d);
       })
       .catch((error) => {
         if (cancelled) return;
@@ -48,7 +55,7 @@ export function CompareView({
     return () => {
       cancelled = true;
     };
-  }, [owner, repo, base, head, status, showNotice, t, useAuthed]);
+  }, [owner, repo, base, head, status, showNotice, t, useAuthed, repoIsPrivate]);
 
   if (status === 'loading' && !repoData) {
     return (

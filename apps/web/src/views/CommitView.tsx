@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { CommitDiffResult } from '../types';
@@ -25,9 +25,16 @@ export function CommitView({
   const [missing, setMissing] = useState(false);
 
   const useAuthed = authorized === true;
+  const repoIsPrivate = repoData?.isPrivate === true;
+  // Same-key auth-upgrade skip as CommitsView: public and authed diffs are
+  // identical for servable repos. Only set on success with a commit, so a
+  // public 404 (private repo) still retries authed.
+  const loadedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (status !== 'ready') return;
+    const key = `${owner}/${repo}/${oid}`;
+    if (useAuthed && !repoIsPrivate && loadedKeyRef.current === key) return;
     let cancelled = false;
     const authOpt = useAuthed ? { isAuthed: true as const } : { isAuthed: false as const };
     loadCommit(owner, repo, oid, authOpt)
@@ -37,6 +44,7 @@ export function CommitView({
           setMissing(true);
           return;
         }
+        loadedKeyRef.current = key;
         setDiff(d);
       })
       .catch((error) => {
@@ -51,7 +59,7 @@ export function CommitView({
     return () => {
       cancelled = true;
     };
-  }, [owner, repo, oid, status, showNotice, t, useAuthed]);
+  }, [owner, repo, oid, status, showNotice, t, useAuthed, repoIsPrivate]);
 
   if (status === 'loading' && !repoData) {
     return (
