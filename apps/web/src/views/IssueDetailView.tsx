@@ -24,11 +24,10 @@ export function IssueDetailView({
   const issueNumber = Number(number);
 
   useEffect(() => {
-    if (authorized === null) return;
     let cancelled = false;
     const run = async () => {
-      // Authenticated first (own + shared repos), then anonymous public.
-      if (authorized) {
+      // Speculative public load; upgrade to authed when `authorized` is true.
+      if (authorized === true) {
         try {
           const data = await loadRepoAuthed(owner, repo);
           if (!cancelled) {
@@ -49,6 +48,7 @@ export function IssueDetailView({
         }
       } catch (error) {
         if (cancelled) return;
+        if (authorized === null) return;
         const message = error instanceof Error ? error.message : '';
         setStatus(message.includes('404') || message.includes('Not found') ? 'missing' : 'forbidden');
       }
@@ -59,7 +59,7 @@ export function IssueDetailView({
     };
   }, [owner, repo, authorized]);
 
-  if (status === 'loading' || authorized === null) {
+  if (status === 'loading' && !repoData) {
     return (
       <div className="min-h-64 flex items-center justify-center">
         <div className="h-10 w-10 rounded-full border-2 border-[var(--color-accent)] border-t-transparent animate-spin" />

@@ -27,7 +27,8 @@ export function CommitView({
   useEffect(() => {
     if (status !== 'ready') return;
     let cancelled = false;
-    loadCommit(owner, repo, oid)
+    const authOpt = authorized === true ? { isAuthed: true as const } : { isAuthed: false as const };
+    loadCommit(owner, repo, oid, authOpt)
       .then((d) => {
         if (cancelled) return;
         if (!d.commit) {
@@ -48,9 +49,9 @@ export function CommitView({
     return () => {
       cancelled = true;
     };
-  }, [owner, repo, oid, status, showNotice, t]);
+  }, [owner, repo, oid, status, showNotice, t, authorized]);
 
-  if (status === 'loading' || authorized === null) {
+  if (status === 'loading' && !repoData) {
     return (
       <div className="min-h-64 flex items-center justify-center">
         <div className="h-10 w-10 rounded-full border-2 border-[var(--color-accent)] border-t-transparent animate-spin" />

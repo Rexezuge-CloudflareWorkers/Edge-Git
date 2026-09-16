@@ -46,7 +46,12 @@ export async function loadRepoPublic(owner: string, repo: string): Promise<Repo>
   return apiGet<Repo>(publicBase(owner, repo));
 }
 
-async function tryAuthedFirst<T>(owner: string, repo: string, authedPath: string, publicPath: string): Promise<T> {
+async function tryAuthedFirst<T>(authedPath: string, publicPath: string, isAuthed?: boolean | null): Promise<T> {
+  // Anonymous viewers hit Cloudflare Access on /user/* (302 → cross-origin
+  // login HTML → CORS failure). Skip the wasted authed attempt entirely.
+  if (isAuthed === false) {
+    return apiGet<T>(publicPath);
+  }
   try {
     return await apiGet<T>(authedPath);
   } catch {
@@ -54,12 +59,12 @@ async function tryAuthedFirst<T>(owner: string, repo: string, authedPath: string
   }
 }
 
-export async function loadBranches(owner: string, repo: string): Promise<BranchesResponse> {
-  return tryAuthedFirst(owner, repo, `${authedBase(owner, repo)}/branches`, `${publicBase(owner, repo)}/branches`);
+export async function loadBranches(owner: string, repo: string, opts?: { isAuthed?: boolean | null }): Promise<BranchesResponse> {
+  return tryAuthedFirst(`${authedBase(owner, repo)}/branches`, `${publicBase(owner, repo)}/branches`, opts?.isAuthed);
 }
 
-export async function loadTags(owner: string, repo: string): Promise<TagInfo[]> {
-  return tryAuthedFirst(owner, repo, `${authedBase(owner, repo)}/tags`, `${publicBase(owner, repo)}/tags`);
+export async function loadTags(owner: string, repo: string, opts?: { isAuthed?: boolean | null }): Promise<TagInfo[]> {
+  return tryAuthedFirst(`${authedBase(owner, repo)}/tags`, `${publicBase(owner, repo)}/tags`, opts?.isAuthed);
 }
 
 export async function createBranch(owner: string, repo: string, name: string, from?: string): Promise<{ branch?: string; ref?: string; oid?: string }> {
@@ -110,43 +115,64 @@ export async function deleteFile(
   return apiDelete<FileCommitResult>(url);
 }
 
-export async function loadTree(owner: string, repo: string, ref?: string, path?: string): Promise<TreeEntry[]> {
-  return tryAuthedFirst(
-    owner,
-    repo,
-    `${authedBase(owner, repo)}/tree${toQuery({ ref, path })}`,
-    `${publicBase(owner, repo)}/tree${toQuery({ ref, path })}`,
-  );
+export async function loadTree(
+  owner: string,
+  repo: string,
+  ref?: string,
+  path?: string,
+  opts?: { isAuthed?: boolean | null; withLastCommit?: boolean },
+): Promise<TreeEntry[]> {
+  const query = toQuery({ ref, path, withLastCommit: opts?.withLastCommit === false ? '0' : opts?.withLastCommit === true ? '1' : undefined });
+  return tryAuthedFirst(`${authedBase(owner, repo)}/tree${query}`, `${publicBase(owner, repo)}/tree${query}`, opts?.isAuthed);
 }
 
-export async function loadBlob(owner: string, repo: string, path: string, ref?: string): Promise<BlobResponse | null> {
+export async function loadBlob(
+  owner: string,
+  repo: string,
+  path: string,
+  ref?: string,
+  opts?: { isAuthed?: boolean | null },
+): Promise<BlobResponse | null> {
   return tryAuthedFirst(
-    owner,
-    repo,
     `${authedBase(owner, repo)}/blob${toQuery({ ref, path })}`,
     `${publicBase(owner, repo)}/blob${toQuery({ ref, path })}`,
+    opts?.isAuthed,
   );
 }
 
-export async function loadCommits(owner: string, repo: string, ref?: string, depth = 20): Promise<GitCommit[]> {
+export async function loadCommits(
+  owner: string,
+  repo: string,
+  ref?: string,
+  depth = 20,
+  opts?: { isAuthed?: boolean | null },
+): Promise<GitCommit[]> {
   return tryAuthedFirst(
-    owner,
-    repo,
     `${authedBase(owner, repo)}/commits${toQuery({ ref, depth: String(depth) })}`,
     `${publicBase(owner, repo)}/commits${toQuery({ ref, depth: String(depth) })}`,
+    opts?.isAuthed,
   );
 }
 
-export async function loadCommit(owner: string, repo: string, oid: string): Promise<CommitDiffResult> {
-  return tryAuthedFirst(owner, repo, `${authedBase(owner, repo)}/commits/${encodeURIComponent(oid)}`, `${publicBase(owner, repo)}/commits/${encodeURIComponent(oid)}`);
+export async function loadCommit(owner: string, repo: string, oid: string, opts?: { isAuthed?: boolean | null }): Promise<CommitDiffResult> {
+  return tryAuthedFirst(
+    `${authedBase(owner, repo)}/commits/${encodeURIComponent(oid)}`,
+    `${publicBase(owner, repo)}/commits/${encodeURIComponent(oid)}`,
+    opts?.isAuthed,
+  );
 }
 
-export async function loadCompare(owner: string, repo: string, base: string, head: string): Promise<CompareResult> {
+export async function loadCompare(
+  owner: string,
+  repo: string,
+  base: string,
+  head: string,
+  opts?: { isAuthed?: boolean | null },
+): Promise<CompareResult> {
   return tryAuthedFirst(
-    owner,
-    repo,
     `${authedBase(owner, repo)}/compare${toQuery({ base, head })}`,
     `${publicBase(owner, repo)}/compare${toQuery({ base, head })}`,
+    opts?.isAuthed,
   );
 }
 

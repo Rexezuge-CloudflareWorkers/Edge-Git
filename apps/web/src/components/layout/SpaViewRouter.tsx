@@ -30,6 +30,31 @@ interface SpaViewRouterProps {
  */
 function SpaViewRouter({ user, setUser, authorized, showNotice, defaultOwner }: SpaViewRouterProps) {
   const { t } = useTranslation();
+  // Auth is still resolving — repo routes render speculatively with public
+  // data (see RepoView/useRepoData), but owner-gated routes stay on a
+  // spinner to avoid flashing Landing/Unauthorized to signed-in users.
+  if (authorized === null) {
+    return (
+      <Routes>
+        <Route path="/:owner/:repo/issues/:number" element={<IssueDetailView authorized={authorized} showNotice={showNotice} />} />
+        <Route path="/search" element={<SearchView showNotice={showNotice} />} />
+        <Route path="/:owner/:repo/pulls/:number" element={<PullDetailView authorized={authorized} showNotice={showNotice} />} />
+        <Route path="/:owner/:repo/commit/:oid" element={<CommitView authorized={authorized} showNotice={showNotice} />} />
+        <Route path="/:owner/:repo/compare" element={<CompareView authorized={authorized} showNotice={showNotice} />} />
+        <Route path="/:owner/:repo/commits" element={<CommitsView authorized={authorized} showNotice={showNotice} />} />
+        <Route path="/:owner/:repo" element={<RepoView authorized={authorized} showNotice={showNotice} defaultOwner={defaultOwner} />} />
+        <Route path="/:username" element={<ProfileView showNotice={showNotice} />} />
+        <Route
+          path="*"
+          element={
+            <div className="min-h-screen bg-[var(--color-surface-base)] flex items-center justify-center">
+              <div className="h-10 w-10 rounded-full border-2 border-[var(--color-accent)] border-t-transparent animate-spin" />
+            </div>
+          }
+        />
+      </Routes>
+    );
+  }
   return (
     <Routes>
       <Route path="/" element={user ? <DashboardView showNotice={showNotice} /> : <LandingView />} />

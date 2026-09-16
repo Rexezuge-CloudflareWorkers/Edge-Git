@@ -29,7 +29,8 @@ export function CompareView({
   useEffect(() => {
     if (status !== 'ready' || !base || !head) return;
     let cancelled = false;
-    loadCompare(owner, repo, base, head)
+    const authOpt = authorized === true ? { isAuthed: true as const } : { isAuthed: false as const };
+    loadCompare(owner, repo, base, head, authOpt)
       .then((d) => {
         if (!cancelled) setDiff(d);
       })
@@ -45,9 +46,9 @@ export function CompareView({
     return () => {
       cancelled = true;
     };
-  }, [owner, repo, base, head, status, showNotice, t]);
+  }, [owner, repo, base, head, status, showNotice, t, authorized]);
 
-  if (status === 'loading' || authorized === null) {
+  if (status === 'loading' && !repoData) {
     return (
       <div className="min-h-64 flex items-center justify-center">
         <div className="h-10 w-10 rounded-full border-2 border-[var(--color-accent)] border-t-transparent animate-spin" />

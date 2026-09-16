@@ -32,6 +32,7 @@ function registerRepoRoutes(app: RepoApp): void {
         await getRepoStub(c.env, fullName).getTree({
           ref: url.searchParams.get('ref') ?? undefined,
           path: url.searchParams.get('path') ?? undefined,
+          withLastCommit: parseWithLastCommit(url.searchParams.get('withLastCommit')),
         }),
       );
     });
@@ -202,6 +203,16 @@ function registerUserRepoRoutes(app: RepoApp): void {
 }
 
 // Read-model passthroughs (branches/tree/blob/commits) via DO RPC.
+// `withLastCommit=0|false` opts out of per-file last-commit enrichment so
+// the tree lists fast; omitted means enriched (backwards compatible).
+function parseWithLastCommit(raw: string | null): boolean | undefined {
+  if (raw === null) return undefined;
+  const v = raw.trim().toLowerCase();
+  if (v === '0' || v === 'false' || v === 'no') return false;
+  if (v === '1' || v === 'true' || v === 'yes') return true;
+  return undefined;
+}
+
 async function withVisibleRepo(c: RequestContext, owner: string, repoName: string, fn: (fullName: string) => Promise<Response>): Promise<Response> {
   const row = await requireVisibleRepo(c.env, owner, repoName, c.get('AuthenticatedUserEmailAddress'));
   if (!row) return c.json({ error: 'Not found' }, 404);
@@ -230,7 +241,13 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
       owner,
       repoName,
       async (fullName) =>
-        c.json(await getRepoStub(c.env, fullName).getTree({ ref: url.searchParams.get('ref') ?? undefined, path: url.searchParams.get('path') ?? undefined })),
+        c.json(
+          await getRepoStub(c.env, fullName).getTree({
+            ref: url.searchParams.get('ref') ?? undefined,
+            path: url.searchParams.get('path') ?? undefined,
+            withLastCommit: parseWithLastCommit(url.searchParams.get('withLastCommit')),
+          }),
+        ),
     );
   });
 

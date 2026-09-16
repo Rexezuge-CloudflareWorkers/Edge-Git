@@ -32,6 +32,7 @@ export function CodeTab({
   canWrite,
   forkOwner,
   showNotice,
+  authorized,
 }: {
   owner: string;
   repo: string;
@@ -40,6 +41,7 @@ export function CodeTab({
   canWrite: boolean;
   forkOwner: string;
   showNotice: (type: 'success' | 'error', text: string) => void;
+  authorized?: boolean | null;
 }) {
   const { t } = useTranslation();
   const [branches, setBranches] = useState<string[]>([]);
@@ -74,17 +76,20 @@ export function CodeTab({
   const editableFile = editable && !blobBinary && (blobText ?? '').length <= MAX_EDIT_CHARS;
 
   useEffect(() => {
+    let cancelled = false;
+    // `authorized !== true` (anonymous or still resolving) goes straight to
+    // the public read-model so we never pay the /user/* Access 302 + CORS
+    // round-trip. When auth resolves to true the effect re-runs via `authorized`.
+    const authOpt = authorized === true ? { isAuthed: true as const } : { isAuthed: false as const };
     const run = async () => {
       try {
-        const b = await loadBranches(owner, repo);
+        const [b, loadedTags] = await Promise.all([
+          loadBranches(owner, repo, authOpt),
+          loadTags(owner, repo, authOpt).catch(() => [] as TagInfo[]),
+        ]);
+        if (cancelled) return;
         setBranches(b.branches);
         setDefaultBranch(b.currentBranch ?? b.branches[0] ?? null);
-        let loadedTags: TagInfo[] = [];
-        try {
-          loadedTags = await loadTags(owner, repo);
-        } catch {
-          loadedTags = [];
-        }
         setTags(loadedTags);
         const tagRefs = new Set(loadedTags.map((tg) => tg.ref));
         // If the current selection no longer exists (e.g. after switching
@@ -96,20 +101,52 @@ export function CodeTab({
           setRef(resolvedRef === 'HEAD' ? '' : resolvedRef);
         }
         const effectiveRef = resolvedRef;
+        const treeRef = effectiveRef === 'HEAD' ? undefined : effectiveRef;
+        const dir = path || undefined;
+        // Fast path: tree without per-file last-commit (avoids the DO N+1
+        // getLog-per-entry) alongside the commit list, so the file list
+        // paints early. Enrichment follows lazily below.
         const [tree, log] = await Promise.all([
-          loadTree(owner, repo, effectiveRef === 'HEAD' ? undefined : effectiveRef, path || undefined),
-          loadCommits(owner, repo, effectiveRef === 'HEAD' ? undefined : effectiveRef, 10),
+          loadTree(owner, repo, treeRef, dir, { ...authOpt, withLastCommit: false }),
+          loadCommits(owner, repo, treeRef, 10, authOpt),
         ]);
+        if (cancelled) return;
         setEntries(tree);
         setCommits(log);
-      } catch (error) {
-        showNotice('error', error instanceof Error ? error.message : 'Failed To Load Repository Files.');
-      } finally {
         setLoading(false);
+        // Lazy enrichment: re-fetch with last-commit and merge by path+oid.
+        // Fire-and-forget relative to loading state so slow histories never
+        // block the file list or README.
+        try {
+          const enriched = await loadTree(owner, repo, treeRef, dir, { ...authOpt, withLastCommit: true });
+          if (cancelled) return;
+          setEntries((prev) => {
+            if (prev.length !== enriched.length) return enriched;
+            const byKey = new Map(enriched.map((e) => [`${e.oid}:${e.path}`, e.lastCommit ?? null]));
+            let changed = false;
+            const next = prev.map((e) => {
+              const lc = byKey.get(`${e.oid}:${e.path}`);
+              if (lc && !e.lastCommit) {
+                changed = true;
+                return { ...e, lastCommit: lc };
+              }
+              return e;
+            });
+            return changed ? next : prev;
+          });
+        } catch {
+          // Enrichment is best-effort; fast tree already rendered.
+        }
+      } catch (error) {
+        if (!cancelled) showNotice('error', error instanceof Error ? error.message : 'Failed To Load Repository Files.');
+        if (!cancelled) setLoading(false);
       }
     };
     void run();
-  }, [owner, repo, ref, path, showNotice, reloadKey]);
+    return () => {
+      cancelled = true;
+    };
+  }, [owner, repo, ref, path, showNotice, reloadKey, authorized]);
 
   const readmeEntry = path === '' ? entries.find((e) => e.type === 'blob' && README_NAMES.has(e.path)) : undefined;
 
@@ -117,7 +154,8 @@ export function CodeTab({
   useEffect(() => {
     if (!readmeEntry) return;
     let cancelled = false;
-    loadBlob(owner, repo, readmeEntry.path, selectedRef || undefined)
+    const authOpt = authorized === true ? { isAuthed: true as const } : { isAuthed: false as const };
+    loadBlob(owner, repo, readmeEntry.path, selectedRef || undefined, authOpt)
       .then((blob) => {
         if (cancelled || !blob || blob.isBinary) return;
         const text = decodeBlobContent(blob);
@@ -128,7 +166,7 @@ export function CodeTab({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [owner, repo, selectedRef, readmeEntry?.path]);
+  }, [owner, repo, selectedRef, readmeEntry?.path, authorized]);
 
   const visibleReadme = readmeEntry && readme && readme.path === readmeEntry.path ? readme.text : null;
 
@@ -154,7 +192,8 @@ export function CodeTab({
   const openBlob = async (entryPath: string) => {
     const fullPath = path ? `${path}/${entryPath}` : entryPath;
     try {
-      const blob = await loadBlob(owner, repo, fullPath, selectedRef || undefined);
+      const authOpt = authorized === true ? { isAuthed: true as const } : { isAuthed: false as const };
+      const blob = await loadBlob(owner, repo, fullPath, selectedRef || undefined, authOpt);
       if (!blob) {
         showNotice('error', 'File Not Found.');
         return;
