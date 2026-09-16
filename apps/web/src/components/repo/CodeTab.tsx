@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { GitBranch, Tag } from 'lucide-react';
-import type { GitCommit, Repo, TagInfo, TreeEntry } from '../../types';
+import type { GitCommit, OverviewResponse, Repo, TagInfo, TreeEntry } from '../../types';
 import { decodeBlobContent, loadBlob, loadOverview, loadTree } from '../../services/repoService';
 import { formatTimestamp } from '../../lib/format';
 import { formatDateLocale } from '../../lib/locale';
@@ -105,6 +105,22 @@ export function CodeTab({
   // `true` only for signed-in viewers: `null` (resolving) and `false`
   // share the public path so null->false never refetches.
   const useAuthed = authorized === true;
+  // Public and authed overview are the same DO payload for repos the public
+  // endpoint can serve, so an auth upgrade (null->true) must not refetch a
+  // key that already loaded (or is still loading) publicly. `key` is the last
+  // successful key, `enrichedKey` the last enriched one; inflight promises are
+  // shared instead of starting duplicate aggregate DO RPCs.
+  const overviewStateRef = useRef<{
+    key: string | null;
+    inflightKey: string | null;
+    inflight: Promise<OverviewResponse> | null;
+    enrichedKey: string | null;
+    enrichInflightKey: string | null;
+    enrichInflight: Promise<TreeEntry[]> | null;
+  }>({ key: null, inflightKey: null, inflight: null, enrichedKey: null, enrichInflightKey: null, enrichInflight: null });
+  // Read directly in the effect (dep below): public and authed overview are
+  // identical unless the repo is private.
+  const repoIsPrivate = repoMeta.isPrivate;
 
   useEffect(() => {
     let cancelled = false;
@@ -113,12 +129,43 @@ export function CodeTab({
     // resolves to true the effect re-runs via `useAuthed`.
     const authOpt = useAuthed ? { isAuthed: true as const } : { isAuthed: false as const };
     const run = async () => {
+      const key = `${owner}/${repo}/${ref}/${path}/${reloadKey}`;
+      const st = overviewStateRef.current;
+      // Auth upgrade with identical key and fresh public data: skip — the
+      // authed overview is byte-identical here (RepoView still upgrades meta
+      // for viewerRole). Private repos never populate `key` publicly.
+      if (useAuthed && !repoIsPrivate && st.key === key) return;
       try {
         // Single aggregate read (one DO RPC): branches + tags + fast tree
         // + commits + README. Replaces the sequential branches/tags/tree/
         // commits/blob waterfall that serialized on the DO input gate.
-        const overview = await loadOverview(owner, repo, ref || undefined, path || undefined, { ...authOpt, depth: 10 });
-        if (cancelled) return;
+        // A same-key public request still in flight is awaited instead of
+        // starting a second aggregate RPC.
+        const shared = useAuthed && !repoIsPrivate && st.inflightKey === key ? st.inflight : null;
+        let overview: OverviewResponse | null = null;
+        if (shared) {
+          try {
+            overview = await shared;
+          } catch {
+            overview = null;
+          }
+          if (cancelled) return;
+        }
+        if (!overview) {
+          const promise = loadOverview(owner, repo, ref || undefined, path || undefined, { ...authOpt, depth: 10 });
+          st.inflightKey = key;
+          st.inflight = promise;
+          try {
+            overview = await promise;
+          } finally {
+            if (st.inflight === promise) {
+              st.inflight = null;
+              st.inflightKey = null;
+            }
+          }
+          if (cancelled) return;
+        }
+        st.key = key;
         setBranches(overview.branches);
         setDefaultBranch(overview.currentBranch ?? overview.branches[0] ?? null);
         setTags(overview.tags);
@@ -139,13 +186,38 @@ export function CodeTab({
         setLoading(false);
         // Lazy enrichment: re-fetch with last-commit and merge by path+oid.
         // Fire-and-forget relative to loading state so slow histories never
-        // block the file list or README.
-        try {
-          const enriched = await loadTree(owner, repo, treeRef, dir, { ...authOpt, withLastCommit: true });
+        // block the file list or README. Claimed per key so the auth-upgrade
+        // run shares (or skips) instead of doubling the call.
+        const enrichKey = `${key}/${treeRef ?? ''}/${dir ?? ''}`;
+        if (st.enrichedKey !== enrichKey) {
+          const sharedEnrich = st.enrichInflightKey === enrichKey ? st.enrichInflight : null;
+          let enriched: TreeEntry[] | null = null;
+          if (sharedEnrich) {
+            try {
+              enriched = await sharedEnrich;
+            } catch {
+              enriched = null;
+            }
+          } else {
+            st.enrichInflightKey = enrichKey;
+            const enrichPromise = loadTree(owner, repo, treeRef, dir, { ...authOpt, withLastCommit: true });
+            st.enrichInflight = enrichPromise;
+            try {
+              enriched = await enrichPromise;
+            } catch {
+              enriched = null;
+            } finally {
+              if (st.enrichInflight === enrichPromise) {
+                st.enrichInflight = null;
+                st.enrichInflightKey = null;
+              }
+            }
+          }
           if (cancelled) return;
-          setEntries((prev) => mergeEnrichedEntries(prev, enriched));
-        } catch {
-          // Enrichment is best-effort; fast tree already rendered.
+          if (enriched) {
+            st.enrichedKey = enrichKey;
+            setEntries((prev) => mergeEnrichedEntries(prev, enriched));
+          }
         }
       } catch (error) {
         if (!cancelled) showNotice('error', error instanceof Error ? error.message : 'Failed To Load Repository Files.');
@@ -156,7 +228,7 @@ export function CodeTab({
     return () => {
       cancelled = true;
     };
-  }, [owner, repo, ref, path, showNotice, reloadKey, useAuthed]);
+  }, [owner, repo, ref, path, showNotice, reloadKey, useAuthed, repoIsPrivate]);
 
   const readmeEntry = path === '' ? entries.find((e) => e.type === 'blob' && README_NAMES.has(e.path)) : undefined;
 

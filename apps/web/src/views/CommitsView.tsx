@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { GitCommit } from '../types';
@@ -29,14 +29,22 @@ export function CommitsView({
   const [exhausted, setExhausted] = useState(false);
 
   const useAuthed = authorized === true;
+  const repoIsPrivate = repoData?.isPrivate === true;
+  // Public and authed commit lists are identical for servable repos: skip a
+  // same-key refetch on auth upgrade (null->true). Private repos never
+  // populate the key publicly, so the upgrade still retries.
+  const loadedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (status !== 'ready') return;
+    const key = `${owner}/${repo}/${depth}`;
+    if (useAuthed && !repoIsPrivate && loadedKeyRef.current === key) return;
     let cancelled = false;
     const authOpt = useAuthed ? { isAuthed: true as const } : { isAuthed: false as const };
     loadCommits(owner, repo, undefined, depth, authOpt)
       .then((log) => {
         if (cancelled) return;
+        loadedKeyRef.current = key;
         setCommits(log);
         if (log.length < depth) setExhausted(true);
       })
@@ -51,7 +59,7 @@ export function CommitsView({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [owner, repo, depth, status, showNotice, t, useAuthed]);
+  }, [owner, repo, depth, status, showNotice, t, useAuthed, repoIsPrivate]);
 
   if (status === 'loading' && !repoData) {
     return (
