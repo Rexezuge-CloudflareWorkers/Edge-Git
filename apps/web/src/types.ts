@@ -73,6 +73,14 @@ export interface Issue {
   updated_at: number;
 }
 
+export interface Comment {
+  id: string;
+  issue_id: string;
+  author_email: string;
+  body: string;
+  created_at: number;
+}
+
 export interface TokenMetadata {
   tokenId: string;
   name: string;

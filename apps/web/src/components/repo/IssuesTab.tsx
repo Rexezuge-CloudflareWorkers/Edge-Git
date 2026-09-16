@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { CircleDot } from 'lucide-react';
 import type { Issue } from '../../types';
 import { createIssue, listIssues } from '../../services/issueService';
@@ -8,6 +10,12 @@ import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Input, Textarea } from '../ui/Input';
 import { IssueStatusBadge } from '../ui/Badge';
 import { RefreshButton } from '../shared/RefreshButton';
+import { Markdown } from '../shared/Markdown';
+
+function excerpt(body: string, max = 500): string {
+  if (body.length <= max) return body;
+  return `${body.slice(0, max).trimEnd()}…`;
+}
 
 export function IssuesTab({
   owner,
@@ -22,6 +30,7 @@ export function IssuesTab({
   showNotice: (type: 'success' | 'error', text: string) => void;
   onCountChange?: (count: number) => void;
 }) {
+  const { t } = useTranslation();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState('');
@@ -37,13 +46,13 @@ export function IssuesTab({
         setIssues(list);
         onCountChange?.(list.length);
       } catch (error) {
-        showNotice('error', error instanceof Error ? error.message : 'Failed To Load Issues.');
+        showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadIssues', 'Failed To Load Issues.'));
       } finally {
         setLoading(false);
       }
     };
     void run();
-  }, [owner, repo, showNotice, onCountChange, reloadKey]);
+  }, [owner, repo, showNotice, onCountChange, reloadKey, t]);
 
   const refresh = () => {
     setLoading(true);
@@ -57,11 +66,11 @@ export function IssuesTab({
       await createIssue(owner, repo, { title: title.trim(), body: body.trim() || undefined });
       setTitle('');
       setBody('');
-      showNotice('success', 'Issue Created.');
+      showNotice('success', t('issues.issueCreated', 'Issue Created.'));
       setLoading(true);
       setReloadKey((k) => k + 1);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : 'Failed To Create Issue.');
+      showNotice('error', error instanceof Error ? error.message : t('errors.failedToCreateIssue', 'Failed To Create Issue.'));
     } finally {
       setSaving(false);
     }
@@ -72,13 +81,18 @@ export function IssuesTab({
       {canWrite && (
         <Card>
           <CardHeader>
-            <CardTitle>New Issue</CardTitle>
+            <CardTitle>{t('issues.newIssue', 'New Issue')}</CardTitle>
           </CardHeader>
           <form onSubmit={submit} className="space-y-3">
-            <Input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} required />
-            <Textarea placeholder="Description (optional)" value={body} onChange={(e) => setBody(e.target.value)} rows={3} />
+            <Input placeholder={t('issues.titlePlaceholder', 'Title')} value={title} onChange={(e) => setTitle(e.target.value)} required />
+            <Textarea
+              placeholder={t('issues.descriptionPlaceholder', 'Description (Optional)')}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={3}
+            />
             <Button type="submit" variant="primary" size="sm" loading={saving}>
-              Create Issue
+              {t('issues.createIssue', 'Create Issue')}
             </Button>
           </form>
         </Card>
@@ -86,13 +100,13 @@ export function IssuesTab({
 
       <Card>
         <CardHeader>
-          <CardTitle>Issues</CardTitle>
+          <CardTitle>{t('issues.issues', 'Issues')}</CardTitle>
           <RefreshButton onRefresh={refresh} loading={loading} />
         </CardHeader>
         {!loading && issues.length === 0 ? (
           <div className="text-center text-[var(--color-text-muted)] py-10 text-sm">
             <CircleDot className="h-6 w-6 mx-auto mb-3" />
-            No Issues Yet.
+            {t('issues.noIssues', 'No Issues Yet.')}
           </div>
         ) : (
           <ul className="divide-y divide-[var(--color-border)]">
@@ -100,12 +114,21 @@ export function IssuesTab({
               <li key={i.id} className="py-3 first:pt-0 last:pb-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <IssueStatusBadge status={i.status} />
-                  <span className="font-medium text-[var(--color-text-primary)]">{i.title}</span>
+                  <Link to={`/${owner}/${repo}/issues/${i.number}`} className="font-medium text-[var(--color-accent)] hover:underline">
+                    {i.title}
+                  </Link>
                   <span className="text-xs text-[var(--color-text-muted)]">#{i.number}</span>
                 </div>
-                {i.body && <p className="mt-1 text-sm text-[var(--color-text-secondary)] whitespace-pre-wrap">{i.body}</p>}
+                {i.body && (
+                  <div className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                    <Markdown content={excerpt(i.body)} />
+                  </div>
+                )}
                 <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                  Opened by {i.creator_email} · {formatTimestamp(i.created_at)}
+                  {t('issues.openedBy', 'Opened By {{email}} · {{date}}', {
+                    email: i.creator_email,
+                    date: formatTimestamp(i.created_at),
+                  })}
                 </p>
               </li>
             ))}

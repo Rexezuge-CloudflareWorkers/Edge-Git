@@ -329,6 +329,28 @@ describe('EdgeGitWorker HTTP surface', () => {
     expect(refs.status).toBe(200);
     expect(refs.headers.get('content-type')).not.toContain('text/html');
   });
+
+  it('serves the SPA shell for individual issue paths', async () => {
+    const worker = new EdgeGitWorker() as unknown as { onRequest(r: Request, e: unknown, c: unknown): Promise<Response> };
+    const db = createApiFakeDb();
+    const authedEnv = createEnv(db);
+    const anonEnv = { ...authedEnv, DEV_AUTH_EMAIL: undefined };
+    await worker.onRequest(
+      new Request('https://git.example.com/user/repos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'pub' }) }),
+      authedEnv,
+      ctx,
+    );
+    const shell = await worker.onRequest(new Request('https://git.example.com/alice/pub/issues/1'), anonEnv, ctx);
+    expect(shell.status).toBe(200);
+    expect(shell.headers.get('content-type')).toContain('text/html');
+
+    const noServeEnv = { ...anonEnv, SERVE_SPA_FROM_WORKER: 'false' };
+    const gated = await worker.onRequest(new Request('https://git.example.com/alice/pub/issues/1'), noServeEnv, ctx);
+    expect(gated.status).toBe(404);
+
+    const tooDeep = await worker.onRequest(new Request('https://git.example.com/alice/pub/issues/1/extra'), anonEnv, ctx);
+    expect(tooDeep.status).toBe(404);
+  });
 });
 
 describe('scheduled tasks', () => {
