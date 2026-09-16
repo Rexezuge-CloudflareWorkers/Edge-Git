@@ -282,11 +282,16 @@ describe('EdgeGitWorker HTTP surface', () => {
     );
 
     expect((await callAsBob('/user/repos/alice/mine', { method: 'PATCH', headers: json, body: JSON.stringify({ description: 'hijack' }) })).status).toBe(
-      403,
+      404,
     );
     expect((await call('/user/repos', { method: 'POST', headers: json, body: JSON.stringify({ name: 'ours' }) })).status).toBe(201);
     await expect(callAsBob('/user/repos/alice/ours').then((r) => r.json())).resolves.toMatchObject({ viewerCanManage: false });
-    expect((await callAsBob('/user/repos/alice/mine', { method: 'DELETE' })).status).toBe(403);
+    // Public repo reveals existence: non-admin gets 403 on write.
+    expect((await callAsBob('/user/repos/alice/ours', { method: 'PATCH', headers: json, body: JSON.stringify({ description: 'hijack' }) })).status).toBe(
+      403,
+    );
+    // Private repo hides existence from outsiders.
+    expect((await callAsBob('/user/repos/alice/mine', { method: 'DELETE' })).status).toBe(404);
 
     expect(
       (await call('/user/repos/alice/mine/issues', { method: 'POST', headers: json, body: JSON.stringify({ title: 'Gone' }) })).status,

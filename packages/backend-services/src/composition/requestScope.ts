@@ -1,4 +1,4 @@
-import { IssueDAO, RepositoryDAO, UserAccessTokenDAO, UserDAO } from '@edge-git/backend-data/dao';
+import { IssueDAO, NamespaceDAO, OrganizationDAO, OrganizationMemberDAO, RepoCollaboratorDAO, RepositoryDAO, UserAccessTokenDAO, UserDAO } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { Container } from '@edge-git/backend-runtime/di';
 import { AppConfiguration } from '@edge-git/backend-runtime/config';
@@ -10,6 +10,8 @@ import { AccessAuthService, TokenService } from '@edge-git/backend-services/auth
 import { RepoService } from '@edge-git/backend-services/repo';
 import { UserService } from '@edge-git/backend-services/user';
 import { IssueService } from '@edge-git/backend-services/issue';
+import { OrganizationService } from '@edge-git/backend-services/org';
+import { PermissionService } from '@edge-git/backend-services/permission';
 import { Tokens } from './tokens';
 
 // Minimal structural env for scope creation. Secrets are resolved lazily and
@@ -53,16 +55,35 @@ function createRequestScope(env: RequestScopeEnv): Container {
   const repositoryDAO = memoize(() => Promise.resolve(new RepositoryDAO(env.DB)));
   const tokenDAO = memoize(() => Promise.resolve(new UserAccessTokenDAO(env.DB)));
   const issueDAO = memoize(() => Promise.resolve(new IssueDAO(env.DB)));
+  const namespaceDAO = memoize(() => Promise.resolve(new NamespaceDAO(env.DB)));
+  const organizationDAO = memoize(() => Promise.resolve(new OrganizationDAO(env.DB)));
+  const organizationMemberDAO = memoize(() => Promise.resolve(new OrganizationMemberDAO(env.DB)));
+  const repoCollaboratorDAO = memoize(() => Promise.resolve(new RepoCollaboratorDAO(env.DB)));
   scope.bindValue(Tokens.UserDAO, userDAO);
   scope.bindValue(Tokens.RepositoryDAO, repositoryDAO);
   scope.bindValue(Tokens.UserAccessTokenDAO, tokenDAO);
   scope.bindValue(Tokens.IssueDAO, issueDAO);
+  scope.bindValue(Tokens.NamespaceDAO, namespaceDAO);
+  scope.bindValue(Tokens.OrganizationDAO, organizationDAO);
+  scope.bindValue(Tokens.OrganizationMemberDAO, organizationMemberDAO);
+  scope.bindValue(Tokens.RepoCollaboratorDAO, repoCollaboratorDAO);
 
   scope.bind(Tokens.AccessAuthService, () => new AccessAuthService(env as never));
   scope.bind(Tokens.TokenService, () => new TokenService(env as never, { tokenDAO }));
-  scope.bind(Tokens.RepoService, () => new RepoService(env as never, { repositoryDAO, issueDAO }));
-  scope.bind(Tokens.UserService, () => new UserService(env as never, { userDAO }));
+  scope.bind(
+    Tokens.RepoService,
+    () => new RepoService(env as never, { repositoryDAO, issueDAO, userDAO, organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO }),
+  );
+  scope.bind(Tokens.UserService, () => new UserService(env as never, { userDAO, namespaceDAO, organizationDAO, repositoryDAO }));
   scope.bind(Tokens.IssueService, () => new IssueService(env as never, { issueDAO }));
+  scope.bind(
+    Tokens.OrganizationService,
+    () => new OrganizationService(env as never, { organizationDAO, organizationMemberDAO, namespaceDAO, userDAO, repositoryDAO }),
+  );
+  scope.bind(
+    Tokens.PermissionService,
+    () => new PermissionService(env as never, { organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO }),
+  );
   // Lazy bind so unit tests mocking `@edge-git/backend-runtime/config` with
   // only `ConfigurationManager` keep working; the factory only touches the
   // mocked module when the token is actually resolved.

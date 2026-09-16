@@ -33,6 +33,7 @@ async function userAuthenticationHandler(c: RequestContext, next: Next): Promise
 export interface GitAuthResult {
   userEmail: string | null;
   repo: RepositoryRow;
+  role: 'admin' | 'write' | 'read';
 }
 
 function unauthorizedGit(): Response {
@@ -53,13 +54,15 @@ async function gitAuthForRepo(
   service: 'git-upload-pack' | 'git-receive-pack',
 ): Promise<GitAuthResult | Response> {
   const env = c.env;
-  const repo = await createRequestScope(env).get(Tokens.RepoService).getByOwnerAndName(owner, repoName);
+  const scope = createRequestScope(env);
+  const repo = await scope.get(Tokens.RepoService).getByOwnerAndName(owner, repoName);
   if (!repo) {
     // Return 401 (not 404) to avoid repo existence oracle for private repos.
     // Callers for public UI routes should handle 404 separately.
     return unauthorizedGit();
   }
-  const isPrivate = repo.is_private === 1;
+  const permission = scope.get(Tokens.PermissionService);
+  const minimum = service === 'git-upload-pack' ? 'read' : 'write';
 
   const creds = getBasicCredentials(c.req.raw);
   const bearer = getBearerToken(c.req.raw);
@@ -71,19 +74,24 @@ async function gitAuthForRepo(
   }
 
   if (!pat) {
-    // Anonymous: allowed only for public fetch/clone
-    if (!isPrivate && service === 'git-upload-pack') {
-      return { userEmail: null, repo };
+    // Anonymous: allowed only for public fetch/clone (read).
+    const role = await permission.getRole(null, repo);
+    if (role && service === 'git-upload-pack') {
+      return { userEmail: null, repo, role };
     }
     return unauthorizedGit();
   }
 
   try {
     const userEmail = await resolvePatToEmail(env, pat);
-    if (repo.owner_email !== userEmail) {
+    const role = await permission.getRole(userEmail, repo);
+    if (!role) return unauthorizedGit();
+    const rank = role === 'admin' ? 3 : role === 'write' ? 2 : 1;
+    const need = minimum === 'write' ? 2 : 1;
+    if (rank < need) {
       return new Response('Forbidden', { status: 403 });
     }
-    return { userEmail, repo };
+    return { userEmail, repo, role };
   } catch {
     return unauthorizedGit();
   }

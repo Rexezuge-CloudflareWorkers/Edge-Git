@@ -10,15 +10,15 @@ Scope: `apps/api/**`. Parent index: `../../AGENTS.md`.
 
 ## Auth
 
-- `/user/*` — Cloudflare Access via `AccessAuthService`: `DEMO_MODE` → `DEV_AUTH_EMAIL` → JWT (`cf-access-jwt-assertion` vs `TEAM_DOMAIN`/`POLICY_AUD`) → `ctx.access` fallback; upserts user on success.
-- Git Smart HTTP stays outside Access: anonymous allowed only for public `git-upload-pack`; private fetch + all `git-receive-pack` require PAT (Basic password or Bearer, `TokenService.authenticateWithPAT`, owner-only push).
-- Public read-model (`/repos/*`): anonymous OK for public repos, private → `404` (viewer resolved best-effort via Access or PAT, never throws).
+- `/user/*` — Cloudflare Access via `AccessAuthService`: `DEMO_MODE` → `DEV_AUTH_EMAIL` → JWT (`cf-access-jwt-assertion` vs `TEAM_DOMAIN`/`POLICY_AUD`) → `ctx.access` fallback; upserts user (email login, username bootstrap) on success.
+- Git Smart HTTP stays outside Access: anonymous `read` only for public `git-upload-pack`; private fetch needs `read`, all `git-receive-pack` needs `write+` via PAT (Basic password or Bearer, `TokenService.authenticateWithPAT` → `PermissionService.getRole`). Private repos hide existence (401, not 404, on git paths).
+- Public read-model (`/repos/*`): anonymous OK for public repos, private → `404` unless viewer has `read+` (viewer resolved best-effort via Access or PAT, never throws). `requireVisibleRepo`/`requireRoleForRepo` delegate to `PermissionService`.
 
 ## Routes
 
 - Git (`EdgeGitWorker`, exact matches so SPA catch-all never intercepts): `GET /:owner/:repo/info/refs?service=git-upload-pack|git-receive-pack` · `POST /:owner/:repo/git-upload-pack` (413 over fetch limit) · `POST /:owner/:repo/git-receive-pack` (413 over pack limit).
-- Public: `GET /repos/:owner/:repo|/branches|/tree|/blob|/commits|/issues|/issues/:number|/issues/:number/comments` · `GET /health` · `/docs` (Chanfana `fromHono`).
-- Protected (`/user/*`): `GET /user/me` · `GET|POST /user/repos` · `GET|PATCH|DELETE /user/repos/:owner/:repo` (+ `/branches|/tree|/blob|/commits` DO passthroughs) · `GET|POST|DELETE /user/tokens` · `GET|POST /user/repos/:owner/:repo/issues` · `GET|PATCH /user/repos/:owner/:repo/issues/:number` · `GET|POST /user/repos/:owner/:repo/issues/:number/comments`.
+- Public: `GET /repos/:owner/:repo|/branches|/tree|/blob|/commits|/issues|/issues/:number|/issues/:number/comments` · `GET /users/:username` (user or org profile) · `GET /health` · `/docs` (Chanfana `fromHono`).
+- Protected (`/user/*`): `GET /user/me` (`{email,username,displayName}`) · `PATCH /user/me` · `PATCH /user/me/username` (cascades repos, best-effort DO move, frees old name) · `GET|POST /user/repos` (owner defaults to self username; org owner must be org where caller is owner|member) · `GET|PATCH|DELETE /user/repos/:owner/:repo` (`admin` for write ops, `viewerRole/viewerCanManage` in reads) (+ `/branches|/tree|/blob|/commits` DO passthroughs) · `GET|PUT|DELETE /user/repos/:owner/:repo/collaborators[/:member]` (`admin`-only, `admin|write|read`) · `POST|GET|PATCH|DELETE /user/orgs[/:org[/members[/:member]]]` (member mgmt `owner`-only, last-owner guard) · `GET|POST|DELETE /user/tokens` · `GET|POST /user/repos/:owner/:repo/issues` (`read` to comment) · `GET|PATCH /user/repos/:owner/:repo/issues/:number` (`write+` to triage) · `GET|POST /user/repos/:owner/:repo/issues/:number/comments`.
 - SPA: `/` + `/user/` redirect + `*` catch-all serves `SPA_HTML` only when `SERVE_SPA_FROM_WORKER`, else `404`; `/:owner/:repo` serves shell, unknown paths `404`.
 
 ## Composition

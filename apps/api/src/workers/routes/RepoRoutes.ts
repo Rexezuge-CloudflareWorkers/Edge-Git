@@ -58,15 +58,27 @@ function registerRepoRoutes(app: RepoApp): void {
 
 // Protected repo CRUD behind /user/* Access auth (plus /user/me identity).
 function registerUserRepoRoutes(app: RepoApp): void {
-  app.get('/user/me', (c) => {
+  app.get('/user/me', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    return c.json({ email });
+    try {
+      const profile = await createRequestScope(c.env).get(Tokens.UserService).getProfileByEmail(email);
+      return c.json({ email: profile.email, username: profile.username, displayName: profile.displayName });
+    } catch {
+      return c.json({ email });
+    }
   });
 
   app.get('/user/repos', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const rows = await createRequestScope(c.env).get(Tokens.RepoService).listByOwnerEmail(email, 100);
-    return c.json({ repos: rows.map(toRepoJson) });
+    const scope = createRequestScope(c.env);
+    const rows = await scope.get(Tokens.RepoService).listVisibleForUser(email, 100);
+    const permission = scope.get(Tokens.PermissionService);
+    const repos = [];
+    for (const row of rows) {
+      const role = await permission.getRole(email, row).catch(() => null);
+      repos.push({ ...(toRepoJson(row, role) as Record<string, unknown>), viewerCanManage: role === 'admin', viewerRole: role });
+    }
+    return c.json({ repos });
   });
 
   app.post('/user/repos', async (c) => {
@@ -77,28 +89,42 @@ function registerUserRepoRoutes(app: RepoApp): void {
       description?: string | null;
       isPrivate?: boolean;
     };
-    const owner = (body.owner ?? email.split('@', 1)[0]).trim();
+    const scope = createRequestScope(c.env);
+    let owner = (body.owner ?? '').trim();
+    if (!owner) {
+      try {
+        const profile = await scope.get(Tokens.UserService).getProfileByEmail(email);
+        owner = (profile.username ?? email.split('@', 1)[0]).trim();
+      } catch {
+        owner = email.split('@', 1)[0].trim();
+      }
+    }
     const name = (body.name ?? '').trim();
     if (!name) return c.json({ error: 'name is required' }, 400);
     try {
       RepoService.validateNames(owner, RepoService.normalizeRepo(name));
-      const svc = createRequestScope(c.env).get(Tokens.RepoService);
+      const svc = scope.get(Tokens.RepoService);
       const normalized = RepoService.normalizeRepo(name);
       const { id } = await svc.createRepo(email, owner, normalized, body.description ?? null, body.isPrivate ?? false);
-      await ensureRepo(c.env, `${owner}/${normalized}`);
-      return c.json({ id, owner, name: normalized, fullName: `${owner}/${normalized}` }, 201);
+      const created = await svc.getByOwnerAndName(owner, normalized);
+      const canonicalOwner = created?.owner ?? owner;
+      await ensureRepo(c.env, `${canonicalOwner}/${normalized}`);
+      return c.json({ id, owner: canonicalOwner, name: normalized, fullName: `${canonicalOwner}/${normalized}` }, 201);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create repo';
-      const status = message.includes('already exists') || message.includes('Invalid') || message.includes('Maximum') ? 400 : 500;
+      const status =
+        message.includes('already exists') || message.includes('Invalid') || message.includes('Maximum') ? 400 : message.includes('members') || message.includes('owner') ? 403 : 500;
       return c.json({ error: message }, status as 400);
     }
   });
 
   app.get('/user/repos/:owner/:repo', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
+    const scope = createRequestScope(c.env);
     const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
     if (!row) return c.json({ error: 'Not found' }, 404);
-    return c.json({ ...(toRepoJson(row) as Record<string, unknown>), viewerCanManage: row.owner_email === email });
+    const role = await scope.get(Tokens.PermissionService).getRole(email, row).catch(() => null);
+    return c.json({ ...(toRepoJson(row, role) as Record<string, unknown>), viewerCanManage: role === 'admin', viewerRole: role });
   });
 
   app.patch('/user/repos/:owner/:repo', async (c) => {

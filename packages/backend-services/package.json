@@ -14,6 +14,10 @@
     "./user/*": "./src/user/*.ts",
     "./issue": "./src/issue/index.ts",
     "./issue/*": "./src/issue/*.ts",
+    "./org": "./src/org/index.ts",
+    "./org/*": "./src/org/*.ts",
+    "./permission": "./src/permission/index.ts",
+    "./permission/*": "./src/permission/*.ts",
     "./composition": "./src/composition/index.ts",
     "./composition/*": "./src/composition/*.ts"
   },

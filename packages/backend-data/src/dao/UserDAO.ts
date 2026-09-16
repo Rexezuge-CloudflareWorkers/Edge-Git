@@ -4,6 +4,9 @@ import type { D1Queryable } from '../utils/D1Types';
 export interface UserRow {
   email: string;
   created_at: number;
+  username: string | null;
+  display_name: string | null;
+  updated_at: number | null;
 }
 
 class UserDAO extends BaseDAO {
@@ -22,8 +25,33 @@ class UserDAO extends BaseDAO {
     );
   }
 
+  public async ensureUsername(email: string, username: string, now: number): Promise<void> {
+    await this.withRetry(
+      () => this.database.prepare('UPDATE users SET username = COALESCE(username, ?), updated_at = COALESCE(updated_at, ?) WHERE email = ?').bind(username, now, email).run(),
+      'ensure username',
+    );
+  }
+
+  public async setUsername(email: string, username: string, now: number): Promise<void> {
+    await this.withRetry(
+      () => this.database.prepare('UPDATE users SET username = ?, updated_at = ? WHERE email = ?').bind(username, now, email).run(),
+      'set username',
+    );
+  }
+
+  public async setDisplayName(email: string, displayName: string | null, now: number): Promise<void> {
+    await this.withRetry(
+      () => this.database.prepare('UPDATE users SET display_name = ?, updated_at = ? WHERE email = ?').bind(displayName, now, email).run(),
+      'set display name',
+    );
+  }
+
   public async getByEmail(email: string): Promise<UserRow | null> {
-    return this.database.prepare('SELECT email, created_at FROM users WHERE email = ? LIMIT 1').bind(email).first<UserRow>();
+    return this.database.prepare('SELECT * FROM users WHERE email = ? LIMIT 1').bind(email).first<UserRow>();
+  }
+
+  public async getByUsernameCi(usernameCi: string): Promise<UserRow | null> {
+    return this.database.prepare('SELECT * FROM users WHERE lower(username) = ? LIMIT 1').bind(usernameCi).first<UserRow>();
   }
 }
 

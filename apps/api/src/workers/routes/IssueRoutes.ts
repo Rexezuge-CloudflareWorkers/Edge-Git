@@ -99,7 +99,12 @@ function registerUserIssueRoutes(app: IssueApp): void {
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return c.json({ error: 'Not found' }, 404);
-    if (row.owner_email !== email) return c.json({ error: 'Forbidden' }, 403);
+    // Write+ (collaborator write, org member with grant, or admin/owner) may triage issues.
+    try {
+      await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
+    } catch {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
     const number = parseIssueNumber(c.req.param('number'));
     if (number === null) return c.json({ error: 'Not found' }, 404);
     const body = (await c.req.json().catch(() => ({}))) as { status?: string };

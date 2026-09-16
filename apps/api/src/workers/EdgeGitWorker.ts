@@ -9,6 +9,8 @@ import { registerGitRoutes } from './routes/GitRoutes';
 import { registerRepoRoutes, registerUserRepoRoutes, registerUserRepoReadModelRoutes } from './routes/RepoRoutes';
 import { registerTokenRoutes } from './routes/TokenRoutes';
 import { registerIssueRoutes, registerUserIssueRoutes } from './routes/IssueRoutes';
+import { registerUserProfileRoutes, registerUserSettingsRoutes } from './routes/UserRoutes';
+import { registerOrgRoutes } from './routes/OrgRoutes';
 
 type AppRouter = HonoOpenAPIRouterType<{
   Bindings: Env;
@@ -40,11 +42,14 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     registerGitRoutes(app);
     registerRepoRoutes(app);
     registerIssueRoutes(app);
+    registerUserProfileRoutes(app);
 
     // Protected UI/API surface
     app.use('/user/*', MiddlewareHandlers.userAuthentication());
 
     registerUserRepoRoutes(app);
+    registerUserSettingsRoutes(app);
+    registerOrgRoutes(app);
 
     const openapi: AppRouter = fromHono(app, { docs_url: '/docs' });
 

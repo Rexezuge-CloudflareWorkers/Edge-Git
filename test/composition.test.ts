@@ -12,6 +12,10 @@ const daoMocks = vi.hoisted(() => ({
   RepositoryDAO: vi.fn(),
   UserAccessTokenDAO: vi.fn(),
   IssueDAO: vi.fn(),
+  NamespaceDAO: vi.fn(),
+  OrganizationDAO: vi.fn(),
+  OrganizationMemberDAO: vi.fn(),
+  RepoCollaboratorDAO: vi.fn(),
 }));
 
 vi.mock('@edge-git/backend-data/dao', () => ({
@@ -19,6 +23,10 @@ vi.mock('@edge-git/backend-data/dao', () => ({
   RepositoryDAO: daoMocks.RepositoryDAO,
   UserAccessTokenDAO: daoMocks.UserAccessTokenDAO,
   IssueDAO: daoMocks.IssueDAO,
+  NamespaceDAO: daoMocks.NamespaceDAO,
+  OrganizationDAO: daoMocks.OrganizationDAO,
+  OrganizationMemberDAO: daoMocks.OrganizationMemberDAO,
+  RepoCollaboratorDAO: daoMocks.RepoCollaboratorDAO,
 }));
 
 const EXPECTED_TOKENS = [
@@ -30,11 +38,17 @@ const EXPECTED_TOKENS = [
   'RepositoryDAO',
   'UserAccessTokenDAO',
   'IssueDAO',
+  'NamespaceDAO',
+  'OrganizationDAO',
+  'OrganizationMemberDAO',
+  'RepoCollaboratorDAO',
   'AccessAuthService',
   'TokenService',
   'RepoService',
   'UserService',
   'IssueService',
+  'OrganizationService',
+  'PermissionService',
 ] as const;
 
 function makeEnv() {
@@ -60,6 +74,18 @@ beforeEach(() => {
   });
   daoMocks.IssueDAO.mockImplementation(function (this: unknown, db: unknown) {
     return { kind: 'IssueDAO', db };
+  });
+  daoMocks.NamespaceDAO.mockImplementation(function (this: unknown, db: unknown) {
+    return { kind: 'NamespaceDAO', db };
+  });
+  daoMocks.OrganizationDAO.mockImplementation(function (this: unknown, db: unknown) {
+    return { kind: 'OrganizationDAO', db };
+  });
+  daoMocks.OrganizationMemberDAO.mockImplementation(function (this: unknown, db: unknown) {
+    return { kind: 'OrganizationMemberDAO', db };
+  });
+  daoMocks.RepoCollaboratorDAO.mockImplementation(function (this: unknown, db: unknown) {
+    return { kind: 'RepoCollaboratorDAO', db };
   });
 });
 
@@ -106,6 +132,10 @@ describe('createRequestScope', () => {
       [Tokens.RepositoryDAO, daoMocks.RepositoryDAO],
       [Tokens.UserAccessTokenDAO, daoMocks.UserAccessTokenDAO],
       [Tokens.IssueDAO, daoMocks.IssueDAO],
+      [Tokens.NamespaceDAO, daoMocks.NamespaceDAO],
+      [Tokens.OrganizationDAO, daoMocks.OrganizationDAO],
+      [Tokens.OrganizationMemberDAO, daoMocks.OrganizationMemberDAO],
+      [Tokens.RepoCollaboratorDAO, daoMocks.RepoCollaboratorDAO],
     ] as const;
     for (const [token, ctor] of pairs) {
       const factory = scope.get(token);
