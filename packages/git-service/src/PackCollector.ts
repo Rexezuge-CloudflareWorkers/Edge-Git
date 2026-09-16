@@ -110,7 +110,39 @@ export class PackCollector {
       visited.add(oid);
       assertObjectBudget();
 
-      if (haveSet.has(oid) || excludeSet.has(oid)) continue;
+      if (haveSet.has(oid) || excludeSet.has(oid)) {
+        // Depth/since (shallow, deepen, deepen-relative) requests arrive with
+        // haves the client physically holds but whose history is truncated at
+        // its shallow boundary. Pruning traversal here would cut the depth
+        // walk short and return an empty pack with no boundary (breaking
+        // `git fetch --deepen`). Traverse through have-commits so the walk
+        // still reaches the cutoff — the objects themselves stay excluded.
+        // deepen-not exclusions keep pruning: those subtrees are unwanted.
+        if ((maxDepth !== undefined || since !== undefined) && haveSet.has(oid)) {
+          try {
+            const probe = await git.readObject({
+              fs: this.fs,
+              gitdir: this.gitdir,
+              oid,
+              cache: this.cache,
+            });
+            if (probe.type === 'commit') {
+              const commit = await git.readCommit({
+                fs: this.fs,
+                gitdir: this.gitdir,
+                oid,
+                cache: this.cache,
+              });
+              for (const parent of commit.commit.parent) {
+                queue.push({ oid: parent, depth: depth + 1 });
+              }
+            }
+          } catch {
+            // Unreadable have: nothing to traverse through.
+          }
+        }
+        continue;
+      }
 
       let objType: string;
       try {

@@ -38,7 +38,11 @@ export function parseReceivePackRequest(data: Uint8Array): { commands: Command[]
       const caps = nullIdx === -1 ? [] : line.slice(Math.max(0, nullIdx + 1)).split(' ');
 
       const parts = refLine.split(' ');
-      if (parts.length >= 3) {
+      // Strict split: ref names cannot contain spaces, so a line with extra
+      // parts is malformed (e.g. `... refs/heads/has space`). Dropping it
+      // fails closed (`no commands`) instead of silently updating a truncated
+      // ref that passes validation but was never requested.
+      if (parts.length === 3) {
         commands.push({
           oldOid: parts[0],
           newOid: parts[1],

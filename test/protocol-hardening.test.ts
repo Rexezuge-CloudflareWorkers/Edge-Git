@@ -127,4 +127,24 @@ describe('PackCollector deepen-relative', () => {
     expect(noDepth.shallow).toEqual([]);
     expect(noDepth.oids).toContain(oids[0]);
   });
+
+  it('traverses through haves under depth requests so deepen keeps working', async () => {
+    // A `git fetch --deepen` client sends have lines for its truncated
+    // history. Pruning traversal at those haves would return an empty pack
+    // with no boundary ("remote did not send all necessary objects").
+    const { svc, oids } = await makeLinearRepo(5);
+    const tip = oids[4];
+    const relative = await svc.collectObjectsForPack([tip], [tip], { depth: 1, deepenRelative: true, relativeTo: [tip] });
+    expect(relative.shallow).toEqual([oids[3]]);
+    expect(relative.oids).toContain(oids[3]);
+    expect(relative.oids).not.toContain(tip);
+  });
+
+  it('still prunes haves for fetches without a depth bound', async () => {
+    const { svc, oids } = await makeLinearRepo(3);
+    const tip = oids[2];
+    const result = await svc.collectObjectsForPack([tip], [tip]);
+    expect(result.oids).toEqual([]);
+    expect(result.shallow).toEqual([]);
+  });
 });
