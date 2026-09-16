@@ -208,8 +208,8 @@ function registerUserRepoRoutes(app: RepoApp): void {
 function parseWithLastCommit(raw: string | null): boolean | undefined {
   if (raw === null) return undefined;
   const v = raw.trim().toLowerCase();
-  if (v === '0' || v === 'false' || v === 'no') return false;
-  if (v === '1' || v === 'true' || v === 'yes') return true;
+  if (['0', 'false', 'no'].includes(v)) return false;
+  if (['1', 'true', 'yes'].includes(v)) return true;
   return undefined;
 }
 

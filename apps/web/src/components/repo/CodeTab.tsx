@@ -24,6 +24,24 @@ const README_NAMES = new Set(['README.md', 'README.markdown', 'README.mdown', 'R
 // Upper bound for in-browser editing; larger files stay git-only.
 const MAX_EDIT_CHARS = 262_144;
 
+// Merge lazily enriched last-commit info into the fast tree by path+oid.
+// Extracted to module scope so the CodeTab effect stays within the
+// max-nesting lint budget.
+function mergeEnrichedEntries(prev: TreeEntry[], enriched: TreeEntry[]): TreeEntry[] {
+  if (prev.length !== enriched.length) return enriched;
+  const byKey = new Map(enriched.map((e) => [`${e.oid}:${e.path}`, e.lastCommit ?? null]));
+  let changed = false;
+  const next = prev.map((e) => {
+    const lc = byKey.get(`${e.oid}:${e.path}`);
+    if (lc && !e.lastCommit) {
+      changed = true;
+      return { ...e, lastCommit: lc };
+    }
+    return e;
+  });
+  return changed ? next : prev;
+}
+
 export function CodeTab({
   owner,
   repo,
@@ -120,20 +138,7 @@ export function CodeTab({
         try {
           const enriched = await loadTree(owner, repo, treeRef, dir, { ...authOpt, withLastCommit: true });
           if (cancelled) return;
-          setEntries((prev) => {
-            if (prev.length !== enriched.length) return enriched;
-            const byKey = new Map(enriched.map((e) => [`${e.oid}:${e.path}`, e.lastCommit ?? null]));
-            let changed = false;
-            const next = prev.map((e) => {
-              const lc = byKey.get(`${e.oid}:${e.path}`);
-              if (lc && !e.lastCommit) {
-                changed = true;
-                return { ...e, lastCommit: lc };
-              }
-              return e;
-            });
-            return changed ? next : prev;
-          });
+          setEntries((prev) => mergeEnrichedEntries(prev, enriched));
         } catch {
           // Enrichment is best-effort; fast tree already rendered.
         }
