@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./RepoWorker": "./src/RepoWorker.ts",
     "./CronTasksWorker": "./src/CronTasksWorker.ts",
+    "./PushHandler": "./src/PushHandler.ts",
     "./scheduled": "./src/scheduled/index.ts",
     "./scheduled/*": "./src/scheduled/*.ts"
   },

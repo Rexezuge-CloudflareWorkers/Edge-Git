@@ -32,10 +32,10 @@ interface PushHandlerDeps {
 // - deletion / direct-push (`require_pr`) gates are pure and evaluated first;
 // - force-push detection needs ancestry (`isAncestor`) after the pack is
 //   indexed (the new objects must exist locally first).
-// - violations fail only those refs (`ng <ref> <reason>`, `unpack ok`) so
-//   unrelated branches in the same push still land — except atomic pushes,
-//   where partial application would violate atomicity and the whole push is
-//   rejected instead.
+// - any violation rejects the whole push, pre-receive-hook style: every ref
+//   reports `ng` (`unpack ok`), blocked refs keep their reason and the rest
+//   report a generic decline. Nothing is applied, so atomicity is preserved
+//   regardless of the client's `atomic` capability.
 class PushHandler {
   constructor(private readonly deps: PushHandlerDeps) {}
 
@@ -73,21 +73,17 @@ class PushHandler {
       if (staticError) blocked.set(cmd.ref, staticError);
     }
 
-    const atomic = capabilities.includes('atomic');
-    if (atomic && blocked.size > 0) {
-      // Atomicity forbids partial application: reject every ref so the
-      // client retries as a whole. Blocked refs keep their reason.
+    if (blocked.size > 0) {
+      // Fail closed, pre-receive-hook style: reject every ref so the client
+      // retries as a whole. Blocked refs keep their reason. Nothing is
+      // written or applied.
+      logger.error(`(receive-pack) Rejected ${getFullName() ?? 'unknown repo'}: protected branch update declined`);
       const results = commands.map((cmd) => ({
         ref: cmd.ref,
         ok: false as const,
         error: blocked.get(cmd.ref) ?? 'push rejected: protected branch update declined',
       }));
       return buildReportStatus(results, true);
-    }
-
-    const allowed = commands.filter((cmd) => !blocked.has(cmd.ref));
-    if (allowed.length === 0) {
-      return buildReportStatus(commands.map((cmd) => ({ ref: cmd.ref, ok: false as const, error: blocked.get(cmd.ref) ?? 'push rejected' })), true);
     }
 
     const packFilePath = `/repo/objects/pack/pack-${Date.now()}.pack`;
@@ -115,7 +111,7 @@ class PushHandler {
 
     // Force-push detection runs after indexing so ancestry covers the new objects.
     const forceBlocked = new Map<string, string>();
-    for (const cmd of allowed) {
+    for (const cmd of commands) {
       const rule = byRef.get(cmd.ref);
       if (!rule?.blockForcePush) continue;
       if (!branchNameFromRef(cmd.ref)) continue;
@@ -132,28 +128,20 @@ class PushHandler {
         forceBlocked.set(cmd.ref, `non-fast-forward push to protected branch "${branch}" is blocked`);
       }
     }
-    if (atomic && forceBlocked.size > 0) {
+    if (forceBlocked.size > 0) {
+      logger.error(`(receive-pack) Rejected ${getFullName() ?? 'unknown repo'}: protected branch update declined`);
       const results = commands.map((cmd) => ({
         ref: cmd.ref,
         ok: false as const,
-        error: blocked.get(cmd.ref) ?? forceBlocked.get(cmd.ref) ?? 'push rejected: protected branch update declined',
+        error: forceBlocked.get(cmd.ref) ?? 'push rejected: protected branch update declined',
       }));
       return buildReportStatus(results, true);
     }
 
-    const appliable = allowed.filter((cmd) => !forceBlocked.has(cmd.ref));
-    const results = await git.applyRefUpdates(appliable, atomic);
+    const results = await git.applyRefUpdates(commands, capabilities.includes('atomic'));
     git.clearCache();
 
-    const byResultRef = new Map(results.map((r) => [r.ref, r]));
-    const combined = commands.map((cmd) => {
-      const staticBlock = blocked.get(cmd.ref);
-      if (staticBlock) return { ref: cmd.ref, ok: false as const, error: staticBlock };
-      const forceBlock = forceBlocked.get(cmd.ref);
-      if (forceBlock) return { ref: cmd.ref, ok: false as const, error: forceBlock };
-      return byResultRef.get(cmd.ref) ?? { ref: cmd.ref, ok: false as const, error: 'push rejected' };
-    });
-    return buildReportStatus(combined, true);
+    return buildReportStatus(results, true);
   }
 }
 
