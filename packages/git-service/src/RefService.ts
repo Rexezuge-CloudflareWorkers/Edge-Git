@@ -1,6 +1,7 @@
 import * as git from 'isomorphic-git';
 import type { IsoGitFs } from './IsoGitFs';
 import type { RefUpdateResult } from '@edge-git/git-protocol';
+import { isValidBranchName } from './MergeService';
 
 const logger = {
   warn: (...args: unknown[]): void => console.warn('[WARN] [GitService]', ...args),
@@ -109,6 +110,87 @@ export class RefService {
     } catch (error) {
       logger.warn('(current-branch) Failed to get current branch: ', error);
       return null;
+    }
+  }
+
+  // Branch lifecycle (create/delete/default). Results are discriminated
+  // unions — never throws — so they survive Durable Object RPC boundaries.
+  async createBranch(
+    name: string,
+    startOid: string,
+  ): Promise<{ ok: true; ref: string; oid: string } | { ok: false; error: string; status: 400 | 404 | 409 }> {
+    if (!isValidBranchName(name)) {
+      return { ok: false, error: `invalid branch name: ${name}`, status: 400 };
+    }
+    if (!/^[0-9a-f]{40}$/i.test(startOid)) {
+      return { ok: false, error: 'unknown start point', status: 404 };
+    }
+    if (!(await this.hasCommit(startOid))) {
+      return { ok: false, error: 'unknown start point', status: 404 };
+    }
+    const ref = `refs/heads/${name}`;
+    try {
+      await git.resolveRef({ fs: this.fs, gitdir: this.gitdir, ref });
+      return { ok: false, error: 'branch already exists', status: 409 };
+    } catch {
+      // Missing — the expected case for creation.
+    }
+    try {
+      await git.branch({ fs: this.fs, gitdir: this.gitdir, ref: name, object: startOid, checkout: false });
+    } catch (error) {
+      logger.warn(`(create-branch) Failed to create branch ${name}: ${String(error)}`);
+      return { ok: false, error: 'failed to create branch', status: 400 };
+    }
+    return { ok: true, ref, oid: startOid.toLowerCase() };
+  }
+
+  async deleteBranchRef(name: string): Promise<{ ok: true; ref: string } | { ok: false; error: string; status: 400 | 404 | 409 }> {
+    if (!isValidBranchName(name)) {
+      return { ok: false, error: `invalid branch name: ${name}`, status: 400 };
+    }
+    const ref = `refs/heads/${name}`;
+    try {
+      await git.resolveRef({ fs: this.fs, gitdir: this.gitdir, ref });
+    } catch {
+      return { ok: false, error: 'branch not found', status: 404 };
+    }
+    const current = await this.currentBranch();
+    if (current === name) {
+      return { ok: false, error: 'cannot delete the default branch', status: 409 };
+    }
+    try {
+      await git.deleteRef({ fs: this.fs, gitdir: this.gitdir, ref });
+    } catch (error) {
+      logger.warn(`(delete-branch) Failed to delete branch ${name}: ${String(error)}`);
+      return { ok: false, error: 'failed to delete branch', status: 400 };
+    }
+    return { ok: true, ref };
+  }
+
+  async setDefaultBranch(name: string): Promise<{ ok: true; defaultBranch: string } | { ok: false; error: string; status: 400 | 404 }> {
+    if (!isValidBranchName(name)) {
+      return { ok: false, error: `invalid branch name: ${name}`, status: 400 };
+    }
+    try {
+      await git.resolveRef({ fs: this.fs, gitdir: this.gitdir, ref: `refs/heads/${name}` });
+    } catch {
+      return { ok: false, error: 'branch not found', status: 404 };
+    }
+    try {
+      await git.writeRef({ fs: this.fs, gitdir: this.gitdir, ref: 'HEAD', value: `refs/heads/${name}`, force: true, symbolic: true });
+    } catch (error) {
+      logger.warn(`(set-default-branch) Failed to point HEAD at ${name}: ${String(error)}`);
+      return { ok: false, error: 'failed to update default branch', status: 400 };
+    }
+    return { ok: true, defaultBranch: name };
+  }
+
+  private async hasCommit(oid: string): Promise<boolean> {
+    try {
+      const object = await git.readObject({ fs: this.fs, gitdir: this.gitdir, oid });
+      return object.type === 'commit';
+    } catch {
+      return false;
     }
   }
 

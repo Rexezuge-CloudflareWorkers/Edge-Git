@@ -101,6 +101,16 @@
     "annotated": "附注",
     "lightweight": "轻量"
   },
+  "branches": {
+    "newBranch": "新建分支",
+    "branchName": "分支名称",
+    "branchNamePlaceholder": "feature-name",
+    "deleteBranch": "删除分支",
+    "created": "分支已创建。",
+    "deleted": "分支已删除。",
+    "defaultBranch": "默认分支",
+    "defaultUpdated": "默认分支已更新。"
+  },
   "issues": {
     "newIssue": "新建议题",
     "titlePlaceholder": "标题",
@@ -300,6 +310,9 @@
     "failedToLoadFiles": "加载仓库文件失败。",
     "failedToLoadTags": "加载标签失败。",
     "failedToLoadFile": "加载文件失败。",
+    "failedToCreateBranch": "创建分支失败。",
+    "failedToDeleteBranch": "删除分支失败。",
+    "failedToUpdateDefaultBranch": "更新默认分支失败。",
     "failedToLoadCommit": "加载提交失败。",
     "failedToLoadCompare": "加载对比失败。",
     "failedToLoadCommits": "加载提交历史失败。",

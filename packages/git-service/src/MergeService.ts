@@ -39,7 +39,7 @@ function hasIllegalBranchChar(branch: string): boolean {
   return false;
 }
 
-function isValidBranchName(branch: string): boolean {
+export function isValidBranchName(branch: string): boolean {
   if (!branch || branch.length > 255) return false;
   if (branch.startsWith('/') || branch.endsWith('/') || branch.endsWith('.')) return false;
   if (branch.includes('..') || branch.includes('//')) return false;

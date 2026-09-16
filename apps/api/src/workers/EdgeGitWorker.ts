@@ -8,6 +8,7 @@ import { SPA_HTML } from '@/generated/spa-shell';
 import { registerGitRoutes } from './routes/GitRoutes';
 import { registerForkRoutes, registerUserForkRoutes } from './routes/ForkRoutes';
 import { registerRepoRoutes, registerUserRepoRoutes, registerUserRepoReadModelRoutes } from './routes/RepoRoutes';
+import { registerBranchRoutes } from './routes/BranchRoutes';
 import { registerTokenRoutes } from './routes/TokenRoutes';
 import { registerIssueRoutes, registerUserIssueRoutes } from './routes/IssueRoutes';
 import { registerPullRoutes, registerUserPullMergeRoutes, registerUserPullRoutes } from './routes/PullRoutes';
@@ -58,6 +59,7 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     const openapi: AppRouter = fromHono(app, { docs_url: '/docs' });
 
     registerUserRepoReadModelRoutes(app);
+    registerBranchRoutes(app);
     registerUserForkRoutes(app);
     registerTokenRoutes(app);
     registerUserIssueRoutes(app);

@@ -52,6 +52,20 @@ export async function loadTags(owner: string, repo: string): Promise<TagInfo[]> 
   return tryAuthedFirst(owner, repo, `${authedBase(owner, repo)}/tags`, `${publicBase(owner, repo)}/tags`);
 }
 
+export async function createBranch(owner: string, repo: string, name: string, from?: string): Promise<{ branch?: string; ref?: string; oid?: string }> {
+  return apiPost(`${authedBase(owner, repo)}/branches`, { name, from });
+}
+
+export async function deleteBranch(owner: string, repo: string, branch: string): Promise<{ deleted?: boolean }> {
+  const base = authedBase(owner, repo);
+  const url = `${base}/branches${toQuery({ branch })}`;
+  return apiDelete(url);
+}
+
+export async function setDefaultBranch(owner: string, repo: string, branch: string): Promise<{ defaultBranch: string }> {
+  return apiPatch(`${authedBase(owner, repo)}/branches/default`, { branch });
+}
+
 export async function loadTree(owner: string, repo: string, ref?: string, path?: string): Promise<TreeEntry[]> {
   return tryAuthedFirst(
     owner,

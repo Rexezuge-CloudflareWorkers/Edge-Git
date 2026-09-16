@@ -13,6 +13,7 @@ import { Markdown } from '../shared/Markdown';
 import { RefreshButton } from '../shared/RefreshButton';
 import { CloneButton } from './CloneButton';
 import { ForkButton } from './ForkButton';
+import { BranchActions } from './BranchActions';
 import { RecentCommitsCard } from './RecentCommitsCard';
 import { TagPicker, TagsCard } from './TagsCard';
 
@@ -23,6 +24,7 @@ export function CodeTab({
   repo,
   repoMeta,
   canFork,
+  canWrite,
   forkOwner,
   showNotice,
 }: {
@@ -30,6 +32,7 @@ export function CodeTab({
   repo: string;
   repoMeta: Repo;
   canFork: boolean;
+  canWrite: boolean;
   forkOwner: string;
   showNotice: (type: 'success' | 'error', text: string) => void;
 }) {
@@ -175,6 +178,26 @@ export function CodeTab({
             setReadme(null);
           }}
         />
+        {canWrite && (
+          <BranchActions
+            owner={owner}
+            repo={repo}
+            branches={branches}
+            defaultBranch={defaultBranch}
+            selectedRef={selectedRef}
+            showNotice={showNotice}
+            onChanged={(nextRef) => {
+              setLoading(true);
+              setRef(nextRef);
+              setPath('');
+              setBlobPath(null);
+              setBlobText(null);
+              setBlobBinary(false);
+              setReadme(null);
+              setReloadKey((k) => k + 1);
+            }}
+          />
+        )}
         {path && (
           <nav className="text-sm text-[var(--color-text-secondary)]">
             <button type="button" className="text-[var(--color-accent)] hover:underline" onClick={() => setPath('')}>

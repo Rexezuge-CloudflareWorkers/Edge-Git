@@ -165,6 +165,15 @@ function createStub() {
     deleteRepo: () => Promise.resolve(),
     listRefs: () => Promise.resolve({ refs: [{ ref: 'refs/heads/main', oid: 'a'.repeat(40) }], symbolicHead: 'refs/heads/main' }),
     getBranches: () => Promise.resolve({ branches: ['main'], currentBranch: 'main' }),
+    createBranch: ({ name }: { name: string }) =>
+      name === 'taken'
+        ? Promise.resolve({ ok: false, error: 'branch already exists', status: 409 })
+        : Promise.resolve({ ok: true, ref: `refs/heads/${name}`, oid: 'a'.repeat(40) }),
+    deleteBranchRef: (branch: string) =>
+      branch === 'main'
+        ? Promise.resolve({ ok: false, error: 'cannot delete the default branch', status: 409 })
+        : Promise.resolve({ ok: true, ref: `refs/heads/${branch}` }),
+    setDefaultBranch: (branch: string) => Promise.resolve({ ok: true, defaultBranch: branch }),
     getTags: () =>
       Promise.resolve([
         { name: 'v1.0.0', ref: 'refs/tags/v1.0.0', oid: 'b'.repeat(40), peeledOid: null, type: 'lightweight' as const },
@@ -490,6 +499,43 @@ describe('EdgeGitWorker HTTP surface', () => {
       expect(shell.status).toBe(200);
       expect(shell.headers.get('content-type')).toContain('text/html');
     }
+  });
+
+  it('manages branches with write and admin guards', async () => {
+    const worker = new EdgeGitWorker() as unknown as { onRequest(r: Request, e: unknown, c: unknown): Promise<Response> };
+    const db = createApiFakeDb();
+    const env = createEnv(db);
+    const bobEnv = { ...env, DEV_AUTH_EMAIL: 'bob@example.com' };
+    const json = { 'Content-Type': 'application/json' };
+    const call = (path: string, init?: RequestInit): Promise<Response> => worker.onRequest(new Request(`https://git.example.com${path}`, init), env, ctx);
+    const callAsBob = (path: string, init?: RequestInit): Promise<Response> =>
+      worker.onRequest(new Request(`https://git.example.com${path}`, init), bobEnv, ctx);
+
+    expect((await call('/user/repos', { method: 'POST', headers: json, body: JSON.stringify({ name: 'demo' }) })).status).toBe(201);
+
+    const created = await call('/user/repos/alice/demo/branches', { method: 'POST', headers: json, body: JSON.stringify({ name: 'feature' }) });
+    expect(created.status).toBe(201);
+    await expect(created.json()).resolves.toMatchObject({ ok: true, ref: 'refs/heads/feature' });
+
+    expect((await call('/user/repos/alice/demo/branches', { method: 'POST', headers: json, body: JSON.stringify({}) })).status).toBe(400);
+    expect(
+      (await call('/user/repos/alice/demo/branches', { method: 'POST', headers: json, body: JSON.stringify({ name: 'taken' }) })).status,
+    ).toBe(409);
+    expect((await callAsBob('/user/repos/alice/demo/branches', { method: 'POST', headers: json, body: JSON.stringify({ name: 'x' }) })).status).toBe(
+      403,
+    );
+
+    expect((await call('/user/repos/alice/demo/branches?branch=feature', { method: 'DELETE' })).status).toBe(200);
+    expect((await call('/user/repos/alice/demo/branches?branch=main', { method: 'DELETE' })).status).toBe(409);
+    expect((await call('/user/repos/alice/demo/branches', { method: 'DELETE' })).status).toBe(400);
+
+    const moved = await call('/user/repos/alice/demo/branches/default', { method: 'PATCH', headers: json, body: JSON.stringify({ branch: 'feature' }) });
+    expect(moved.status).toBe(200);
+    await expect(moved.json()).resolves.toMatchObject({ ok: true, defaultBranch: 'feature' });
+    expect(
+      (await callAsBob('/user/repos/alice/demo/branches/default', { method: 'PATCH', headers: json, body: JSON.stringify({ branch: 'feature' }) })).status,
+    ).toBe(403);
+    expect((await call('/user/repos/alice/demo/branches/default', { method: 'PATCH', headers: json, body: JSON.stringify({}) })).status).toBe(400);
   });
 });
 

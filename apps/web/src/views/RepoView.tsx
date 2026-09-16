@@ -108,7 +108,16 @@ export function RepoView({
       />
       <div className="max-w-7xl mx-auto px-6 py-6">
         {visibleTab === 'code' && (
-          <CodeTab key={`${owner}/${repo}`} owner={owner} repo={repo} repoMeta={repoData} canFork={authorized ?? false} forkOwner={defaultOwner || owner} showNotice={showNotice} />
+          <CodeTab
+            key={`${owner}/${repo}`}
+            owner={owner}
+            repo={repo}
+            repoMeta={repoData}
+            canFork={authorized ?? false}
+            canWrite={repoData.viewerRole === 'admin' || repoData.viewerRole === 'write'}
+            forkOwner={defaultOwner || owner}
+            showNotice={showNotice}
+          />
         )}
         {visibleTab === 'pulls' && (
           <PullsTab owner={owner} repo={repo} repoMeta={repoData} canWrite={authorized ?? false} showNotice={showNotice} onCountChange={setPullCount} />
