@@ -8,6 +8,8 @@
     ".": "./src/index.ts",
     "./auth": "./src/auth/index.ts",
     "./auth/*": "./src/auth/*.ts",
+    "./fork": "./src/fork/index.ts",
+    "./fork/*": "./src/fork/*.ts",
     "./repo": "./src/repo/index.ts",
     "./repo/*": "./src/repo/*.ts",
     "./user": "./src/user/index.ts",

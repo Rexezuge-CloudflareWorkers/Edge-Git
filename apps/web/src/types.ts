@@ -18,6 +18,8 @@ export interface Repo {
   fullName: string;
   description: string | null;
   isPrivate: boolean;
+  forkedFrom?: string | null;
+  forksCount?: number;
   createdAt: number;
   updatedAt: number;
   viewerCanManage?: boolean;
@@ -124,6 +126,8 @@ export interface PullRequest {
   status: string;
   base_branch: string;
   head_branch: string;
+  head_repository_id?: string | null;
+  head_full_name?: string | null;
   base_oid: string | null;
   head_oid: string | null;
   merge_base_oid: string | null;

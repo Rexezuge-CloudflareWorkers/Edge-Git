@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { DofsFs, GitService, IsoGitFs } from '@edge-git/git-service';
+import { DofsFs, GitService, IsoGitFs, PackLimitError } from '@edge-git/git-service';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { FetchHandler } from './FetchHandler';
 import type { FetchLimits } from './FetchHandler';
@@ -190,6 +190,81 @@ class RepoWorker extends DurableObject<Env> {
     return this.readModel.getMergePreview(args.baseRef, args.headRef);
   }
 
+  public async getMergePreviewByOids(args: { baseOid: string; headOid: string }): Promise<unknown> {
+    await this.prepare();
+    return this.readModel.getMergePreviewByOids(args.baseOid, args.headOid);
+  }
+
+  public async resolveRef(ref: string): Promise<string | null> {
+    await this.prepare();
+    return this.git.resolveRef(ref);
+  }
+
+  public async hasObject(oid: string): Promise<boolean> {
+    await this.prepare();
+    return this.git.hasObject(oid);
+  }
+
+  /**
+   * Export a packfile for the given wants (fork copy, cross-fork PR
+   * materialization). Bounded by the repo pack limits; over-limit exports
+   * throw `PackLimitError` so callers fail closed.
+   */
+  public async exportPack(wants: string[]): Promise<{ oids: string[]; pack: Uint8Array | null }> {
+    await this.prepare();
+    if (wants.length === 0) return { oids: [], pack: null };
+    const limits = this.getLimits();
+    const { oids } = await this.git.collectObjectsForPack(wants, [], { maxObjects: limits.maxObjects });
+    if (oids.length === 0) return { oids, pack: null };
+    const pack = (await this.git.packObjects(oids)) as Uint8Array | undefined;
+    if (!pack || pack.byteLength === 0) return { oids, pack: null };
+    if (pack.byteLength > limits.maxPackBytes) {
+      throw new PackLimitError(`pack too large: ${pack.byteLength} > ${limits.maxPackBytes} bytes`);
+    }
+    return { oids, pack };
+  }
+
+  /**
+   * Index an exported packfile into this repo. When `refs` are provided
+   * (fork copy), missing refs are created; otherwise (cross-fork PR
+   * materialization) only objects are imported and no refs are touched.
+   */
+  public async importPack(pack: Uint8Array, refs?: Array<{ ref: string; oid: string }>): Promise<{ importedRefs: string[] }> {
+    await this.prepare();
+    if (!pack || pack.byteLength === 0) return { importedRefs: [] };
+    const limits = this.getLimits();
+    if (pack.byteLength > limits.maxPackBytes) {
+      throw new PackLimitError(`pack too large: ${pack.byteLength} > ${limits.maxPackBytes} bytes`);
+    }
+    const suffix = `${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
+    const packFilePath = `/repo/objects/pack/fork-${suffix}.pack`;
+    let wrotePack = false;
+    try {
+      await this.isoGitFs.promises.writeFile(packFilePath, pack);
+      wrotePack = true;
+      await this.git.indexPack(packFilePath.replace('/repo/', ''));
+    } catch (error) {
+      if (wrotePack) {
+        await this.isoGitFs.promises.unlink(packFilePath).catch(() => undefined);
+      }
+      throw error;
+    }
+    this.git.clearCache();
+    const importedRefs: string[] = [];
+    const pending = (refs ?? []).filter((r) => typeof r.ref === 'string' && /^[0-9a-f]{40}$/.test(r.oid));
+    if (pending.length > 0) {
+      const results = await this.git.applyRefUpdates(
+        pending.map((r) => ({ oldOid: '0'.repeat(40), newOid: r.oid, ref: r.ref })),
+        false,
+      );
+      for (const [i, result] of results.entries()) {
+        if (result.ok) importedRefs.push(pending[i].ref);
+      }
+      this.git.clearCache();
+    }
+    return { importedRefs };
+  }
+
   public async getPullDiff(args: { baseOid: string | null; headOid: string }): Promise<unknown> {
     await this.prepare();
     return this.readModel.getPullDiff(args.baseOid, args.headOid, ConfigurationManager.repo.getMaxMergeDiffFiles(this.env));
@@ -226,6 +301,22 @@ class RepoWorker extends DurableObject<Env> {
       }
     }
     return { ...outcome, deletedHead };
+  }
+
+  /**
+   * Delete a branch in this repo (cross-fork PR `deleteHead` targets the
+   * head repo DO). Best-effort: missing/invalid branches report
+   * `deleted: false` instead of throwing.
+   */
+  public async deleteBranch(branch: string): Promise<{ deleted: boolean }> {
+    await this.prepare();
+    try {
+      await this.git.deleteBranch(branch);
+      this.git.clearCache();
+      return { deleted: true };
+    } catch {
+      return { deleted: false };
+    }
   }
 }
 

@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { File, Folder, GitBranch, History } from 'lucide-react';
 import type { GitCommit, Repo, TreeEntry } from '../../types';
 import { decodeBlobContent, loadBlob, loadBranches, loadCommits, loadTree } from '../../services/repoService';
@@ -10,6 +12,7 @@ import { Badge, VisibilityBadge } from '../ui/Badge';
 import { Markdown } from '../shared/Markdown';
 import { RefreshButton } from '../shared/RefreshButton';
 import { CloneButton } from './CloneButton';
+import { ForkButton } from './ForkButton';
 
 const README_NAMES = new Set(['README.md', 'README.markdown', 'README.mdown', 'README.txt', 'README']);
 
@@ -17,13 +20,18 @@ export function CodeTab({
   owner,
   repo,
   repoMeta,
+  canFork,
+  forkOwner,
   showNotice,
 }: {
   owner: string;
   repo: string;
   repoMeta: Repo;
+  canFork: boolean;
+  forkOwner: string;
   showNotice: (type: 'success' | 'error', text: string) => void;
 }) {
+  const { t } = useTranslation();
   const [branches, setBranches] = useState<string[]>([]);
   const [defaultBranch, setDefaultBranch] = useState<string | null>(null);
   const [ref, setRef] = useState('');
@@ -164,6 +172,7 @@ export function CodeTab({
         )}
         <div className="ml-auto flex items-center gap-2">
           <RefreshButton onRefresh={refresh} loading={loading} />
+          {canFork && <ForkButton owner={owner} repo={repo} defaultOwner={forkOwner} showNotice={showNotice} />}
           <CloneButton owner={owner} repo={repo} />
         </div>
       </div>
@@ -277,6 +286,12 @@ export function CodeTab({
             <div className="mt-3">
               <VisibilityBadge isPrivate={repoMeta.isPrivate} />
             </div>
+            {repoMeta.forkedFrom && (
+              <p className="mt-2 text-xs text-[var(--color-text-muted)]">
+                {t('forks.forkedFrom', 'Forked From')}{' '}
+                <Link className="text-[var(--color-accent)] hover:underline font-mono" to={`/${repoMeta.forkedFrom}`}>{repoMeta.forkedFrom}</Link>
+              </p>
+            )}
             <dl className="mt-4 space-y-2.5 text-sm">
               <div className="flex items-center justify-between gap-2">
                 <dt className="text-[var(--color-text-muted)] inline-flex items-center gap-1.5">

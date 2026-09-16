@@ -160,6 +160,10 @@ export class GitService {
     return this.merger.getPreview(baseRef, headRef);
   }
 
+  async getMergePreviewByOids(baseOid: string, headOid: string) {
+    return this.merger.getPreviewByOids(baseOid, headOid);
+  }
+
   async mergeBranches(input: { baseBranch: string; headOid: string; author: { name: string; email: string }; message?: string }) {
     return this.merger.mergeBranches(input);
   }

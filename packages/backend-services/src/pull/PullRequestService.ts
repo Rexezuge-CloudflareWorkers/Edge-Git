@@ -86,6 +86,8 @@ class PullRequestService {
     headOid?: string | null;
     mergeBaseOid?: string | null;
     creatorEmail: string;
+    headRepositoryId?: string | null;
+    headFullName?: string | null;
   }): Promise<{ id: string; number: number }> {
     const title = input.title.trim();
     if (!title) throw new BadRequestError('title is required');
@@ -94,9 +96,17 @@ class PullRequestService {
     const headBranch = input.headBranch.trim();
     if (!baseBranch || !headBranch) throw new BadRequestError('baseBranch and headBranch are required');
     if (!isValidBranchName(baseBranch) || !isValidBranchName(headBranch)) throw new BadRequestError('invalid branch name');
-    if (baseBranch === headBranch) throw new BadRequestError('baseBranch and headBranch must differ');
+    if (baseBranch === headBranch && !input.headRepositoryId) throw new BadRequestError('baseBranch and headBranch must differ');
     if (input.body !== undefined && input.body !== null && input.body.length > 10_000) {
       throw new BadRequestError('body must be at most 10000 characters');
+    }
+    const headRepositoryId = input.headRepositoryId?.trim() ? input.headRepositoryId.trim() : null;
+    const headFullName = input.headFullName?.trim() ? input.headFullName.trim() : null;
+    if ((headRepositoryId === null) !== (headFullName === null)) {
+      throw new BadRequestError('headRepositoryId and headFullName must be provided together');
+    }
+    if (headFullName && headFullName.toLowerCase() === input.fullName.toLowerCase()) {
+      throw new BadRequestError('headFullName must differ from the base repository for cross-fork pull requests');
     }
     const dao = await this.deps.pullRequestDAO();
     // Retry on UNIQUE(repository_id, number) races from concurrent POSTs.
@@ -120,6 +130,8 @@ class PullRequestService {
           mergeBaseOid: input.mergeBaseOid ?? null,
           creatorEmail: input.creatorEmail,
           now,
+          headRepositoryId,
+          headFullName,
         });
         return { id, number };
       } catch (error) {

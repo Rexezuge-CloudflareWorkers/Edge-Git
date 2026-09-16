@@ -13,9 +13,11 @@ import Unauthorized from '../components/layout/Unauthorized';
 export function RepoView({
   authorized,
   showNotice,
+  defaultOwner,
 }: {
   authorized: boolean | null;
   showNotice: (type: 'success' | 'error', text: string) => void;
+  defaultOwner: string;
 }) {
   const { owner = '', repo = '' } = useParams<{ owner: string; repo: string }>();
   const navigate = useNavigate();
@@ -100,15 +102,16 @@ export function RepoView({
         activeTab={visibleTab}
         issueCount={issueCount}
         pullCount={pullCount}
+        forkCount={repoData.forksCount}
         showSettings={canManage}
         onTabChange={setTab}
       />
       <div className="max-w-7xl mx-auto px-6 py-6">
         {visibleTab === 'code' && (
-          <CodeTab key={`${owner}/${repo}`} owner={owner} repo={repo} repoMeta={repoData} showNotice={showNotice} />
+          <CodeTab key={`${owner}/${repo}`} owner={owner} repo={repo} repoMeta={repoData} canFork={authorized ?? false} forkOwner={defaultOwner || owner} showNotice={showNotice} />
         )}
         {visibleTab === 'pulls' && (
-          <PullsTab owner={owner} repo={repo} canWrite={authorized ?? false} showNotice={showNotice} onCountChange={setPullCount} />
+          <PullsTab owner={owner} repo={repo} repoMeta={repoData} canWrite={authorized ?? false} showNotice={showNotice} onCountChange={setPullCount} />
         )}
         {visibleTab === 'issues' && (
           <IssuesTab owner={owner} repo={repo} canWrite={authorized ?? false} showNotice={showNotice} onCountChange={setIssueCount} />

@@ -156,11 +156,21 @@
     "reviewPlaceholder": "评审意见（可选）",
     "base": "目标分支",
     "head": "来源分支",
+    "headRepo": "来源仓库",
     "selectHead": "选择来源分支",
     "sameBranch": "目标分支和来源分支必须不同。",
     "mergeConflicts": "存在合并冲突。请在你的分支上解决。",
     "mergeMessagePlaceholder": "合并说明（可选）",
     "deleteHeadAfterMerge": "合并后删除来源分支"
+  },
+  "forks": {
+    "fork": "复刻",
+    "forks": "复刻",
+    "forkRepository": "复刻 {{fullName}}",
+    "ownerHint": "你的用户名或你所属的组织。",
+    "createFork": "创建复刻",
+    "forkCreated": "复刻 {{fullName}} 已创建。",
+    "forkedFrom": "复刻自"
   },
   "settings": {
     "userSettings": "用户设置",
@@ -278,6 +288,7 @@
     "failedToLoadPulls": "加载合并请求列表失败。",
     "failedToCreatePull": "创建合并请求失败。",
     "failedToUpdatePull": "更新合并请求失败。",
+    "failedToFork": "复刻仓库失败。",
     "failedToAddReview": "提交评审失败。",
     "failedToMergePull": "合并失败。",
     "fileNotFound": "文件不存在。",

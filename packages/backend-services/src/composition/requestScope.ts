@@ -7,6 +7,7 @@ import { AppConfiguration } from '@edge-git/backend-runtime/config';
 // (`vi.mock('@edge-git/backend-services/repo', ...)`) keep working
 // after migration to `scope.get(...)`. Runtime behavior is identical.
 import { AccessAuthService, TokenService } from '@edge-git/backend-services/auth';
+import { ForkService } from '@edge-git/backend-services/fork';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { UserService } from '@edge-git/backend-services/user';
 import { IssueService } from '@edge-git/backend-services/issue';
@@ -73,6 +74,10 @@ function createRequestScope(env: RequestScopeEnv): Container {
 
   scope.bind(Tokens.AccessAuthService, () => new AccessAuthService(env as never));
   scope.bind(Tokens.TokenService, () => new TokenService(env as never, { tokenDAO }));
+  scope.bind(
+    Tokens.ForkService,
+    () => new ForkService(env as never, { repositoryDAO, userDAO, organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO }),
+  );
   scope.bind(
     Tokens.RepoService,
     () => new RepoService(env as never, { repositoryDAO, issueDAO, pullRequestDAO, userDAO, organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO }),

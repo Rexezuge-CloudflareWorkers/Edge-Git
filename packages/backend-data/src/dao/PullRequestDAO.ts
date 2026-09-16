@@ -19,6 +19,8 @@ export interface PullRequestRow {
   merged_at: number | null;
   created_at: number;
   updated_at: number;
+  head_repository_id?: string | null;
+  head_full_name?: string | null;
 }
 
 export interface PullRequestReviewRow {
@@ -66,7 +68,42 @@ class PullRequestDAO extends BaseDAO {
     mergeBaseOid: string | null;
     creatorEmail: string;
     now: number;
+    headRepositoryId?: string | null;
+    headFullName?: string | null;
   }): Promise<void> {
+    try {
+      await this.withRetry(
+        () =>
+          this.database
+            .prepare(
+              'INSERT INTO pull_requests (id, repository_id, full_name, number, title, body, status, base_branch, head_branch, base_oid, head_oid, merge_base_oid, creator_email, merged_by, merged_at, created_at, updated_at, head_repository_id, head_full_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?)',
+            )
+            .bind(
+              input.id,
+              input.repositoryId,
+              input.fullName,
+              input.number,
+              input.title,
+              input.body,
+              'open',
+              input.baseBranch,
+              input.headBranch,
+              input.baseOid,
+              input.headOid,
+              input.mergeBaseOid,
+              input.creatorEmail,
+              input.now,
+              input.now,
+              input.headRepositoryId ?? null,
+              input.headFullName ?? null,
+            )
+            .run(),
+        'create pull request',
+      );
+      return;
+    } catch {
+      // Fallback for DBs without 0004 head-repo columns: retry without them.
+    }
     await this.withRetry(
       () =>
         this.database

@@ -15,6 +15,7 @@ function toRepoJson(r: RepositoryRow, viewerRole?: string | null): unknown {
     ownerType: r.owner_type ?? (r.org_id ? 'org' : 'user'),
     description: r.description,
     isPrivate: r.is_private === 1,
+    forkedFrom: r.forked_from_full_name ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };

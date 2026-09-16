@@ -15,6 +15,8 @@ export interface RepositoryRow {
   name_ci?: string | null;
   owner_user_email?: string | null;
   org_id?: string | null;
+  forked_from_repo_id?: string | null;
+  forked_from_full_name?: string | null;
 }
 
 class RepositoryDAO extends BaseDAO {
@@ -33,11 +35,44 @@ class RepositoryDAO extends BaseDAO {
     ownerType?: string;
     orgId?: string | null;
     ownerUserEmail?: string | null;
+    forkedFromRepoId?: string | null;
+    forkedFromFullName?: string | null;
   }): Promise<void> {
     const ownerType = input.ownerType ?? 'user';
     const ownerCi = input.owner.toLowerCase();
     const nameCi = input.name.toLowerCase();
     const ownerUserEmail = input.ownerUserEmail ?? (ownerType === 'user' ? input.ownerEmail : null);
+    try {
+      await this.withRetry(
+        () =>
+          this.database
+            .prepare(
+              'INSERT INTO repositories (id, owner_email, owner, name, description, is_private, created_at, updated_at, owner_type, owner_ci, name_ci, owner_user_email, org_id, forked_from_repo_id, forked_from_full_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            )
+            .bind(
+              input.id,
+              input.ownerEmail,
+              input.owner,
+              input.name,
+              input.description,
+              input.isPrivate ? 1 : 0,
+              input.now,
+              input.now,
+              ownerType,
+              ownerCi,
+              nameCi,
+              ownerUserEmail,
+              input.orgId ?? null,
+              input.forkedFromRepoId ?? null,
+              input.forkedFromFullName ?? null,
+            )
+            .run(),
+        'create repository',
+      );
+      return;
+    } catch {
+      // Fallback for DBs without 0004 fork columns: retry without them.
+    }
     try {
       await this.withRetry(
         () =>
@@ -155,6 +190,31 @@ class RepositoryDAO extends BaseDAO {
         () => this.database.prepare('UPDATE repositories SET owner = ? WHERE owner = ?').bind(newOwner, oldOwnerCi).run(),
         'rename repo owner legacy',
       );
+    }
+  }
+
+  public async listForks(sourceRepoId: string, limit = 100): Promise<RepositoryRow[]> {
+    try {
+      const result = await this.database
+        .prepare('SELECT * FROM repositories WHERE forked_from_repo_id = ? ORDER BY updated_at DESC LIMIT ?')
+        .bind(sourceRepoId, limit)
+        .all<RepositoryRow>();
+      return result.results ?? [];
+    } catch {
+      // DBs without 0004 fork columns (unit fakes / old D1) have no forks.
+      return [];
+    }
+  }
+
+  public async countForks(sourceRepoId: string): Promise<number> {
+    try {
+      const row = await this.database
+        .prepare('SELECT COUNT(*) AS n FROM repositories WHERE forked_from_repo_id = ?')
+        .bind(sourceRepoId)
+        .first<{ n: number }>();
+      return row?.n ?? 0;
+    } catch {
+      return 0;
     }
   }
 

@@ -156,11 +156,21 @@
     "reviewPlaceholder": "Review Notes (Optional)",
     "base": "Base",
     "head": "Head",
+    "headRepo": "Head Repository",
     "selectHead": "Select Head",
     "sameBranch": "Base And Head Must Differ.",
     "mergeConflicts": "Merge Conflicts. Resolve Them On Your Branch.",
     "mergeMessagePlaceholder": "Merge Message (Optional)",
     "deleteHeadAfterMerge": "Delete Head Branch After Merge"
+  },
+  "forks": {
+    "fork": "Fork",
+    "forks": "Forks",
+    "forkRepository": "Fork {{fullName}}",
+    "ownerHint": "Your Username Or An Organization You Belong To.",
+    "createFork": "Create Fork",
+    "forkCreated": "Fork {{fullName}} Created.",
+    "forkedFrom": "Forked From"
   },
   "settings": {
     "userSettings": "User Settings",
@@ -277,6 +287,7 @@
     "failedToLoadPulls": "Failed To Load Pull Requests.",
     "failedToCreatePull": "Failed To Create Pull Request.",
     "failedToUpdatePull": "Failed To Update Pull Request.",
+    "failedToFork": "Failed To Fork Repository.",
     "failedToAddReview": "Failed To Submit Review.",
     "failedToMergePull": "Failed To Merge Pull Request.",
     "failedToLoadFile": "Failed To Load File.",
