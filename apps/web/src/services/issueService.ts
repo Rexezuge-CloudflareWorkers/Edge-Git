@@ -59,7 +59,9 @@ export async function listComments(owner: string, repo: string, number: number):
 }
 
 export async function addComment(owner: string, repo: string, number: number, input: { body: string }): Promise<Comment> {
-  return apiPost<Comment>(`${authedIssue(owner, repo, number)}/comments`, input);
+  const data = await apiPost<Comment | { comment?: Comment }>(`${authedIssue(owner, repo, number)}/comments`, input);
+  const nested = (data as { comment?: Comment }).comment;
+  return nested ?? (data as Comment);
 }
 
 export async function updateIssueStatus(owner: string, repo: string, number: number, status: 'open' | 'closed'): Promise<Issue> {
