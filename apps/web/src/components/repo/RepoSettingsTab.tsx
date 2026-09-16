@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Repo } from '../../types';
 import { deleteRepo, updateRepo } from '../../services/repoService';
+import { CollaboratorsCard } from './CollaboratorsCard';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Label, Textarea } from '../ui/Input';
@@ -101,6 +102,8 @@ export function RepoSettingsTab({
           </div>
         </form>
       </Card>
+
+      <CollaboratorsCard owner={owner} repo={repo} showNotice={showNotice} />
 
       <Card className="border-[var(--color-error-text)]/40">
         <CardHeader>

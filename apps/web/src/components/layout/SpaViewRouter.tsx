@@ -6,6 +6,7 @@ import { Card } from '../ui/Card';
 import { LandingView } from '../../views/LandingView';
 import { DashboardView } from '../../views/DashboardView';
 import { NewRepoView } from '../../views/NewRepoView';
+import { ProfileView } from '../../views/ProfileView';
 import { RepoView } from '../../views/RepoView';
 import { IssueDetailView } from '../../views/IssueDetailView';
 import { SettingsView } from '../../views/SettingsView';
@@ -40,6 +41,7 @@ function SpaViewRouter({ user, authorized, showNotice, defaultOwner }: SpaViewRo
       />
       <Route path="/:owner/:repo/issues/:number" element={<IssueDetailView authorized={authorized} showNotice={showNotice} />} />
       <Route path="/:owner/:repo" element={<RepoView authorized={authorized} showNotice={showNotice} />} />
+      <Route path="/:username" element={<ProfileView showNotice={showNotice} />} />
       <Route
         path="/settings"
         element={

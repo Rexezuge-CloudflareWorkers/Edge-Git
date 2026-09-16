@@ -57,8 +57,9 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     registerTokenRoutes(app);
     registerUserIssueRoutes(app);
 
-    // SPA catch-all — public shell for user home (/), repo home
-    // (/:owner/:repo, GitHub-style), and the legacy authenticated /user/* app.
+    // SPA catch-all — public shell for user home (/), profile home
+    // (/:username, GitHub-style), repo home (/:owner/:repo), and the legacy
+    // authenticated /user/* app.
     // Git Smart HTTP paths never reach here: they match exact routes above.
     app.get('*', (c) => {
       if (!ConfigurationManager.spa.isServeFromWorker(c.env)) {
@@ -67,6 +68,13 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
       const path: string = new URL(c.req.url).pathname;
       if (path === '/' || path === '/settings' || path === '/new' || path.startsWith('/user/')) {
         return c.html(SPA_HTML);
+      }
+      if (/^\/[^/]+\/?$/.test(path)) {
+        // Single-segment profile shell — never shadow reserved API/UI roots.
+        const segment = path.replace(/^\//, '').replace(/\/$/, '').toLowerCase();
+        const reserved = new Set(['health', 'docs', 'repos', 'users', 'user', 'settings', 'new']);
+        if (!reserved.has(segment)) return c.html(SPA_HTML);
+        return c.notFound();
       }
       if (/^\/[^/]+\/[^/]+\/?$/.test(path)) {
         return c.html(SPA_HTML);
