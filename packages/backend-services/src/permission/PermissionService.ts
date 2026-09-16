@@ -61,6 +61,7 @@ class PermissionService {
     if (!repo) return null;
     const isPrivate = PermissionService.isPrivateRepo(repo);
     if (!viewerEmail) return isPrivate ? null : 'read';
+    const viewer = viewerEmail.toLowerCase();
 
     // Resolve org (0002 path with graceful fallback for legacy DBs/fakes).
     let orgId: string | null = null;
@@ -94,14 +95,14 @@ class PermissionService {
     if (orgId) {
       try {
         const memberDAO = await this.deps.organizationMemberDAO();
-        const membership = await memberDAO.get(orgId, viewerEmail);
+        const membership = await memberDAO.get(orgId, viewer);
         if (membership?.role === 'owner') return 'admin';
       } catch {
         // missing table → fall through to collaborator/public checks
       }
       try {
         const collabDAO = await this.deps.repoCollaboratorDAO();
-        const grant = await collabDAO.get(repo.id, viewerEmail);
+        const grant = await collabDAO.get(repo.id, viewer);
         if (grant) return grant.role;
       } catch {
         // ignore
@@ -111,10 +112,10 @@ class PermissionService {
 
     // User-owned repo.
     const ownerEmail = repo.owner_user_email ?? repo.owner_email;
-    if (ownerEmail === viewerEmail) return 'admin';
+    if (ownerEmail?.toLowerCase() === viewer) return 'admin';
     try {
       const collabDAO = await this.deps.repoCollaboratorDAO();
-      const grant = await collabDAO.get(repo.id, viewerEmail);
+      const grant = await collabDAO.get(repo.id, viewer);
       if (grant) return grant.role;
     } catch {
       // ignore

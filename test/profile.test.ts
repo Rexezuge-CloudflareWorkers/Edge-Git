@@ -20,8 +20,10 @@ function createProfileFakeDb() {
     const q = query.replace(/\s+/g, ' ').trim();
     return {
       first<T>(): Promise<T | null> {
-        if (q.includes('FROM users WHERE email = ?')) {
-          return Promise.resolve((state.users.find((u) => u.email === params[0]) ?? null) as T | null);
+        if (q.includes('FROM users WHERE email = ?') || q.includes('FROM users WHERE lower(email)')) {
+          return Promise.resolve(
+            (state.users.find((u) => String(u.email).toLowerCase() === String(params[0]).toLowerCase()) ?? null) as T | null,
+          );
         }
         if (q.includes('FROM users WHERE lower(username) = ?')) {
           return Promise.resolve(
@@ -34,9 +36,9 @@ function createProfileFakeDb() {
         if (q.includes('FROM organizations WHERE id = ?')) {
           return Promise.resolve((state.orgs.find((o) => o.id === params[0]) ?? null) as T | null);
         }
-        if (q.includes('FROM organization_members WHERE org_id = ? AND user_email = ?')) {
+        if (q.includes('FROM organization_members WHERE org_id = ? AND') && q.includes('user_email')) {
           return Promise.resolve(
-            (state.members.find((m) => m.org_id === params[0] && m.user_email === params[1]) ?? null) as T | null,
+            (state.members.find((m) => m.org_id === params[0] && String(m.user_email).toLowerCase() === String(params[1]).toLowerCase()) ?? null) as T | null,
           );
         }
         if (q.includes('FROM namespaces WHERE username_ci = ?')) {
@@ -82,8 +84,10 @@ function createProfileFakeDb() {
             .slice(0, params[1] as number);
           return Promise.resolve({ results: rows as T[] });
         }
-        if (q.includes('FROM repositories WHERE owner_email = ?')) {
-          return Promise.resolve({ results: state.repos.filter((r) => r.owner_email === params[0]) as T[] });
+        if (q.includes('FROM repositories WHERE owner_email = ?') || q.includes('FROM repositories WHERE lower(owner_email)')) {
+          return Promise.resolve({
+            results: state.repos.filter((r) => String(r.owner_email).toLowerCase() === String(params[0]).toLowerCase()) as T[],
+          });
         }
         if (q.includes('FROM repositories WHERE org_id = ?')) {
           const rows = state.repos
@@ -99,9 +103,9 @@ function createProfileFakeDb() {
             .slice(0, params[1] as number);
           return Promise.resolve({ results: rows as T[] });
         }
-        if (q.includes('FROM organization_members WHERE user_email = ? ORDER BY')) {
+        if (q.includes('FROM organization_members WHERE') && q.includes('user_email') && q.includes('ORDER BY')) {
           const rows = state.members
-            .filter((m) => m.user_email === params[0])
+            .filter((m) => String(m.user_email).toLowerCase() === String(params[0]).toLowerCase())
             .sort((a, b) => (a.created_at as number) - (b.created_at as number))
             .slice(0, params[1] as number);
           return Promise.resolve({ results: rows as T[] });
@@ -112,7 +116,7 @@ function createProfileFakeDb() {
         if (q.includes('FROM comments WHERE issue_id = ?')) {
           return Promise.resolve({ results: [] as T[] });
         }
-        if (q.includes('FROM user_access_tokens WHERE user_email = ?')) {
+        if (q.includes('FROM user_access_tokens WHERE') && q.includes('user_email')) {
           return Promise.resolve({ results: [] as T[] });
         }
         return Promise.resolve({ results: [] });
@@ -150,11 +154,27 @@ function createProfileFakeDb() {
           state.orgs.push({ id, username, username_ci, display_name, creator_email, created_at, updated_at });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
+        if (q.startsWith('DELETE FROM organization_members WHERE org_id = ?')) {
+          if (params.length >= 3) {
+            state.members = state.members.filter(
+              (m) => !(m.org_id === params[0] && String(m.user_email).toLowerCase() === String(params[1]).toLowerCase() && m.user_email !== params[2]),
+            );
+          } else {
+            state.members = state.members.filter(
+              (m) => !(m.org_id === params[0] && String(m.user_email).toLowerCase() === String(params[1]).toLowerCase()),
+            );
+          }
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
         if (q.startsWith('INSERT INTO organization_members (org_id, user_email, role')) {
           const [org_id, user_email, role, created_at] = params as [string, string, string, number];
-          const existing = state.members.find((m) => m.org_id === org_id && m.user_email === user_email);
+          const normalized = String(user_email).toLowerCase();
+          state.members = state.members.filter(
+            (m) => !(m.org_id === org_id && String(m.user_email).toLowerCase() === normalized && m.user_email !== normalized),
+          );
+          const existing = state.members.find((m) => m.org_id === org_id && m.user_email === normalized);
           if (existing) existing.role = role;
-          else state.members.push({ org_id, user_email, role, created_at });
+          else state.members.push({ org_id, user_email: normalized, role, created_at });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO repositories')) {
@@ -260,6 +280,13 @@ describe('profile + permission management surface', () => {
     const ownOrg = (await (await call('/users/acme')).json()) as { memberCount: number; viewerIsOwner: boolean; repoCount: number };
     expect(ownOrg).toMatchObject({ memberCount: 1, viewerIsOwner: true, repoCount: 1 });
 
+    // Explicit authed role for the SPA Manage-tab fallback when the public
+    // profile endpoint is anonymous at the edge.
+    const authedOrg = (await (await call('/user/orgs/acme')).json()) as { username: string; viewerRole: string; members: unknown[] };
+    expect(authedOrg).toMatchObject({ username: 'acme', viewerRole: 'owner' });
+    expect(authedOrg.members).toHaveLength(1);
+    expect((await callAnon('/user/orgs/acme')).status).toBe(401);
+
     const orgRepos = (await (await callAnon('/users/acme/repos')).json()) as { repos: Array<{ name: string }> };
     expect(orgRepos.repos.map((r) => r.name)).toContain('site');
 
@@ -269,5 +296,26 @@ describe('profile + permission management surface', () => {
     expect(shell.headers.get('content-type')).toContain('text/html');
     expect((await callAnon('/repos')).status).toBe(404);
     expect((await callAnon('/users')).status).toBe(404);
+  });
+
+  it('resolves org ownership case-insensitively for mixed-case emails', async () => {
+    const worker = new EdgeGitWorker() as unknown as { onRequest(r: Request, e: unknown, c: unknown): Promise<Response> };
+    const db = createProfileFakeDb();
+    const upperEnv = createEnv(db, 'Alice@Example.COM');
+    const lowerEnv = createEnv(db, 'alice@example.com');
+    const callUpper = (path: string, init?: RequestInit): Promise<Response> =>
+      worker.onRequest(new Request(`https://git.example.com${path}`, init), upperEnv, ctx);
+    const callLower = (path: string, init?: RequestInit): Promise<Response> =>
+      worker.onRequest(new Request(`https://git.example.com${path}`, init), lowerEnv, ctx);
+    const json = { 'Content-Type': 'application/json' };
+
+    await callUpper('/user/me');
+    expect((await callUpper('/user/orgs', { method: 'POST', headers: json, body: JSON.stringify({ username: 'acme' }) })).status).toBe(201);
+
+    // Same mailbox in different case still sees ownership on public + authed surfaces.
+    const publicOrg = (await (await callLower('/users/acme')).json()) as { viewerIsOwner: boolean; viewerIsMember: boolean };
+    expect(publicOrg).toMatchObject({ viewerIsOwner: true, viewerIsMember: true });
+    const authedOrg = (await (await callLower('/user/orgs/acme')).json()) as { viewerRole: string };
+    expect(authedOrg).toMatchObject({ viewerRole: 'owner' });
   });
 });

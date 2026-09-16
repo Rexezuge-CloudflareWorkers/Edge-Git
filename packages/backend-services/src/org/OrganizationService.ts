@@ -54,20 +54,20 @@ class OrganizationService {
 
   public async getMemberRole(orgId: string, userEmail: string): Promise<OrgMemberRole | null> {
     const dao = await this.deps.organizationMemberDAO();
-    const row = await dao.get(orgId, userEmail);
+    const row = await dao.get(orgId, userEmail.toLowerCase());
     return row?.role ?? null;
   }
 
   public async requireOwner(orgUsername: string, userEmail: string): Promise<OrganizationRow> {
     const org = await this.requireOrg(orgUsername);
-    const role = await this.getMemberRole(org.id, userEmail);
+    const role = await this.getMemberRole(org.id, userEmail.toLowerCase());
     if (role !== 'owner') throw new ForbiddenError('Only organization owners can perform this action');
     return org;
   }
 
   public async requireMember(orgUsername: string, userEmail: string): Promise<OrganizationRow> {
     const org = await this.requireOrg(orgUsername);
-    const role = await this.getMemberRole(org.id, userEmail);
+    const role = await this.getMemberRole(org.id, userEmail.toLowerCase());
     if (!role) throw new ForbiddenError('Only organization members can perform this action');
     return org;
   }
@@ -76,6 +76,7 @@ class OrganizationService {
     const handle = username.trim();
     OrganizationService.validateOrgName(handle);
     const handleCi = handle.toLowerCase();
+    const normalizedCreator = creatorEmail.toLowerCase();
     const namespaceDAO = await this.deps.namespaceDAO();
     const orgDAO = await this.deps.organizationDAO();
     const memberDAO = await this.deps.organizationMemberDAO();
@@ -100,13 +101,13 @@ class OrganizationService {
 
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const id = UUIDUtil.getRandomUUID();
-    await orgDAO.create({ id, username: handle, displayName: displayName ?? null, creatorEmail, now });
+    await orgDAO.create({ id, username: handle, displayName: displayName ?? null, creatorEmail: normalizedCreator, now });
     try {
       await namespaceDAO.claim({ usernameCi: handleCi, kind: 'org', orgId: id, now });
     } catch {
       // Best-effort: org row is source of truth if namespaces table is unavailable.
     }
-    await memberDAO.upsert(id, creatorEmail, 'owner', now);
+    await memberDAO.upsert(id, normalizedCreator, 'owner', now);
     const created = await orgDAO.getById(id);
     if (!created) throw new NotFoundError('Organization not found');
     return created;
@@ -118,7 +119,7 @@ class OrganizationService {
     const userDAO = await this.deps.userDAO();
     const user = await userDAO.getByUsernameCi(raw.toLowerCase());
     if (!user) throw new NotFoundError('User not found');
-    return user.email;
+    return user.email.toLowerCase();
   }
 
   public async addMember(orgUsername: string, actorEmail: string, targetUsernameOrEmail: string, role: OrgMemberRole = 'member'): Promise<void> {
@@ -178,7 +179,7 @@ class OrganizationService {
   public async listOrgsForUser(userEmail: string): Promise<OrganizationRow[]> {
     const memberDAO = await this.deps.organizationMemberDAO();
     const orgDAO = await this.deps.organizationDAO();
-    const memberships = await memberDAO.listOrgsByUser(userEmail);
+    const memberships = await memberDAO.listOrgsByUser(userEmail.toLowerCase());
     const orgs: OrganizationRow[] = [];
     for (const m of memberships) {
       const org = await orgDAO.getById(m.org_id);

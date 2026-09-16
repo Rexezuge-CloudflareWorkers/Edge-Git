@@ -34,7 +34,8 @@ function registerOrgRoutes(app: OrgApp): void {
       const scope = createRequestScope(c.env);
       const org = await scope.get(Tokens.OrganizationService).requireMember(orgName, email);
       const members = await scope.get(Tokens.OrganizationService).listMembers(org.username, email);
-      return c.json({ id: org.id, username: org.username, displayName: org.display_name ?? null, members });
+      const viewerRole = await scope.get(Tokens.OrganizationService).getMemberRole(org.id, email).catch(() => null);
+      return c.json({ id: org.id, username: org.username, displayName: org.display_name ?? null, members, viewerRole });
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
     }

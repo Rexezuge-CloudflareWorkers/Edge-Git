@@ -111,7 +111,7 @@ class RepositoryDAO extends BaseDAO {
 
   public async listByOwnerEmail(ownerEmail: string, limit = 100): Promise<RepositoryRow[]> {
     const result = await this.database
-      .prepare('SELECT * FROM repositories WHERE owner_email = ? ORDER BY updated_at DESC LIMIT ?')
+      .prepare('SELECT * FROM repositories WHERE lower(owner_email) = lower(?) ORDER BY updated_at DESC LIMIT ?')
       .bind(ownerEmail, limit)
       .all<RepositoryRow>();
     return result.results ?? [];
@@ -133,7 +133,7 @@ class RepositoryDAO extends BaseDAO {
     try {
       const result = await this.database
         .prepare(
-          'SELECT r.* FROM repositories r JOIN repo_collaborators c ON c.repo_id = r.id WHERE c.user_email = ? ORDER BY r.updated_at DESC LIMIT ?',
+          'SELECT r.* FROM repositories r JOIN repo_collaborators c ON c.repo_id = r.id WHERE lower(c.user_email) = lower(?) ORDER BY r.updated_at DESC LIMIT ?',
         )
         .bind(userEmail, limit)
         .all<RepositoryRow>();

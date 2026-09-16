@@ -46,16 +46,17 @@ class TokenService {
     const tokenData: UserAccessTokenMetadata | undefined = await dao.getByTokenHash(tokenHash, now);
     if (tokenData) {
       await dao.updateLastUsedByHash(tokenHash, now);
-      return tokenData.userEmail;
+      return tokenData.userEmail.toLowerCase();
     }
     throw new UnauthorizedError('Your personal access token is invalid or has expired.');
   }
 
   public async createToken(userEmail: string, name: string, expiresInDays?: number): Promise<CreatedToken> {
     const dao = await this.deps.tokenDAO();
+    const normalized = userEmail.toLowerCase();
     const maxTokens: number = ConfigurationManager.token.getMaxPerUser(this.env);
     const maxExpiryInDays: number = ConfigurationManager.token.getMaxExpiryDays(this.env);
-    const existingTokens: UserAccessTokenMetadata[] = await dao.getByUserEmail(userEmail);
+    const existingTokens: UserAccessTokenMetadata[] = await dao.getByUserEmail(normalized);
     if (existingTokens.length >= maxTokens) {
       throw new BadRequestError(`Maximum ${maxTokens} tokens allowed per user`);
     }
@@ -68,7 +69,7 @@ class TokenService {
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const expiresAt: number = TimestampUtil.addDays(now, effectiveExpiryInDays);
     const tokenHash = await TokenService.hashToken(token);
-    await dao.create(tokenId, userEmail, tokenHash, name, expiresAt, now);
+    await dao.create(tokenId, normalized, tokenHash, name, expiresAt, now);
     return { tokenId, token, name, expiresAt };
   }
 

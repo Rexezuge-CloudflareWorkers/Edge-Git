@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Building2, UserRound } from 'lucide-react';
 import type { OrgMember, OrgSummary, Repo, UserOrOrgProfile } from '../types';
-import { listOrgMembers, listProfileOrgs, listProfileRepos, loadProfile } from '../services/profileService';
+import { listOrgMembers, listProfileOrgs, listProfileRepos, loadOrgAuthed, loadProfile } from '../services/profileService';
 import { Card, CardHeader, CardTitle } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { VisibilityBadge } from '../components/ui/Badge';
@@ -24,6 +24,7 @@ export function ProfileView({
   const [repos, setRepos] = useState<Repo[]>([]);
   const [orgs, setOrgs] = useState<OrgSummary[]>([]);
   const [members, setMembers] = useState<OrgMember[] | null>(null);
+  const [authedViewerRole, setAuthedViewerRole] = useState<'owner' | 'member' | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'missing'>('loading');
   const [tab, setTab] = useState<ProfileTab>('repositories');
 
@@ -43,10 +44,22 @@ export function ProfileView({
         setRepos(repoRows);
         setOrgs(orgRows);
         setMembers(null);
+        setAuthedViewerRole(null);
         setTab('repositories');
-        if (data.type === 'org' && data.viewerIsMember) {
-          const memberRows = await listOrgMembers(username).catch(() => null);
-          if (!cancelled) setMembers(memberRows);
+        if (data.type === 'org') {
+          // Public `/users/:username` cannot resolve the viewer when the request
+          // is anonymous at the edge (no Access assertion on public routes), so
+          // an org owner would see `viewerIsOwner: false`. Fall back to the
+          // authenticated org endpoint for an explicit `viewerRole`.
+          const authed = await loadOrgAuthed(username).catch(() => null);
+          if (cancelled) return;
+          if (authed) {
+            setAuthedViewerRole(authed.viewerRole);
+            setMembers(authed.members);
+          } else if (data.viewerIsMember) {
+            const memberRows = await listOrgMembers(username).catch(() => null);
+            if (!cancelled) setMembers(memberRows);
+          }
         }
         setStatus('ready');
       } catch {
@@ -81,7 +94,7 @@ export function ProfileView({
   }
 
   const isOrg = profile.type === 'org';
-  const canManageOrg = isOrg && profile.viewerIsOwner === true;
+  const canManageOrg = isOrg && (profile.viewerIsOwner === true || authedViewerRole === 'owner');
   const tabs: ProfileTab[] = isOrg
     ? canManageOrg
       ? ['repositories', 'people', 'manage']

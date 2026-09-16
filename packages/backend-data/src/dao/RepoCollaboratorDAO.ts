@@ -17,21 +17,26 @@ class RepoCollaboratorDAO extends BaseDAO {
   }
 
   public async upsert(repoId: string, userEmail: string, role: RepoRole, grantedBy: string | null, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'INSERT INTO repo_collaborators (repo_id, user_email, role, granted_by, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(repo_id, user_email) DO UPDATE SET role = excluded.role, granted_by = excluded.granted_by',
-          )
-          .bind(repoId, userEmail, role, grantedBy, now)
-          .run(),
-      'upsert repo collaborator',
-    );
+    const normalized = userEmail.toLowerCase();
+    const normalizedGrant = grantedBy?.toLowerCase() ?? null;
+    await this.withRetry(async () => {
+      await this.database
+        .prepare('DELETE FROM repo_collaborators WHERE repo_id = ? AND lower(user_email) = ? AND user_email != ?')
+        .bind(repoId, normalized, normalized)
+        .run()
+        .catch(() => undefined);
+      return this.database
+        .prepare(
+          'INSERT INTO repo_collaborators (repo_id, user_email, role, granted_by, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(repo_id, user_email) DO UPDATE SET role = excluded.role, granted_by = excluded.granted_by',
+        )
+        .bind(repoId, normalized, role, normalizedGrant, now)
+        .run();
+    }, 'upsert repo collaborator');
   }
 
   public async get(repoId: string, userEmail: string): Promise<RepoCollaboratorRow | null> {
     return this.database
-      .prepare('SELECT * FROM repo_collaborators WHERE repo_id = ? AND user_email = ? LIMIT 1')
+      .prepare('SELECT * FROM repo_collaborators WHERE repo_id = ? AND lower(user_email) = lower(?) LIMIT 1')
       .bind(repoId, userEmail)
       .first<RepoCollaboratorRow>();
   }
@@ -46,7 +51,7 @@ class RepoCollaboratorDAO extends BaseDAO {
 
   public async listByUser(userEmail: string, limit = 500): Promise<RepoCollaboratorRow[]> {
     const result = await this.database
-      .prepare('SELECT * FROM repo_collaborators WHERE user_email = ? ORDER BY created_at DESC LIMIT ?')
+      .prepare('SELECT * FROM repo_collaborators WHERE lower(user_email) = lower(?) ORDER BY created_at DESC LIMIT ?')
       .bind(userEmail, limit)
       .all<RepoCollaboratorRow>();
     return result.results ?? [];
@@ -54,7 +59,7 @@ class RepoCollaboratorDAO extends BaseDAO {
 
   public async remove(repoId: string, userEmail: string): Promise<void> {
     await this.withRetry(
-      () => this.database.prepare('DELETE FROM repo_collaborators WHERE repo_id = ? AND user_email = ?').bind(repoId, userEmail).run(),
+      () => this.database.prepare('DELETE FROM repo_collaborators WHERE repo_id = ? AND lower(user_email) = lower(?)').bind(repoId, userEmail).run(),
       'remove repo collaborator',
     );
   }

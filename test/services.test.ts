@@ -50,8 +50,8 @@ function createFakeDb(seed: { now?: number } = {}): D1Queryable & {
           const row = state.tokens.find((t) => t.token_hash === params[0] && (t.expires_at as number) > (params[1] as number));
           return Promise.resolve((row ?? null) as T | null);
         }
-        if (q.startsWith('SELECT email, created_at FROM users WHERE email = ?')) {
-          const row = state.users.find((u) => u.email === params[0]);
+        if (q.startsWith('SELECT email, created_at FROM users WHERE email = ?') || q.includes('FROM users WHERE lower(email)')) {
+          const row = state.users.find((u) => String(u.email).toLowerCase() === String(params[0]).toLowerCase());
           return Promise.resolve((row ?? null) as T | null);
         }
         if (q.startsWith('SELECT * FROM issues WHERE repository_id = ? AND number = ?')) {
@@ -61,16 +61,16 @@ function createFakeDb(seed: { now?: number } = {}): D1Queryable & {
         return Promise.resolve(null);
       },
       all<T>(): Promise<{ results: T[] }> {
-        if (q.startsWith('SELECT * FROM repositories WHERE owner_email = ?')) {
-          const rows = state.repos.filter((r) => r.owner_email === params[0]).slice(0, params[1] as number);
+        if (q.startsWith('SELECT * FROM repositories WHERE owner_email = ?') || q.includes('FROM repositories WHERE lower(owner_email)')) {
+          const rows = state.repos.filter((r) => String(r.owner_email).toLowerCase() === String(params[0]).toLowerCase()).slice(0, params[1] as number);
           return Promise.resolve({ results: rows as T[] });
         }
         if (q.startsWith('SELECT * FROM repositories WHERE owner = ?')) {
           const rows = state.repos.filter((r) => r.owner === params[0]);
           return Promise.resolve({ results: rows as T[] });
         }
-        if (q.startsWith('SELECT * FROM user_access_tokens WHERE user_email = ?')) {
-          const rows = state.tokens.filter((t) => t.user_email === params[0]);
+        if (q.startsWith('SELECT * FROM user_access_tokens WHERE') && q.includes('user_email')) {
+          const rows = state.tokens.filter((t) => String(t.user_email).toLowerCase() === String(params[0]).toLowerCase());
           return Promise.resolve({ results: rows as T[] });
         }
         if (q.startsWith('SELECT * FROM issues WHERE repository_id = ?')) {
@@ -106,7 +106,9 @@ function createFakeDb(seed: { now?: number } = {}): D1Queryable & {
         }
         if (q.startsWith('DELETE FROM user_access_tokens WHERE token_id = ?')) {
           const before = state.tokens.length;
-          state.tokens = state.tokens.filter((t) => !(t.token_id === params[0] && t.user_email === params[1]));
+          state.tokens = state.tokens.filter(
+            (t) => !(t.token_id === params[0] && String(t.user_email).toLowerCase() === String(params[1]).toLowerCase()),
+          );
           return Promise.resolve({ success: true, meta: { changes: before - state.tokens.length } });
         }
         if (q.startsWith('INSERT INTO issues')) {
