@@ -103,6 +103,15 @@ export interface BlobResponse {
   contentBase64?: string;
 }
 
+export interface FileCommitResult {
+  ok: boolean;
+  commitOid: string;
+  branch?: string;
+  path?: string;
+  created?: boolean;
+  deleted?: boolean;
+}
+
 export interface DiffLine {
   kind: 'context' | 'add' | 'remove';
   text: string;

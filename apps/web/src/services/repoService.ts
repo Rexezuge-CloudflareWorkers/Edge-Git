@@ -1,4 +1,14 @@
-import type { BlobResponse, BranchesResponse, CommitDiffResult, CompareResult, GitCommit, Repo, TagInfo, TreeEntry } from '../types';
+import type {
+  BlobResponse,
+  BranchesResponse,
+  CommitDiffResult,
+  CompareResult,
+  FileCommitResult,
+  GitCommit,
+  Repo,
+  TagInfo,
+  TreeEntry,
+} from '../types';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../lib/api';
 
 function authedBase(owner: string, repo: string): string {
@@ -64,6 +74,40 @@ export async function deleteBranch(owner: string, repo: string, branch: string):
 
 export async function setDefaultBranch(owner: string, repo: string, branch: string): Promise<{ defaultBranch: string }> {
   return apiPatch(`${authedBase(owner, repo)}/branches/default`, { branch });
+}
+
+function encodeTextToBase64(text: string): string {
+  const bytes = new TextEncoder().encode(text);
+  let binary = '';
+  const chunk = 8192;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCodePoint(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+export async function saveFile(
+  owner: string,
+  repo: string,
+  input: { branch: string; path: string; content: string; message?: string; expectedOid?: string },
+): Promise<FileCommitResult> {
+  return apiPost<FileCommitResult>(`${authedBase(owner, repo)}/contents`, {
+    branch: input.branch,
+    path: input.path,
+    contentBase64: encodeTextToBase64(input.content),
+    message: input.message,
+    expectedOid: input.expectedOid,
+  });
+}
+
+export async function deleteFile(
+  owner: string,
+  repo: string,
+  input: { branch: string; path: string; message?: string; expectedOid?: string },
+): Promise<FileCommitResult> {
+  const base = authedBase(owner, repo);
+  const url = `${base}/contents${toQuery({ branch: input.branch, path: input.path, message: input.message, expectedOid: input.expectedOid })}`;
+  return apiDelete<FileCommitResult>(url);
 }
 
 export async function loadTree(owner: string, repo: string, ref?: string, path?: string): Promise<TreeEntry[]> {

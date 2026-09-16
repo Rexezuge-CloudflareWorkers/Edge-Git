@@ -174,6 +174,15 @@ function createStub() {
         ? Promise.resolve({ ok: false, error: 'cannot delete the default branch', status: 409 })
         : Promise.resolve({ ok: true, ref: `refs/heads/${branch}` }),
     setDefaultBranch: (branch: string) => Promise.resolve({ ok: true, defaultBranch: branch }),
+    commitFile: (args: { branch: string; path: string; content: Uint8Array | null; expectedOid?: string | null }) => {
+      if (args.branch === 'nope') return Promise.resolve({ ok: false, error: 'branch not found', status: 404 });
+      if (args.expectedOid === 'a'.repeat(40)) {
+        return Promise.resolve({ ok: false, error: 'branch has changed since you loaded it; reload and try again', status: 409 });
+      }
+      if (args.content === null && args.path === 'missing.txt') return Promise.resolve({ ok: false, error: 'file not found', status: 404 });
+      const created = args.content !== null && args.path === 'new.txt';
+      return Promise.resolve({ ok: true, commitOid: 'c'.repeat(40), created, deleted: args.content === null });
+    },
     getTags: () =>
       Promise.resolve([
         { name: 'v1.0.0', ref: 'refs/tags/v1.0.0', oid: 'b'.repeat(40), peeledOid: null, type: 'lightweight' as const },
@@ -536,6 +545,77 @@ describe('EdgeGitWorker HTTP surface', () => {
       (await callAsBob('/user/repos/alice/demo/branches/default', { method: 'PATCH', headers: json, body: JSON.stringify({ branch: 'feature' }) })).status,
     ).toBe(403);
     expect((await call('/user/repos/alice/demo/branches/default', { method: 'PATCH', headers: json, body: JSON.stringify({}) })).status).toBe(400);
+  });
+
+  it('edits files with write guards and concurrency checks', async () => {
+    const worker = new EdgeGitWorker() as unknown as { onRequest(r: Request, e: unknown, c: unknown): Promise<Response> };
+    const db = createApiFakeDb();
+    const env = createEnv(db);
+    const bobEnv = { ...env, DEV_AUTH_EMAIL: 'bob@example.com' };
+    const json = { 'Content-Type': 'application/json' };
+    const call = (path: string, init?: RequestInit): Promise<Response> => worker.onRequest(new Request(`https://git.example.com${path}`, init), env, ctx);
+    const callAsBob = (path: string, init?: RequestInit): Promise<Response> =>
+      worker.onRequest(new Request(`https://git.example.com${path}`, init), bobEnv, ctx);
+    const toB64 = (text: string): string => btoa(String.fromCodePoint(...new TextEncoder().encode(text)));
+
+    expect((await call('/user/repos', { method: 'POST', headers: json, body: JSON.stringify({ name: 'demo' }) })).status).toBe(201);
+
+    const created = await call('/user/repos/alice/demo/contents', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ branch: 'main', path: 'new.txt', contentBase64: toB64('hello\n') }),
+    });
+    expect(created.status).toBe(201);
+    await expect(created.json()).resolves.toMatchObject({ ok: true, commitOid: 'c'.repeat(40), created: true });
+
+    const updated = await call('/user/repos/alice/demo/contents', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ branch: 'main', path: 'old.txt', contentBase64: toB64('v2\n'), message: 'Tweak' }),
+    });
+    expect(updated.status).toBe(200);
+
+    expect((await call('/user/repos/alice/demo/contents', { method: 'POST', headers: json, body: JSON.stringify({}) })).status).toBe(400);
+    expect(
+      (await call('/user/repos/alice/demo/contents', { method: 'POST', headers: json, body: JSON.stringify({ branch: 'main', path: 'x.txt', contentBase64: '!!!' }) }))
+        .status,
+    ).toBe(400);
+    expect(
+      (
+        await call('/user/repos/alice/demo/contents', {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ branch: 'main', path: 'x.txt', contentBase64: toB64('x'), expectedOid: 'short' }),
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await call('/user/repos/alice/demo/contents', {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ branch: 'main', path: 'x.txt', contentBase64: toB64('x'), expectedOid: 'a'.repeat(40) }),
+        })
+      ).status,
+    ).toBe(409);
+    expect(
+      (
+        await call('/user/repos/alice/demo/contents', {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ branch: 'nope', path: 'x.txt', contentBase64: toB64('x') }),
+        })
+      ).status,
+    ).toBe(404);
+    expect(
+      (await callAsBob('/user/repos/alice/demo/contents', { method: 'POST', headers: json, body: JSON.stringify({ branch: 'main', path: 'x.txt', contentBase64: toB64('x') }) }))
+        .status,
+    ).toBe(403);
+
+    expect((await call('/user/repos/alice/demo/contents?branch=main&path=old.txt', { method: 'DELETE' })).status).toBe(200);
+    expect((await call('/user/repos/alice/demo/contents?branch=main&path=missing.txt', { method: 'DELETE' })).status).toBe(404);
+    expect((await call('/user/repos/alice/demo/contents?branch=main', { method: 'DELETE' })).status).toBe(400);
+    expect((await callAsBob('/user/repos/alice/demo/contents?branch=main&path=old.txt', { method: 'DELETE' })).status).toBe(403);
   });
 });
 

@@ -1,23 +1,28 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { File, Folder, GitBranch, Tag } from 'lucide-react';
+import { GitBranch, Tag } from 'lucide-react';
 import type { GitCommit, Repo, TagInfo, TreeEntry } from '../../types';
 import { decodeBlobContent, loadBlob, loadBranches, loadCommits, loadTags, loadTree } from '../../services/repoService';
-import { firstLine, formatCommitDate, formatTimestamp } from '../../lib/format';
+import { formatTimestamp } from '../../lib/format';
 import { formatDateLocale } from '../../lib/locale';
 import { Card } from '../ui/Card';
 import { Select } from '../ui/Input';
+import { Button } from '../ui/Button';
 import { Badge, VisibilityBadge } from '../ui/Badge';
 import { Markdown } from '../shared/Markdown';
 import { RefreshButton } from '../shared/RefreshButton';
 import { CloneButton } from './CloneButton';
 import { ForkButton } from './ForkButton';
 import { BranchActions } from './BranchActions';
+import { BlobView } from './BlobView';
+import { FileBrowser } from './FileBrowser';
 import { RecentCommitsCard } from './RecentCommitsCard';
 import { TagPicker, TagsCard } from './TagsCard';
 
 const README_NAMES = new Set(['README.md', 'README.markdown', 'README.mdown', 'README.txt', 'README']);
+// Upper bound for in-browser editing; larger files stay git-only.
+const MAX_EDIT_CHARS = 262_144;
 
 export function CodeTab({
   owner,
@@ -49,6 +54,10 @@ export function CodeTab({
   const [blobText, setBlobText] = useState<string | null>(null);
   const [blobBinary, setBlobBinary] = useState(false);
   const [readme, setReadme] = useState<{ path: string; text: string } | null>(null);
+  // Edit/create targets are paths, not booleans, so navigating to another
+  // ref, directory, or file hides the forms without a reset effect.
+  const [editingPath, setEditingPath] = useState<string | null>(null);
+  const [createDir, setCreateDir] = useState<string | null>(null);
 
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -58,6 +67,11 @@ export function CodeTab({
   const selectedRef = ref || defaultBranch || branches[0] || '';
   const emptyBranchesLabel = loading ? 'Loading...' : 'No Branches';
   const placeholderLabel = branches.length === 0 ? emptyBranchesLabel : selectedRef;
+  // Web writes target branches only — tag refs are immutable snapshots.
+  const isTagRef = ref.startsWith('refs/tags/');
+  const editable = canWrite && !isTagRef && selectedRef !== '';
+  const branchTip = commits[0]?.oid;
+  const editableFile = editable && !blobBinary && (blobText ?? '').length <= MAX_EDIT_CHARS;
 
   useEffect(() => {
     const run = async () => {
@@ -117,6 +131,20 @@ export function CodeTab({
   }, [owner, repo, selectedRef, readmeEntry?.path]);
 
   const visibleReadme = readmeEntry && readme && readme.path === readmeEntry.path ? readme.text : null;
+
+  const editing = editingPath !== null && editingPath === blobPath;
+  const creating = createDir !== null && createDir === path;
+
+  const afterChange = () => {
+    setEditingPath(null);
+    setCreateDir(null);
+    setBlobPath(null);
+    setBlobText(null);
+    setBlobBinary(false);
+    setReadme(null);
+    setLoading(true);
+    setReloadKey((k) => k + 1);
+  };
 
   const refresh = () => {
     setLoading(true);
@@ -198,6 +226,20 @@ export function CodeTab({
             }}
           />
         )}
+        {editable && (
+          <Button
+            size="sm"
+            onClick={() => {
+              setCreateDir((d) => (d === path ? null : path));
+              setBlobPath(null);
+              setBlobText(null);
+              setBlobBinary(false);
+              setEditingPath(null);
+            }}
+          >
+            {t('files.newFile', 'New File')}
+          </Button>
+        )}
         {path && (
           <nav className="text-sm text-[var(--color-text-secondary)]">
             <button type="button" className="text-[var(--color-accent)] hover:underline" onClick={() => setPath('')}>
@@ -227,91 +269,47 @@ export function CodeTab({
       <div className="grid gap-6 lg:grid-cols-4 items-start">
         <div className="lg:col-span-3 space-y-4 min-w-0">
           {blobPath ? (
-            <Card>
-              <div className="flex items-center justify-between mb-3">
-                <span className="font-mono text-sm text-[var(--color-text-primary)]">{blobPath}</span>
-                <button
-                  type="button"
-                  className="text-sm text-[var(--color-accent)] hover:underline"
-                  onClick={() => {
-                    setBlobPath(null);
-                    setBlobText(null);
-                  }}
-                >
-                  Back To Files
-                </button>
-              </div>
-              {blobBinary ? (
-                <p className="text-sm text-[var(--color-text-muted)]">Binary file — not previewed.</p>
-              ) : (
-                <pre className="overflow-x-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-base)] p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap break-words">
-                  {blobText ?? 'Empty file.'}
-                </pre>
-              )}
-            </Card>
+            <BlobView
+              owner={owner}
+              repo={repo}
+              branch={selectedRef}
+              blobPath={blobPath}
+              blobText={blobText}
+              blobBinary={blobBinary}
+              branchTip={branchTip}
+              editing={editing}
+              editableFile={editableFile}
+              showNotice={showNotice}
+              onSaved={afterChange}
+              onEdit={() => setEditingPath(blobPath)}
+              onCancelEdit={() => setEditingPath(null)}
+              onBack={() => {
+                setBlobPath(null);
+                setBlobText(null);
+                setEditingPath(null);
+              }}
+            />
           ) : (
-            <Card className="p-0 overflow-hidden">
-              {latestCommit && (
-                <div className="flex items-center gap-3 px-5 py-3 border-b border-[var(--color-border)] bg-[var(--color-surface-2)] text-sm min-w-0">
-                  <span className="h-6 w-6 rounded-full bg-[var(--color-surface-4)] text-[var(--color-text-secondary)] inline-flex items-center justify-center text-xs font-medium shrink-0">
-                    {latestCommit.commit.author.name.slice(0, 1).toUpperCase()}
-                  </span>
-                  <span className="text-[var(--color-text-primary)] truncate flex-1">{firstLine(latestCommit.commit.message)}</span>
-                  <code className="font-mono text-xs text-[var(--color-text-muted)] shrink-0 hidden sm:inline">
-                    {latestCommit.oid.slice(0, 7)}
-                  </code>
-                  <span className="text-xs text-[var(--color-text-muted)] shrink-0 hidden md:inline">
-                    {formatCommitDate(latestCommit.commit.author.timestamp, latestCommit.commit.author.timezoneOffset)}
-                  </span>
-                </div>
-              )}
-              {!loading && entries.length === 0 ? (
-                <p className="text-sm text-[var(--color-text-muted)] p-5">Empty repository — push a branch to get started.</p>
-              ) : (
-                <ul className="divide-y divide-[var(--color-border)]">
-                  {path && (
-                    <li>
-                      <button
-                        type="button"
-                        className="w-full text-left px-5 py-2.5 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-2)]"
-                        onClick={() => setPath(crumbs.slice(0, -1).join('/'))}
-                      >
-                        ..
-                      </button>
-                    </li>
-                  )}
-                  {entries.map((e) => (
-                    <li key={e.oid + e.path}>
-                      <button
-                        type="button"
-                        className="w-full flex items-center gap-3 px-5 py-2.5 text-sm hover:bg-[var(--color-surface-2)] text-left"
-                        onClick={() => {
-                          if (e.type === 'tree') {
-                            setLoading(true);
-                            setPath(path ? `${path}/${e.path}` : e.path);
-                          } else {
-                            void openBlob(e.path);
-                          }
-                        }}
-                      >
-                        {e.type === 'tree' ? (
-                          <Folder className="h-4 w-4 text-[var(--color-info-text)] shrink-0" />
-                        ) : (
-                          <File className="h-4 w-4 text-[var(--color-text-muted)] shrink-0" />
-                        )}
-                        <span className="text-[var(--color-text-primary)] truncate flex-1">{e.path}</span>
-                        <span className="text-xs text-[var(--color-text-muted)] truncate max-w-64 hidden md:inline">
-                          {e.lastCommit ? firstLine(e.lastCommit.commit.message) : ''}
-                        </span>
-                        <span className="text-xs text-[var(--color-text-muted)] shrink-0">
-                          {e.lastCommit ? formatTimestamp(e.lastCommit.commit.author.timestamp) : ''}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
+            <FileBrowser
+              owner={owner}
+              repo={repo}
+              branch={selectedRef}
+              directory={path}
+              entries={entries}
+              latestCommit={latestCommit}
+              loading={loading}
+              showNewFile={creating && editable}
+              showEmptyCreate={canWrite && branches.length === 0}
+              emptyCreateBranch={defaultBranch ?? 'main'}
+              branchTip={branchTip}
+              showNotice={showNotice}
+              onSaved={afterChange}
+              onOpenBlob={openBlob}
+              onNavigate={(dir) => {
+                setLoading(true);
+                setPath(dir);
+              }}
+            />
           )}
 
           {visibleReadme && !blobPath && (

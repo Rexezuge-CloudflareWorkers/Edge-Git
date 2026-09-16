@@ -188,6 +188,34 @@ class RepoWorker extends DurableObject<Env> {
     return result;
   }
 
+  /**
+   * Commit a single file create/update/delete on a branch (web editor).
+   * `content: null` deletes. Returns a discriminated union — never throws
+   * except for oversized packs — so it survives DO RPC boundaries.
+   */
+  public async commitFile(args: {
+    branch: string;
+    path: string;
+    content: Uint8Array | null;
+    message?: string;
+    expectedOid?: string | null;
+    authorName: string;
+    authorEmail: string;
+  }): Promise<unknown> {
+    await this.prepare();
+    const result = await this.git.commitFile({
+      branch: args.branch,
+      path: args.path,
+      content: args.content,
+      message: args.message,
+      expectedOid: args.expectedOid,
+      author: { name: args.authorName, email: args.authorEmail },
+      maxFileBytes: ConfigurationManager.repo.getMaxFileBytes(this.env),
+    });
+    if (result.ok) this.git.clearCache();
+    return result;
+  }
+
   public async setDefaultBranch(branch: string): Promise<unknown> {
     await this.prepare();
     const result = await this.git.setDefaultBranch(branch);

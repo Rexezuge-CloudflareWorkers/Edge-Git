@@ -111,6 +111,21 @@
     "defaultBranch": "Default Branch",
     "defaultUpdated": "Default Branch Updated."
   },
+  "files": {
+    "edit": "Edit",
+    "newFile": "New File",
+    "fileName": "File Name",
+    "fileNamePlaceholder": "notes/todo.txt",
+    "contentPlaceholder": "File Contents…",
+    "commitMessage": "Commit Message",
+    "commitMessagePlaceholder": "Update {{path}}",
+    "save": "Commit",
+    "saved": "File Saved.",
+    "deleted": "File Deleted.",
+    "deleteFile": "Delete File",
+    "createFirstFile": "Create The First File To Start This Repository.",
+    "unsavedChanges": "You Have Unsaved Changes."
+  },
   "issues": {
     "newIssue": "New Issue",
     "titlePlaceholder": "Title",
@@ -319,6 +334,8 @@
     "failedToLoadFile": "Failed To Load File.",
     "failedToCreateBranch": "Failed To Create Branch.",
     "failedToDeleteBranch": "Failed To Delete Branch.",
+    "failedToSaveFile": "Failed To Save File.",
+    "failedToDeleteFile": "Failed To Delete File.",
     "failedToUpdateDefaultBranch": "Failed To Update Default Branch.",
     "failedToLoadCommit": "Failed To Load Commit.",
     "failedToLoadCompare": "Failed To Load Comparison.",
