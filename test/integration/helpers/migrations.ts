@@ -4,6 +4,11 @@
  * Handles: single/double/backtick quoted strings (incl. `''` escapes),
  * `--` line comments, `/* ... *\/` block comments. Semicolons inside strings
  * or comments do not split. Skips comment-only statements.
+ *
+ * Trigger-aware: `CREATE TRIGGER ... BEGIN ...; ... END;` bodies contain
+ * semicolons that must not split. The splitter tracks the outermost
+ * BEGIN/END depth after a CREATE TRIGGER header and only splits on the
+ * terminating semicolon after the final END.
  */
 
 declare const __INTEGRATION_MIGRATION_SQL__: string;
@@ -15,6 +20,34 @@ function splitSql(sql: string): string[] {
   let stringChar = '';
   let inLineComment = false;
   let inBlockComment = false;
+  // CREATE TRIGGER body tracking (see header comment). Keywords are scanned
+  // outside strings/comments only, matched as whole words case-insensitively.
+  let inTrigger = false;
+  let triggerDepth = 0;
+  let word = '';
+  const recentKeywords: string[] = [];
+  const flushWord = (): void => {
+    if (word.length === 0) return;
+    const upper = word.toUpperCase();
+    word = '';
+    recentKeywords.push(upper);
+    if (recentKeywords.length > 6) recentKeywords.shift();
+    // `CREATE [TEMP|TEMPORARY] TRIGGER` opens a body; a table merely named
+    // "trigger" (`CREATE TABLE trigger`) must not. The word before TRIGGER
+    // disambiguates.
+    if (upper === 'TRIGGER' && ['CREATE', 'TEMP', 'TEMPORARY'].includes(recentKeywords[recentKeywords.length - 2] ?? '')) {
+      inTrigger = true;
+      triggerDepth = 0;
+    } else if (inTrigger && upper === 'BEGIN') {
+      triggerDepth += 1;
+    } else if (inTrigger && upper === 'END') {
+      triggerDepth -= 1;
+      if (triggerDepth <= 0) {
+        inTrigger = false;
+        triggerDepth = 0;
+      }
+    }
+  };
   let i = 0;
   while (i < sql.length) {
     const ch = sql[i];
@@ -51,6 +84,15 @@ function splitSql(sql: string): string[] {
       i++;
       continue;
     }
+    // Buffer word characters for CREATE TRIGGER / BEGIN / END tracking.
+    // Any other character ends the current word.
+    if (/[\w$]/.test(ch)) {
+      word += ch;
+      current += ch;
+      i++;
+      continue;
+    }
+    flushWord();
     if (ch === '-' && next === '-') {
       inLineComment = true;
       current += ch;
@@ -71,6 +113,12 @@ function splitSql(sql: string): string[] {
       continue;
     }
     if (ch === ';') {
+      // Semicolons inside a trigger body do not terminate the statement.
+      if (inTrigger) {
+        current += ch;
+        i++;
+        continue;
+      }
       const trimmed = current.trim();
       if (trimmed.length > 0) statements.push(trimmed);
       current = '';
