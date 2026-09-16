@@ -125,6 +125,7 @@ export function PullDetailView({
           canWrite={authorized ?? false}
           canManage={repoData.viewerCanManage === true}
           showNotice={showNotice}
+          authorized={authorized}
         />
       </div>
     </div>

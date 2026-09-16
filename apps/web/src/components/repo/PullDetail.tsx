@@ -13,6 +13,7 @@ import {
   mergePull,
   updatePullStatus,
 } from '../../services/pullService';
+import { fetchUpgraded, useUpgradeFetchState } from '../../lib/upgradeFetch';
 import { formatTimestamp } from '../../lib/format';
 import { Markdown } from '../shared/Markdown';
 import { headLabel } from './PullsTab';
@@ -28,6 +29,7 @@ export function PullDetail({
   canWrite,
   canManage,
   showNotice,
+  authorized,
 }: {
   owner: string;
   repo: string;
@@ -35,6 +37,7 @@ export function PullDetail({
   canWrite: boolean;
   canManage: boolean;
   showNotice: (type: 'success' | 'error', text: string) => void;
+  authorized?: boolean | null;
 }) {
   const { t } = useTranslation();
   const [pull, setPull] = useState<PullRequest | null>(null);
@@ -55,34 +58,54 @@ export function PullDetail({
   const [mergeMessage, setMergeMessage] = useState('');
   const [deleteHead, setDeleteHead] = useState(false);
 
+  const useAuthed = authorized === true;
+  // Single-flight reads across the auth upgrade (see upgradeFetch). Keys are
+  // marked only on success, so a public 404 (private repo) still retries
+  // authed. Post-mutation refreshes below bypass the helper and call services
+  // directly.
+  const pullStateRef = useUpgradeFetchState<PullRequest>();
+  const commentsStateRef = useUpgradeFetchState<PullComment[]>();
+  const reviewsStateRef = useUpgradeFetchState<PullReview[]>();
+  const diffStateRef = useUpgradeFetchState<PullDiff | null>();
+  const previewStateRef = useUpgradeFetchState<MergePreview | null>();
+
   useEffect(() => {
+    const key = `${owner}/${repo}/${number}`;
+    const authOpt = useAuthed ? { isAuthed: true as const } : { isAuthed: false as const };
     let cancelled = false;
     const run = async () => {
+      let pullRes;
       try {
-        const loaded = await getPull(owner, repo, number);
-        if (cancelled) return;
-        setPull(loaded);
-        setStatus('ready');
+        pullRes = await fetchUpgraded(pullStateRef.current, key, () => getPull(owner, repo, number, authOpt));
       } catch {
         if (!cancelled) setStatus('missing');
         return;
       }
-      try {
-        const [c, r, d] = await Promise.all([
-          listPullComments(owner, repo, number).catch(() => [] as PullComment[]),
-          listPullReviews(owner, repo, number).catch(() => [] as PullReview[]),
-          getPullDiff(owner, repo, number).catch(() => null),
-        ]);
-        if (cancelled) return;
-        setComments(c);
-        setReviews(r);
-        setDiff(d);
-      } catch (error) {
-        if (!cancelled) showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadPull', 'Failed To Load Pull Request.'));
+      if (cancelled) return;
+      if (pullRes.status === 'loaded') {
+        setPull(pullRes.data);
+        setStatus('ready');
       }
+      const [c, r, d] = await Promise.all([
+        fetchUpgraded(commentsStateRef.current, `${key}/comments`, () => listPullComments(owner, repo, number, authOpt))
+          .then((res) => (res.status === 'loaded' ? res.data : null))
+          .catch(() => [] as PullComment[]),
+        fetchUpgraded(reviewsStateRef.current, `${key}/reviews`, () => listPullReviews(owner, repo, number, authOpt))
+          .then((res) => (res.status === 'loaded' ? res.data : null))
+          .catch(() => [] as PullReview[]),
+        fetchUpgraded(diffStateRef.current, `${key}/diff`, () => getPullDiff(owner, repo, number, authOpt))
+          .then((res) => (res.status === 'loaded' ? res.data : null))
+          .catch(() => null),
+      ]);
+      if (cancelled) return;
+      if (c) setComments(c);
+      if (r) setReviews(r);
+      if (d) setDiff(d);
       try {
-        const p = await getMergePreview(owner, repo, number).catch(() => null);
-        if (!cancelled) setPreview(p);
+        const previewRes = await fetchUpgraded(previewStateRef.current, `${key}/preview`, () =>
+          getMergePreview(owner, repo, number, authOpt),
+        );
+        if (!cancelled && previewRes.status === 'loaded') setPreview(previewRes.data);
       } catch {
         // preview is best-effort
       }
@@ -91,7 +114,7 @@ export function PullDetail({
     return () => {
       cancelled = true;
     };
-  }, [owner, repo, number, showNotice, t]);
+  }, [owner, repo, number, useAuthed]);
 
   if (status === 'loading') {
     return (

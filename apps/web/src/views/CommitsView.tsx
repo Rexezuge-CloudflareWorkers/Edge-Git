@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { GitCommit } from '../types';
 import { loadCommits } from '../services/repoService';
+import { fetchUpgraded, useUpgradeFetchState } from '../lib/upgradeFetch';
 import { firstLine, formatTimestamp } from '../lib/format';
 import { RepoHeader } from '../components/repo/RepoHeader';
 import { Card } from '../components/ui/Card';
@@ -29,37 +30,37 @@ export function CommitsView({
   const [exhausted, setExhausted] = useState(false);
 
   const useAuthed = authorized === true;
-  const repoIsPrivate = repoData?.isPrivate === true;
-  // Public and authed commit lists are identical for servable repos: skip a
-  // same-key refetch on auth upgrade (null->true). Private repos never
-  // populate the key publicly, so the upgrade still retries.
-  const loadedKeyRef = useRef<string | null>(null);
+  // Single-flight reads across the auth upgrade (see upgradeFetch).
+  const upgradeStateRef = useUpgradeFetchState<GitCommit[]>();
 
   useEffect(() => {
     if (status !== 'ready') return;
     const key = `${owner}/${repo}/${depth}`;
-    if (useAuthed && !repoIsPrivate && loadedKeyRef.current === key) return;
-    let cancelled = false;
     const authOpt = useAuthed ? { isAuthed: true as const } : { isAuthed: false as const };
-    loadCommits(owner, repo, undefined, depth, authOpt)
-      .then((log) => {
-        if (cancelled) return;
-        loadedKeyRef.current = key;
-        setCommits(log);
-        if (log.length < depth) setExhausted(true);
-      })
-      .catch((error) => {
-        if (!cancelled)
+    let cancelled = false;
+    const run = async () => {
+      let result;
+      try {
+        result = await fetchUpgraded(upgradeStateRef.current, key, () => loadCommits(owner, repo, undefined, depth, authOpt));
+      } catch (error) {
+        if (!cancelled) {
           showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadCommits', 'Failed To Load Commits.'));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+          setLoading(false);
+        }
+        return;
+      }
+      if (cancelled || result.status === 'skipped') return;
+      const log = result.data;
+      setCommits(log);
+      if (log.length < depth) setExhausted(true);
+      setLoading(false);
+    };
+    void run();
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [owner, repo, depth, status, showNotice, t, useAuthed, repoIsPrivate]);
+  }, [owner, repo, depth, status, showNotice, t, useAuthed]);
 
   if (status === 'loading' && !repoData) {
     return (

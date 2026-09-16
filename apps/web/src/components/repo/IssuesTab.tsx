@@ -23,12 +23,14 @@ export function IssuesTab({
   canWrite,
   showNotice,
   onCountChange,
+  authorized,
 }: {
   owner: string;
   repo: string;
   canWrite: boolean;
   showNotice: (type: 'success' | 'error', text: string) => void;
   onCountChange?: (count: number) => void;
+  authorized?: boolean | null;
 }) {
   const { t } = useTranslation();
   const [issues, setIssues] = useState<Issue[]>([]);
@@ -40,9 +42,10 @@ export function IssuesTab({
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    const authOpt = authorized === true ? { isAuthed: true as const } : { isAuthed: false as const };
     const run = async () => {
       try {
-        const list = await listIssues(owner, repo);
+        const list = await listIssues(owner, repo, authOpt);
         setIssues(list);
         onCountChange?.(list.length);
       } catch (error) {
@@ -52,7 +55,7 @@ export function IssuesTab({
       }
     };
     void run();
-  }, [owner, repo, showNotice, onCountChange, reloadKey, t]);
+  }, [owner, repo, showNotice, onCountChange, reloadKey, t, authorized]);
 
   const refresh = () => {
     setLoading(true);

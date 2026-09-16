@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { CommitDiffResult } from '../types';
 import { loadCommit } from '../services/repoService';
+import { fetchUpgraded, useUpgradeFetchState } from '../lib/upgradeFetch';
 import { firstLine, formatCommitDate } from '../lib/format';
 import { RepoHeader } from '../components/repo/RepoHeader';
 import { DiffView } from '../components/repo/DiffView';
@@ -25,29 +26,20 @@ export function CommitView({
   const [missing, setMissing] = useState(false);
 
   const useAuthed = authorized === true;
-  const repoIsPrivate = repoData?.isPrivate === true;
-  // Same-key auth-upgrade skip as CommitsView: public and authed diffs are
-  // identical for servable repos. Only set on success with a commit, so a
-  // public 404 (private repo) still retries authed.
-  const loadedKeyRef = useRef<string | null>(null);
+  // Same-key auth-upgrade skip + in-flight sharing (see upgradeFetch). Keys
+  // mark only on success, so a public 404 (private repo) still retries.
+  const upgradeStateRef = useUpgradeFetchState<CommitDiffResult>();
 
   useEffect(() => {
     if (status !== 'ready') return;
     const key = `${owner}/${repo}/${oid}`;
-    if (useAuthed && !repoIsPrivate && loadedKeyRef.current === key) return;
-    let cancelled = false;
     const authOpt = useAuthed ? { isAuthed: true as const } : { isAuthed: false as const };
-    loadCommit(owner, repo, oid, authOpt)
-      .then((d) => {
-        if (cancelled) return;
-        if (!d.commit) {
-          setMissing(true);
-          return;
-        }
-        loadedKeyRef.current = key;
-        setDiff(d);
-      })
-      .catch((error) => {
+    let cancelled = false;
+    const run = async () => {
+      let result;
+      try {
+        result = await fetchUpgraded(upgradeStateRef.current, key, () => loadCommit(owner, repo, oid, authOpt));
+      } catch (error) {
         if (cancelled) return;
         const message = error instanceof Error ? error.message : '';
         if (message.includes('404') || message.includes('Not found')) {
@@ -55,11 +47,20 @@ export function CommitView({
           return;
         }
         showNotice('error', message || t('errors.failedToLoadCommit', 'Failed To Load Commit.'));
-      });
+        return;
+      }
+      if (cancelled || result.status === 'skipped') return;
+      if (!result.data.commit) {
+        setMissing(true);
+        return;
+      }
+      setDiff(result.data);
+    };
+    void run();
     return () => {
       cancelled = true;
     };
-  }, [owner, repo, oid, status, showNotice, t, useAuthed, repoIsPrivate]);
+  }, [owner, repo, oid, status, showNotice, t, useAuthed]);
 
   if (status === 'loading' && !repoData) {
     return (

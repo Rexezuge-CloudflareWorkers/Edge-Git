@@ -9,14 +9,26 @@ function publicBase(owner: string, repo: string): string {
   return `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues`;
 }
 
-export async function listIssues(owner: string, repo: string): Promise<Issue[]> {
-  try {
-    const data = await apiGet<{ issues?: Issue[] }>(authedBase(owner, repo));
-    return data.issues ?? [];
-  } catch {
-    const data = await apiGet<{ issues?: Issue[] }>(publicBase(owner, repo));
-    return data.issues ?? [];
+export interface ReadOpts {
+  isAuthed?: boolean | null;
+}
+
+async function tryAuthedFirst<T>(authedPath: string, publicPath: string, isAuthed?: boolean | null): Promise<T> {
+  // Same Access 302 + CORS trap as repoService: anonymous viewers go
+  // straight to the public read-model.
+  if (isAuthed === false) {
+    return apiGet<T>(publicPath);
   }
+  try {
+    return await apiGet<T>(authedPath);
+  } catch {
+    return apiGet<T>(publicPath);
+  }
+}
+
+export async function listIssues(owner: string, repo: string, opts?: ReadOpts): Promise<Issue[]> {
+  const data = await tryAuthedFirst<{ issues?: Issue[] }>(authedBase(owner, repo), publicBase(owner, repo), opts?.isAuthed);
+  return data.issues ?? [];
 }
 
 export async function createIssue(
@@ -40,22 +52,17 @@ function unwrapIssue(data: Issue | { issue?: Issue }): Issue {
   return nested ?? (data as Issue);
 }
 
-export async function getIssue(owner: string, repo: string, number: number): Promise<Issue> {
-  try {
-    return unwrapIssue(await apiGet<Issue | { issue?: Issue }>(authedIssue(owner, repo, number)));
-  } catch {
-    return unwrapIssue(await apiGet<Issue | { issue?: Issue }>(publicIssue(owner, repo, number)));
-  }
+export async function getIssue(owner: string, repo: string, number: number, opts?: ReadOpts): Promise<Issue> {
+  return unwrapIssue(await tryAuthedFirst<Issue | { issue?: Issue }>(authedIssue(owner, repo, number), publicIssue(owner, repo, number), opts?.isAuthed));
 }
 
-export async function listComments(owner: string, repo: string, number: number): Promise<Comment[]> {
-  try {
-    const data = await apiGet<{ comments?: Comment[] }>(`${authedIssue(owner, repo, number)}/comments`);
-    return data.comments ?? [];
-  } catch {
-    const data = await apiGet<{ comments?: Comment[] }>(`${publicIssue(owner, repo, number)}/comments`);
-    return data.comments ?? [];
-  }
+export async function listComments(owner: string, repo: string, number: number, opts?: ReadOpts): Promise<Comment[]> {
+  const data = await tryAuthedFirst<{ comments?: Comment[] }>(
+    `${authedIssue(owner, repo, number)}/comments`,
+    `${publicIssue(owner, repo, number)}/comments`,
+    opts?.isAuthed,
+  );
+  return data.comments ?? [];
 }
 
 export async function addComment(owner: string, repo: string, number: number, input: { body: string }): Promise<Comment> {

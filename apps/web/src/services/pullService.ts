@@ -9,14 +9,26 @@ function publicBase(owner: string, repo: string): string {
   return `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls`;
 }
 
-export async function listPulls(owner: string, repo: string): Promise<PullRequest[]> {
-  try {
-    const data = await apiGet<{ pulls?: PullRequest[] }>(authedBase(owner, repo));
-    return data.pulls ?? [];
-  } catch {
-    const data = await apiGet<{ pulls?: PullRequest[] }>(publicBase(owner, repo));
-    return data.pulls ?? [];
+export interface ReadOpts {
+  isAuthed?: boolean | null;
+}
+
+async function tryAuthedFirst<T>(authedPath: string, publicPath: string, isAuthed?: boolean | null): Promise<T> {
+  // Same Access 302 + CORS trap as repoService: anonymous viewers go
+  // straight to the public read-model.
+  if (isAuthed === false) {
+    return apiGet<T>(publicPath);
   }
+  try {
+    return await apiGet<T>(authedPath);
+  } catch {
+    return apiGet<T>(publicPath);
+  }
+}
+
+export async function listPulls(owner: string, repo: string, opts?: ReadOpts): Promise<PullRequest[]> {
+  const data = await tryAuthedFirst<{ pulls?: PullRequest[] }>(authedBase(owner, repo), publicBase(owner, repo), opts?.isAuthed);
+  return data.pulls ?? [];
 }
 
 export async function createPull(
@@ -40,22 +52,19 @@ function unwrapPull(data: PullRequest | { pull?: PullRequest }): PullRequest {
   return nested ?? (data as PullRequest);
 }
 
-export async function getPull(owner: string, repo: string, number: number): Promise<PullRequest> {
-  try {
-    return unwrapPull(await apiGet<PullRequest | { pull?: PullRequest }>(authedPull(owner, repo, number)));
-  } catch {
-    return unwrapPull(await apiGet<PullRequest | { pull?: PullRequest }>(publicPull(owner, repo, number)));
-  }
+export async function getPull(owner: string, repo: string, number: number, opts?: ReadOpts): Promise<PullRequest> {
+  return unwrapPull(
+    await tryAuthedFirst<PullRequest | { pull?: PullRequest }>(authedPull(owner, repo, number), publicPull(owner, repo, number), opts?.isAuthed),
+  );
 }
 
-export async function listPullComments(owner: string, repo: string, number: number): Promise<PullComment[]> {
-  try {
-    const data = await apiGet<{ comments?: PullComment[] }>(`${authedPull(owner, repo, number)}/comments`);
-    return data.comments ?? [];
-  } catch {
-    const data = await apiGet<{ comments?: PullComment[] }>(`${publicPull(owner, repo, number)}/comments`);
-    return data.comments ?? [];
-  }
+export async function listPullComments(owner: string, repo: string, number: number, opts?: ReadOpts): Promise<PullComment[]> {
+  const data = await tryAuthedFirst<{ comments?: PullComment[] }>(
+    `${authedPull(owner, repo, number)}/comments`,
+    `${publicPull(owner, repo, number)}/comments`,
+    opts?.isAuthed,
+  );
+  return data.comments ?? [];
 }
 
 export async function addPullComment(owner: string, repo: string, number: number, input: { body: string }): Promise<PullComment> {
@@ -64,14 +73,13 @@ export async function addPullComment(owner: string, repo: string, number: number
   return nested ?? (data as PullComment);
 }
 
-export async function listPullReviews(owner: string, repo: string, number: number): Promise<PullReview[]> {
-  try {
-    const data = await apiGet<{ reviews?: PullReview[] }>(`${authedPull(owner, repo, number)}/reviews`);
-    return data.reviews ?? [];
-  } catch {
-    const data = await apiGet<{ reviews?: PullReview[] }>(`${publicPull(owner, repo, number)}/reviews`);
-    return data.reviews ?? [];
-  }
+export async function listPullReviews(owner: string, repo: string, number: number, opts?: ReadOpts): Promise<PullReview[]> {
+  const data = await tryAuthedFirst<{ reviews?: PullReview[] }>(
+    `${authedPull(owner, repo, number)}/reviews`,
+    `${publicPull(owner, repo, number)}/reviews`,
+    opts?.isAuthed,
+  );
+  return data.reviews ?? [];
 }
 
 export async function addPullReview(
@@ -89,24 +97,22 @@ export async function updatePullStatus(owner: string, repo: string, number: numb
   return unwrapPull(await apiPatch<PullRequest | { pull?: PullRequest }>(authedPull(owner, repo, number), { status }));
 }
 
-export async function getPullDiff(owner: string, repo: string, number: number): Promise<PullDiff> {
-  try {
-    const data = await apiGet<PullDiff | { diff?: PullDiff }>(`${authedPull(owner, repo, number)}/diff`);
-    return (data as { diff?: PullDiff }).diff ?? (data as PullDiff);
-  } catch {
-    const data = await apiGet<PullDiff | { diff?: PullDiff }>(`${publicPull(owner, repo, number)}/diff`);
-    return (data as { diff?: PullDiff }).diff ?? (data as PullDiff);
-  }
+export async function getPullDiff(owner: string, repo: string, number: number, opts?: ReadOpts): Promise<PullDiff> {
+  const data = await tryAuthedFirst<PullDiff | { diff?: PullDiff }>(
+    `${authedPull(owner, repo, number)}/diff`,
+    `${publicPull(owner, repo, number)}/diff`,
+    opts?.isAuthed,
+  );
+  return (data as { diff?: PullDiff }).diff ?? (data as PullDiff);
 }
 
-export async function getMergePreview(owner: string, repo: string, number: number): Promise<MergePreview | null> {
-  try {
-    const data = await apiGet<{ preview?: MergePreview | null }>(`${authedPull(owner, repo, number)}/preview`);
-    return data.preview ?? null;
-  } catch {
-    const data = await apiGet<{ preview?: MergePreview | null }>(`${publicPull(owner, repo, number)}/preview`);
-    return data.preview ?? null;
-  }
+export async function getMergePreview(owner: string, repo: string, number: number, opts?: ReadOpts): Promise<MergePreview | null> {
+  const data = await tryAuthedFirst<{ preview?: MergePreview | null }>(
+    `${authedPull(owner, repo, number)}/preview`,
+    `${publicPull(owner, repo, number)}/preview`,
+    opts?.isAuthed,
+  );
+  return data.preview ?? null;
 }
 
 export async function mergePull(
