@@ -342,6 +342,15 @@
     "failedToMergePull": "合并失败。",
     "fileNotFound": "文件不存在。",
     "languageLoadFailed": "无法加载语言。",
-    "languageSaveFailed": "无法保存语言。"
+    "languageSaveFailed": "无法保存语言。",
+    "failedToSearch": "加载搜索结果失败。"
+  },
+  "search": {
+    "placeholder": "搜索仓库和议题…",
+    "repos": "仓库",
+    "issues": "议题",
+    "hint": "至少输入 2 个字符进行搜索。",
+    "noRepos": "未找到仓库。",
+    "noIssues": "未找到议题。"
   }
 }

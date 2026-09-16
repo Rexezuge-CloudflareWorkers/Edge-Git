@@ -15,6 +15,7 @@ import { registerIssueRoutes, registerUserIssueRoutes } from './routes/IssueRout
 import { registerPullRoutes, registerUserPullMergeRoutes, registerUserPullRoutes } from './routes/PullRoutes';
 import { registerUserProfileRoutes, registerUserSettingsRoutes } from './routes/UserRoutes';
 import { registerOrgRoutes } from './routes/OrgRoutes';
+import { registerSearchRoutes } from './routes/SearchRoutes';
 
 type AppRouter = HonoOpenAPIRouterType<{
   Bindings: Env;
@@ -49,6 +50,7 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     registerIssueRoutes(app);
     registerPullRoutes(app);
     registerUserProfileRoutes(app);
+    registerSearchRoutes(app);
 
     // Protected UI/API surface
     app.use('/user/*', MiddlewareHandlers.userAuthentication());
@@ -77,13 +79,13 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
         return c.notFound();
       }
       const path: string = new URL(c.req.url).pathname;
-      if (path === '/' || path === '/settings' || path === '/new' || path.startsWith('/user/')) {
+      if (path === '/' || path === '/settings' || path === '/new' || path === '/search' || path.startsWith('/user/')) {
         return c.html(SPA_HTML);
       }
       if (/^\/[^/]+\/?$/.test(path)) {
         // Single-segment profile shell — never shadow reserved API/UI roots.
         const segment = path.replace(/^\//, '').replace(/\/$/, '').toLowerCase();
-        const reserved = new Set(['health', 'docs', 'repos', 'users', 'user', 'settings', 'new']);
+        const reserved = new Set(['health', 'docs', 'repos', 'users', 'user', 'settings', 'new', 'search']);
         if (!reserved.has(segment)) return c.html(SPA_HTML);
         return c.notFound();
       }

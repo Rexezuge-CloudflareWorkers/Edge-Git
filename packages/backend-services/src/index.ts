@@ -6,3 +6,4 @@ export * from './issue/index';
 export * from './pull/index';
 export * from './org/index';
 export * from './permission/index';
+export * from './search/index';

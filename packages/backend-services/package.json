@@ -22,6 +22,8 @@
     "./org/*": "./src/org/*.ts",
     "./permission": "./src/permission/index.ts",
     "./permission/*": "./src/permission/*.ts",
+    "./search": "./src/search/index.ts",
+    "./search/*": "./src/search/*.ts",
     "./composition": "./src/composition/index.ts",
     "./composition/*": "./src/composition/*.ts"
   },
