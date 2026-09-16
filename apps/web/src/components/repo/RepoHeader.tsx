@@ -42,11 +42,15 @@ export function RepoHeader({
           </span>
           <BookMarked className="h-5 w-5 text-[var(--color-text-muted)]" />
           <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
-            <Link to={`/${repo.owner}/${repo.name}`} className="text-[var(--color-accent)] hover:underline">
+            <Link to={`/${repo.owner}`} className="text-[var(--color-accent)] hover:underline">
               {repo.owner}
             </Link>
             <span className="text-[var(--color-text-muted)] font-normal"> / </span>
-            <Link to={`/${repo.owner}/${repo.name}`} className="text-[var(--color-accent)] hover:underline">
+            <Link
+              to={`/${repo.owner}/${repo.name}`}
+              onClick={() => onTabChange('code')}
+              className="text-[var(--color-accent)] hover:underline"
+            >
               {repo.name}
             </Link>
           </h1>
