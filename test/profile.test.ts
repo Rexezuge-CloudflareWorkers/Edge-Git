@@ -207,6 +207,16 @@ function createStub() {
     getTree: () => Promise.resolve([]),
     getBlob: () => Promise.resolve(null),
     getCommits: () => Promise.resolve([]),
+    getOverview: () =>
+      Promise.resolve({
+        branches: ['main'],
+        currentBranch: 'main',
+        resolvedRef: 'a'.repeat(40),
+        tags: [],
+        tree: [],
+        commits: [],
+        readme: null,
+      }),
     fetch: () => Promise.resolve(new Response('PACK', { status: 200 })),
   };
 }

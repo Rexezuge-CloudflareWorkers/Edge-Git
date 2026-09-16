@@ -190,6 +190,16 @@ function createStub() {
     getTree: () => Promise.resolve([]),
     getBlob: () => Promise.resolve(null),
     getCommits: () => Promise.resolve([]),
+    getOverview: () =>
+      Promise.resolve({
+        branches: ['main'],
+        currentBranch: 'main',
+        resolvedRef: 'a'.repeat(40),
+        tags: [{ name: 'v1.0.0', ref: 'refs/tags/v1.0.0', oid: 'b'.repeat(40), peeledOid: null, type: 'lightweight' as const }],
+        tree: [],
+        commits: [],
+        readme: null,
+      }),
     getCommitDiff: () => Promise.resolve({ commit: { oid: 'a'.repeat(40) }, truncated: false, files: [] }),
     getCompare: () => Promise.resolve({ baseOid: 'a'.repeat(40), headOid: 'b'.repeat(40), mergeBase: null, truncated: false, files: [] }),
     fetch: () => Promise.resolve(new Response('PACK', { status: 200 })),
@@ -264,6 +274,14 @@ describe('EdgeGitWorker HTTP surface', () => {
     expect((await call('/user/repos/alice/demo/tree')).status).toBe(200);
     expect((await call('/user/repos/alice/demo/blob?path=f.txt')).status).toBe(200);
     expect((await call('/user/repos/alice/demo/commits')).status).toBe(200);
+    await expect(call('/user/repos/alice/demo/overview').then((r) => r.json())).resolves.toMatchObject({
+      branches: ['main'],
+      currentBranch: 'main',
+      resolvedRef: 'a'.repeat(40),
+      tree: [],
+      commits: [],
+      readme: null,
+    });
     await expect(call(`/user/repos/alice/demo/commits/${'a'.repeat(40)}`).then((r) => r.json())).resolves.toMatchObject({
       truncated: false,
     });
@@ -434,6 +452,11 @@ describe('EdgeGitWorker HTTP surface', () => {
     for (const path of ['/repos/alice/pub', '/repos/alice/pub/branches', '/repos/alice/pub/tree', '/repos/alice/pub/commits', '/repos/alice/pub/issues']) {
       expect(await anon(path).then((r) => r.status)).toBe(200);
     }
+    await expect(anon('/repos/alice/pub/overview').then((r) => r.json())).resolves.toMatchObject({
+      branches: ['main'],
+      currentBranch: 'main',
+      resolvedRef: 'a'.repeat(40),
+    });
     await expect(anon('/repos/alice/pub/tags').then((r) => r.json())).resolves.toEqual([
       { name: 'v1.0.0', ref: 'refs/tags/v1.0.0', oid: 'b'.repeat(40), peeledOid: null, type: 'lightweight' },
     ]);
@@ -447,6 +470,7 @@ describe('EdgeGitWorker HTTP surface', () => {
 
     expect(await anon('/repos/alice/sec').then((r) => r.status)).toBe(404);
     expect(await anon('/repos/alice/sec/branches').then((r) => r.status)).toBe(404);
+    expect(await anon('/repos/alice/sec/overview').then((r) => r.status)).toBe(404);
     expect(await anon('/repos/alice/missing').then((r) => r.status)).toBe(404);
 
     expect(await authed('/repos/alice/sec').then((r) => r.status)).toBe(200);

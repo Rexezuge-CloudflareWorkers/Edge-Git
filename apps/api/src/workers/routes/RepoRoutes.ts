@@ -63,6 +63,15 @@ function registerRepoRoutes(app: RepoApp): void {
     });
   });
 
+  // Aggregate code-page read: branches + tags + fast tree + commits + README
+  // in one DO RPC. Replaces 5 sequential granular calls on owner/repo load.
+  app.get('/repos/:owner/:repo/overview', async (c) => {
+    return withPublicRepo(c as never, async (_row, fullName) => {
+      const url = new URL(c.req.url);
+      return c.json(await getRepoStub(c.env, fullName).getOverview(parseOverviewArgs(url.searchParams)));
+    });
+  });
+
   app.get('/repos/:owner/:repo/commits/:oid', async (c) => {
     const oid = c.req.param('oid');
     if (!/^[0-9a-f]{40}$/i.test(oid)) return c.json({ error: 'Invalid commit oid' }, 400);
@@ -202,15 +211,39 @@ function registerUserRepoRoutes(app: RepoApp): void {
   });
 }
 
-// Read-model passthroughs (branches/tree/blob/commits) via DO RPC.
+// Read-model passthroughs (branches/tree/blob/commits/overview) via DO RPC.
 // `withLastCommit=0|false` opts out of per-file last-commit enrichment so
 // the tree lists fast; omitted means enriched (backwards compatible).
 function parseWithLastCommit(raw: string | null): boolean | undefined {
+  return parseOptionalFlag(raw);
+}
+
+function parseOptionalFlag(raw: string | null): boolean | undefined {
   if (raw === null) return undefined;
   const v = raw.trim().toLowerCase();
   if (['0', 'false', 'no'].includes(v)) return false;
   if (['1', 'true', 'yes'].includes(v)) return true;
   return undefined;
+}
+
+function parseOverviewArgs(params: URLSearchParams): {
+  ref?: string;
+  path?: string;
+  depth?: number;
+  includeTags?: boolean;
+  includeReadme?: boolean;
+} {
+  const ref = params.get('ref') || undefined;
+  const path = params.get('path') || undefined;
+  const depthRaw = params.get('depth');
+  const depth = depthRaw ? Number(depthRaw) : undefined;
+  return {
+    ref,
+    path,
+    depth: depth !== undefined && Number.isFinite(depth) ? depth : undefined,
+    includeTags: parseOptionalFlag(params.get('includeTags')),
+    includeReadme: parseOptionalFlag(params.get('includeReadme')),
+  };
 }
 
 async function withVisibleRepo(c: RequestContext, owner: string, repoName: string, fn: (fullName: string) => Promise<Response>): Promise<Response> {
@@ -302,6 +335,14 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
       if (!diff) return c.json({ error: 'Not found' }, 404);
       return c.json(diff);
     });
+  });
+
+  app.get('/user/repos/:owner/:repo/overview', async (c) => {
+    const owner = c.req.param('owner');
+    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const url = new URL(c.req.url);
+    const args = parseOverviewArgs(url.searchParams);
+    return withVisibleRepo(c as never, owner, repoName, async (fullName) => c.json(await getRepoStub(c.env, fullName).getOverview(args)));
   });
 }
 
