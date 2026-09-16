@@ -167,6 +167,17 @@
     "mergeMessagePlaceholder": "Merge Message (Optional)",
     "deleteHeadAfterMerge": "Delete Head Branch After Merge"
   },
+  "commits": {
+    "history": "Commit History",
+    "backToHistory": "Back To History",
+    "commitNotFound": "Commit Not Found.",
+    "compare": "Compare",
+    "compareHint": "Provide Base And Head Refs, E.g. ?base=main&head=feature.",
+    "compareNotFound": "Comparison Not Found.",
+    "diff": "Diff",
+    "diffTooLarge": "Diff Too Large To Display.",
+    "viewAll": "View All Commits"
+  },
   "forks": {
     "fork": "Fork",
     "forks": "Forks",
@@ -286,8 +297,8 @@
     "failedToLoadComments": "Failed To Load Comments.",
     "failedToAddComment": "Failed To Add Comment.",
     "failedToUpdateIssue": "Failed To Update Issue.",
-      "failedToLoadFiles": "Failed To Load Repository Files.",
-      "failedToLoadTags": "Failed To Load Tags.",
+    "failedToLoadFiles": "Failed To Load Repository Files.",
+    "failedToLoadTags": "Failed To Load Tags.",
     "failedToLoadPull": "Failed To Load Pull Request.",
     "failedToLoadPulls": "Failed To Load Pull Requests.",
     "failedToCreatePull": "Failed To Create Pull Request.",
@@ -296,6 +307,9 @@
     "failedToAddReview": "Failed To Submit Review.",
     "failedToMergePull": "Failed To Merge Pull Request.",
     "failedToLoadFile": "Failed To Load File.",
+    "failedToLoadCommit": "Failed To Load Commit.",
+    "failedToLoadCompare": "Failed To Load Comparison.",
+    "failedToLoadCommits": "Failed To Load Commits.",
     "fileNotFound": "File Not Found.",
     "languageLoadFailed": "Unable To Load Language.",
     "languageSaveFailed": "Unable To Save Language."

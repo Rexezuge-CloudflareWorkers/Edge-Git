@@ -148,6 +148,14 @@ export class GitService {
     return this.history.getCommit(commitOid);
   }
 
+  async getCommitDiff(commitOid: string, maxFiles: number) {
+    return this.history.getCommitDiff(commitOid, maxFiles);
+  }
+
+  async getCompareDiff(baseRef: string, headRef: string, maxFiles: number) {
+    return this.history.getCompareDiff(baseRef, headRef, maxFiles);
+  }
+
   async applyRefUpdates(commands: Array<{ oldOid: string; newOid: string; ref: string }>, atomic: boolean): Promise<RefUpdateResult[]> {
     return this.refs.applyRefUpdates(commands, atomic);
   }

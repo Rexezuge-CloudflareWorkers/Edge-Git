@@ -172,6 +172,8 @@ function createStub() {
     getTree: () => Promise.resolve([]),
     getBlob: () => Promise.resolve(null),
     getCommits: () => Promise.resolve([]),
+    getCommitDiff: () => Promise.resolve({ commit: { oid: 'a'.repeat(40) }, truncated: false, files: [] }),
+    getCompare: () => Promise.resolve({ baseOid: 'a'.repeat(40), headOid: 'b'.repeat(40), mergeBase: null, truncated: false, files: [] }),
     fetch: () => Promise.resolve(new Response('PACK', { status: 200 })),
   };
 }
@@ -244,6 +246,14 @@ describe('EdgeGitWorker HTTP surface', () => {
     expect((await call('/user/repos/alice/demo/tree')).status).toBe(200);
     expect((await call('/user/repos/alice/demo/blob?path=f.txt')).status).toBe(200);
     expect((await call('/user/repos/alice/demo/commits')).status).toBe(200);
+    await expect(call(`/user/repos/alice/demo/commits/${'a'.repeat(40)}`).then((r) => r.json())).resolves.toMatchObject({
+      truncated: false,
+    });
+    expect((await call('/user/repos/alice/demo/commits/short')).status).toBe(400);
+    await expect(call('/user/repos/alice/demo/compare?base=main&head=other').then((r) => r.json())).resolves.toMatchObject({
+      baseOid: 'a'.repeat(40),
+    });
+    expect((await call('/user/repos/alice/demo/compare?base=main')).status).toBe(400);
   });
 
   it('serves git smart-http anonymously for public repos', async () => {
@@ -410,6 +420,12 @@ describe('EdgeGitWorker HTTP surface', () => {
       { name: 'v1.0.0', ref: 'refs/tags/v1.0.0', oid: 'b'.repeat(40), peeledOid: null, type: 'lightweight' },
     ]);
     expect(await anon('/repos/alice/pub/blob?path=f.txt').then((r) => r.status)).toBe(200);
+    await expect(anon(`/repos/alice/pub/commits/${'a'.repeat(40)}`).then((r) => r.json())).resolves.toMatchObject({ truncated: false });
+    expect(await anon('/repos/alice/pub/commits/short').then((r) => r.status)).toBe(400);
+    await expect(anon('/repos/alice/pub/compare?base=main&head=other').then((r) => r.json())).resolves.toMatchObject({
+      baseOid: 'a'.repeat(40),
+    });
+    expect(await anon('/repos/alice/pub/compare?base=main').then((r) => r.status)).toBe(400);
 
     expect(await anon('/repos/alice/sec').then((r) => r.status)).toBe(404);
     expect(await anon('/repos/alice/sec/branches').then((r) => r.status)).toBe(404);
@@ -457,6 +473,23 @@ describe('EdgeGitWorker HTTP surface', () => {
 
     const tooDeep = await worker.onRequest(new Request('https://git.example.com/alice/pub/issues/1/extra'), anonEnv, ctx);
     expect(tooDeep.status).toBe(404);
+  });
+
+  it('serves the SPA shell for commit, compare, and history paths', async () => {
+    const worker = new EdgeGitWorker() as unknown as { onRequest(r: Request, e: unknown, c: unknown): Promise<Response> };
+    const db = createApiFakeDb();
+    const authedEnv = createEnv(db);
+    const anonEnv = { ...authedEnv, DEV_AUTH_EMAIL: undefined };
+    await worker.onRequest(
+      new Request('https://git.example.com/user/repos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'pub' }) }),
+      authedEnv,
+      ctx,
+    );
+    for (const path of [`/alice/pub/commit/${'a'.repeat(40)}`, '/alice/pub/compare?base=main&head=other', '/alice/pub/commits']) {
+      const shell = await worker.onRequest(new Request(`https://git.example.com${path}`), anonEnv, ctx);
+      expect(shell.status).toBe(200);
+      expect(shell.headers.get('content-type')).toContain('text/html');
+    }
   });
 });
 

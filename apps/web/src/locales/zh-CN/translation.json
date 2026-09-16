@@ -167,6 +167,17 @@
     "mergeMessagePlaceholder": "合并说明（可选）",
     "deleteHeadAfterMerge": "合并后删除来源分支"
   },
+  "commits": {
+    "history": "提交历史",
+    "backToHistory": "返回历史",
+    "commitNotFound": "提交不存在。",
+    "compare": "对比",
+    "compareHint": "请提供基准和目标引用，例如 ?base=main&head=feature。",
+    "compareNotFound": "对比不存在。",
+    "diff": "差异",
+    "diffTooLarge": "差异过大，无法显示。",
+    "viewAll": "查看全部提交"
+  },
   "forks": {
     "fork": "复刻",
     "forks": "复刻",
@@ -289,6 +300,9 @@
     "failedToLoadFiles": "加载仓库文件失败。",
     "failedToLoadTags": "加载标签失败。",
     "failedToLoadFile": "加载文件失败。",
+    "failedToLoadCommit": "加载提交失败。",
+    "failedToLoadCompare": "加载对比失败。",
+    "failedToLoadCommits": "加载提交历史失败。",
     "failedToLoadPull": "加载合并请求失败。",
     "failedToLoadPulls": "加载合并请求列表失败。",
     "failedToCreatePull": "创建合并请求失败。",
