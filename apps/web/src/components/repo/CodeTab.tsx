@@ -118,9 +118,6 @@ export function CodeTab({
     enrichInflightKey: string | null;
     enrichInflight: Promise<TreeEntry[]> | null;
   }>({ key: null, inflightKey: null, inflight: null, enrichedKey: null, enrichInflightKey: null, enrichInflight: null });
-  // Read directly in the effect (dep below): public and authed overview are
-  // identical unless the repo is private.
-  const repoIsPrivate = repoMeta.isPrivate;
 
   useEffect(() => {
     let cancelled = false;
@@ -131,17 +128,17 @@ export function CodeTab({
     const run = async () => {
       const key = `${owner}/${repo}/${ref}/${path}/${reloadKey}`;
       const st = overviewStateRef.current;
-      // Auth upgrade with identical key and fresh public data: skip — the
-      // authed overview is byte-identical here (RepoView still upgrades meta
-      // for viewerRole). Private repos never populate `key` publicly.
-      if (useAuthed && !repoIsPrivate && st.key === key) return;
+      // Same-key request already settled (public and authed overviews are
+      // byte-identical, even for private repos served with a session): skip.
+      // RepoView still upgrades meta for viewerRole.
+      if (st.key === key) return;
       try {
         // Single aggregate read (one DO RPC): branches + tags + fast tree
         // + commits + README. Replaces the sequential branches/tags/tree/
         // commits/blob waterfall that serialized on the DO input gate.
-        // A same-key public request still in flight is awaited instead of
+        // A same-key request still in flight is awaited instead of
         // starting a second aggregate RPC.
-        const shared = useAuthed && !repoIsPrivate && st.inflightKey === key ? st.inflight : null;
+        const shared = st.inflightKey === key ? st.inflight : null;
         let overview: OverviewResponse | null = null;
         if (shared) {
           try {
@@ -228,7 +225,7 @@ export function CodeTab({
     return () => {
       cancelled = true;
     };
-  }, [owner, repo, ref, path, showNotice, reloadKey, useAuthed, repoIsPrivate]);
+  }, [owner, repo, ref, path, showNotice, reloadKey, useAuthed]);
 
   const readmeEntry = path === '' ? entries.find((e) => e.type === 'blob' && README_NAMES.has(e.path)) : undefined;
 

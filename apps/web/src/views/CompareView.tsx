@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { CompareResult } from '../types';
 import { loadCompare } from '../services/repoService';
+import { fetchUpgraded, useUpgradeFetchState } from '../lib/upgradeFetch';
 import { RepoHeader } from '../components/repo/RepoHeader';
 import { DiffView } from '../components/repo/DiffView';
 import { Card } from '../components/ui/Card';
@@ -27,23 +28,19 @@ export function CompareView({
   const [missing, setMissing] = useState(false);
 
   const useAuthed = authorized === true;
-  const repoIsPrivate = repoData?.isPrivate === true;
-  // Same-key auth-upgrade skip as CommitsView.
-  const loadedKeyRef = useRef<string | null>(null);
+  // Same-key auth-upgrade skip + in-flight sharing (see upgradeFetch).
+  const upgradeStateRef = useUpgradeFetchState<CompareResult>();
 
   useEffect(() => {
     if (status !== 'ready' || !base || !head) return;
     const key = `${owner}/${repo}/${base}/${head}`;
-    if (useAuthed && !repoIsPrivate && loadedKeyRef.current === key) return;
-    let cancelled = false;
     const authOpt = useAuthed ? { isAuthed: true as const } : { isAuthed: false as const };
-    loadCompare(owner, repo, base, head, authOpt)
-      .then((d) => {
-        if (cancelled) return;
-        loadedKeyRef.current = key;
-        setDiff(d);
-      })
-      .catch((error) => {
+    let cancelled = false;
+    const run = async () => {
+      let result;
+      try {
+        result = await fetchUpgraded(upgradeStateRef.current, key, () => loadCompare(owner, repo, base, head, authOpt));
+      } catch (error) {
         if (cancelled) return;
         const message = error instanceof Error ? error.message : '';
         if (message.includes('404') || message.includes('Not found')) {
@@ -51,11 +48,16 @@ export function CompareView({
           return;
         }
         showNotice('error', message || t('errors.failedToLoadCompare', 'Failed To Load Comparison.'));
-      });
+        return;
+      }
+      if (cancelled || result.status === 'skipped') return;
+      setDiff(result.data);
+    };
+    void run();
     return () => {
       cancelled = true;
     };
-  }, [owner, repo, base, head, status, showNotice, t, useAuthed, repoIsPrivate]);
+  }, [owner, repo, base, head, status, showNotice, t, useAuthed]);
 
   if (status === 'loading' && !repoData) {
     return (

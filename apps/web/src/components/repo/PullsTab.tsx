@@ -42,6 +42,7 @@ export function PullsTab({
   canWrite,
   showNotice,
   onCountChange,
+  authorized,
 }: {
   owner: string;
   repo: string;
@@ -49,6 +50,7 @@ export function PullsTab({
   canWrite: boolean;
   showNotice: (type: 'success' | 'error', text: string) => void;
   onCountChange?: (count: number) => void;
+  authorized?: boolean | null;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -71,12 +73,13 @@ export function PullsTab({
 
   useEffect(() => {
     let cancelled = false;
+    const authOpt = authorized === true ? { isAuthed: true as const } : { isAuthed: false as const };
     const run = async () => {
       try {
         const [list, b, forks] = await Promise.all([
-          listPulls(owner, repo),
-          loadBranches(owner, repo).catch(() => ({ branches: [], currentBranch: null })),
-          listForks(owner, repo).catch(() => ({ forks: [], count: 0 })),
+          listPulls(owner, repo, authOpt),
+          loadBranches(owner, repo, authOpt).catch(() => ({ branches: [], currentBranch: null })),
+          listForks(owner, repo, authOpt).catch(() => ({ forks: [], count: 0 })),
         ]);
         if (cancelled) return;
         setPulls(list);
@@ -96,16 +99,17 @@ export function PullsTab({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [owner, repo, reloadKey]);
+  }, [owner, repo, reloadKey, authorized]);
 
   useEffect(() => {
     if (!isCrossRepo) return;
     const slash = headRepo.indexOf('/');
     if (slash <= 0) return;
+    const authOpt = authorized === true ? { isAuthed: true as const } : { isAuthed: false as const };
     let cancelled = false;
     const run = async () => {
       try {
-        const b = await loadBranches(headRepo.slice(0, slash), headRepo.slice(slash + 1));
+        const b = await loadBranches(headRepo.slice(0, slash), headRepo.slice(slash + 1), authOpt);
         if (!cancelled) setCrossBranches(b.branches);
       } catch {
         if (!cancelled) setCrossBranches([]);
@@ -116,7 +120,7 @@ export function PullsTab({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [headRepo, isCrossRepo]);
+  }, [headRepo, isCrossRepo, authorized]);
 
   useEffect(() => {
     onCountChange?.(pulls.length);

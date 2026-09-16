@@ -149,10 +149,10 @@ export function RepoView({
           />
         )}
         {visibleTab === 'pulls' && (
-          <PullsTab owner={owner} repo={repo} repoMeta={repoData} canWrite={authorized ?? false} showNotice={showNotice} onCountChange={setPullCount} />
+          <PullsTab owner={owner} repo={repo} repoMeta={repoData} canWrite={authorized ?? false} showNotice={showNotice} onCountChange={setPullCount} authorized={authorized} />
         )}
         {visibleTab === 'issues' && (
-          <IssuesTab owner={owner} repo={repo} canWrite={authorized ?? false} showNotice={showNotice} onCountChange={setIssueCount} />
+          <IssuesTab owner={owner} repo={repo} canWrite={authorized ?? false} showNotice={showNotice} onCountChange={setIssueCount} authorized={authorized} />
         )}
         {visibleTab === 'settings' && (
           <RepoSettingsTab

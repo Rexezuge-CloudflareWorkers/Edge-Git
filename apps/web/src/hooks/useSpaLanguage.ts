@@ -50,6 +50,15 @@ function useSpaLanguage({ user, showNotice, setUser }: UseSpaLanguageInput) {
           }
         })(),
     );
+    // Already on this language with its bundle loaded: reloading would still
+    // call changeLanguage, mint a new `t` identity, and refire every data
+    // effect that (correctly) lists `t` in deps — skip it.
+    if (normalizeLanguage(i18n.language) === preferred && i18n.hasResourceBundle(preferred, 'translation')) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing already-correct external i18n state into React on user load; values are identical so this settles instead of looping.
+      setLanguage(preferred);
+      setLanguageStatus('ready');
+      return;
+    }
     let cancelled = false;
     setLanguageStatus('loading');
     loadLanguage(preferred)

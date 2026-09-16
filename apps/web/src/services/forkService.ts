@@ -29,12 +29,20 @@ export async function forkRepo(owner: string, repo: string, input: ForkInput): P
   return apiPost<CreatedFork>(authedForks(owner, repo), input);
 }
 
-export async function listForks(owner: string, repo: string): Promise<{ forks: Repo[]; count: number }> {
-  try {
-    const data = await apiGet<{ forks?: Repo[]; count?: number }>(authedForks(owner, repo));
-    return { forks: data.forks ?? [], count: data.count ?? data.forks?.length ?? 0 };
-  } catch {
-    const data = await apiGet<{ forks?: Repo[]; count?: number }>(publicForks(owner, repo));
-    return { forks: data.forks ?? [], count: data.count ?? data.forks?.length ?? 0 };
+async function tryAuthedFirst<T>(authedPath: string, publicPath: string, isAuthed?: boolean | null): Promise<T> {
+  // Same Access 302 + CORS trap as repoService: anonymous viewers go
+  // straight to the public read-model.
+  if (isAuthed === false) {
+    return apiGet<T>(publicPath);
   }
+  try {
+    return await apiGet<T>(authedPath);
+  } catch {
+    return apiGet<T>(publicPath);
+  }
+}
+
+export async function listForks(owner: string, repo: string, opts?: { isAuthed?: boolean | null }): Promise<{ forks: Repo[]; count: number }> {
+  const data = await tryAuthedFirst<{ forks?: Repo[]; count?: number }>(authedForks(owner, repo), publicForks(owner, repo), opts?.isAuthed);
+  return { forks: data.forks ?? [], count: data.count ?? data.forks?.length ?? 0 };
 }

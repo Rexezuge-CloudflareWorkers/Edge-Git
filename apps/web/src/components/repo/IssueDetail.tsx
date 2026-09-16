@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { Comment, Issue } from '../../types';
 import { addComment, getIssue, listComments, updateIssueStatus } from '../../services/issueService';
+import { fetchUpgraded, useUpgradeFetchState } from '../../lib/upgradeFetch';
 import { formatTimestamp } from '../../lib/format';
 import { Markdown } from '../shared/Markdown';
 import { Button } from '../ui/Button';
@@ -17,6 +18,7 @@ export function IssueDetail({
   canWrite,
   canManage,
   showNotice,
+  authorized,
 }: {
   owner: string;
   repo: string;
@@ -24,6 +26,7 @@ export function IssueDetail({
   canWrite: boolean;
   canManage: boolean;
   showNotice: (type: 'success' | 'error', text: string) => void;
+  authorized?: boolean | null;
 }) {
   const { t } = useTranslation();
   const [issue, setIssue] = useState<Issue | null>(null);
@@ -33,32 +36,50 @@ export function IssueDetail({
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState(false);
 
+  const useAuthed = authorized === true;
+  // Single-flight reads across the auth upgrade (see upgradeFetch). Keyed
+  // only on success, so a public 404 (private repo) still retries authed.
+  // Post-mutation refreshes below bypass the helper and call services
+  // directly, so new comments are never hidden by a stale key.
+  const issueStateRef = useUpgradeFetchState<Issue>();
+  const commentsStateRef = useUpgradeFetchState<Comment[]>();
+
   useEffect(() => {
+    const key = `${owner}/${repo}/${number}`;
+    const authOpt = useAuthed ? { isAuthed: true as const } : { isAuthed: false as const };
     let cancelled = false;
     const run = async () => {
+      let issueRes;
       try {
-        const loaded = await getIssue(owner, repo, number);
-        if (cancelled) return;
-        setIssue(loaded);
-        setStatus('ready');
+        issueRes = await fetchUpgraded(issueStateRef.current, key, () => getIssue(owner, repo, number, authOpt));
       } catch {
         if (!cancelled) setStatus('missing');
         return;
       }
+      if (cancelled) return;
+      if (issueRes.status === 'loaded') {
+        setIssue(issueRes.data);
+        setStatus('ready');
+      }
+      let commentsRes;
       try {
-        const list = await listComments(owner, repo, number);
-        if (!cancelled) setComments(list);
+        commentsRes = await fetchUpgraded(commentsStateRef.current, `${key}/comments`, () =>
+          listComments(owner, repo, number, authOpt),
+        );
       } catch (error) {
         if (!cancelled) {
           showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadComments', 'Failed To Load Comments.'));
         }
+        return;
       }
+      if (cancelled || commentsRes.status === 'skipped') return;
+      setComments(commentsRes.data);
     };
     void run();
     return () => {
       cancelled = true;
     };
-  }, [owner, repo, number, showNotice, t]);
+  }, [owner, repo, number, showNotice, t, useAuthed]);
 
   if (status === 'loading') {
     return (
