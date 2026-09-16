@@ -26,10 +26,12 @@ export function CompareView({
   const [diff, setDiff] = useState<CompareResult | null>(null);
   const [missing, setMissing] = useState(false);
 
+  const useAuthed = authorized === true;
+
   useEffect(() => {
     if (status !== 'ready' || !base || !head) return;
     let cancelled = false;
-    const authOpt = authorized === true ? { isAuthed: true as const } : { isAuthed: false as const };
+    const authOpt = useAuthed ? { isAuthed: true as const } : { isAuthed: false as const };
     loadCompare(owner, repo, base, head, authOpt)
       .then((d) => {
         if (!cancelled) setDiff(d);
@@ -46,7 +48,7 @@ export function CompareView({
     return () => {
       cancelled = true;
     };
-  }, [owner, repo, base, head, status, showNotice, t, authorized]);
+  }, [owner, repo, base, head, status, showNotice, t, useAuthed]);
 
   if (status === 'loading' && !repoData) {
     return (

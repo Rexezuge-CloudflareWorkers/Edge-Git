@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { Repo } from '../types';
 import { loadRepoAuthed, loadRepoPublic } from '../services/repoService';
@@ -27,13 +27,21 @@ export function RepoView({
   const [issueCount, setIssueCount] = useState<number | undefined>(undefined);
   const [pullCount, setPullCount] = useState<number | undefined>(undefined);
 
+  // `true` only for signed-in viewers: `null` (resolving) and `false`
+  // share the public path so null->false never refetches. A public 404
+  // while resolving is parked in `pendingErrorRef` and applied when auth
+  // settles without a second fetch (see effect below).
+  const useAuthed = authorized === true;
+  const pendingErrorRef = useRef<{ key: string; kind: 'missing' | 'forbidden' } | null>(null);
+
   useEffect(() => {
+    pendingErrorRef.current = null;
     let cancelled = false;
     const run = async () => {
       // Speculative public load: never wait for Access auth to render public
       // repos. When auth resolves to true we upgrade to the authed payload
-      // (viewerRole/viewerCanManage) in the same effect via `authorized`.
-      if (authorized === true) {
+      // (viewerRole/viewerCanManage) via `useAuthed`.
+      if (useAuthed) {
         try {
           const data = await loadRepoAuthed(owner, repo);
           if (!cancelled) {
@@ -54,18 +62,34 @@ export function RepoView({
         }
       } catch (error) {
         if (cancelled) return;
+        const message = error instanceof Error ? error.message : '';
+        const kind = message.includes('404') || message.includes('Not found') ? 'missing' : 'forbidden';
         // Private repos 404 on public while auth is still resolving — stay in
         // loading until `authorized` settles instead of flashing Not Found.
-        if (authorized === null) return;
-        const message = error instanceof Error ? error.message : '';
-        setStatus(message.includes('404') || message.includes('Not found') ? 'missing' : 'forbidden');
+        if (authorized === null) {
+          pendingErrorRef.current = { key: `${owner}/${repo}`, kind };
+          return;
+        }
+        setStatus(kind);
       }
     };
     void run();
     return () => {
       cancelled = true;
     };
-  }, [owner, repo, authorized]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [owner, repo, useAuthed]);
+
+  // Apply a parked public-load error once auth settles as anonymous, with no
+  // refetch (null->false keeps `useAuthed` false so the loader above idles).
+  useEffect(() => {
+    if (authorized !== false || status !== 'loading' || repoData) return;
+    const pending = pendingErrorRef.current;
+    if (pending && pending.key === `${owner}/${repo}`) {
+      setStatus(pending.kind);
+      pendingErrorRef.current = null;
+    }
+  }, [authorized, status, repoData, owner, repo]);
 
   if (status === 'loading' && !repoData) {
     return (

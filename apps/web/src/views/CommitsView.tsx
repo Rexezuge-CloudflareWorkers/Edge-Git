@@ -28,10 +28,12 @@ export function CommitsView({
   const [loading, setLoading] = useState(true);
   const [exhausted, setExhausted] = useState(false);
 
+  const useAuthed = authorized === true;
+
   useEffect(() => {
     if (status !== 'ready') return;
     let cancelled = false;
-    const authOpt = authorized === true ? { isAuthed: true as const } : { isAuthed: false as const };
+    const authOpt = useAuthed ? { isAuthed: true as const } : { isAuthed: false as const };
     loadCommits(owner, repo, undefined, depth, authOpt)
       .then((log) => {
         if (cancelled) return;
@@ -48,7 +50,8 @@ export function CommitsView({
     return () => {
       cancelled = true;
     };
-  }, [owner, repo, depth, status, showNotice, t, authorized]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [owner, repo, depth, status, showNotice, t, useAuthed]);
 
   if (status === 'loading' && !repoData) {
     return (

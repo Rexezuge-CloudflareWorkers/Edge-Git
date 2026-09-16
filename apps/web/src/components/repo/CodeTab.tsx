@@ -93,12 +93,16 @@ export function CodeTab({
   const branchTip = commits[0]?.oid;
   const editableFile = editable && !blobBinary && (blobText ?? '').length <= MAX_EDIT_CHARS;
 
+  // `true` only for signed-in viewers: `null` (resolving) and `false`
+  // share the public path so null->false never refetches.
+  const useAuthed = authorized === true;
+
   useEffect(() => {
     let cancelled = false;
-    // `authorized !== true` (anonymous or still resolving) goes straight to
-    // the public read-model so we never pay the /user/* Access 302 + CORS
-    // round-trip. When auth resolves to true the effect re-runs via `authorized`.
-    const authOpt = authorized === true ? { isAuthed: true as const } : { isAuthed: false as const };
+    // Anonymous (or still resolving) goes straight to the public read-model
+    // so we never pay the /user/* Access 302 + CORS round-trip. When auth
+    // resolves to true the effect re-runs via `useAuthed`.
+    const authOpt = useAuthed ? { isAuthed: true as const } : { isAuthed: false as const };
     const run = async () => {
       try {
         const [b, loadedTags] = await Promise.all([
@@ -151,7 +155,7 @@ export function CodeTab({
     return () => {
       cancelled = true;
     };
-  }, [owner, repo, ref, path, showNotice, reloadKey, authorized]);
+  }, [owner, repo, ref, path, showNotice, reloadKey, useAuthed]);
 
   const readmeEntry = path === '' ? entries.find((e) => e.type === 'blob' && README_NAMES.has(e.path)) : undefined;
 
@@ -159,7 +163,7 @@ export function CodeTab({
   useEffect(() => {
     if (!readmeEntry) return;
     let cancelled = false;
-    const authOpt = authorized === true ? { isAuthed: true as const } : { isAuthed: false as const };
+    const authOpt = useAuthed ? { isAuthed: true as const } : { isAuthed: false as const };
     loadBlob(owner, repo, readmeEntry.path, selectedRef || undefined, authOpt)
       .then((blob) => {
         if (cancelled || !blob || blob.isBinary) return;
@@ -171,7 +175,7 @@ export function CodeTab({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [owner, repo, selectedRef, readmeEntry?.path, authorized]);
+  }, [owner, repo, selectedRef, readmeEntry?.path, useAuthed]);
 
   const visibleReadme = readmeEntry && readme && readme.path === readmeEntry.path ? readme.text : null;
 
@@ -197,7 +201,7 @@ export function CodeTab({
   const openBlob = async (entryPath: string) => {
     const fullPath = path ? `${path}/${entryPath}` : entryPath;
     try {
-      const authOpt = authorized === true ? { isAuthed: true as const } : { isAuthed: false as const };
+      const authOpt = useAuthed ? { isAuthed: true as const } : { isAuthed: false as const };
       const blob = await loadBlob(owner, repo, fullPath, selectedRef || undefined, authOpt);
       if (!blob) {
         showNotice('error', 'File Not Found.');
