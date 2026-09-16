@@ -33,7 +33,23 @@ class BackgroundTaskRunPruningTask extends BaseScheduledTask {
   }
 }
 
-const CRON_TASK_DEFINITIONS: ScheduledTask[] = [new ExpiredTokenPruningTask(), new BackgroundTaskRunPruningTask(), new SearchBackfillTask()];
+class SocialPruningTask extends BaseScheduledTask {
+  public readonly name = 'SocialPruningTask';
+  public readonly phase: 1 | 2 = 2;
+
+  protected async handleScheduledTask(env: Env): Promise<void> {
+    const retentionDays = ConfigurationManager.processing.getAuditLogRetentionDays(env);
+    const cutoff = TimestampUtil.getCurrentUnixTimestampInSeconds() - retentionDays * 86_400;
+    const scope = createRequestScope(env);
+    const prunedEvents = await scope.get(Tokens.EventDAO)().then((dao) => dao.pruneOlderThan(cutoff, 500)).catch(() => 0);
+    const prunedNotifications = await scope.get(Tokens.NotificationDAO)().then((dao) => dao.pruneReadOlderThan(cutoff, 500)).catch(() => 0);
+    if (prunedEvents > 0 || prunedNotifications > 0) {
+      logger.info(`Pruned ${prunedEvents} repo events and ${prunedNotifications} read notifications`);
+    }
+  }
+}
+
+const CRON_TASK_DEFINITIONS: ScheduledTask[] = [new ExpiredTokenPruningTask(), new BackgroundTaskRunPruningTask(), new SearchBackfillTask(), new SocialPruningTask()];
 
 async function runScheduledTasks(env: Env, cron: string, scheduledTime: number): Promise<void> {
   logger.info(`Running scheduled tasks for ${cron} at ${scheduledTime}`);
@@ -43,6 +59,6 @@ async function runScheduledTasks(env: Env, cron: string, scheduledTime: number):
   await Promise.all(phase2.map((t) => t.run(env).catch((error: unknown) => logger.error(`Task ${t.name} failed`, error))));
 }
 
-export { CRON_TASK_DEFINITIONS, runScheduledTasks, ExpiredTokenPruningTask, BackgroundTaskRunPruningTask };
+export { CRON_TASK_DEFINITIONS, runScheduledTasks, ExpiredTokenPruningTask, BackgroundTaskRunPruningTask, SocialPruningTask };
 export { SearchBackfillTask } from './SearchBackfillTask';
 export type { ScheduledTask } from './IScheduledTask';

@@ -17,6 +17,8 @@ import { registerPullRoutes, registerUserPullMergeRoutes, registerUserPullRoutes
 import { registerUserProfileRoutes, registerUserSettingsRoutes } from './routes/UserRoutes';
 import { registerOrgRoutes } from './routes/OrgRoutes';
 import { registerSearchRoutes } from './routes/SearchRoutes';
+import { registerUserNotificationRoutes } from './routes/NotificationRoutes';
+import { registerSocialRoutes, registerUserSocialRoutes } from './routes/SocialRoutes';
 
 type AppRouter = HonoOpenAPIRouterType<{
   Bindings: Env;
@@ -52,6 +54,7 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     registerPullRoutes(app);
     registerUserProfileRoutes(app);
     registerSearchRoutes(app);
+    registerSocialRoutes(app);
 
     // Protected UI/API surface
     app.use('/user/*', MiddlewareHandlers.userAuthentication());
@@ -71,6 +74,8 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     registerUserIssueRoutes(app);
     registerUserPullRoutes(app);
     registerUserPullMergeRoutes(app);
+    registerUserSocialRoutes(app);
+    registerUserNotificationRoutes(app);
 
     // SPA catch-all — public shell for user home (/), profile home
     // (/:username, GitHub-style), repo home (/:owner/:repo), and the legacy
@@ -81,7 +86,7 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
         return c.notFound();
       }
       const path: string = new URL(c.req.url).pathname;
-      if (path === '/' || path === '/settings' || path === '/new' || path === '/search' || path.startsWith('/user/')) {
+      if (path === '/' || path === '/settings' || path === '/new' || path === '/search' || path === '/notifications' || path.startsWith('/user/')) {
         return c.html(SPA_HTML);
       }
       if (/^\/[^/]+\/?$/.test(path)) {

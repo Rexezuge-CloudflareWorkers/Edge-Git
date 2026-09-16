@@ -1,6 +1,7 @@
 import type { Hono } from 'hono';
 import { getRepoStub, ensureRepo } from '../repoStub';
 import { requireVisibleRepo, toRepoJson, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { recordAndNotify } from './SocialEmit';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
 import type { RequestContext } from '@/middleware';
@@ -148,7 +149,10 @@ function registerUserRepoRoutes(app: RepoApp): void {
       const created = await svc.getByOwnerAndName(owner, normalized);
       const canonicalOwner = created?.owner ?? owner;
       await ensureRepo(c.env, `${canonicalOwner}/${normalized}`);
-      return c.json({ id, owner: canonicalOwner, name: normalized, fullName: `${canonicalOwner}/${normalized}` }, 201);
+      const fullName = `${canonicalOwner}/${normalized}`;
+      await scope.get(Tokens.WatchService).ensureWatching(id, email).catch(() => undefined);
+      await recordAndNotify(c.env, { repositoryId: id, fullName, actorEmail: email, type: 'repo_created', title: `Created repository ${fullName}` });
+      return c.json({ id, owner: canonicalOwner, name: normalized, fullName }, 201);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create repo';
       const status =

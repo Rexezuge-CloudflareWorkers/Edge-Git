@@ -1,9 +1,10 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { GitBranch, Plus } from 'lucide-react';
+import { Bell, GitBranch, Plus } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { LanguageSelector } from '../shared/LanguageSelector';
+import { getUnreadCount } from '../../services/notificationService';
 
 export function Header({
   userEmail,
@@ -21,6 +22,28 @@ export function Header({
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    // The bell only renders for signed-in viewers, so a stale count is never
+    // visible after sign-out; the next sign-in refetches via [userEmail].
+    if (!userEmail) return;
+    let cancelled = false;
+    const fetchCount = async () => {
+      try {
+        const count = await getUnreadCount();
+        if (!cancelled) setUnread(count);
+      } catch {
+        // inbox unavailable (legacy DBs); bell stays quiet
+      }
+    };
+    void fetchCount();
+    const timer = setInterval(() => void fetchCount(), 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [userEmail]);
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--color-border)] bg-[var(--color-surface-base)]/95 backdrop-blur">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
@@ -90,6 +113,21 @@ export function Header({
         <div className="flex items-center gap-3">
           {onLanguageChange && (
             <LanguageSelector value={language} onChange={onLanguageChange} disabled={languageDisabled} />
+          )}
+          {userEmail && (
+            <button
+              type="button"
+              onClick={() => navigate('/notifications')}
+              aria-label={t('notifications.title', 'Notifications')}
+              className="relative rounded-lg p-2 text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-2)]"
+            >
+              <Bell className="h-4 w-4" />
+              {unread > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full bg-[var(--color-accent)] text-[10px] leading-4 text-center text-white font-medium">
+                  {unread > 99 ? '99+' : unread}
+                </span>
+              )}
+            </button>
           )}
           {username ? (
             <Link to={`/${username}`} className="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-accent)] truncate max-w-xs">

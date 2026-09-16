@@ -275,3 +275,44 @@ export interface BranchProtectionRule {
   createdBy: string;
   createdAt: number;
 }
+
+export type RepoEventType =
+  | 'repo_created'
+  | 'push'
+  | 'issue_opened'
+  | 'issue_closed'
+  | 'issue_reopened'
+  | 'issue_commented'
+  | 'pr_opened'
+  | 'pr_closed'
+  | 'pr_merged'
+  | 'pr_reviewed'
+  | 'pr_commented'
+  | 'fork_created';
+
+export interface RepoEvent {
+  id: string;
+  repository_id: string;
+  full_name: string;
+  actor_email: string;
+  type: RepoEventType;
+  subject_type: string | null;
+  subject_number: number | null;
+  subject_oid: string | null;
+  payload: string;
+  created_at: number;
+}
+
+export interface NotificationItem {
+  id: string;
+  user_email: string;
+  repository_id: string | null;
+  full_name: string;
+  actor_email: string;
+  type: string;
+  title: string;
+  subject_type: string | null;
+  subject_number: number | null;
+  is_read: number;
+  created_at: number;
+}

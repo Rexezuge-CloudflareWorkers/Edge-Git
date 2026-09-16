@@ -26,6 +26,8 @@
     "./protection/*": "./src/protection/*.ts",
     "./search": "./src/search/index.ts",
     "./search/*": "./src/search/*.ts",
+    "./social": "./src/social/index.ts",
+    "./social/*": "./src/social/*.ts",
     "./composition": "./src/composition/index.ts",
     "./composition/*": "./src/composition/*.ts"
   },

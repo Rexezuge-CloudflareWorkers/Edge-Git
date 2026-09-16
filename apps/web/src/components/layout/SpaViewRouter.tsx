@@ -15,6 +15,7 @@ import { CommitsView } from '../../views/CommitsView';
 import { IssueDetailView } from '../../views/IssueDetailView';
 import { PullDetailView } from '../../views/PullDetailView';
 import { SettingsView } from '../../views/SettingsView';
+import { NotificationsView } from '../../views/NotificationsView';
 
 interface SpaViewRouterProps {
   user: CurrentUser | null;
@@ -44,6 +45,14 @@ function SpaViewRouter({ user, setUser, authorized, showNotice, defaultOwner }: 
         <Route path="/:owner/:repo/commits" element={<CommitsView authorized={authorized} showNotice={showNotice} />} />
         <Route path="/:owner/:repo" element={<RepoView authorized={authorized} showNotice={showNotice} defaultOwner={defaultOwner} />} />
         <Route path="/:username" element={<ProfileView showNotice={showNotice} />} />
+        <Route
+          path="/notifications"
+          element={
+            <div className="min-h-screen bg-[var(--color-surface-base)] flex items-center justify-center">
+              <div className="h-10 w-10 rounded-full border-2 border-[var(--color-accent)] border-t-transparent animate-spin" />
+            </div>
+          }
+        />
         <Route
           path="*"
           element={
@@ -83,6 +92,18 @@ function SpaViewRouter({ user, setUser, authorized, showNotice, defaultOwner }: 
         element={
           user ? (
             <SettingsView user={user} setUser={setUser} showNotice={showNotice} />
+          ) : (
+            <div className="max-w-7xl mx-auto px-6 py-8">
+              <Unauthorized message={t('errors.signInToManage', 'Sign In To Manage Settings.')} />
+            </div>
+          )
+        }
+      />
+      <Route
+        path="/notifications"
+        element={
+          user ? (
+            <NotificationsView showNotice={showNotice} />
           ) : (
             <div className="max-w-7xl mx-auto px-6 py-8">
               <Unauthorized message={t('errors.signInToManage', 'Sign In To Manage Settings.')} />

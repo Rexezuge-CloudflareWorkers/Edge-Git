@@ -1,13 +1,17 @@
 import {
   BranchProtectionDAO,
+  EventDAO,
   IssueDAO,
   NamespaceDAO,
+  NotificationDAO,
   OrganizationDAO,
   OrganizationMemberDAO,
   PullRequestDAO,
   RepoCollaboratorDAO,
   RepositoryDAO,
+  StarDAO,
   UserDAO,
+  WatchDAO,
 } from '@edge-git/backend-data/dao';
 import type { RepositoryRow, RepoRole } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
@@ -34,6 +38,10 @@ interface RepoServiceDeps {
   organizationMemberDAO?: () => Promise<OrganizationMemberDAO>;
   repoCollaboratorDAO?: () => Promise<RepoCollaboratorDAO>;
   namespaceDAO?: () => Promise<NamespaceDAO>;
+  starDAO?: () => Promise<StarDAO>;
+  watchDAO?: () => Promise<WatchDAO>;
+  eventDAO?: () => Promise<EventDAO>;
+  notificationDAO?: () => Promise<NotificationDAO>;
 }
 
 class RepoService {
@@ -53,6 +61,10 @@ class RepoService {
       organizationMemberDAO: () => Promise.resolve(new OrganizationMemberDAO(env.DB)),
       repoCollaboratorDAO: () => Promise.resolve(new RepoCollaboratorDAO(env.DB)),
       namespaceDAO: () => Promise.resolve(new NamespaceDAO(env.DB)),
+      starDAO: () => Promise.resolve(new StarDAO(env.DB)),
+      watchDAO: () => Promise.resolve(new WatchDAO(env.DB)),
+      eventDAO: () => Promise.resolve(new EventDAO(env.DB)),
+      notificationDAO: () => Promise.resolve(new NotificationDAO(env.DB)),
       ...deps,
     };
   }
@@ -329,6 +341,30 @@ class RepoService {
       await collabDao.deleteByRepo(repo.id);
     } catch {
       // ignore — legacy DBs without collaborators table
+    }
+    try {
+      const starDao = await this.deps.starDAO();
+      await starDao.deleteByRepo(repo.id);
+    } catch {
+      // ignore — legacy DBs without repo_stars table
+    }
+    try {
+      const watchDao = await this.deps.watchDAO();
+      await watchDao.deleteByRepo(repo.id);
+    } catch {
+      // ignore — legacy DBs without repo_watches table
+    }
+    try {
+      const eventDao = await this.deps.eventDAO();
+      await eventDao.deleteByRepo(repo.id);
+    } catch {
+      // ignore — legacy DBs without repo_events table
+    }
+    try {
+      const notificationDao = await this.deps.notificationDAO();
+      await notificationDao.deleteByRepo(repo.id);
+    } catch {
+      // ignore — legacy DBs without notifications table
     }
     const repositoryDAO = await this.deps.repositoryDAO();
     await repositoryDAO.deleteById(repo.id);

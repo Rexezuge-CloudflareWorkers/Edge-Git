@@ -1,5 +1,6 @@
 import { getRepoStub } from '../repoStub';
 import { requireVisibleRepo, toServiceStatus } from './PublicViewerResolver';
+import { recordAndNotify } from './SocialEmit';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { PullRequestService } from '@edge-git/backend-services/pull';
@@ -50,6 +51,17 @@ async function openCrossForkPull(env: Env, input: OpenCrossForkInput): Promise<{
         headRepositoryId: headRow.id,
         headFullName,
       });
+    await recordAndNotify(env, {
+      repositoryId: input.rowId,
+      fullName: input.fullName,
+      actorEmail: input.email,
+      type: 'pr_opened',
+      title: `Pull request #${created.number} ${input.title}`,
+      subjectType: 'pull',
+      subjectNumber: created.number,
+      subjectOid: preview.preview.headOid,
+      mentionText: `${input.title}\n${input.body ?? ''}`,
+    });
     return { status: 201, body: created };
   } catch (error) {
     return { status: toServiceStatus(error), body: { error: error instanceof Error ? error.message : 'Failed to create pull request' } };
@@ -131,6 +143,16 @@ async function mergeCrossForkPull(env: Env, input: MergeCrossForkInput): Promise
   }
   try {
     const merged = await input.scope.get(Tokens.PullRequestService).markMerged({ repositoryId: input.rowId, number: input.number, mergedBy: input.email, commitOid: outcome.commitOid ?? headOid });
+    await recordAndNotify(env, {
+      repositoryId: input.rowId,
+      fullName: input.fullName,
+      actorEmail: input.email,
+      type: 'pr_merged',
+      title: `Pull request #${input.number} merged: ${input.pull.title}`,
+      subjectType: 'pull',
+      subjectNumber: input.number,
+      subjectOid: outcome.commitOid ?? headOid,
+    });
     return { status: 200, body: { pull: merged, merge: outcome } };
   } catch (error) {
     const failure = error instanceof Error ? error.message : 'Failed to record merge';
@@ -229,6 +251,17 @@ function registerUserPullMergeRoutes(app: PullApp): void {
     }
     try {
       const merged = await scope.get(Tokens.PullRequestService).markMerged({ repositoryId: row.id, number, mergedBy: email, commitOid: outcome.commitOid ?? headOid });
+      await recordAndNotify(c.env, {
+        repositoryId: row.id,
+        fullName,
+        actorEmail: email,
+        type: 'pr_merged',
+        title: `Pull request #${number} merged: ${pull.title}`,
+        subjectType: 'pull',
+        subjectNumber: number,
+        subjectOid: outcome.commitOid ?? headOid,
+        participantEmails: [pull.creator_email],
+      });
       return c.json({ pull: merged, merge: outcome });
     } catch (error) {
       const failure = error instanceof Error ? error.message : 'Failed to record merge';

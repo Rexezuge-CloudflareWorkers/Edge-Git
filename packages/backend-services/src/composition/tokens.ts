@@ -24,6 +24,10 @@ import type { PullRequestService } from '../pull/PullRequestService';
 import type { OrganizationService } from '../org/OrganizationService';
 import type { PermissionService } from '../permission/PermissionService';
 import type { SearchService } from '../search/SearchService';
+import type { ActivityService } from '../social/ActivityService';
+import type { NotificationService } from '../social/NotificationService';
+import type { StarService } from '../social/StarService';
+import type { WatchService } from '../social/WatchService';
 import type { SearchDAO } from '@edge-git/backend-data/dao';
 
 // Central token registry for the per-request composition root
@@ -57,6 +61,10 @@ const Tokens = {
   RepoCollaboratorDAO: Symbol('RepoCollaboratorDAO') as Token<() => Promise<RepoCollaboratorDAO>>,
   BranchProtectionDAO: Symbol('BranchProtectionDAO') as Token<() => Promise<BranchProtectionDAO>>,
   SearchDAO: Symbol('SearchDAO') as Token<() => Promise<SearchDAO>>,
+  StarDAO: Symbol('StarDAO') as Token<() => Promise<import('@edge-git/backend-data/dao').StarDAO>>,
+  WatchDAO: Symbol('WatchDAO') as Token<() => Promise<import('@edge-git/backend-data/dao').WatchDAO>>,
+  EventDAO: Symbol('EventDAO') as Token<() => Promise<import('@edge-git/backend-data/dao').EventDAO>>,
+  NotificationDAO: Symbol('NotificationDAO') as Token<() => Promise<import('@edge-git/backend-data/dao').NotificationDAO>>,
   AccessAuthService: Symbol('AccessAuthService') as Token<AccessAuthService>,
   TokenService: Symbol('TokenService') as Token<TokenService>,
   BranchProtectionService: Symbol('BranchProtectionService') as Token<BranchProtectionService>,
@@ -68,6 +76,10 @@ const Tokens = {
   OrganizationService: Symbol('OrganizationService') as Token<OrganizationService>,
   PermissionService: Symbol('PermissionService') as Token<PermissionService>,
   SearchService: Symbol('SearchService') as Token<SearchService>,
+  StarService: Symbol('StarService') as Token<StarService>,
+  WatchService: Symbol('WatchService') as Token<WatchService>,
+  ActivityService: Symbol('ActivityService') as Token<ActivityService>,
+  NotificationService: Symbol('NotificationService') as Token<NotificationService>,
 } satisfies Record<string, Token<unknown>>;
 
 export { Tokens };

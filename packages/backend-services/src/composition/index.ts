@@ -46,3 +46,19 @@ export { PermissionService, PermissionServiceFactory } from '../permission/Permi
 @deprecated Prefer `createRequestScope(env).get(Tokens.SearchService)`; kept for backward compatibility during migration.
 */
 export { SearchService, SearchServiceFactory } from '../search/SearchService';
+/**
+@deprecated Prefer `createRequestScope(env).get(Tokens.StarService)`; kept for backward compatibility during migration.
+*/
+export { StarService, StarServiceFactory } from '../social/StarService';
+/**
+@deprecated Prefer `createRequestScope(env).get(Tokens.WatchService)`; kept for backward compatibility during migration.
+*/
+export { WatchService, WatchServiceFactory } from '../social/WatchService';
+/**
+@deprecated Prefer `createRequestScope(env).get(Tokens.ActivityService)`; kept for backward compatibility during migration.
+*/
+export { ActivityService, ActivityServiceFactory } from '../social/ActivityService';
+/**
+@deprecated Prefer `createRequestScope(env).get(Tokens.NotificationService)`; kept for backward compatibility during migration.
+*/
+export { NotificationService, NotificationServiceFactory } from '../social/NotificationService';

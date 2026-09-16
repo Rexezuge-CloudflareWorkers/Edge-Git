@@ -18,6 +18,10 @@ const daoMocks = vi.hoisted(() => ({
   RepoCollaboratorDAO: vi.fn(),
   BranchProtectionDAO: vi.fn(),
   SearchDAO: vi.fn(),
+  StarDAO: vi.fn(),
+  WatchDAO: vi.fn(),
+  EventDAO: vi.fn(),
+  NotificationDAO: vi.fn(),
 }));
 
 vi.mock('@edge-git/backend-data/dao', () => ({
@@ -31,6 +35,10 @@ vi.mock('@edge-git/backend-data/dao', () => ({
   RepoCollaboratorDAO: daoMocks.RepoCollaboratorDAO,
   BranchProtectionDAO: daoMocks.BranchProtectionDAO,
   SearchDAO: daoMocks.SearchDAO,
+  StarDAO: daoMocks.StarDAO,
+  WatchDAO: daoMocks.WatchDAO,
+  EventDAO: daoMocks.EventDAO,
+  NotificationDAO: daoMocks.NotificationDAO,
 }));
 
 const EXPECTED_TOKENS = [
@@ -48,6 +56,10 @@ const EXPECTED_TOKENS = [
   'RepoCollaboratorDAO',
   'BranchProtectionDAO',
   'SearchDAO',
+  'StarDAO',
+  'WatchDAO',
+  'EventDAO',
+  'NotificationDAO',
   'AccessAuthService',
   'TokenService',
   'BranchProtectionService',
@@ -57,6 +69,10 @@ const EXPECTED_TOKENS = [
   'OrganizationService',
   'PermissionService',
   'SearchService',
+  'StarService',
+  'WatchService',
+  'ActivityService',
+  'NotificationService',
 ] as const;
 
 function makeEnv() {
@@ -100,6 +116,18 @@ beforeEach(() => {
   });
   daoMocks.SearchDAO.mockImplementation(function (this: unknown, db: unknown) {
     return { kind: 'SearchDAO', db };
+  });
+  daoMocks.StarDAO.mockImplementation(function (this: unknown, db: unknown) {
+    return { kind: 'StarDAO', db };
+  });
+  daoMocks.WatchDAO.mockImplementation(function (this: unknown, db: unknown) {
+    return { kind: 'WatchDAO', db };
+  });
+  daoMocks.EventDAO.mockImplementation(function (this: unknown, db: unknown) {
+    return { kind: 'EventDAO', db };
+  });
+  daoMocks.NotificationDAO.mockImplementation(function (this: unknown, db: unknown) {
+    return { kind: 'NotificationDAO', db };
   });
 });
 
@@ -152,6 +180,10 @@ describe('createRequestScope', () => {
       [Tokens.RepoCollaboratorDAO, daoMocks.RepoCollaboratorDAO],
       [Tokens.BranchProtectionDAO, daoMocks.BranchProtectionDAO],
       [Tokens.SearchDAO, daoMocks.SearchDAO],
+      [Tokens.StarDAO, daoMocks.StarDAO],
+      [Tokens.WatchDAO, daoMocks.WatchDAO],
+      [Tokens.EventDAO, daoMocks.EventDAO],
+      [Tokens.NotificationDAO, daoMocks.NotificationDAO],
     ] as const;
     for (const [token, ctor] of pairs) {
       const factory = scope.get(token);

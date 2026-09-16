@@ -3,10 +3,12 @@ import { useNavigate, useParams } from 'react-router-dom';
 import type { Repo } from '../types';
 import { loadRepoAuthed, loadRepoPublic } from '../services/repoService';
 import { RepoHeader, type RepoTab } from '../components/repo/RepoHeader';
+import { ActivityTab } from '../components/repo/ActivityTab';
 import { CodeTab } from '../components/repo/CodeTab';
 import { IssuesTab } from '../components/repo/IssuesTab';
 import { PullsTab } from '../components/repo/PullsTab';
 import { RepoSettingsTab } from '../components/repo/RepoSettingsTab';
+import { SocialButtons } from '../components/repo/SocialButtons';
 import { Card } from '../components/ui/Card';
 import Unauthorized from '../components/layout/Unauthorized';
 
@@ -132,6 +134,7 @@ export function RepoView({
         pullCount={pullCount}
         forkCount={repoData.forksCount}
         showSettings={canManage}
+        socialActions={<SocialButtons owner={owner} repo={repo} authorized={authorized} showNotice={showNotice} />}
         onTabChange={setTab}
       />
       <div className="max-w-7xl mx-auto px-6 py-6">
@@ -154,6 +157,7 @@ export function RepoView({
         {visibleTab === 'issues' && (
           <IssuesTab owner={owner} repo={repo} canWrite={authorized ?? false} showNotice={showNotice} onCountChange={setIssueCount} authorized={authorized} />
         )}
+        {visibleTab === 'activity' && <ActivityTab owner={owner} repo={repo} showNotice={showNotice} />}
         {visibleTab === 'settings' && (
           <RepoSettingsTab
             key={`${repoData.description ?? ''}:${repoData.isPrivate}`}

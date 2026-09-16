@@ -6,6 +6,7 @@ import type { ProtectedRefRule } from '@edge-git/git-protocol';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { BranchProtectionService } from '@edge-git/backend-services/protection';
 import { RepoService } from '@edge-git/backend-services/repo';
+import { recordAndNotify } from './SocialEmit';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 
 type GitApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -76,6 +77,24 @@ function registerGitRoutes(app: GitApp): void {
     // no rules — the DO then behaves as before.
     const protections = await resolvePushProtections(c.env, auth.repo.id, body).catch(() => []);
     const res = await stub.receivePack(body, protections);
+    if (res.ok && auth.userEmail) {
+      try {
+        const { commands } = parseReceivePackRequest(body);
+        const branches = commands.map((cmd) => branchNameFromRef(cmd.ref)).filter((b): b is string => b !== null);
+        const headOid = commands.find((cmd) => branchNameFromRef(cmd.ref))?.newOid ?? null;
+        await recordAndNotify(c.env, {
+          repositoryId: auth.repo.id,
+          fullName,
+          actorEmail: auth.userEmail,
+          type: 'push',
+          title: branches.length > 0 ? `Pushed to ${branches.slice(0, 3).join(', ')}${branches.length > 3 ? ` and ${branches.length - 3} more` : ''}` : 'Pushed commits',
+          subjectOid: headOid,
+          payload: { refs: branches.slice(0, 10), count: commands.length },
+        });
+      } catch {
+        // push succeeded; social bookkeeping must not fail the response
+      }
+    }
     return new Response(res.body, {
       status: res.status,
       headers: { 'Content-Type': 'application/x-git-receive-pack-result', 'Cache-Control': 'no-cache' },

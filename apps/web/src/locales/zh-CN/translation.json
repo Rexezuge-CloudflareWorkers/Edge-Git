@@ -41,7 +41,8 @@
     "cloneAnyRepository": "克隆任意仓库",
     "cloneHelp": "私有拉取和推送请使用个人访问令牌作为密码：{{example}}。公开仓库允许匿名拉取。请在设置中管理令牌。",
     "repositories": "仓库",
-    "empty": "还没有仓库。创建一个开始吧。"
+    "empty": "还没有仓库。创建一个开始吧。",
+    "watched": "关注的仓库"
   },
   "repos": {
     "newRepository": "新建仓库",
@@ -382,5 +383,44 @@
     "noIssues": "未找到议题。",
     "code": "代码",
     "noCode": "未找到代码匹配。"
+  },
+  "social": {
+    "star": "标星",
+    "unstar": "取消标星",
+    "watch": "关注",
+    "unwatch": "取消关注",
+    "activity": "动态",
+    "noActivity": "暂无动态。",
+    "signInToStar": "登录后即可标星或关注仓库。",
+    "failedToStar": "更新标星失败。",
+    "failedToWatch": "更新关注失败。",
+    "failedToLoadActivity": "加载动态失败。",
+    "viewIssue": "查看议题 #{{number}}",
+    "viewPull": "查看拉取请求 #{{number}}",
+    "events": {
+      "repo_created": "创建了该仓库",
+      "push": "推送了提交",
+      "issue_opened": "创建了议题",
+      "issue_closed": "关闭了议题",
+      "issue_reopened": "重新打开了议题",
+      "issue_commented": "评论了议题",
+      "pr_opened": "创建了拉取请求",
+      "pr_closed": "关闭了拉取请求",
+      "pr_merged": "合并了拉取请求",
+      "pr_reviewed": "评审了拉取请求",
+      "pr_commented": "评论了拉取请求",
+      "fork_created": "复刻了该仓库"
+    }
+  },
+  "notifications": {
+    "title": "通知",
+    "inbox": "收件箱",
+    "unreadCount": "{{count}} 条未读",
+    "unreadOnly": "仅未读",
+    "markAllRead": "全部标为已读",
+    "markRead": "标为已读",
+    "empty": "暂无通知。",
+    "failedToLoad": "加载通知失败。",
+    "failedToMark": "标记通知失败。"
   }
 }
