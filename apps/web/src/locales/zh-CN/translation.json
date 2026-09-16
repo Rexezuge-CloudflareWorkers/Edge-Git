@@ -111,6 +111,21 @@
     "defaultBranch": "默认分支",
     "defaultUpdated": "默认分支已更新。"
   },
+  "files": {
+    "edit": "编辑",
+    "newFile": "新建文件",
+    "fileName": "文件名",
+    "fileNamePlaceholder": "notes/todo.txt",
+    "contentPlaceholder": "文件内容…",
+    "commitMessage": "提交说明",
+    "commitMessagePlaceholder": "更新 {{path}}",
+    "save": "提交",
+    "saved": "文件已保存。",
+    "deleted": "文件已删除。",
+    "deleteFile": "删除文件",
+    "createFirstFile": "创建第一个文件来初始化仓库。",
+    "unsavedChanges": "你有未保存的更改。"
+  },
   "issues": {
     "newIssue": "新建议题",
     "titlePlaceholder": "标题",
@@ -312,6 +327,8 @@
     "failedToLoadFile": "加载文件失败。",
     "failedToCreateBranch": "创建分支失败。",
     "failedToDeleteBranch": "删除分支失败。",
+    "failedToSaveFile": "保存文件失败。",
+    "failedToDeleteFile": "删除文件失败。",
     "failedToUpdateDefaultBranch": "更新默认分支失败。",
     "failedToLoadCommit": "加载提交失败。",
     "failedToLoadCompare": "加载对比失败。",

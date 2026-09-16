@@ -9,6 +9,7 @@ import { registerGitRoutes } from './routes/GitRoutes';
 import { registerForkRoutes, registerUserForkRoutes } from './routes/ForkRoutes';
 import { registerRepoRoutes, registerUserRepoRoutes, registerUserRepoReadModelRoutes } from './routes/RepoRoutes';
 import { registerBranchRoutes } from './routes/BranchRoutes';
+import { registerFileWriteRoutes } from './routes/FileWriteRoutes';
 import { registerTokenRoutes } from './routes/TokenRoutes';
 import { registerIssueRoutes, registerUserIssueRoutes } from './routes/IssueRoutes';
 import { registerPullRoutes, registerUserPullMergeRoutes, registerUserPullRoutes } from './routes/PullRoutes';
@@ -60,6 +61,7 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
 
     registerUserRepoReadModelRoutes(app);
     registerBranchRoutes(app);
+    registerFileWriteRoutes(app);
     registerUserForkRoutes(app);
     registerTokenRoutes(app);
     registerUserIssueRoutes(app);

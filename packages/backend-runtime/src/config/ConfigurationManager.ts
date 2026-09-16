@@ -4,6 +4,7 @@ import {
   DEFAULT_DEBUG_MODE,
   DEFAULT_GIT_CACHE_TTL_SECONDS,
   DEFAULT_MAX_FETCH_BODY_BYTES,
+  DEFAULT_MAX_FILE_BYTES,
   DEFAULT_MAX_FETCH_HAVES,
   DEFAULT_MAX_FETCH_WANTS,
   DEFAULT_MAX_MERGE_DIFF_FILES,
@@ -39,6 +40,7 @@ class ConfigurationManager {
     getMaxFetchBodyBytes: (env: unknown): number =>
       EnvParser.positiveInt(env, 'MAX_FETCH_BODY_BYTES', DEFAULT_MAX_FETCH_BODY_BYTES),
     getMaxMergeDiffFiles: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_MERGE_DIFF_FILES', DEFAULT_MAX_MERGE_DIFF_FILES),
+    getMaxFileBytes: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_FILE_BYTES', DEFAULT_MAX_FILE_BYTES),
   };
 
   public static readonly spa = {

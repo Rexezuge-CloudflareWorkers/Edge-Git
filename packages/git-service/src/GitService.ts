@@ -5,6 +5,8 @@ import { ObjectReader } from './ObjectReader';
 import { PackCollector } from './PackCollector';
 import { HistoryService } from './HistoryService';
 import { MergeService } from './MergeService';
+import { WriteService } from './WriteService';
+import type { CommitFileInput } from './WriteService';
 
 export { PackLimitError } from './PackCollector';
 
@@ -18,6 +20,7 @@ export class GitService {
   private readonly packs: PackCollector;
   private readonly history: HistoryService;
   private readonly merger: MergeService;
+  private readonly writer: WriteService;
 
   private cache: object = {};
   private cacheCreatedAt = Date.now();
@@ -30,6 +33,7 @@ export class GitService {
     this.packs = new PackCollector(fs, gitdir);
     this.history = new HistoryService(fs, gitdir);
     this.merger = new MergeService(fs, gitdir);
+    this.writer = new WriteService(fs, gitdir);
   }
 
   public clearCache(): void {
@@ -198,5 +202,9 @@ export class GitService {
 
   async deleteBranch(branch: string): Promise<void> {
     await this.merger.deleteBranch(branch);
+  }
+
+  async commitFile(input: CommitFileInput) {
+    return this.writer.commitFile(input);
   }
 }
