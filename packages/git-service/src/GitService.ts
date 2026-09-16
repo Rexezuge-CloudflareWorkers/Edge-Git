@@ -68,6 +68,18 @@ export class GitService {
     return this.refs.currentBranch();
   }
 
+  async createBranch(name: string, startOid: string) {
+    return this.refs.createBranch(name, startOid);
+  }
+
+  async deleteBranchRef(name: string) {
+    return this.refs.deleteBranchRef(name);
+  }
+
+  async setDefaultBranch(name: string) {
+    return this.refs.setDefaultBranch(name);
+  }
+
   async listTags(): Promise<Array<{ ref: string; oid: string }>> {
     return this.refs.listTags();
   }

@@ -170,6 +170,31 @@ class RepoWorker extends DurableObject<Env> {
     return this.readModel.getBranches();
   }
 
+  public async createBranch(args: { name: string; fromRef?: string }): Promise<unknown> {
+    await this.prepare();
+    const startOid = await this.git.resolveRef(args.fromRef || 'HEAD');
+    if (!startOid) {
+      return { ok: false, error: 'unknown start point', status: 404 };
+    }
+    const result = await this.git.createBranch(args.name, startOid);
+    if (result.ok) this.git.clearCache();
+    return result;
+  }
+
+  public async deleteBranchRef(branch: string): Promise<unknown> {
+    await this.prepare();
+    const result = await this.git.deleteBranchRef(branch);
+    if (result.ok) this.git.clearCache();
+    return result;
+  }
+
+  public async setDefaultBranch(branch: string): Promise<unknown> {
+    await this.prepare();
+    const result = await this.git.setDefaultBranch(branch);
+    if (result.ok) this.git.clearCache();
+    return result;
+  }
+
   public async getTags(): Promise<
     Array<{ name: string; ref: string; oid: string; peeledOid: string | null; type: 'lightweight' | 'annotated' }>
   > {

@@ -101,6 +101,16 @@
     "annotated": "Annotated",
     "lightweight": "Lightweight"
   },
+  "branches": {
+    "newBranch": "New Branch",
+    "branchName": "Branch Name",
+    "branchNamePlaceholder": "feature-name",
+    "deleteBranch": "Delete Branch",
+    "created": "Branch Created.",
+    "deleted": "Branch Deleted.",
+    "defaultBranch": "Default Branch",
+    "defaultUpdated": "Default Branch Updated."
+  },
   "issues": {
     "newIssue": "New Issue",
     "titlePlaceholder": "Title",
@@ -307,6 +317,9 @@
     "failedToAddReview": "Failed To Submit Review.",
     "failedToMergePull": "Failed To Merge Pull Request.",
     "failedToLoadFile": "Failed To Load File.",
+    "failedToCreateBranch": "Failed To Create Branch.",
+    "failedToDeleteBranch": "Failed To Delete Branch.",
+    "failedToUpdateDefaultBranch": "Failed To Update Default Branch.",
     "failedToLoadCommit": "Failed To Load Commit.",
     "failedToLoadCompare": "Failed To Load Comparison.",
     "failedToLoadCommits": "Failed To Load Commits.",

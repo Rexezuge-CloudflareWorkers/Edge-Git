@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Repo } from '../../types';
-import { deleteRepo, updateRepo } from '../../services/repoService';
+import { deleteRepo, loadBranches, setDefaultBranch, updateRepo } from '../../services/repoService';
 import { CollaboratorsCard } from './CollaboratorsCard';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
-import { Label, Textarea } from '../ui/Input';
+import { Label, Select, Textarea } from '../ui/Input';
 import { RefreshButton } from '../shared/RefreshButton';
 import { ConfirmDeleteModal } from '../modals/ConfirmDeleteModal';
 
@@ -28,6 +29,38 @@ export function RepoSettingsTab({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [branches, setBranches] = useState<string[]>([]);
+  const [defaultBranch, setDefaultBranchName] = useState('');
+  const [savingDefault, setSavingDefault] = useState(false);
+  const { t } = useTranslation();
+
+  useEffect(() => {
+    let cancelled = false;
+    loadBranches(owner, repo)
+      .then((b) => {
+        if (cancelled) return;
+        setBranches(b.branches);
+        setDefaultBranchName(b.currentBranch ?? '');
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [owner, repo]);
+
+  const saveDefaultBranch = async () => {
+    if (!defaultBranch) return;
+    setSavingDefault(true);
+    try {
+      const updated = await setDefaultBranch(owner, repo, defaultBranch);
+      setDefaultBranchName(updated.defaultBranch);
+      showNotice('success', t('branches.defaultUpdated', 'Default Branch Updated.'));
+    } catch (error) {
+      showNotice('error', error instanceof Error ? error.message : t('errors.failedToUpdateDefaultBranch', 'Failed To Update Default Branch.'));
+    } finally {
+      setSavingDefault(false);
+    }
+  };
 
   const dirty = description.trim() !== (repoMeta.description ?? '') || isPrivate !== repoMeta.isPrivate;
 
@@ -104,6 +137,24 @@ export function RepoSettingsTab({
       </Card>
 
       <CollaboratorsCard owner={owner} repo={repo} showNotice={showNotice} />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('branches.defaultBranch', 'Default Branch')}</CardTitle>
+        </CardHeader>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select aria-label={t('branches.defaultBranch', 'Default Branch')} value={defaultBranch} onChange={(e) => setDefaultBranchName(e.target.value)} disabled={branches.length === 0}>
+            {branches.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </Select>
+          <Button size="sm" variant="primary" loading={savingDefault} disabled={!defaultBranch} onClick={() => void saveDefaultBranch()}>
+            {t('common.saveChanges', 'Save Changes')}
+          </Button>
+        </div>
+      </Card>
 
       <Card className="border-[var(--color-error-text)]/40">
         <CardHeader>
