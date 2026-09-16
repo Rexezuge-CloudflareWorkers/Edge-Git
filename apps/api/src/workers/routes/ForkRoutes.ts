@@ -4,6 +4,7 @@ import { requireVisibleRepo, resolvePublicViewer, toRepoJson, toServiceStatus, w
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { copyRepoGit, isPackLimitError } from './CrossFork';
+import { recordAndNotify } from './SocialEmit';
 
 type ForkApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -50,8 +51,7 @@ function registerUserForkRoutes(app: ForkApp): void {
     try {
       await ensureRepo(c.env, fork.fullName);
       await copyRepoGit(c.env, sourceFullName, fork.fullName);
-    } catch (error) {
-      // Roll back the fork so a failed copy never leaves a half-made repo.
+    } catch (error) {      // Roll back the fork so a failed copy never leaves a half-made repo.
       await scope.get(Tokens.ForkService).rollbackFork(fork.id);
       try {
         await getRepoStub(c.env, fork.fullName).deleteRepo();
@@ -62,6 +62,18 @@ function registerUserForkRoutes(app: ForkApp): void {
         return c.json({ error: error instanceof Error ? error.message : 'Repository too large to fork' }, 413);
       }
       return c.json({ error: 'Failed to copy repository data' }, 500);
+    }
+    await scope.get(Tokens.WatchService).ensureWatching(fork.id, email).catch(() => undefined);
+    const sourceRow = await scope.get(Tokens.RepoService).getByOwnerAndName(owner, repoName).catch(() => null);
+    if (sourceRow) {
+      await recordAndNotify(c.env, {
+        repositoryId: sourceRow.id,
+        fullName: sourceFullName,
+        actorEmail: email,
+        type: 'fork_created',
+        title: `${email} forked ${sourceFullName} to ${fork.fullName}`,
+        payload: { fork: fork.fullName },
+      });
     }
     return c.json({ id: fork.id, owner: fork.owner, name: fork.name, fullName: fork.fullName, forkedFrom: sourceFullName, isPrivate: fork.isPrivate }, 201);
   });

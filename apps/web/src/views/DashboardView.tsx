@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { BookMarked, ChevronDown, Plus } from 'lucide-react';
 import type { Repo } from '../types';
 import { listMyRepos } from '../services/repoService';
+import { listWatchedRepos } from '../services/socialService';
 import { Button } from '../components/ui/Button';
 import { Card, CardHeader, CardTitle } from '../components/ui/Card';
 import { VisibilityBadge } from '../components/ui/Badge';
@@ -15,6 +16,7 @@ export function DashboardView({ showNotice }: { showNotice: (type: 'success' | '
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [repos, setRepos] = useState<Repo[]>([]);
+  const [watched, setWatched] = useState<Repo[]>([]);
   const [loading, setLoading] = useState(true);
   const [newOpen, setNewOpen] = useState(false);
   const [orgModal, setOrgModal] = useState(false);
@@ -24,7 +26,16 @@ export function DashboardView({ showNotice }: { showNotice: (type: 'success' | '
   useEffect(() => {
     const run = async () => {
       try {
-        setRepos(await listMyRepos());
+        const mine = await listMyRepos();
+        let watching: Repo[] = [];
+        try {
+          watching = await listWatchedRepos();
+        } catch {
+          watching = [];
+        }
+        const mineNames = new Set(mine.map((m) => m.fullName));
+        setRepos(mine);
+        setWatched(watching.filter((w) => !mineNames.has(w.fullName)));
       } catch (error) {
         showNotice('error', error instanceof Error ? error.message : 'Failed To Load Repositories.');
       } finally {
@@ -131,6 +142,27 @@ export function DashboardView({ showNotice }: { showNotice: (type: 'success' | '
           </ul>
         )}
       </Card>
+      {watched.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('dashboard.watched', 'Watched Repositories')}</CardTitle>
+            <span className="text-sm text-[var(--color-text-muted)]">{watched.length}</span>
+          </CardHeader>
+          <ul className="divide-y divide-[var(--color-border)]">
+            {watched.map((r) => (
+              <li key={r.fullName} className="py-3 flex items-center justify-between gap-3 first:pt-0 last:pb-0">
+                <div className="min-w-0">
+                  <Link to={`/${r.owner}/${r.name}`} className="font-medium text-[var(--color-accent)] hover:underline truncate">
+                    {r.fullName}
+                  </Link>
+                  {r.description && <p className="text-sm text-[var(--color-text-secondary)] truncate">{r.description}</p>}
+                </div>
+                <VisibilityBadge isPrivate={r.isPrivate} />
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
       {orgModal && (
         <OrgCreateModal
           showNotice={showNotice}

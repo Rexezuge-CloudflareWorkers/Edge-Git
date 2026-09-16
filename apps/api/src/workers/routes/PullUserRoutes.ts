@@ -1,5 +1,6 @@
 import { getRepoStub } from '../repoStub';
 import { requireVisibleRepo, toServiceStatus } from './PublicViewerResolver';
+import { recordAndNotify } from './SocialEmit';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { PullRequestService } from '@edge-git/backend-services/pull';
 import { RepoService } from '@edge-git/backend-services/repo';
@@ -71,6 +72,17 @@ function registerUserPullRoutes(app: PullApp): void {
           mergeBaseOid: preview.mergeBase ?? null,
           creatorEmail: email,
         });
+      await recordAndNotify(c.env, {
+        repositoryId: row.id,
+        fullName,
+        actorEmail: email,
+        type: 'pr_opened',
+        title: `Pull request #${created.number} ${body.title}`,
+        subjectType: 'pull',
+        subjectNumber: created.number,
+        subjectOid: preview.headOid,
+        mentionText: `${body.title}\n${body.body ?? ''}`,
+      });
       return c.json(created, 201);
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'Failed to create pull request' }, toServiceStatus(error));
@@ -112,6 +124,16 @@ function registerUserPullRoutes(app: PullApp): void {
       const pull = await createRequestScope(c.env)
         .get(Tokens.PullRequestService)
         .updateStatus({ repositoryId: row.id, number, status: body.status ?? '' });
+      await recordAndNotify(c.env, {
+        repositoryId: row.id,
+        fullName: `${owner}/${repoName}`,
+        actorEmail: email,
+        type: 'pr_closed',
+        title: `Pull request #${pull.number} closed: ${pull.title}`,
+        subjectType: 'pull',
+        subjectNumber: pull.number,
+        participantEmails: [pull.creator_email],
+      });
       return c.json({ pull });
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'Failed to update pull request' }, toServiceStatus(error));
@@ -145,11 +167,24 @@ function registerUserPullRoutes(app: PullApp): void {
     const body = (await c.req.json().catch(() => ({}))) as { body?: string };
     if (typeof body.body !== 'string' || !body.body.trim()) return c.json({ error: 'body is required' }, 400);
     try {
-      const comment = await createRequestScope(c.env).get(Tokens.PullRequestService).addComment({
+      const scope = createRequestScope(c.env);
+      const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
+      const comment = await scope.get(Tokens.PullRequestService).addComment({
         repositoryId: row.id,
         number,
         authorEmail: email,
         body: body.body,
+      });
+      await recordAndNotify(c.env, {
+        repositoryId: row.id,
+        fullName: `${owner}/${repoName}`,
+        actorEmail: email,
+        type: 'pr_commented',
+        title: `New comment on pull request #${pull.number}: ${pull.title}`,
+        subjectType: 'pull',
+        subjectNumber: pull.number,
+        participantEmails: [pull.creator_email],
+        mentionText: body.body,
       });
       return c.json({ comment }, 201);
     } catch (error) {
@@ -184,13 +219,26 @@ function registerUserPullRoutes(app: PullApp): void {
     const body = (await c.req.json().catch(() => ({}))) as { state?: string; body?: string; commitOid?: string };
     if (typeof body.state !== 'string') return c.json({ error: 'state is required' }, 400);
     try {
-      const review = await createRequestScope(c.env).get(Tokens.PullRequestService).addReview({
+      const scope = createRequestScope(c.env);
+      const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
+      const review = await scope.get(Tokens.PullRequestService).addReview({
         repositoryId: row.id,
         number,
         authorEmail: email,
         state: body.state,
         body: body.body ?? null,
         commitOid: body.commitOid ?? null,
+      });
+      await recordAndNotify(c.env, {
+        repositoryId: row.id,
+        fullName: `${owner}/${repoName}`,
+        actorEmail: email,
+        type: 'pr_reviewed',
+        title: `${email} reviewed pull request #${pull.number}: ${body.state}`,
+        subjectType: 'pull',
+        subjectNumber: pull.number,
+        participantEmails: [pull.creator_email],
+        mentionText: typeof body.body === 'string' ? body.body : null,
       });
       return c.json({ review }, 201);
     } catch (error) {

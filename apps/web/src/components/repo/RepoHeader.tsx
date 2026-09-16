@@ -1,15 +1,17 @@
 import { Link } from 'react-router-dom';
+import type { ReactNode } from 'react';
 import { BookMarked, GitBranch, GitFork } from 'lucide-react';
 import type { Repo } from '../../types';
 import { VisibilityBadge } from '../ui/Badge';
 import { cn } from '../../lib/utils';
 
-export type RepoTab = 'code' | 'pulls' | 'issues' | 'settings';
+export type RepoTab = 'code' | 'pulls' | 'issues' | 'activity' | 'settings';
 
 const TABS: Array<{ id: RepoTab; label: string }> = [
   { id: 'code', label: 'Code' },
   { id: 'pulls', label: 'Pulls' },
   { id: 'issues', label: 'Issues' },
+  { id: 'activity', label: 'Activity' },
   { id: 'settings', label: 'Settings' },
 ];
 
@@ -20,6 +22,7 @@ export function RepoHeader({
   pullCount,
   forkCount,
   showSettings,
+  socialActions,
   onTabChange,
 }: {
   repo: Repo;
@@ -28,6 +31,7 @@ export function RepoHeader({
   pullCount?: number;
   forkCount?: number;
   showSettings?: boolean;
+  socialActions?: ReactNode;
   onTabChange: (tab: RepoTab) => void;
 }) {
   const tabs = showSettings ? TABS : TABS.filter((t) => t.id !== 'settings');
@@ -66,6 +70,7 @@ export function RepoHeader({
               {forkCount}
             </span>
           )}
+          {socialActions && <div className="ml-auto">{socialActions}</div>}
         </div>
 
         <nav className="flex items-center gap-0.5 mt-4">

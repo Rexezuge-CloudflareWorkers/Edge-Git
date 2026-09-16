@@ -41,7 +41,8 @@
     "cloneAnyRepository": "Clone Any Repository",
     "cloneHelp": "Authenticated Push And Private Fetch Use A Personal Access Token As The Password: {{example}}. Public Repos Allow Anonymous Fetch. Manage Tokens In Settings.",
     "repositories": "Repositories",
-    "empty": "No Repositories Yet. Create One To Get Started."
+    "empty": "No Repositories Yet. Create One To Get Started.",
+    "watched": "Watched Repositories"
   },
   "repos": {
     "newRepository": "New Repository",
@@ -382,5 +383,44 @@
     "noIssues": "No Issues Found.",
     "code": "Code",
     "noCode": "No Code Matches Found."
+  },
+  "social": {
+    "star": "Star",
+    "unstar": "Unstar",
+    "watch": "Watch",
+    "unwatch": "Unwatch",
+    "activity": "Activity",
+    "noActivity": "No Activity Yet.",
+    "signInToStar": "Sign In To Star Or Watch Repositories.",
+    "failedToStar": "Failed To Update Star.",
+    "failedToWatch": "Failed To Update Watch.",
+    "failedToLoadActivity": "Failed To Load Activity.",
+    "viewIssue": "View Issue #{{number}}",
+    "viewPull": "View Pull #{{number}}",
+    "events": {
+      "repo_created": "Created This Repository",
+      "push": "Pushed Commits",
+      "issue_opened": "Opened An Issue",
+      "issue_closed": "Closed An Issue",
+      "issue_reopened": "Reopened An Issue",
+      "issue_commented": "Commented On An Issue",
+      "pr_opened": "Opened A Pull Request",
+      "pr_closed": "Closed A Pull Request",
+      "pr_merged": "Merged A Pull Request",
+      "pr_reviewed": "Reviewed A Pull Request",
+      "pr_commented": "Commented On A Pull Request",
+      "fork_created": "Forked This Repository"
+    }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "inbox": "Inbox",
+    "unreadCount": "{{count}} Unread",
+    "unreadOnly": "Unread Only",
+    "markAllRead": "Mark All Read",
+    "markRead": "Mark Read",
+    "empty": "No Notifications.",
+    "failedToLoad": "Failed To Load Notifications.",
+    "failedToMark": "Failed To Mark Notification Read."
   }
 }

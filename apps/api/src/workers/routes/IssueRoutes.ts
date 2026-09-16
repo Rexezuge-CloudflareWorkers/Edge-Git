@@ -1,5 +1,6 @@
 import type { Hono } from 'hono';
 import { requireVisibleRepo, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { recordAndNotify } from './SocialEmit';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
 
@@ -74,6 +75,16 @@ function registerUserIssueRoutes(app: IssueApp): void {
         body: body.body ?? null,
         creatorEmail: email,
       });
+    await recordAndNotify(c.env, {
+      repositoryId: row.id,
+      fullName: `${owner}/${repoName}`,
+      actorEmail: email,
+      type: 'issue_opened',
+      title: `Issue #${created.number} ${body.title}`,
+      subjectType: 'issue',
+      subjectNumber: created.number,
+      mentionText: `${body.title}\n${body.body ?? ''}`,
+    });
     return c.json(created, 201);
   });
 
@@ -112,6 +123,16 @@ function registerUserIssueRoutes(app: IssueApp): void {
       const issue = await createRequestScope(c.env)
         .get(Tokens.IssueService)
         .updateStatus({ repositoryId: row.id, number, status: body.status ?? '' });
+      await recordAndNotify(c.env, {
+        repositoryId: row.id,
+        fullName: `${owner}/${repoName}`,
+        actorEmail: email,
+        type: issue.status === 'closed' ? 'issue_closed' : 'issue_reopened',
+        title: `Issue #${issue.number} ${issue.status === 'closed' ? 'closed' : 'reopened'}: ${issue.title}`,
+        subjectType: 'issue',
+        subjectNumber: issue.number,
+        participantEmails: [issue.creator_email],
+      });
       return c.json({ issue });
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'Failed to update issue' }, toServiceStatus(error));
@@ -145,11 +166,24 @@ function registerUserIssueRoutes(app: IssueApp): void {
     const body = (await c.req.json().catch(() => ({}))) as { body?: string };
     if (typeof body.body !== 'string' || !body.body.trim()) return c.json({ error: 'body is required' }, 400);
     try {
-      const comment = await createRequestScope(c.env).get(Tokens.IssueService).addComment({
+      const scope = createRequestScope(c.env);
+      const issue = await scope.get(Tokens.IssueService).getByNumber(row.id, number);
+      const comment = await scope.get(Tokens.IssueService).addComment({
         repositoryId: row.id,
         number,
         authorEmail: email,
         body: body.body,
+      });
+      await recordAndNotify(c.env, {
+        repositoryId: row.id,
+        fullName: `${owner}/${repoName}`,
+        actorEmail: email,
+        type: 'issue_commented',
+        title: `New comment on issue #${issue.number}: ${issue.title}`,
+        subjectType: 'issue',
+        subjectNumber: issue.number,
+        participantEmails: [issue.creator_email],
+        mentionText: body.body,
       });
       return c.json({ comment }, 201);
     } catch (error) {
