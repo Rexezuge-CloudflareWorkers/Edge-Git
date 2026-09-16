@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BranchProtectionDAO } from '@edge-git/backend-data/dao';
 import { BranchProtectionService } from '@edge-git/backend-services/protection';
-import { branchNameFromRef, checkStaticPushProtection } from '@edge-git/git-protocol';
+import { PktLine, branchNameFromRef, checkStaticPushProtection } from '@edge-git/git-protocol';
+import type { ProtectedRefRule } from '@edge-git/git-protocol';
+import { PushHandler } from '@edge-git/background/PushHandler';
 
 function createProtectionFakeDb(seedRules: Array<Record<string, unknown>> = []): D1Queryable & { rules: Array<Record<string, unknown>> } {
   const state = { rules: seedRules.map((r) => ({ ...r })) };
@@ -215,5 +217,120 @@ describe('BranchProtectionDAO', () => {
     await expect(dao.countByRepo('repo1')).resolves.toBe(1);
     await dao.deleteByRepo('repo1');
     await expect(dao.listByRepo('repo1')).resolves.toHaveLength(0);
+  });
+});
+
+describe('PushHandler whole-push protection rejection', () => {
+  const OID_A = 'a'.repeat(40);
+  const OID_B = 'b'.repeat(40);
+  const OID_C = 'c'.repeat(40);
+  const LIMITS = { maxCommands: 100, maxPackBytes: 50_000_000 };
+
+  function pushPayload(cmds: Array<{ oldOid: string; newOid: string; ref: string }>, caps: string[] = []): Uint8Array {
+    const lines = cmds.map((cmd, i) => PktLine.encode(`${cmd.oldOid} ${cmd.newOid} ${cmd.ref}${i === 0 && caps.length > 0 ? `\0${caps.join(' ')}` : ''}\n`));
+    const head = PktLine.mergeLines([...lines, PktLine.encodeFlush()]);
+    const pack = new Uint8Array([1, 2, 3]);
+    const out = new Uint8Array(head.byteLength + pack.byteLength);
+    out.set(head, 0);
+    out.set(pack, head.byteLength);
+    return out;
+  }
+
+  function makeHandler(opts: { ancestor?: boolean } = {}): {
+    handler: PushHandler;
+    calls: { writeFile: number; indexPack: number; apply: number; appliedRefs: string[] };
+  } {
+    const calls = { writeFile: 0, indexPack: 0, apply: 0, appliedRefs: [] as string[] };
+    const isoGitFs = { promises: { writeFile: async () => { calls.writeFile += 1; }, unlink: async () => undefined } };
+    const git = {
+      indexPack: async () => { calls.indexPack += 1; },
+      isAncestor: async () => opts.ancestor ?? true,
+      applyRefUpdates: async (cmds: Array<{ ref: string }>) => {
+        calls.apply += 1;
+        calls.appliedRefs = cmds.map((c) => c.ref);
+        return cmds.map((c) => ({ ref: c.ref, ok: true as const }));
+      },
+      clearCache: () => undefined,
+    };
+    const handler = new PushHandler({ isoGitFs: isoGitFs as never, git: git as never, getFullName: () => 'a/b' });
+    return { handler, calls };
+  }
+
+  const mainRule: ProtectedRefRule = { ref: 'refs/heads/main', requirePr: true, blockForcePush: true, blockDeletion: true };
+
+  it('rejects every ref when a static violation exists (non-atomic)', async () => {
+    const { handler, calls } = makeHandler();
+    const res = await handler.receivePack(
+      pushPayload([
+        { oldOid: OID_A, newOid: OID_B, ref: 'refs/heads/main' },
+        { oldOid: OID_A, newOid: OID_C, ref: 'refs/heads/feature' },
+      ]),
+      LIMITS,
+      [mainRule],
+    );
+    const text = await res.text();
+    expect(text).toContain('unpack ok');
+    expect(text).toContain('ng refs/heads/main direct pushes to protected branch "main" are blocked');
+    expect(text).toContain('ng refs/heads/feature push rejected: protected branch update declined');
+    expect(text).not.toContain('ok refs/heads/feature');
+    expect(calls.writeFile).toBe(0);
+    expect(calls.apply).toBe(0);
+  });
+
+  it('rejects every ref when a static violation exists (atomic)', async () => {
+    const { handler, calls } = makeHandler();
+    const res = await handler.receivePack(
+      pushPayload(
+        [
+          { oldOid: OID_A, newOid: OID_B, ref: 'refs/heads/main' },
+          { oldOid: OID_A, newOid: OID_C, ref: 'refs/heads/feature' },
+        ],
+        ['atomic'],
+      ),
+      LIMITS,
+      [mainRule],
+    );
+    const text = await res.text();
+    expect(text).toContain('ng refs/heads/main');
+    expect(text).toContain('ng refs/heads/feature');
+    expect(calls.writeFile).toBe(0);
+    expect(calls.apply).toBe(0);
+  });
+
+  it('rejects every ref on force-push violations after indexing', async () => {
+    const { handler, calls } = makeHandler({ ancestor: false });
+    const nonPrRule: ProtectedRefRule = { ...mainRule, requirePr: false };
+    const res = await handler.receivePack(
+      pushPayload([
+        { oldOid: OID_A, newOid: OID_B, ref: 'refs/heads/main' },
+        { oldOid: OID_A, newOid: OID_C, ref: 'refs/heads/feature' },
+      ]),
+      LIMITS,
+      [nonPrRule],
+    );
+    const text = await res.text();
+    expect(text).toContain('unpack ok');
+    expect(text).toContain('ng refs/heads/main non-fast-forward push to protected branch "main" is blocked');
+    expect(text).toContain('ng refs/heads/feature push rejected: protected branch update declined');
+    expect(calls.indexPack).toBe(1);
+    expect(calls.apply).toBe(0);
+  });
+
+  it('applies clean pushes untouched', async () => {
+    const { handler, calls } = makeHandler();
+    const res = await handler.receivePack(
+      pushPayload([
+        { oldOid: OID_A, newOid: OID_B, ref: 'refs/heads/main' },
+        { oldOid: OID_A, newOid: OID_C, ref: 'refs/heads/feature' },
+      ]),
+      LIMITS,
+      [],
+    );
+    const text = await res.text();
+    expect(text).toContain('unpack ok');
+    expect(text).toContain('ok refs/heads/main');
+    expect(text).toContain('ok refs/heads/feature');
+    expect(calls.apply).toBe(1);
+    expect(calls.appliedRefs).toEqual(['refs/heads/main', 'refs/heads/feature']);
   });
 });
