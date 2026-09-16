@@ -1,4 +1,13 @@
-import type { IssueDAO, RepositoryDAO, UserAccessTokenDAO, UserDAO } from '@edge-git/backend-data/dao';
+import type {
+  IssueDAO,
+  NamespaceDAO,
+  OrganizationDAO,
+  OrganizationMemberDAO,
+  RepoCollaboratorDAO,
+  RepositoryDAO,
+  UserAccessTokenDAO,
+  UserDAO,
+} from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import type { Token } from '@edge-git/backend-runtime/di';
 import type { AppConfiguration } from '@edge-git/backend-runtime/config';
@@ -7,6 +16,8 @@ import type { TokenService } from '../auth/TokenService';
 import type { RepoService } from '../repo/RepoService';
 import type { UserService } from '../user/UserService';
 import type { IssueService } from '../issue/IssueService';
+import type { OrganizationService } from '../org/OrganizationService';
+import type { PermissionService } from '../permission/PermissionService';
 
 // Central token registry for the per-request composition root
 // (`requestScope.ts`). Call sites resolve services via
@@ -32,11 +43,17 @@ const Tokens = {
   RepositoryDAO: Symbol('RepositoryDAO') as Token<() => Promise<RepositoryDAO>>,
   UserAccessTokenDAO: Symbol('UserAccessTokenDAO') as Token<() => Promise<UserAccessTokenDAO>>,
   IssueDAO: Symbol('IssueDAO') as Token<() => Promise<IssueDAO>>,
+  NamespaceDAO: Symbol('NamespaceDAO') as Token<() => Promise<NamespaceDAO>>,
+  OrganizationDAO: Symbol('OrganizationDAO') as Token<() => Promise<OrganizationDAO>>,
+  OrganizationMemberDAO: Symbol('OrganizationMemberDAO') as Token<() => Promise<OrganizationMemberDAO>>,
+  RepoCollaboratorDAO: Symbol('RepoCollaboratorDAO') as Token<() => Promise<RepoCollaboratorDAO>>,
   AccessAuthService: Symbol('AccessAuthService') as Token<AccessAuthService>,
   TokenService: Symbol('TokenService') as Token<TokenService>,
   RepoService: Symbol('RepoService') as Token<RepoService>,
   UserService: Symbol('UserService') as Token<UserService>,
   IssueService: Symbol('IssueService') as Token<IssueService>,
+  OrganizationService: Symbol('OrganizationService') as Token<OrganizationService>,
+  PermissionService: Symbol('PermissionService') as Token<PermissionService>,
 } satisfies Record<string, Token<unknown>>;
 
 export { Tokens };

@@ -202,15 +202,19 @@ describe('RepoService', () => {
     const issueSvc = new IssueService({ DB: db });
     await issueSvc.createIssue({ repositoryId: db.repos[0].id as string, fullName: 'alice/demo', title: 'T', creatorEmail: 'a@x.co' });
 
+    // Public repo: non-owner without grant is forbidden (still reveals existence).
+    await expect(svc.updateRepo('alice', 'demo', 'mallory@example.com', { description: 'x' })).rejects.toThrow('owner');
+
     const updated = await svc.updateRepo('alice', 'demo', 'alice@example.com', { description: 'new', isPrivate: true });
     expect(updated.description).toBe('new');
     expect(updated.is_private).toBe(1);
 
-    await expect(svc.updateRepo('alice', 'demo', 'mallory@example.com', { description: 'x' })).rejects.toThrow('owner');
+    // Private repo: non-owner without grant hides existence.
+    await expect(svc.updateRepo('alice', 'demo', 'mallory@example.com', { description: 'x' })).rejects.toThrow('not found');
     await expect(svc.updateRepo('alice', 'demo', 'alice@example.com', { description: 'x'.repeat(501) })).rejects.toThrow('500');
     await expect(svc.updateRepo('alice', 'missing', 'alice@example.com', { description: 'x' })).rejects.toThrow('not found');
 
-    await expect(svc.deleteRepo('alice', 'demo', 'mallory@example.com')).rejects.toThrow('owner');
+    await expect(svc.deleteRepo('alice', 'demo', 'mallory@example.com')).rejects.toThrow('not found');
     await svc.deleteRepo('alice', 'demo', 'alice@example.com');
     expect(db.repos).toHaveLength(0);
     expect(db.issues).toHaveLength(0);

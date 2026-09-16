@@ -6,24 +6,46 @@ import { ServiceError } from '@edge-git/backend-errors';
 import { getBasicCredentials, getBearerToken } from '@edge-git/git-protocol';
 import type { RequestContext } from '@/middleware';
 
-function toRepoJson(r: RepositoryRow): unknown {
-  return {
+function toRepoJson(r: RepositoryRow, viewerRole?: string | null): unknown {
+  const base = {
     id: r.id,
     owner: r.owner,
     name: r.name,
     fullName: `${r.owner}/${r.name}`,
+    ownerType: r.owner_type ?? (r.org_id ? 'org' : 'user'),
     description: r.description,
     isPrivate: r.is_private === 1,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
+  return viewerRole ? { ...base, viewerRole } : base;
 }
 
 async function requireVisibleRepo(env: Env, owner: string, repoName: string, viewerEmail: string | null): Promise<RepositoryRow | null> {
-  const row = await createRequestScope(env).get(Tokens.RepoService).getByOwnerAndName(owner, repoName);
+  const scope = createRequestScope(env);
+  const row = await scope.get(Tokens.RepoService).getByOwnerAndName(owner, repoName);
   if (!row) return null;
-  if (row.is_private === 1 && row.owner_email !== viewerEmail) return null;
+  const role = await scope.get(Tokens.PermissionService).getRole(viewerEmail, row);
+  if (!role) return null;
   return row;
+}
+
+async function requireRoleForRepo(
+  env: Env,
+  owner: string,
+  repoName: string,
+  viewerEmail: string | null,
+  minimum: 'read' | 'write' | 'admin',
+): Promise<{ row: RepositoryRow; role: 'read' | 'write' | 'admin' } | null> {
+  const scope = createRequestScope(env);
+  const row = await scope.get(Tokens.RepoService).getByOwnerAndName(owner, repoName);
+  if (!row) return null;
+  const role = await scope.get(Tokens.PermissionService).getRole(viewerEmail, row);
+  if (!role) return null;
+  const rank = role === 'admin' ? 3 : role === 'write' ? 2 : 1;
+  const need = minimum === 'admin' ? 3 : minimum === 'write' ? 2 : 1;
+  if (rank < need) return null;
+  return { row, role };
 }
 
 /**
@@ -75,4 +97,4 @@ function toServiceStatus(error: unknown): 400 | 403 | 404 | 500 {
   return 500;
 }
 
-export { toRepoJson, requireVisibleRepo, resolvePublicViewer, withPublicRepo, toServiceStatus };
+export { toRepoJson, requireVisibleRepo, requireRoleForRepo, resolvePublicViewer, withPublicRepo, toServiceStatus };
