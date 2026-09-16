@@ -1,20 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Repo } from '../types';
 import { loadRepoAuthed, loadRepoPublic } from '../services/repoService';
 
 export type RepoShellStatus = 'loading' | 'ready' | 'missing' | 'forbidden';
 
 // Shared repo shell loader for detail views (commit, compare, history):
-// authenticated first, then anonymous public. Private repos report
-// `forbidden` so callers can render the sign-in gate.
+// speculative public first, upgrade to authed when signed in. `null` and
+// `false` share the public path so null->false never refetches; a public
+// 404 while resolving is parked and applied on settle without refetch.
 export function useRepoData(owner: string, repo: string, authorized: boolean | null): { status: RepoShellStatus; repoData: Repo | null } {
   const [repoData, setRepoData] = useState<Repo | null>(null);
   const [status, setStatus] = useState<RepoShellStatus>('loading');
+  const useAuthed = authorized === true;
+  const pendingErrorRef = useRef<{ key: string; kind: RepoShellStatus } | null>(null);
 
   useEffect(() => {
+    pendingErrorRef.current = null;
     let cancelled = false;
     const run = async () => {
-      if (authorized === true) {
+      if (useAuthed) {
         try {
           const data = await loadRepoAuthed(owner, repo);
           if (!cancelled) {
@@ -34,16 +38,30 @@ export function useRepoData(owner: string, repo: string, authorized: boolean | n
         }
       } catch (error) {
         if (cancelled) return;
-        if (authorized === null) return;
         const message = error instanceof Error ? error.message : '';
-        setStatus(message.includes('404') || message.includes('Not found') ? 'missing' : 'forbidden');
+        const kind: RepoShellStatus = message.includes('404') || message.includes('Not found') ? 'missing' : 'forbidden';
+        if (authorized === null) {
+          pendingErrorRef.current = { key: `${owner}/${repo}`, kind };
+          return;
+        }
+        setStatus(kind);
       }
     };
     void run();
     return () => {
       cancelled = true;
     };
-  }, [owner, repo, authorized]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [owner, repo, useAuthed]);
+
+  useEffect(() => {
+    if (authorized !== false || status !== 'loading' || repoData) return;
+    const pending = pendingErrorRef.current;
+    if (pending && pending.key === `${owner}/${repo}`) {
+      setStatus(pending.kind);
+      pendingErrorRef.current = null;
+    }
+  }, [authorized, status, repoData, owner, repo]);
 
   return { status, repoData };
 }

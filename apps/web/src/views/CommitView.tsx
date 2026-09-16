@@ -24,10 +24,12 @@ export function CommitView({
   const [diff, setDiff] = useState<CommitDiffResult | null>(null);
   const [missing, setMissing] = useState(false);
 
+  const useAuthed = authorized === true;
+
   useEffect(() => {
     if (status !== 'ready') return;
     let cancelled = false;
-    const authOpt = authorized === true ? { isAuthed: true as const } : { isAuthed: false as const };
+    const authOpt = useAuthed ? { isAuthed: true as const } : { isAuthed: false as const };
     loadCommit(owner, repo, oid, authOpt)
       .then((d) => {
         if (cancelled) return;
@@ -49,7 +51,7 @@ export function CommitView({
     return () => {
       cancelled = true;
     };
-  }, [owner, repo, oid, status, showNotice, t, authorized]);
+  }, [owner, repo, oid, status, showNotice, t, useAuthed]);
 
   if (status === 'loading' && !repoData) {
     return (

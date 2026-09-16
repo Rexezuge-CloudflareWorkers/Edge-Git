@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { Repo } from '../types';
@@ -23,10 +23,14 @@ export function PullDetailView({
 
   const pullNumber = Number(number);
 
+  const useAuthed = authorized === true;
+  const pendingErrorRef = useRef<{ key: string; kind: 'missing' | 'forbidden' } | null>(null);
+
   useEffect(() => {
+    pendingErrorRef.current = null;
     let cancelled = false;
     const run = async () => {
-      if (authorized === true) {
+      if (useAuthed) {
         try {
           const data = await loadRepoAuthed(owner, repo);
           if (!cancelled) {
@@ -46,16 +50,30 @@ export function PullDetailView({
         }
       } catch (error) {
         if (cancelled) return;
-        if (authorized === null) return;
         const message = error instanceof Error ? error.message : '';
-        setStatus(message.includes('404') || message.includes('Not found') ? 'missing' : 'forbidden');
+        const kind = message.includes('404') || message.includes('Not found') ? 'missing' : 'forbidden';
+        if (authorized === null) {
+          pendingErrorRef.current = { key: `${owner}/${repo}`, kind };
+          return;
+        }
+        setStatus(kind);
       }
     };
     void run();
     return () => {
       cancelled = true;
     };
-  }, [owner, repo, authorized]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [owner, repo, useAuthed]);
+
+  useEffect(() => {
+    if (authorized !== false || status !== 'loading' || repoData) return;
+    const pending = pendingErrorRef.current;
+    if (pending && pending.key === `${owner}/${repo}`) {
+      setStatus(pending.kind);
+      pendingErrorRef.current = null;
+    }
+  }, [authorized, status, repoData, owner, repo]);
 
   if (status === 'loading' && !repoData) {
     return (
