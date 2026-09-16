@@ -101,3 +101,35 @@ export function validateReceivePackCounts(
   }
   return null;
 }
+
+const OID_RE = /^[0-9a-f]{40}$/i;
+const REF_SEGMENT_RE = /^[\w.-]+$/;
+
+// Ref-name guard (git-check-ref-format subset): rejects path escapes,
+// control characters, and shell-significant names before refs hit storage.
+export function validateReceivePackCommands(commands: Command[]): string | null {
+  for (const cmd of commands) {
+    if (!OID_RE.test(cmd.oldOid) || !OID_RE.test(cmd.newOid)) {
+      return `invalid oid in command for ${cmd.ref}`;
+    }
+    if (!isValidRefName(cmd.ref)) {
+      return `invalid ref name: ${cmd.ref}`;
+    }
+  }
+  return null;
+}
+
+function isValidRefName(ref: string): boolean {
+  if (!ref || ref.length > 255) return false;
+  if (!ref.startsWith('refs/')) return false;
+  if (ref.includes('..') || ref.includes('//')) return false;
+  if (ref.endsWith('/') || ref.endsWith('.') || ref.endsWith('.lock')) return false;
+  for (const ch of ref) {
+    const code = ch.codePointAt(0) ?? 0;
+    if (code === 0x7f || code === 0x5c || code <= 0x20) return false;
+    if ('~^:?*[]@{'.includes(ch)) return false;
+  }
+  return ref
+    .split('/')
+    .every((seg) => seg.length > 0 && seg !== '.' && seg !== '..' && seg !== '@' && REF_SEGMENT_RE.test(seg));
+}

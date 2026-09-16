@@ -8,6 +8,8 @@ import {
   parseFetchRequest,
   shouldSendPackfileForFetch,
   validateFetchRequestCounts,
+  validateFetchRequestOids,
+  validateFilterSpec,
 } from '@edge-git/git-protocol';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { createLogger } from '@edge-git/backend-runtime/logger';
@@ -70,6 +72,18 @@ class FetchHandler {
         return buildFetchErrorResponse(countError, 400);
       }
 
+      const oidError = validateFetchRequestOids(fetchRequest);
+      if (oidError) {
+        logger.error(`(upload-pack-fetch) Rejected ${getFullName() ?? 'unknown repo'}: ${oidError}`);
+        return buildFetchErrorResponse(oidError, 400);
+      }
+
+      const filterError = validateFilterSpec(fetchRequest.filterSpec);
+      if (filterError) {
+        logger.error(`(upload-pack-fetch) Rejected ${getFullName() ?? 'unknown repo'}: ${filterError}`);
+        return buildFetchErrorResponse(filterError, 400);
+      }
+
       let commonCommits: string[];
       try {
         commonCommits = await git.findCommonCommits(fetchRequest.haves, limits.maxHaves);
@@ -107,6 +121,8 @@ class FetchHandler {
             exclude: excludeOids,
             filter: fetchRequest.filterSpec,
             maxObjects: limits.maxObjects,
+            deepenRelative: fetchRequest.shallowOptions?.deepenRelative,
+            relativeTo: fetchRequest.shallowOptions?.shallow,
           });
 
           // include-tag: also send annotated tags pointing at packed commits.
@@ -154,7 +170,7 @@ class FetchHandler {
       });
     }
 
-    return new Response('Unsupported command', { status: 400 });
+    return buildFetchErrorResponse(`unsupported command: ${command || '(empty)'}`, 400);
   }
 
   private async expandWithTags(oids: string[]): Promise<string[]> {

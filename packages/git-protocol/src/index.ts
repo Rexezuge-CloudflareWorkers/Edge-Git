@@ -12,7 +12,10 @@ export {
   buildFetchErrorResponse,
   shouldSendPackfileForFetch,
   validateFetchRequestCounts,
+  validateFetchRequestOids,
+  validateFilterSpec,
   validateReceivePackCounts,
+  validateReceivePackCommands,
   getBasicCredentials,
   getBearerToken,
 } from './protocol';
