@@ -2,15 +2,15 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Card } from '../components/ui/Card';
-import { searchCode, searchIssues, searchRepos } from '../services/searchService';
+import { searchCode, searchIssues, searchPulls, searchRepos } from '../services/searchService';
 import type { CodeHit } from '../services/searchService';
-import type { Issue, Repo } from '../types';
+import type { Issue, PullRequest, Repo } from '../types';
 
-type SearchTab = 'repos' | 'issues' | 'code';
+type SearchTab = 'repos' | 'issues' | 'pulls' | 'code';
 
 function parseTab(raw: string | null): SearchTab {
-  if (raw === 'issues' || raw === 'code') return raw;
-  return 'repos';
+  const tabs: SearchTab[] = ['repos', 'issues', 'pulls', 'code'];
+  return raw !== null && tabs.includes(raw as SearchTab) ? (raw as SearchTab) : 'repos';
 }
 
 export function SearchView({ showNotice }: { showNotice: (type: 'success' | 'error', text: string) => void }) {
@@ -20,6 +20,7 @@ export function SearchView({ showNotice }: { showNotice: (type: 'success' | 'err
   const type = parseTab(params.get('type'));
   const [repos, setRepos] = useState<Repo[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
+  const [pulls, setPulls] = useState<PullRequest[]>([]);
   const [code, setCode] = useState<CodeHit[]>([]);
   const [loading, setLoading] = useState(query.length >= 2);
   // Clear stale hits when the query changes (render-phase adjustment avoids
@@ -29,6 +30,7 @@ export function SearchView({ showNotice }: { showNotice: (type: 'success' | 'err
     setLastKey(`${type}:${query}`);
     setRepos([]);
     setIssues([]);
+    setPulls([]);
     setCode([]);
     setLoading(true);
   }
@@ -39,9 +41,11 @@ export function SearchView({ showNotice }: { showNotice: (type: 'success' | 'err
     const run =
       type === 'issues'
         ? searchIssues(query, 20).then(setIssues)
-        : type === 'code'
-          ? searchCode(query, 20).then(setCode)
-          : searchRepos(query, 20).then(setRepos);
+        : type === 'pulls'
+          ? searchPulls(query, 20).then(setPulls)
+          : type === 'code'
+            ? searchCode(query, 20).then(setCode)
+            : searchRepos(query, 20).then(setRepos);
     run
       .catch(() => {
         if (!cancelled) showNotice('error', t('errors.failedToSearch', 'Failed To Load Search Results.'));
@@ -67,6 +71,10 @@ export function SearchView({ showNotice }: { showNotice: (type: 'success' | 'err
         <span aria-hidden="true">·</span>
         <button type="button" onClick={() => switchTab('issues')} className={type === 'issues' ? 'font-semibold' : ''}>
           {t('search.issues', 'Issues')}
+        </button>
+        <span aria-hidden="true">·</span>
+        <button type="button" onClick={() => switchTab('pulls')} className={type === 'pulls' ? 'font-semibold' : ''}>
+          {t('search.pulls', 'Pull Requests')}
         </button>
         <span aria-hidden="true">·</span>
         <button type="button" onClick={() => switchTab('code')} className={type === 'code' ? 'font-semibold' : ''}>
@@ -109,6 +117,23 @@ export function SearchView({ showNotice }: { showNotice: (type: 'success' | 'err
                   {i.full_name}#{i.number} — {i.title}
                 </Link>
                 {i.body ? <p className="mt-1 text-sm text-[var(--color-text-secondary)] line-clamp-2">{i.body}</p> : null}
+              </Card>
+            ))
+          )}
+        </div>
+      ) : type === 'pulls' ? (
+        <div className="grid gap-3">
+          {pulls.length === 0 ? (
+            <Card>
+              <p className="text-sm text-[var(--color-text-secondary)]">{t('search.noPulls', 'No Pull Requests Found.')}</p>
+            </Card>
+          ) : (
+            pulls.map((p) => (
+              <Card key={p.id}>
+                <Link to={`/${p.full_name}/pulls/${p.number}`} className="font-semibold text-[var(--color-accent)]">
+                  {p.full_name}#{p.number} — {p.title}
+                </Link>
+                {p.body ? <p className="mt-1 text-sm text-[var(--color-text-secondary)] line-clamp-2">{p.body}</p> : null}
               </Card>
             ))
           )}

@@ -6,6 +6,7 @@ import type {
   OrganizationDAO,
   OrganizationMemberDAO,
   PullRequestDAO,
+  PullThreadDAO,
   RepoCollaboratorDAO,
   RepositoryDAO,
   UserAccessTokenDAO,
@@ -22,6 +23,7 @@ import type { RepoService } from '../repo/RepoService';
 import type { UserService } from '../user/UserService';
 import type { IssueService } from '../issue/IssueService';
 import type { PullRequestService } from '../pull/PullRequestService';
+import type { PullThreadService } from '../pull/PullThreadService';
 import type { OrganizationService } from '../org/OrganizationService';
 import type { PermissionService } from '../permission/PermissionService';
 import type { SearchService } from '../search/SearchService';
@@ -57,6 +59,7 @@ const Tokens = {
   UserAccessTokenDAO: Symbol('UserAccessTokenDAO') as Token<() => Promise<UserAccessTokenDAO>>,
   IssueDAO: Symbol('IssueDAO') as Token<() => Promise<IssueDAO>>,
   PullRequestDAO: Symbol('PullRequestDAO') as Token<() => Promise<PullRequestDAO>>,
+  PullThreadDAO: Symbol('PullThreadDAO') as Token<() => Promise<PullThreadDAO>>,
   NamespaceDAO: Symbol('NamespaceDAO') as Token<() => Promise<NamespaceDAO>>,
   OrganizationDAO: Symbol('OrganizationDAO') as Token<() => Promise<OrganizationDAO>>,
   OrganizationMemberDAO: Symbol('OrganizationMemberDAO') as Token<() => Promise<OrganizationMemberDAO>>,
@@ -76,6 +79,7 @@ const Tokens = {
   UserService: Symbol('UserService') as Token<UserService>,
   IssueService: Symbol('IssueService') as Token<IssueService>,
   PullRequestService: Symbol('PullRequestService') as Token<PullRequestService>,
+  PullThreadService: Symbol('PullThreadService') as Token<PullThreadService>,
   OrganizationService: Symbol('OrganizationService') as Token<OrganizationService>,
   PermissionService: Symbol('PermissionService') as Token<PermissionService>,
   SearchService: Symbol('SearchService') as Token<SearchService>,

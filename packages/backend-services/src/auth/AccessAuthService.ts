@@ -106,14 +106,5 @@ class AccessAuthService {
   }
 }
 
-/**
-@deprecated Prefer `createRequestScope(env).get(Tokens.AccessAuthService)`; this thin wrapper only preserves backward compatibility.
-*/
-class AccessAuthServiceFactory {
-  public static create(env: AccessAuthEnv): AccessAuthService {
-    return new AccessAuthService(env);
-  }
-}
-
-export { AccessAuthService, AccessAuthServiceFactory, DEFAULT_ACCESS_AUTH_STRATEGIES };
+export { AccessAuthService, DEFAULT_ACCESS_AUTH_STRATEGIES };
 export type { AccessAuthEnv, AccessIdentityContext, AccessAuthStrategy };

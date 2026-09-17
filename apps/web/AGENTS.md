@@ -8,4 +8,4 @@ Scope: `apps/web/**`. Parent index: `../../AGENTS.md`.
 - API access: `src/lib/api.ts` + `src/services/*` (`repo/issue/token/userService`) + `src/adapters/repoAdapter.ts`; `src/lib/format.ts`, `src/lib/constants.ts`, `src/types.ts`.
 - i18n: `src/i18n.ts` (i18next + `react-i18next`) — `SUPPORTED_LANGUAGES` (12 tags), `normalizeLanguage` (case/separator-insensitive, `zh` → `zh-CN`, unknown → `en`), `detectInitialLanguage` (stored `edge-git-lng` → `navigator.language` → `en`), `loadLanguage` (static `import.meta.glob` per-locale chunks). Bundles shipped: `src/locales/en|zh-CN/translation.json`. `src/lib/locale.ts` adds `canonicalizeLocaleTag`/`normalizeLocale`/`resolveLocale` on top.
 - English UI text uses Title Case (`Sign In To Create Repositories.`); keep `{{placeholder}}` parity across locales. Validate with `pnpm run validate:locales` (key/placeholder parity vs `en`, no empty values).
-- No web unit tests yet (see `docs/agents/testing/AGENTS.md`).
+- Pure helpers are unit-tested from the root suite (`src/lib/threads.ts` gate parity/grouping via `test/web-threads.test.ts`); no component tests yet (see `docs/agents/testing/AGENTS.md`).

@@ -124,14 +124,5 @@ class PermissionService {
   }
 }
 
-/**
-@deprecated Prefer `createRequestScope(env).get(Tokens.PermissionService)`; kept for backward compatibility.
-*/
-class PermissionServiceFactory {
-  public static create(env: PermissionServiceEnv): PermissionService {
-    return new PermissionService(env);
-  }
-}
-
-export { PermissionService, PermissionServiceFactory };
+export { PermissionService };
 export type { PermissionServiceDeps, PermissionServiceEnv, RepoPermission };

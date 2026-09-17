@@ -144,14 +144,5 @@ class ForkService {
   }
 }
 
-/**
-@deprecated Prefer `createRequestScope(env).get(Tokens.ForkService)`; this thin wrapper only preserves backward compatibility.
-*/
-class ForkServiceFactory {
-  public static create(env: ForkServiceEnv): ForkService {
-    return new ForkService(env);
-  }
-}
-
-export { ForkService, ForkServiceFactory };
+export { ForkService };
 export type { ForkServiceDeps, ForkServiceEnv };

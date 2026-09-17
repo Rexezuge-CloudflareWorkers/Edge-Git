@@ -1,8 +1,8 @@
-export { StarService, StarServiceFactory } from './StarService';
+export { StarService } from './StarService';
 export type { StarServiceDeps, StarServiceEnv } from './StarService';
-export { WatchService, WatchServiceFactory } from './WatchService';
+export { WatchService } from './WatchService';
 export type { WatchServiceDeps, WatchServiceEnv } from './WatchService';
-export { ActivityService, ActivityServiceFactory } from './ActivityService';
+export { ActivityService } from './ActivityService';
 export type { ActivityServiceDeps, ActivityServiceEnv, RecordEventInput } from './ActivityService';
-export { NotificationService, NotificationServiceFactory, MAX_FANOUT_RECIPIENTS } from './NotificationService';
+export { NotificationService, MAX_FANOUT_RECIPIENTS } from './NotificationService';
 export type { FanOutInput, NotificationServiceDeps, NotificationServiceEnv } from './NotificationService';

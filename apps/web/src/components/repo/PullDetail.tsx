@@ -3,8 +3,6 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { MergePreview, PullComment, PullDiff, PullRequest, PullReview } from '../../types';
 import {
-  addPullComment,
-  addPullReview,
   getMergePreview,
   getPull,
   getPullDiff,
@@ -13,11 +11,15 @@ import {
   mergePull,
   updatePullStatus,
 } from '../../services/pullService';
+import { isBlockedByReviews } from '../../lib/threads';
+import { PullComments } from './PullComments';
+import { PullReviews } from './PullReviews';
+import { PullThreads } from './PullThreads';
 import { fetchUpgraded, useUpgradeFetchState } from '../../lib/upgradeFetch';
 import { formatTimestamp } from '../../lib/format';
 import { Markdown } from '../shared/Markdown';
 import { headLabel } from './PullsTab';
-import { getCodeowners, getPullMeta, requestReviewers, setPullDraft } from '../../services/collabService';
+import { getPullMeta, setPullDraft } from '../../services/collabService';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Select, Textarea } from '../ui/Input';
@@ -47,21 +49,14 @@ export function PullDetail({
   const [diff, setDiff] = useState<PullDiff | null>(null);
   const [preview, setPreview] = useState<MergePreview | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'missing'>('loading');
-  const [draft, setDraft] = useState('');
-  const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [merging, setMerging] = useState(false);
-  const [reviewState, setReviewState] = useState('approved');
-  const [reviewBody, setReviewBody] = useState('');
-  const [reviewing, setReviewing] = useState(false);
   const [conflicts, setConflicts] = useState<string[]>([]);
   const [conflictReason, setConflictReason] = useState<string | null>(null);
   const [mergeMessage, setMergeMessage] = useState('');
   const [deleteHead, setDeleteHead] = useState(false);
   const [strategy, setStrategy] = useState<'merge' | 'squash' | 'rebase'>('merge');
-  const [reviewerInput, setReviewerInput] = useState('');
   const [metaLabels, setMetaLabels] = useState<Array<{ name: string }>>([]);
-  const [codeowners, setCodeowners] = useState<string[]>([]);
 
   const useAuthed = authorized === true;
   // Single-flight reads across the auth upgrade (see upgradeFetch). Keys are
@@ -126,9 +121,6 @@ export function PullDetail({
     void getPullMeta(owner, repo, number).then((meta) => {
       if (!cancelled) setMetaLabels(meta.labels ?? []);
     }).catch(() => undefined);
-    void getCodeowners(owner, repo, number).then((res) => {
-      if (!cancelled) setCodeowners(res.owners ?? []);
-    }).catch(() => undefined);
     return () => {
       cancelled = true;
     };
@@ -150,17 +142,9 @@ export function PullDetail({
     );
   }
 
-  // Mirrors the API rule: a reviewer's latest review wins; any outstanding
-  // changes_requested blocks the merge button.
-  const latestByAuthor = new Map<string, string>();
-  for (const r of reviews) latestByAuthor.set(r.author_email.toLowerCase(), r.state);
-  let blockedByReview = false;
-  for (const state of latestByAuthor.values()) {
-    if (state === 'changes_requested') {
-      blockedByReview = true;
-      break;
-    }
-  }
+  // Mirrors the API rule: a reviewer's latest non-dismissed review wins; any
+  // outstanding changes_requested blocks the merge button.
+  const blockedByReview = isBlockedByReviews(reviews);
 
   const toggleStatus = async () => {
     const next = pull.status === 'open' ? 'closed' : 'open';
@@ -173,36 +157,6 @@ export function PullDetail({
       showNotice('error', error instanceof Error ? error.message : t('errors.failedToUpdatePull', 'Failed To Update Pull Request.'));
     } finally {
       setToggling(false);
-    }
-  };
-
-  const submitComment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (draft.trim() === '') return;
-    setSaving(true);
-    try {
-      await addPullComment(owner, repo, number, { body: draft.trim() });
-      setDraft('');
-      setComments(await listPullComments(owner, repo, number));
-    } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToAddComment', 'Failed To Add Comment.'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const submitReview = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setReviewing(true);
-    try {
-      await addPullReview(owner, repo, number, { state: reviewState, body: reviewBody.trim() || undefined });
-      setReviewBody('');
-      setReviews(await listPullReviews(owner, repo, number));
-      showNotice('success', t('pulls.reviewSubmitted', 'Review Submitted.'));
-    } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToAddReview', 'Failed To Submit Review.'));
-    } finally {
-      setReviewing(false);
     }
   };
 
@@ -391,103 +345,34 @@ export function PullDetail({
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>{t('pulls.reviews', 'Reviews')}</CardTitle>
-        </CardHeader>
-        {codeowners.length > 0 && (
-          <p className="mb-2 text-xs text-[var(--color-text-muted)]">
-            {t('pulls.suggestedReviewers', 'Suggested Reviewers: {{owners}}', { owners: codeowners.join(', ') })}
-          </p>
-        )}
-        {canWrite && pull.status === 'open' && (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!reviewerInput.trim()) return;
-              void requestReviewers(owner, repo, number, [reviewerInput.trim()])
-                .then(() => {
-                  setReviewerInput('');
-                  showNotice('success', t('pulls.reviewRequested', 'Review Requested.'));
-                })
-                .catch((error) => showNotice('error', error instanceof Error ? error.message : t('errors.failedToRequestReview', 'Failed To Request Review.')));
-            }}
-            className="mb-3 flex gap-2"
-          >
-            <input
-              className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-base)] px-3 py-2 text-sm"
-              placeholder={t('pulls.requestReviewerPlaceholder', 'Request Reviewer (Email Or Username)…')}
-              value={reviewerInput}
-              onChange={(e) => setReviewerInput(e.target.value)}
-            />
-            <Button type="submit" variant="secondary" size="sm">
-              {t('pulls.requestReview', 'Request')}
-            </Button>
-          </form>
-        )}
-        {reviews.length === 0 ? (
-          <p className="text-sm text-[var(--color-text-muted)]">{t('pulls.noReviews', 'No Reviews Yet.')}</p>
-        ) : (
-          <ul className="divide-y divide-[var(--color-border)]">
-            {reviews.map((r) => (
-              <li key={r.id} className="py-3 first:pt-0 last:pb-0">
-                <div className="flex items-center gap-2">
-                  <Badge variant={r.state === 'approved' ? 'success' : r.state === 'changes_requested' ? 'error' : 'neutral'}>{r.state}</Badge>
-                  <span className="text-xs text-[var(--color-text-muted)]">
-                    {r.author_email} · {formatTimestamp(r.created_at)}
-                  </span>
-                </div>
-                {r.body && (
-                  <div className="mt-1 text-sm text-[var(--color-text-primary)]">
-                    <Markdown content={r.body} />
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-        {canWrite && pull.status === 'open' && (
-          <form onSubmit={submitReview} className="mt-4 space-y-2">
-            <Select value={reviewState} onChange={(e) => setReviewState(e.target.value)} aria-label="Review state">
-              <option value="approved">approved</option>
-              <option value="changes_requested">changes_requested</option>
-              <option value="commented">commented</option>
-            </Select>
-            <Textarea placeholder={t('pulls.reviewPlaceholder', 'Review Notes (Optional)')} value={reviewBody} onChange={(e) => setReviewBody(e.target.value)} rows={2} />
-            <Button type="submit" variant="secondary" size="sm" loading={reviewing}>
-              {t('pulls.submitReview', 'Submit Review')}
-            </Button>
-          </form>
-        )}
+        <PullReviews
+          owner={owner}
+          repo={repo}
+          number={number}
+          reviews={reviews}
+          onReviewsChange={setReviews}
+          canWrite={canWrite}
+          canManage={canManage}
+          isOpen={pull.status === 'open'}
+          showNotice={showNotice}
+          authorized={authorized}
+        />
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>{t('pulls.comments', 'Comments')}</CardTitle>
-        </CardHeader>
-        {comments.length === 0 ? (
-          <p className="text-sm text-[var(--color-text-muted)]">{t('pulls.noComments', 'No Comments Yet.')}</p>
-        ) : (
-          <ul className="divide-y divide-[var(--color-border)]">
-            {comments.map((c) => (
-              <li key={c.id} className="py-3 first:pt-0 last:pb-0">
-                <p className="text-xs text-[var(--color-text-muted)]">
-                  {c.author_email} · {formatTimestamp(c.created_at)}
-                </p>
-                <div className="mt-1 text-sm text-[var(--color-text-primary)]">
-                  <Markdown content={c.body} />
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-        {canWrite && (
-          <form onSubmit={submitComment} className="mt-4 space-y-2">
-            <Textarea placeholder={t('pulls.commentPlaceholder', 'Write A Comment…')} value={draft} onChange={(e) => setDraft(e.target.value)} rows={3} />
-            <Button type="submit" variant="primary" size="sm" loading={saving} disabled={draft.trim() === ''}>
-              {t('pulls.addComment', 'Add Comment')}
-            </Button>
-          </form>
-        )}
+        <PullThreads owner={owner} repo={repo} number={number} canWrite={canWrite} showNotice={showNotice} authorized={authorized} />
+      </Card>
+
+      <Card>
+        <PullComments
+          owner={owner}
+          repo={repo}
+          number={number}
+          comments={comments}
+          onCommentsChange={setComments}
+          canWrite={canWrite}
+          showNotice={showNotice}
+        />
       </Card>
     </div>
   );

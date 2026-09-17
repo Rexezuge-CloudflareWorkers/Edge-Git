@@ -1,5 +1,5 @@
 import { IssueDAO, RepositoryDAO, SearchDAO } from '@edge-git/backend-data/dao';
-import type { CodeHit, IssueRow, RepositoryRow } from '@edge-git/backend-data/dao';
+import type { CodeHit, IssueRow, PullRequestRow, RepositoryRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError } from '@edge-git/backend-errors';
 import { TimestampUtil } from '@edge-git/shared/utils';
@@ -20,7 +20,7 @@ const MAX_QUERY_LENGTH = 200;
 const MAX_LIMIT = 50;
 const MAX_INDEX_BYTES = 20_000;
 
-type SearchType = 'repos' | 'issues' | 'code';
+type SearchType = 'repos' | 'issues' | 'pulls' | 'code';
 
 class SearchService {
   private readonly deps: Required<SearchServiceDeps>;
@@ -53,6 +53,7 @@ class SearchService {
 
   public static parseType(raw: unknown): SearchType {
     if (raw === 'issues') return 'issues';
+    if (raw === 'pulls') return 'pulls';
     if (raw === 'code') return 'code';
     return 'repos';
   }
@@ -113,6 +114,33 @@ class SearchService {
       if (!repo) continue;
       const role = await permission.getRole(viewerEmail, repo).catch(() => null);
       if (role) visible.push(issue);
+      if (visible.length >= limit) break;
+    }
+    return visible;
+  }
+
+  public async searchPulls(
+    query: string,
+    viewerEmail: string | null,
+    opts: { limit?: number; repoId?: string } = {},
+  ): Promise<PullRequestRow[]> {
+    const q = SearchService.sanitizeQuery(query);
+    const limit = SearchService.clampLimit(opts.limit ?? 20);
+    const dao = await this.deps.searchDAO();
+    const candidates = await dao.searchPulls(q, { limit: Math.min(limit * 3, MAX_LIMIT), repoId: opts.repoId });
+    const permission = await this.deps.permissionService().catch(() => this.permissionServiceSync());
+    const repositoryDAO = await this.deps.repositoryDAO().catch(() => null);
+    const repoCache = new Map<string, RepositoryRow | null>();
+    const visible: PullRequestRow[] = [];
+    for (const pull of candidates) {
+      let repo: RepositoryRow | null | undefined = repoCache.get(pull.repository_id);
+      if (repo === undefined) {
+        repo = repositoryDAO ? await repositoryDAO.getById(pull.repository_id).catch(() => null) : null;
+        repoCache.set(pull.repository_id, repo ?? null);
+      }
+      if (!repo) continue;
+      const role = await permission.getRole(viewerEmail, repo).catch(() => null);
+      if (role) visible.push(pull);
       if (visible.length >= limit) break;
     }
     return visible;
@@ -179,14 +207,5 @@ class SearchService {
   }
 }
 
-/**
-@deprecated Prefer `createRequestScope(env).get(Tokens.SearchService)`; kept for backward compatibility.
-*/
-class SearchServiceFactory {
-  public static create(env: SearchServiceEnv): SearchService {
-    return new SearchService(env);
-  }
-}
-
-export { SearchService, SearchServiceFactory };
+export { SearchService };
 export type { SearchServiceDeps, SearchServiceEnv, SearchType };

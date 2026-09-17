@@ -1,4 +1,4 @@
-import { BranchProtectionDAO, CollaborationDAO, IssueDAO, NamespaceDAO, OrganizationDAO, OrganizationMemberDAO, PullRequestDAO, RepoCollaboratorDAO, RepositoryDAO, SearchDAO, UserAccessTokenDAO, UserDAO } from '@edge-git/backend-data/dao';
+import { BranchProtectionDAO, CollaborationDAO, IssueDAO, NamespaceDAO, OrganizationDAO, OrganizationMemberDAO, PullRequestDAO, PullThreadDAO, RepoCollaboratorDAO, RepositoryDAO, SearchDAO, UserAccessTokenDAO, UserDAO } from '@edge-git/backend-data/dao';
 import { EventDAO, NotificationDAO, StarDAO, WatchDAO } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { Container } from '@edge-git/backend-runtime/di';
@@ -14,6 +14,7 @@ import { RepoService } from '@edge-git/backend-services/repo';
 import { UserService } from '@edge-git/backend-services/user';
 import { IssueService } from '@edge-git/backend-services/issue';
 import { PullRequestService } from '@edge-git/backend-services/pull';
+import { PullThreadService } from '@edge-git/backend-services/pull/PullThreadService';
 import { OrganizationService } from '@edge-git/backend-services/org';
 import { PermissionService } from '@edge-git/backend-services/permission';
 import { SearchService } from '@edge-git/backend-services/search';
@@ -47,7 +48,7 @@ function memoize<T>(fn: () => Promise<T>): () => Promise<T> {
 }
 
 // Composition root: builds a per-request child scope wiring DAOs → services.
-// Replaces the scattered `*Factory.create({ DB })` / `new XDAO(env.DB)`
+// Replaces the former scattered `new X(env)` / `new XDAO(env.DB)`
 // call sites in apps/api and apps/background.
 function createRequestScope(env: RequestScopeEnv): Container {
   const scope = new Container();
@@ -66,6 +67,7 @@ function createRequestScope(env: RequestScopeEnv): Container {
   const tokenDAO = memoize(() => Promise.resolve(new UserAccessTokenDAO(env.DB)));
   const issueDAO = memoize(() => Promise.resolve(new IssueDAO(env.DB)));
   const pullRequestDAO = memoize(() => Promise.resolve(new PullRequestDAO(env.DB)));
+  const pullThreadDAO = memoize(() => Promise.resolve(new PullThreadDAO(env.DB)));
   const namespaceDAO = memoize(() => Promise.resolve(new NamespaceDAO(env.DB)));
   const organizationDAO = memoize(() => Promise.resolve(new OrganizationDAO(env.DB)));
   const organizationMemberDAO = memoize(() => Promise.resolve(new OrganizationMemberDAO(env.DB)));
@@ -82,6 +84,7 @@ function createRequestScope(env: RequestScopeEnv): Container {
   scope.bindValue(Tokens.UserAccessTokenDAO, tokenDAO);
   scope.bindValue(Tokens.IssueDAO, issueDAO);
   scope.bindValue(Tokens.PullRequestDAO, pullRequestDAO);
+  scope.bindValue(Tokens.PullThreadDAO, pullThreadDAO);
   scope.bindValue(Tokens.NamespaceDAO, namespaceDAO);
   scope.bindValue(Tokens.OrganizationDAO, organizationDAO);
   scope.bindValue(Tokens.OrganizationMemberDAO, organizationMemberDAO);
@@ -103,11 +106,12 @@ function createRequestScope(env: RequestScopeEnv): Container {
   );
   scope.bind(
     Tokens.RepoService,
-    () => new RepoService(env as never, { repositoryDAO, issueDAO, pullRequestDAO, branchProtectionDAO, userDAO, organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO, starDAO, watchDAO, eventDAO, notificationDAO }),
+    () => new RepoService(env as never, { repositoryDAO, issueDAO, pullRequestDAO, pullThreadDAO, branchProtectionDAO, userDAO, organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO, starDAO, watchDAO, eventDAO, notificationDAO }),
   );
   scope.bind(Tokens.UserService, () => new UserService(env as never, { userDAO, namespaceDAO, organizationDAO, repositoryDAO }));
   scope.bind(Tokens.IssueService, () => new IssueService(env as never, { issueDAO }));
   scope.bind(Tokens.PullRequestService, () => new PullRequestService(env as never, { pullRequestDAO }));
+  scope.bind(Tokens.PullThreadService, () => new PullThreadService(env as never, { pullRequestDAO, pullThreadDAO }));
   scope.bind(
     Tokens.OrganizationService,
     () => new OrganizationService(env as never, { organizationDAO, organizationMemberDAO, namespaceDAO, userDAO, repositoryDAO }),

@@ -1,3 +1,3 @@
-export { CollaborationService, CollaborationServiceFactory } from './CollaborationService';
+export { CollaborationService } from './CollaborationService';
 export type { CollaborationServiceDeps, CollaborationServiceEnv } from './CollaborationService';
-export { parseCodeowners, matchCodeowners } from './Codeowners';
+export { parseCodeowners, matchCodeowners, normalizeCodeownerHandle } from './Codeowners';

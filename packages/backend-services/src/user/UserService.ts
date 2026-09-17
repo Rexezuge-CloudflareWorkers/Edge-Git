@@ -184,14 +184,5 @@ class UserService {
 
 }
 
-/**
-@deprecated Prefer `createRequestScope(env).get(Tokens.UserService)`; this thin wrapper only preserves backward compatibility.
-*/
-class UserServiceFactory {
-  public static create(env: UserServiceEnv): UserService {
-    return new UserService(env);
-  }
-}
-
-export { UserService, UserServiceFactory };
+export { UserService };
 export type { UserServiceDeps, UserServiceEnv };

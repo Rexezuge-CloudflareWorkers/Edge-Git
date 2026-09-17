@@ -1,6 +1,5 @@
-import type { MergePreview, PullComment, PullDiff, PullRequest, PullReview } from '../types';
+import type { MergePreview, PullComment, PullDiff, PullRequest, PullReview, PullReviewThread, PullThreadComment } from '../types';
 import { apiGet, apiPatch, apiPost } from '../lib/api';
-
 function authedBase(owner: string, repo: string): string {
   return `/user/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls`;
 }
@@ -26,8 +25,11 @@ async function tryAuthedFirst<T>(authedPath: string, publicPath: string, isAuthe
   }
 }
 
-export async function listPulls(owner: string, repo: string, opts?: ReadOpts & { label?: string }): Promise<PullRequest[]> {
-  const suffix = opts?.label ? `?label=${encodeURIComponent(opts.label)}` : '';
+export async function listPulls(owner: string, repo: string, opts?: ReadOpts & { label?: string; q?: string }): Promise<PullRequest[]> {
+  const params = new URLSearchParams();
+  if (opts?.label) params.set('label', opts.label);
+  if (opts?.q) params.set('q', opts.q);
+  const suffix = params.size > 0 ? `?${params.toString()}` : '';
   const data = await tryAuthedFirst<{ pulls?: PullRequest[] }>(`${authedBase(owner, repo)}${suffix}`, `${publicBase(owner, repo)}${suffix}`, opts?.isAuthed);
   return data.pulls ?? [];
 }
@@ -115,7 +117,6 @@ export async function getMergePreview(owner: string, repo: string, number: numbe
   );
   return data.preview ?? null;
 }
-
 export async function mergePull(
   owner: string,
   repo: string,
@@ -123,4 +124,47 @@ export async function mergePull(
   input?: { message?: string; deleteHead?: boolean; strategy?: 'merge' | 'squash' | 'rebase' },
 ): Promise<{ pull: PullRequest; merge: { type?: string; commitOid?: string; deletedHead?: boolean } }> {
   return apiPost<{ pull: PullRequest; merge: { type?: string; commitOid?: string; deletedHead?: boolean } }>(`${authedPull(owner, repo, number)}/merge`, input ?? {});
+}
+
+export async function dismissPullReview(owner: string, repo: string, number: number, reviewId: string, reason?: string): Promise<PullReview> {
+  const data = await apiPost<PullReview | { review?: PullReview }>(`${authedPull(owner, repo, number)}/reviews/${encodeURIComponent(reviewId)}/dismiss`, reason ? { reason } : {});
+  const nested = (data as { review?: PullReview }).review;
+  return nested ?? (data as PullReview);
+}
+
+export async function listPullThreads(owner: string, repo: string, number: number, opts?: ReadOpts): Promise<PullReviewThread[]> {
+  const data = await tryAuthedFirst<{ threads?: PullReviewThread[] }>(
+    `${authedPull(owner, repo, number)}/threads`,
+    `${publicPull(owner, repo, number)}/threads`,
+    opts?.isAuthed,
+  );
+  return data.threads ?? [];
+}
+
+export async function openPullThread(
+  owner: string,
+  repo: string,
+  number: number,
+  input: { path: string; line?: number | null; side?: 'old' | 'new'; commitOid?: string | null; body: string },
+): Promise<PullReviewThread> {
+  const data = await apiPost<PullReviewThread | { thread?: PullReviewThread }>(`${authedPull(owner, repo, number)}/threads`, input);
+  const nested = (data as { thread?: PullReviewThread }).thread;
+  return nested ?? (data as PullReviewThread);
+}
+
+export async function replyPullThread(owner: string, repo: string, number: number, threadId: string, body: string): Promise<PullThreadComment> {
+  const data = await apiPost<PullThreadComment | { comment?: PullThreadComment }>(
+    `${authedPull(owner, repo, number)}/threads/${encodeURIComponent(threadId)}/replies`,
+    { body },
+  );
+  const nested = (data as { comment?: PullThreadComment }).comment;
+  return nested ?? (data as PullThreadComment);
+}
+
+export async function resolvePullThread(owner: string, repo: string, number: number, threadId: string, resolved: boolean): Promise<PullReviewThread> {
+  const data = await apiPatch<PullReviewThread | { thread?: PullReviewThread }>(`${authedPull(owner, repo, number)}/threads/${encodeURIComponent(threadId)}`, {
+    resolved,
+  });
+  const nested = (data as { thread?: PullReviewThread }).thread;
+  return nested ?? (data as PullReviewThread);
 }

@@ -14,6 +14,16 @@ interface PullRequestServiceDeps {
 
 type ReviewState = 'approved' | 'changes_requested' | 'commented';
 
+interface ReviewGateInput {
+  author_email: string;
+  state: string;
+  dismissed?: number | null;
+}
+
+function isDismissed(review: ReviewGateInput): boolean {
+  return review.dismissed === 1;
+}
+
 const REVIEW_STATES: ReadonlySet<string> = new Set(['approved', 'changes_requested', 'commented']);
 
 const BRANCH_SEGMENT_RE = /^[\w.-]+$/;
@@ -53,15 +63,17 @@ class PullRequestService {
    * A pull request is merge-blocked when any reviewer's latest review requests
    * changes. List order is oldest-first, so the last entry per author wins
    * (same-second reviews share `created_at`, making timestamp comparison
-   * unreliable — insertion order is the tiebreak).
+   * unreliable — insertion order is the tiebreak). Dismissed reviews never
+   * block (they remain visible for audit).
    */
-  public static isBlockedByReviews(reviews: Array<{ author_email: string; state: string }>): boolean {
-    const latestByAuthor = new Map<string, string>();
+  public static isBlockedByReviews(reviews: ReviewGateInput[]): boolean {
+    const latestByAuthor = new Map<string, ReviewGateInput>();
     for (const review of reviews) {
-      latestByAuthor.set(review.author_email.toLowerCase(), review.state);
+      if (isDismissed(review)) continue;
+      latestByAuthor.set(review.author_email.toLowerCase(), review);
     }
-    for (const state of latestByAuthor.values()) {
-      if (state === 'changes_requested') return true;
+    for (const review of latestByAuthor.values()) {
+      if (review.state === 'changes_requested') return true;
     }
     return false;
   }
@@ -236,6 +248,25 @@ class PullRequestService {
     return dao.listComments(pr.id);
   }
 
+  public async dismissReview(input: {
+    repositoryId: string;
+    number: number;
+    reviewId: string;
+    dismissedBy: string;
+    reason?: string | null;
+  }): Promise<PullRequestReviewRow> {
+    const pr = await this.getByNumber(input.repositoryId, input.number);
+    if (pr.status === 'merged') throw new BadRequestError('cannot dismiss a review on a merged pull request');
+    const dao = await this.deps.pullRequestDAO();
+    const review = await dao.getReviewById(pr.id, input.reviewId);
+    if (!review) throw new NotFoundError('Review not found');
+    if (review.dismissed === 1) throw new BadRequestError('review is already dismissed');
+    const reason = input.reason?.trim() ? input.reason.trim().slice(0, 1000) : null;
+    const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
+    await dao.dismissReview(review.id, input.dismissedBy.toLowerCase(), reason, now);
+    return { ...review, dismissed: 1, dismissed_by: input.dismissedBy.toLowerCase(), dismissed_at: now, dismiss_reason: reason };
+  }
+
   public async refreshOids(input: {
     repositoryId: string;
     number: number;
@@ -264,14 +295,5 @@ class PullRequestService {
   }
 }
 
-/**
-@deprecated Prefer `createRequestScope(env).get(Tokens.PullRequestService)`; this thin wrapper only preserves backward compatibility.
-*/
-class PullRequestServiceFactory {
-  public static create(env: PullRequestServiceEnv): PullRequestService {
-    return new PullRequestService(env);
-  }
-}
-
-export { PullRequestService, PullRequestServiceFactory };
+export { PullRequestService };
 export type { PullRequestServiceDeps, PullRequestServiceEnv, ReviewState };

@@ -49,11 +49,5 @@ class StarService {
   }
 }
 
-class StarServiceFactory {
-  public static create(env: StarServiceEnv): StarService {
-    return new StarService(env);
-  }
-}
-
-export { StarService, StarServiceFactory };
+export { StarService };
 export type { StarServiceDeps, StarServiceEnv };

@@ -9,8 +9,15 @@ function registerPullRoutes(app: PullApp): void {
   app.get('/repos/:owner/:repo/pulls', async (c) => {
     return withPublicRepo(c as never, async (row) => {
       const scope = createRequestScope(c.env);
-      const pulls = await scope.get(Tokens.PullRequestService).listByRepo(row.id, 50);
       const label = c.req.query('label');
+      const q = (c.req.query('q') ?? '').trim();
+      let pulls = q
+        ? await scope
+            .get(Tokens.SearchService)
+            .searchPulls(q, await resolvePublicViewer(c as never).catch(() => null), { limit: 50, repoId: row.id })
+            .catch(() => null)
+        : null;
+      if (!pulls) pulls = await scope.get(Tokens.PullRequestService).listByRepo(row.id, 50);
       if (!label) return c.json({ pulls });
       try {
         const collab = scope.get(Tokens.CollaborationService);

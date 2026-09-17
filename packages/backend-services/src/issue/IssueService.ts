@@ -93,14 +93,5 @@ class IssueService {
   }
 }
 
-/**
-@deprecated Prefer `createRequestScope(env).get(Tokens.IssueService)`; this thin wrapper only preserves backward compatibility.
-*/
-class IssueServiceFactory {
-  public static create(env: IssueServiceEnv): IssueService {
-    return new IssueService(env);
-  }
-}
-
-export { IssueService, IssueServiceFactory };
+export { IssueService };
 export type { IssueServiceDeps, IssueServiceEnv };

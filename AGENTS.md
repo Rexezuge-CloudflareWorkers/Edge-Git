@@ -7,8 +7,8 @@ Edge-Git: Cloudflare Workers git server (`@edge-git/monorepo`, `pnpm@11.2.2`).
 - **Auth**: `/user/*` Cloudflare Access (`AccessAuthService`: DEMO→DEV→JWT→`ctx.access` fallback; never trust `Cf-Access-Authenticated-User-Email`); email login, globally-unique mutable username (`user ↔ org` single namespace); git anon (public fetch) + PAT Basic/Bearer (`TokenService`, sha256 `edge-git-pat:` prefix, `MAX_TOKENS_PER_USER=5`, inherits repo/org permissions).
 - **API**: `apps/api` Hono+Chanfana `EdgeGitWorker` (`/:owner/:repo/info/refs|git-upload-pack|git-receive-pack` + `/user/me|repos|orgs|tokens|issues` + `/users/:username` + `/health`, `/docs`); permissions `admin|write|read` (org `owner|member`, owner+member may create org repos); `apps/api/src/index.ts` re-exports DOs for bindings.
 - **Web**: `apps/web` Vite SPA, build embeds `dist/index.html` → `apps/api/src/generated/spa-shell.ts`.
-- **Composition**: per-request `*Factory.create({ DB })` / `(env)` from `@edge-git/backend-services/composition`; `Container` + `createServiceContext` + `AppConfiguration` in `@edge-git/backend-runtime/di+config` are the DI foundation (`scope.get(Tokens.X)` is Otter-parity target, not yet wired). See `docs/agents/runtime/AGENTS.md`.
-- **i18n**: not yet implemented (no `packages/shared/src/i18n`, no web locales); English UI text uses Title Case. See `apps/web/AGENTS.md`.
+- **Composition**: per-request `createRequestScope(env)` from `@edge-git/backend-services/composition` (`scope.get(Tokens.X)` is the standard; the old `*Factory` shims were removed); `Container` + `createServiceContext` + `AppConfiguration` in `@edge-git/backend-runtime/di+config` are the DI foundation. See `docs/agents/runtime/AGENTS.md`.
+- **i18n**: backend strings in `packages/shared/src/i18n` (`en`, `zh-CN`) + web i18next (`SUPPORTED_LANGUAGES` 12 tags, `en`+`zh-CN` bundles shipped); English UI text uses Title Case. See `apps/web/AGENTS.md`.
 
 ## Commands
 

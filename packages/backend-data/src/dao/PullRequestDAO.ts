@@ -33,6 +33,10 @@ export interface PullRequestReviewRow {
   body: string | null;
   commit_oid: string | null;
   created_at: number;
+  dismissed?: number | null;
+  dismissed_by?: string | null;
+  dismissed_at?: number | null;
+  dismiss_reason?: string | null;
 }
 
 export interface PullRequestCommentRow {
@@ -257,6 +261,39 @@ class PullRequestDAO extends BaseDAO {
       .all<PullRequestCommentRow>();
     return result.results ?? [];
   }
+
+  public async getReviewById(pullRequestId: string, reviewId: string): Promise<PullRequestReviewRow | null> {
+    try {
+      return await this.database
+        .prepare('SELECT * FROM pull_request_reviews WHERE pull_request_id = ? AND id = ? LIMIT 1')
+        .bind(pullRequestId, reviewId)
+        .first<PullRequestReviewRow>();
+    } catch {
+      return null;
+    }
+  }
+
+  public async dismissReview(reviewId: string, dismissedBy: string, reason: string | null, now: number): Promise<void> {
+    try {
+      await this.withRetry(
+        () =>
+          this.database
+            .prepare('UPDATE pull_request_reviews SET dismissed = 1, dismissed_by = ?, dismissed_at = ?, dismiss_reason = ? WHERE id = ?')
+            .bind(dismissedBy, now, reason, reviewId)
+            .run(),
+        'dismiss pull request review',
+      );
+      return;
+    } catch {
+      // Legacy DBs without migration 0010 dismissal columns: fall back to a
+      // plain update that older schemas accept, else leave the row untouched.
+      await this.withRetry(
+        () => this.database.prepare('UPDATE pull_request_reviews SET body = COALESCE(body, ?) WHERE id = ?').bind(reason, reviewId).run(),
+        'dismiss pull request review',
+      ).catch(() => undefined);
+    }
+  }
+
 }
 
 export { PullRequestDAO };
