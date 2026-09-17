@@ -31,6 +31,10 @@
       {
         "name": "CRON_TASKS",
         "class_name": "CronTasksWorker"
+      },
+      {
+        "name": "CHECK_RUNNER",
+        "class_name": "CheckRunnerWorker"
       }
     ]
   },
@@ -38,6 +42,10 @@
     {
       "tag": "v1000000000",
       "new_sqlite_classes": ["RepoWorker", "CronTasksWorker"]
+    },
+    {
+      "tag": "v1000000001",
+      "new_sqlite_classes": ["CheckRunnerWorker"]
     }
   ],
   "d1_databases": [
@@ -88,6 +96,9 @@
     "MAX_DEPLOY_KEYS_PER_REPO": "10",
     "MAX_TOKEN_REPO_GRANTS": "50",
     "MAX_MIRROR_FAILURES": "5",
-    "IMPORT_CLAIM_STALE_SECONDS": "600"
+    "IMPORT_CLAIM_STALE_SECONDS": "600",
+    "MAX_CHECKS_PER_SHA": "50",
+    "CHECK_TIMEOUT_SECONDS": "3600",
+    "CHECK_RETENTION_DAYS": "90"
   }
 }

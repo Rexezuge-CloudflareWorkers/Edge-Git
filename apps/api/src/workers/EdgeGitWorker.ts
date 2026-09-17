@@ -22,6 +22,7 @@ import { registerSearchRoutes } from './routes/SearchRoutes';
 import { registerUserNotificationRoutes } from './routes/NotificationRoutes';
 import { registerSocialRoutes, registerUserSocialRoutes } from './routes/SocialRoutes';
 import { registerWebhookRoutes } from './routes/WebhookRoutes';
+import { registerCheckPublicRoutes, registerCheckUserRoutes } from './routes/CheckRoutes';
 import { registerImportRoutes } from './routes/ImportRoutes';
 import { registerMirrorRoutes } from './routes/MirrorRoutes';
 import { registerDeployKeyRoutes } from './routes/DeployKeyRoutes';
@@ -76,6 +77,7 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
   registerUserProfileRoutes(app);
   registerSearchRoutes(app);
   registerSocialRoutes(app);
+  registerCheckPublicRoutes(app);
   registerReleasePublicRoutes(app);
   registerReleaseAssetPublicRoutes(app);
   registerProjectPublicRoutes(app);
@@ -119,6 +121,7 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
   registerReleaseUserRoutes(app);
   registerReleaseAssetUserRoutes(app);
   registerWebhookRoutes(app);
+  registerCheckUserRoutes(app);
   registerImportRoutes(app);
   registerMirrorRoutes(app);
   registerDeployKeyRoutes(app);

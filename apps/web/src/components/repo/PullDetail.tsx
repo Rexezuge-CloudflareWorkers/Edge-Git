@@ -12,6 +12,7 @@ import {
   updatePullStatus,
 } from '../../services/pullService';
 import { isBlockedByReviews } from '../../lib/threads';
+import { PullChecks } from './PullChecks';
 import { PullComments } from './PullComments';
 import { PullReviews } from './PullReviews';
 import { PullThreads } from './PullThreads';
@@ -281,6 +282,7 @@ export function PullDetail({
         {blockedByReview && (
           <p className="mt-2 text-sm text-[var(--color-error-text)]">{t('pulls.blockedByReview', 'Blocked: Unresolved Change Requests.')}</p>
         )}
+        <PullChecks owner={owner} repo={repo} headOid={pull.head_oid} />
         {(conflicts.length > 0 || conflictReason) && (
           <div className="mt-2 text-sm text-[var(--color-error-text)]">
             <p>{t('pulls.mergeConflicts', 'Merge Conflicts. Resolve Them On Your Branch.')}</p>

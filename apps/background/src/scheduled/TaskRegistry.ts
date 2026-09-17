@@ -5,6 +5,8 @@ import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { BaseScheduledTask } from './IScheduledTask';
 import type { ScheduledTask } from './IScheduledTask';
 import { AuditLogCleanupTask } from './AuditLogCleanupTask';
+import { CheckPruneTask } from './CheckPruneTask';
+import { CheckStaleTask } from './CheckStaleTask';
 import { SearchBackfillTask } from './SearchBackfillTask';
 import { WebhookDeliveryTask } from './WebhookDeliveryTask';
 import { ImportSweeperTask } from './ImportSweeperTask';
@@ -68,6 +70,8 @@ const CRON_TASK_DEFINITIONS: ScheduledTask[] = [
   new SearchBackfillTask(),
   new SocialPruningTask(),
   new AuditLogCleanupTask(),
+  new CheckStaleTask(),
+  new CheckPruneTask(),
   new WebhookDeliveryTask(),
   new ImportSweeperTask(),
   new MirrorSyncTask(),
@@ -83,6 +87,8 @@ async function runScheduledTasks(env: Env, cron: string, scheduledTime: number):
 
 export { CRON_TASK_DEFINITIONS, runScheduledTasks, ExpiredTokenPruningTask, BackgroundTaskRunPruningTask, SocialPruningTask };
 export { AuditLogCleanupTask } from './AuditLogCleanupTask';
+export { CheckPruneTask } from './CheckPruneTask';
+export { CheckStaleTask } from './CheckStaleTask';
 export { SearchBackfillTask } from './SearchBackfillTask';
 export { WebhookDeliveryTask } from './WebhookDeliveryTask';
 export { ImportSweeperTask } from './ImportSweeperTask';

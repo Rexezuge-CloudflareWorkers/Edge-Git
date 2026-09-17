@@ -325,7 +325,7 @@ function json(method: string, body: unknown): RequestInit {
 
 describe('webhook event helpers', () => {
   it('lists the supported webhook events', () => {
-    expect([...WEBHOOK_EVENTS]).toEqual(['push', 'repository', 'issues', 'issue_comment', 'pull_request', 'pull_request_review', 'fork', 'star', 'watch', 'release', 'project', 'discussion', 'discussion_comment', 'wiki', 'snippet', 'ping']);
+    expect([...WEBHOOK_EVENTS]).toEqual(['push', 'repository', 'issues', 'issue_comment', 'pull_request', 'pull_request_review', 'fork', 'star', 'watch', 'release', 'project', 'discussion', 'discussion_comment', 'wiki', 'snippet', 'check_run', 'check_suite', 'ping']);
   });
 
   it('normalizes event subscriptions', () => {

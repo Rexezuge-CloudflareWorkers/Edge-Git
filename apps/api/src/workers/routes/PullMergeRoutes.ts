@@ -1,8 +1,10 @@
 import { getRepoStub } from '../repoStub';
 import { requireVisibleRepo, toServiceStatus } from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
+import { triggerRequiredChecks } from './TriggerChecks';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { CheckService } from '@edge-git/backend-services/checks';
 import { PullRequestService } from '@edge-git/backend-services/pull';
 import { BranchProtectionService } from '@edge-git/backend-services/protection';
 import { RepoService } from '@edge-git/backend-services/repo';
@@ -78,6 +80,14 @@ async function openCrossForkPull(env: Env, input: OpenCrossForkInput): Promise<{
       subjectOid: preview.preview.headOid,
       mentionText: `${input.title}\n${input.body ?? ''}`,
     });
+    // CI: queue required checks for the base branch against the head SHA.
+    await triggerRequiredChecks(env, {
+      repositoryId: input.rowId,
+      fullName: input.fullName,
+      branch: input.baseBranch,
+      headSha: preview.preview.headOid,
+      actorEmail: input.email,
+    }).catch(() => undefined);
     return { status: 201, body: created };
   } catch (error) {
     return { status: toServiceStatus(error), body: { error: error instanceof Error ? error.message : 'Failed to create pull request' } };
@@ -227,6 +237,26 @@ function registerUserPullMergeRoutes(app: PullApp): void {
       .catch(() => [] as string[]);
     const gate = BranchProtectionService.checkMergeBlocked({ rule, reviews, creatorEmail: pull.creator_email, codeowners: { owners: codeownerEmails } });
     if (gate.blocked) return c.json({ error: gate.reason ?? 'pull request is blocked by branch protection' }, 409);
+    // Required status checks: every context listed on the matched rule must
+    // report a passing conclusion (success/neutral/skipped) on the merge head
+    // SHA. Missing or pending runs block; direct pushes are unaffected
+    // (merge-gate only, per v1 scope).
+    const requiredContexts = rule?.requireStatusChecks ?? [];
+    if (requiredContexts.length > 0) {
+      const headSha = pull.head_oid ?? null;
+      if (!headSha) return c.json({ error: 'required status checks are pending: head commit unknown', requiredChecks: requiredContexts, state: 'pending' }, 409);
+      const runs = await scope.get(Tokens.CheckService).listForSha(row.id, headSha).then((r) => r.runs).catch(() => []);
+      const checkGate = CheckService.checkRequiredContexts({
+        requiredContexts,
+        runs: runs.map((r) => ({ context: r.context, status: r.status, conclusion: r.conclusion })),
+      });
+      if (checkGate.blocked) {
+        const detail = checkGate.failing.length > 0
+          ? `failing checks: ${checkGate.failing.join(', ')}`
+          : `pending checks: ${checkGate.pending.join(', ')}`;
+        return c.json({ error: `required status checks not satisfied (${detail})`, requiredChecks: requiredContexts, state: checkGate.state, pending: checkGate.pending, failing: checkGate.failing }, 409);
+      }
+    }
     const body = (await c.req.json().catch(() => ({}))) as { message?: string; deleteHead?: boolean; strategy?: string };
     const rawMessage = typeof body.message === 'string' ? body.message.trim() : '';
     const message = rawMessage ? rawMessage.slice(0, 1000) : `Merge pull request #${number}: ${pull.title}`;

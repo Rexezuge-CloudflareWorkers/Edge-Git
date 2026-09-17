@@ -2,6 +2,8 @@ import { EnvParser } from './EnvParser';
 import {
   DEFAULT_AUDIT_LOG_RETENTION_DAYS,
   DEFAULT_BACKGROUND_TASK_RUN_RETENTION_DAYS,
+  DEFAULT_CHECK_RETENTION_DAYS,
+  DEFAULT_CHECK_TIMEOUT_SECONDS,
   DEFAULT_DEBUG_MODE,
   DEFAULT_GIT_CACHE_TTL_SECONDS,
   DEFAULT_IMPORT_CLAIM_STALE_SECONDS,
@@ -10,6 +12,7 @@ import {
   DEFAULT_MAX_ASSETS_PER_RELEASE,
   DEFAULT_MAX_ASSET_BYTES,
   DEFAULT_MAX_CARDS_PER_COLUMN,
+  DEFAULT_MAX_CHECKS_PER_SHA,
   DEFAULT_MAX_COLUMNS_PER_PROJECT,
   DEFAULT_MAX_DISCUSSIONS_PER_REPO,
   DEFAULT_MAX_FETCH_BODY_BYTES,
@@ -236,6 +239,18 @@ class AppConfiguration {
 
   public getImportClaimStaleSeconds(): number {
     return EnvParser.positiveInt(this.env, 'IMPORT_CLAIM_STALE_SECONDS', DEFAULT_IMPORT_CLAIM_STALE_SECONDS);
+  }
+
+  public getMaxChecksPerSha(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_CHECKS_PER_SHA', DEFAULT_MAX_CHECKS_PER_SHA);
+  }
+
+  public getCheckTimeoutSeconds(): number {
+    return EnvParser.positiveInt(this.env, 'CHECK_TIMEOUT_SECONDS', DEFAULT_CHECK_TIMEOUT_SECONDS);
+  }
+
+  public getCheckRetentionDays(): number {
+    return EnvParser.positiveInt(this.env, 'CHECK_RETENTION_DAYS', DEFAULT_CHECK_RETENTION_DAYS);
   }
 
   public isDemoMode(): boolean {

@@ -26,6 +26,7 @@ export function BranchProtectionCard({
   const [requiredApprovals, setRequiredApprovals] = useState('1');
   const [blockForcePush, setBlockForcePush] = useState(true);
   const [blockDeletion, setBlockDeletion] = useState(true);
+  const [requireStatusChecks, setRequireStatusChecks] = useState('');
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState<BranchProtectionRule | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -62,14 +63,20 @@ export function BranchProtectionCard({
     }
     setSaving(true);
     try {
+      const checks = requireStatusChecks
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
       await createRule(owner, repo, {
         pattern: pattern.trim(),
         requirePr,
         requiredApprovals: approvals,
         blockForcePush,
         blockDeletion,
+        requireStatusChecks: checks,
       });
       setPattern('');
+      setRequireStatusChecks('');
       showNotice('success', t('rules.ruleCreated', 'Protection Rule Created.'));
       refresh();
     } catch (error) {
@@ -117,6 +124,14 @@ export function BranchProtectionCard({
               inputMode="numeric"
             />
           </div>
+          <div className="flex-1 min-w-40">
+            <Input
+              aria-label={t('rules.requireStatusChecks', 'Required Status Checks')}
+              placeholder={t('rules.checksPlaceholder', 'Required Checks (e.g. secret-scan, diff-limit)')}
+              value={requireStatusChecks}
+              onChange={(e) => setRequireStatusChecks(e.target.value)}
+            />
+          </div>
           <Button type="submit" variant="primary" size="sm" loading={saving}>
             {t('rules.addRule', 'Add Rule')}
           </Button>
@@ -147,6 +162,8 @@ export function BranchProtectionCard({
                   ` · ${t('rules.approvals', '{{count}} Approvals', { count: rule.requiredApprovals })}`}
                 {rule.blockForcePush && ` · ${t('rules.noForcePush', 'No Force Push')}`}
                 {rule.blockDeletion && ` · ${t('rules.noDelete', 'No Delete')}`}
+                {rule.requireStatusChecks.length > 0 &&
+                  ` · ${t('rules.checks', 'Checks: {{contexts}}', { contexts: rule.requireStatusChecks.join(', ') })}`}
               </p>
             </div>
             <Button variant="danger" size="sm" onClick={() => setRemoving(rule)}>

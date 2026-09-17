@@ -112,6 +112,9 @@
     "requirePr": "需要拉取请求",
     "blockForcePush": "禁止强制推送",
     "blockDeletion": "禁止删除",
+    "requireStatusChecks": "所需状态检查",
+    "checksPlaceholder": "所需检查（例如 secret-scan、diff-limit）",
+    "checks": "检查：{{contexts}}",
     "prRequired": "需要 PR",
     "directPushOk": "允许直接推送",
     "approvals": "{{count}} 个审核",
@@ -176,6 +179,13 @@
     "deleted": "分支已删除。",
     "defaultBranch": "默认分支",
     "defaultUpdated": "默认分支已更新。"
+  },
+  "checks": {
+    "title": "状态检查",
+    "success": "通过",
+    "failure": "未通过",
+    "pending": "等待中",
+    "noChecks": "该提交暂无检查结果。"
   },
   "files": {
     "edit": "编辑",

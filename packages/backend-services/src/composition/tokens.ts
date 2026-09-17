@@ -1,6 +1,7 @@
 import type {
   AuditLogDAO,
   BranchProtectionDAO,
+  CheckRunDAO,
   CollaborationDAO,
   DeployKeyDAO,
   DiscussionDAO,
@@ -33,6 +34,7 @@ import type { Token } from '@edge-git/backend-runtime/di';
 import type { AppConfiguration } from '@edge-git/backend-runtime/config';
 import type { AccessAuthService } from '../auth/AccessAuthService';
 import type { TokenService } from '../auth/TokenService';
+import type { CheckService } from '../checks/CheckService';
 import type { WebhookDeliveryService } from '../webhook/WebhookDeliveryService';
 import type { WebhookService } from '../webhook/WebhookService';
 import type { BranchProtectionService } from '../protection/BranchProtectionService';
@@ -94,6 +96,7 @@ const Tokens = {
   OrganizationMemberDAO: Symbol('OrganizationMemberDAO') as Token<() => Promise<OrganizationMemberDAO>>,
   RepoCollaboratorDAO: Symbol('RepoCollaboratorDAO') as Token<() => Promise<RepoCollaboratorDAO>>,
   BranchProtectionDAO: Symbol('BranchProtectionDAO') as Token<() => Promise<BranchProtectionDAO>>,
+  CheckRunDAO: Symbol('CheckRunDAO') as Token<() => Promise<CheckRunDAO>>,
   CollaborationDAO: Symbol('CollaborationDAO') as Token<() => Promise<CollaborationDAO>>,
   SearchDAO: Symbol('SearchDAO') as Token<() => Promise<SearchDAO>>,
   StarDAO: Symbol('StarDAO') as Token<() => Promise<import('@edge-git/backend-data/dao').StarDAO>>,
@@ -118,6 +121,7 @@ const Tokens = {
   SecuritySettingsDAO: Symbol('SecuritySettingsDAO') as Token<() => Promise<SecuritySettingsDAO>>,
   AccessAuthService: Symbol('AccessAuthService') as Token<AccessAuthService>,
   TokenService: Symbol('TokenService') as Token<TokenService>,
+  CheckService: Symbol('CheckService') as Token<CheckService>,
   BranchProtectionService: Symbol('BranchProtectionService') as Token<BranchProtectionService>,
   ForkService: Symbol('ForkService') as Token<ForkService>,
   RepoService: Symbol('RepoService') as Token<RepoService>,

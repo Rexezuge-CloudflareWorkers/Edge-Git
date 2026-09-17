@@ -8,6 +8,7 @@ import { BranchProtectionService } from '@edge-git/backend-services/protection';
 import { scanBytes } from '@edge-git/backend-services/security';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { recordAndNotify } from './SocialEmit';
+import { triggerRequiredChecks } from './TriggerChecks';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 
 type GitApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -127,6 +128,19 @@ function registerGitRoutes(app: GitApp): void {
           subjectOid: headOid,
           payload: { refs: branches.slice(0, 10), count: commands.length },
         });
+        // CI: auto-queue required status checks for each pushed branch head.
+        // Best-effort — never fails the push response.
+        for (const cmd of commands) {
+          const branch = branchNameFromRef(cmd.ref);
+          if (!branch || !cmd.newOid || /^0{40}$/.test(cmd.newOid)) continue;
+          await triggerRequiredChecks(c.env, {
+            repositoryId: auth.repo.id,
+            fullName,
+            branch,
+            headSha: cmd.newOid,
+            actorEmail: auth.userEmail,
+          }).catch(() => undefined);
+        }
       } catch {
         // push succeeded; social bookkeeping must not fail the response
       }

@@ -1,5 +1,5 @@
 import { BranchProtectionDAO, CollaborationDAO, DiscussionDAO, IssueDAO, NamespaceDAO, OrganizationDAO, OrganizationMemberDAO, ProjectDAO, PullRequestDAO, PullThreadDAO, ReleaseDAO, RepoCollaboratorDAO, RepositoryDAO, SearchDAO, SnippetDAO, UserAccessTokenDAO, UserDAO, WikiDAO } from '@edge-git/backend-data/dao';
-import { AuditLogDAO, DeployKeyDAO, EventDAO, ImportDAO, MirrorDAO, NotificationDAO, SecuritySettingsDAO, StarDAO, TeamDAO, TeamMemberDAO, TeamRepoGrantDAO, TokenRepoGrantDAO, WatchDAO, WebhookDAO, WebhookDeliveryDAO } from '@edge-git/backend-data/dao';
+import { AuditLogDAO, CheckRunDAO, DeployKeyDAO, EventDAO, ImportDAO, MirrorDAO, NotificationDAO, SecuritySettingsDAO, StarDAO, TeamDAO, TeamMemberDAO, TeamRepoGrantDAO, TokenRepoGrantDAO, WatchDAO, WebhookDAO, WebhookDeliveryDAO } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { Container } from '@edge-git/backend-runtime/di';
 import { AppConfiguration } from '@edge-git/backend-runtime/config';
@@ -9,6 +9,7 @@ import { AppConfiguration } from '@edge-git/backend-runtime/config';
 // after migration to `scope.get(...)`. Runtime behavior is identical.
 import { AccessAuthService, TokenService } from '@edge-git/backend-services/auth';
 import { BranchProtectionService } from '@edge-git/backend-services/protection';
+import { CheckService } from '@edge-git/backend-services/checks';
 import { ForkService } from '@edge-git/backend-services/fork';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { UserService } from '@edge-git/backend-services/user';
@@ -86,6 +87,7 @@ function createRequestScope(env: RequestScopeEnv): Container {
   const organizationMemberDAO = memoize(() => Promise.resolve(new OrganizationMemberDAO(env.DB)));
   const repoCollaboratorDAO = memoize(() => Promise.resolve(new RepoCollaboratorDAO(env.DB)));
   const branchProtectionDAO = memoize(() => Promise.resolve(new BranchProtectionDAO(env.DB)));
+  const checkRunDAO = memoize(() => Promise.resolve(new CheckRunDAO(env.DB)));
   const collaborationDAO = memoize(() => Promise.resolve(new CollaborationDAO(env.DB)));
   const searchDAO = memoize(() => Promise.resolve(new SearchDAO(env.DB)));
   const starDAO = memoize(() => Promise.resolve(new StarDAO(env.DB)));
@@ -119,6 +121,7 @@ function createRequestScope(env: RequestScopeEnv): Container {
   scope.bindValue(Tokens.OrganizationMemberDAO, organizationMemberDAO);
   scope.bindValue(Tokens.RepoCollaboratorDAO, repoCollaboratorDAO);
   scope.bindValue(Tokens.BranchProtectionDAO, branchProtectionDAO);
+  scope.bindValue(Tokens.CheckRunDAO, checkRunDAO);
   scope.bindValue(Tokens.CollaborationDAO, collaborationDAO);
   scope.bindValue(Tokens.SearchDAO, searchDAO);
   scope.bindValue(Tokens.StarDAO, starDAO);
@@ -144,6 +147,7 @@ function createRequestScope(env: RequestScopeEnv): Container {
 
   scope.bind(Tokens.AccessAuthService, () => new AccessAuthService(env as never));
   scope.bind(Tokens.TokenService, () => new TokenService(env as never, { tokenDAO, repositoryDAO, tokenGrantDAO }));
+  scope.bind(Tokens.CheckService, () => new CheckService(env as never, { checkRunDAO }));
   scope.bind(Tokens.BranchProtectionService, () => new BranchProtectionService(env as never, { branchProtectionDAO }));
   scope.bind(
     Tokens.ForkService,
