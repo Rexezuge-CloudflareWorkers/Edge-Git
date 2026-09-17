@@ -28,12 +28,17 @@ interface GitStrings {
   pushRejected: string;
 }
 
+interface NamespaceStrings {
+  reserved: string;
+}
+
 interface BackendLocaleStrings {
   common: CommonStrings;
   repo: RepoStrings;
   token: TokenStrings;
   issue: IssueStrings;
   git: GitStrings;
+  namespace: NamespaceStrings;
 }
 
 function formatBackendString(template: string, vars: Record<string, string | number> = {}): string {
@@ -71,6 +76,7 @@ export type {
   TokenStrings,
   IssueStrings,
   GitStrings,
+  NamespaceStrings,
   SupportedBackendLocale,
 };
 export { SUPPORTED_BACKEND_LOCALES, canonicalizeBackendLocaleTag, formatBackendString, normalizeBackendLocale };

@@ -2,6 +2,7 @@ import { NamespaceDAO, OrganizationDAO, RepositoryDAO, UserDAO } from '@edge-git
 import type { UserRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
+import { isReservedNamespaceName } from '@edge-git/shared/constants';
 import { TimestampUtil } from '@edge-git/shared/utils';
 
 interface UserServiceEnv {
@@ -58,6 +59,9 @@ class UserService {
     if (!USERNAME_RE.test(username)) {
       throw new BadRequestError('Invalid username');
     }
+    if (isReservedNamespaceName(username)) {
+      throw new BadRequestError('Username is reserved');
+    }
   }
 
   public async upsertUser(email: string): Promise<void> {
@@ -88,12 +92,12 @@ class UserService {
     let candidate = base;
     for (let attempt = 0; attempt < 50; attempt++) {
       const ci = candidate.toLowerCase();
-      let taken = false;
+      let taken = isReservedNamespaceName(ci);
       try {
         const ns = await this.deps.namespaceDAO();
-        taken = await ns.isTaken(ci);
+        taken ||= await ns.isTaken(ci);
       } catch {
-        taken = false;
+        // keep reserved-derived taken value
       }
       if (!taken) {
         try {

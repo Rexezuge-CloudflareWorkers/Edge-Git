@@ -18,6 +18,7 @@ import type { RepositoryRow, RepoRole } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError, ForbiddenError, NotFoundError } from '@edge-git/backend-errors';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
+import { isReservedNamespaceName } from '@edge-git/shared/constants';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 import { PermissionService } from '../permission/PermissionService';
 
@@ -84,6 +85,9 @@ class RepoService {
   public static validateNames(owner: string, name: string): void {
     if (!OWNER_RE.test(owner) || !REPO_RE.test(name)) {
       throw new BadRequestError('Invalid owner or repository name');
+    }
+    if (isReservedNamespaceName(owner)) {
+      throw new BadRequestError('Username is reserved');
     }
   }
 

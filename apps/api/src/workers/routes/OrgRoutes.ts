@@ -16,7 +16,7 @@ function registerOrgRoutes(app: OrgApp): void {
       return c.json({ id: org.id, username: org.username }, 201);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create organization';
-      const status = message.includes('taken') || message.includes('Invalid') ? 400 : toServiceStatus(error);
+      const status = message.includes('taken') || message.includes('Invalid') || message.includes('reserved') ? 400 : toServiceStatus(error);
       return c.json({ error: message }, status);
     }
   });
@@ -73,7 +73,7 @@ function registerOrgRoutes(app: OrgApp): void {
       return c.json({ id: org.id, username: org.username });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to update organization';
-      const status = message.includes('taken') || message.includes('Invalid') ? 400 : toServiceStatus(error);
+      const status = message.includes('taken') || message.includes('Invalid') || message.includes('reserved') ? 400 : toServiceStatus(error);
       return c.json({ error: message }, status);
     }
   });

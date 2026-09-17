@@ -271,6 +271,7 @@
     "username": "用户名",
     "usernamePlaceholder": "your-username",
     "renameHint": "重命名将更改你名下所有仓库地址。",
+    "usernameReserved": "该名称为系统保留名称。",
     "settingsUpdated": "个人资料已更新。",
     "failedToUpdate": "更新个人资料失败。"
   },
@@ -315,6 +316,7 @@
     "username": "用户名",
     "usernamePlaceholder": "my-org",
     "renameHint": "重命名将更改该组织下所有仓库地址。",
+    "usernameReserved": "该名称为系统保留名称。",
     "settingsUpdated": "组织设置已更新。",
     "failedToUpdate": "更新组织失败。",
     "dangerZone": "危险区",

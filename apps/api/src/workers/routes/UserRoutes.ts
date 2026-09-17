@@ -244,7 +244,7 @@ function registerUserSettingsRoutes(app: UserApp): void {
       return c.json({ email: profile.email, username: profile.username });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to rename';
-      const status = message.includes('taken') || message.includes('Invalid') ? 400 : toServiceStatus(error);
+      const status = message.includes('taken') || message.includes('Invalid') || message.includes('reserved') ? 400 : toServiceStatus(error);
       return c.json({ error: message }, status);
     }
   });

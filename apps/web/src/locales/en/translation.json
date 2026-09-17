@@ -271,6 +271,7 @@
     "username": "Username",
     "usernamePlaceholder": "your-username",
     "renameHint": "Renaming Changes All Repository URLs Under Your Account.",
+    "usernameReserved": "This Name Is Reserved For System Use.",
     "settingsUpdated": "Profile Settings Updated.",
     "failedToUpdate": "Failed To Update Profile."
   },
@@ -315,6 +316,7 @@
     "username": "Username",
     "usernamePlaceholder": "my-org",
     "renameHint": "Renaming Changes All Repository URLs Under This Organization.",
+    "usernameReserved": "This Name Is Reserved For System Use.",
     "settingsUpdated": "Organization Settings Updated.",
     "failedToUpdate": "Failed To Update Organization.",
     "dangerZone": "Danger Zone",
