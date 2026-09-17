@@ -27,7 +27,15 @@ export function OrgCreateModal({
       showNotice('success', t('orgs.created', 'Organization {{username}} Created.', { username: org.username }));
       onCreated(org.username);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('orgs.failedToCreate', 'Failed To Create Organization.'));
+      const message = error instanceof Error ? error.message : '';
+      showNotice(
+        'error',
+        message.toLowerCase().includes('reserved')
+          ? t('orgs.usernameReserved', 'This Name Is Reserved For System Use.')
+          : error instanceof Error
+            ? error.message
+            : t('orgs.failedToCreate', 'Failed To Create Organization.'),
+      );
     } finally {
       setSaving(false);
     }

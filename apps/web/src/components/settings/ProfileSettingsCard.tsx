@@ -39,7 +39,15 @@ export function ProfileSettingsCard({
       } catch {
         // Ignore refresh failures — the error notice below is authoritative.
       }
-      showNotice('error', error instanceof Error ? error.message : t('settings.failedToUpdate', 'Failed To Update Profile.'));
+      const message = error instanceof Error ? error.message : '';
+      showNotice(
+        'error',
+        message.toLowerCase().includes('reserved')
+          ? t('settings.usernameReserved', 'This Name Is Reserved For System Use.')
+          : error instanceof Error
+            ? error.message
+            : t('settings.failedToUpdate', 'Failed To Update Profile.'),
+      );
     } finally {
       setSaving(false);
     }

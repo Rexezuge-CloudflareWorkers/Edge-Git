@@ -2,6 +2,7 @@ import { NamespaceDAO, OrganizationDAO, OrganizationMemberDAO, RepositoryDAO, Us
 import type { OrganizationRow, OrgMemberRole } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError, ForbiddenError, NotFoundError } from '@edge-git/backend-errors';
+import { isReservedNamespaceName } from '@edge-git/shared/constants';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 
 interface OrganizationServiceEnv {
@@ -38,6 +39,9 @@ class OrganizationService {
   public static validateOrgName(username: string): void {
     if (!ORG_NAME_RE.test(username)) {
       throw new BadRequestError('Invalid organization name');
+    }
+    if (isReservedNamespaceName(username)) {
+      throw new BadRequestError('Username is reserved');
     }
   }
 

@@ -1,4 +1,5 @@
 export const ZERO_OID = '0000000000000000000000000000000000000000';
+export { RESERVED_NAMESPACE_NAMES, RESERVED_NAMESPACE_NAMES_LIST, isReservedNamespaceName } from './reservedNames';
 export const DEFAULT_BRANCH = 'main';
 export const GIT_AGENT = 'edge-git/0.1.0';
 export const MAX_REF_NAME_LENGTH = 255;

@@ -22,6 +22,9 @@ const zhCNStrings: BackendLocaleStrings = {
   git: {
     pushRejected: '推送被拒绝：{reason}。',
   },
+  namespace: {
+    reserved: '该名称为系统保留名称。',
+  },
 };
 
 export { zhCNStrings };

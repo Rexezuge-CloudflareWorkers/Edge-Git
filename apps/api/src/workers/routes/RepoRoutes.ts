@@ -156,7 +156,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create repo';
       const status =
-        message.includes('already exists') || message.includes('Invalid') || message.includes('Maximum') ? 400 : message.includes('members') || message.includes('owner') ? 403 : 500;
+        message.includes('already exists') || message.includes('Invalid') || message.includes('Maximum') || message.includes('reserved') ? 400 : message.includes('members') || message.includes('owner') ? 403 : 500;
       return c.json({ error: message }, status as 400);
     }
   });

@@ -22,6 +22,9 @@ const enStrings: BackendLocaleStrings = {
   git: {
     pushRejected: 'Push Rejected: {reason}.',
   },
+  namespace: {
+    reserved: 'Username Is Reserved.',
+  },
 };
 
 export { enStrings };

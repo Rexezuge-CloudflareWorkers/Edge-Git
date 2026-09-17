@@ -35,7 +35,15 @@ export function OrgSettingsCard({
         void navigate(`/${updated.username}`, { replace: true });
       }
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('orgs.failedToUpdate', 'Failed To Update Organization.'));
+      const message = error instanceof Error ? error.message : '';
+      showNotice(
+        'error',
+        message.toLowerCase().includes('reserved')
+          ? t('orgs.usernameReserved', 'This Name Is Reserved For System Use.')
+          : error instanceof Error
+            ? error.message
+            : t('orgs.failedToUpdate', 'Failed To Update Organization.'),
+      );
     } finally {
       setSaving(false);
     }

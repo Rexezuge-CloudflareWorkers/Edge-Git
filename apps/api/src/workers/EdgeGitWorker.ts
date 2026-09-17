@@ -4,6 +4,7 @@ import type { HonoOpenAPIRouterType } from 'chanfana';
 import { Hono } from 'hono';
 import { MiddlewareHandlers } from '@/middleware';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
+import { RESERVED_NAMESPACE_NAMES } from '@edge-git/shared/constants';
 import { SPA_HTML } from '@/generated/spa-shell';
 import { registerGitRoutes } from './routes/GitRoutes';
 import { registerForkRoutes, registerUserForkRoutes } from './routes/ForkRoutes';
@@ -97,8 +98,7 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
       if (/^\/[^/]+\/?$/.test(path)) {
         // Single-segment profile shell — never shadow reserved API/UI roots.
         const segment = path.replace(/^\//, '').replace(/\/$/, '').toLowerCase();
-        const reserved = new Set(['health', 'docs', 'repos', 'users', 'user', 'settings', 'new', 'search']);
-        if (!reserved.has(segment)) return c.html(SPA_HTML);
+        if (!RESERVED_NAMESPACE_NAMES.has(segment)) return c.html(SPA_HTML);
         return c.notFound();
       }
       if (/^\/[^/]+\/[^/]+\/?$/.test(path)) {
