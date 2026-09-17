@@ -56,7 +56,7 @@ class ReadModelService {
       return [];
     }
     const tree = await this.git.getTree(resolvedRef, path);
-    if (withLastCommit === false) {
+    if (!withLastCommit) {
       return (tree as Array<Record<string, unknown>>).map((item) => ({ ...item, lastCommit: null }));
     }
     const data = await Promise.all(
@@ -234,6 +234,10 @@ class ReadModelService {
     const diffBase = mergeBase ?? baseOid;
     const changes = (await this.git.getFileStateChanges(diffBase, headOid)) as unknown[];
     return { mergeBase, truncated: changes.length > maxFiles, changes: changes.slice(0, maxFiles) };
+  }
+
+  public async getBlame(ref: string, filepath: string): Promise<unknown> {
+    return this.git.getBlame(ref, filepath);
   }
 }
 

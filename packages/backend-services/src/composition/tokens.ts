@@ -1,5 +1,6 @@
 import type {
   BranchProtectionDAO,
+  CollaborationDAO,
   IssueDAO,
   NamespaceDAO,
   OrganizationDAO,
@@ -28,6 +29,7 @@ import type { ActivityService } from '../social/ActivityService';
 import type { NotificationService } from '../social/NotificationService';
 import type { StarService } from '../social/StarService';
 import type { WatchService } from '../social/WatchService';
+import type { CollaborationService } from '../collab/CollaborationService';
 import type { SearchDAO } from '@edge-git/backend-data/dao';
 
 // Central token registry for the per-request composition root
@@ -60,6 +62,7 @@ const Tokens = {
   OrganizationMemberDAO: Symbol('OrganizationMemberDAO') as Token<() => Promise<OrganizationMemberDAO>>,
   RepoCollaboratorDAO: Symbol('RepoCollaboratorDAO') as Token<() => Promise<RepoCollaboratorDAO>>,
   BranchProtectionDAO: Symbol('BranchProtectionDAO') as Token<() => Promise<BranchProtectionDAO>>,
+  CollaborationDAO: Symbol('CollaborationDAO') as Token<() => Promise<CollaborationDAO>>,
   SearchDAO: Symbol('SearchDAO') as Token<() => Promise<SearchDAO>>,
   StarDAO: Symbol('StarDAO') as Token<() => Promise<import('@edge-git/backend-data/dao').StarDAO>>,
   WatchDAO: Symbol('WatchDAO') as Token<() => Promise<import('@edge-git/backend-data/dao').WatchDAO>>,
@@ -80,6 +83,7 @@ const Tokens = {
   WatchService: Symbol('WatchService') as Token<WatchService>,
   ActivityService: Symbol('ActivityService') as Token<ActivityService>,
   NotificationService: Symbol('NotificationService') as Token<NotificationService>,
+  CollaborationService: Symbol('CollaborationService') as Token<CollaborationService>,
 } satisfies Record<string, Token<unknown>>;
 
 export { Tokens };

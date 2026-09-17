@@ -79,6 +79,7 @@ interface MergeCrossForkInput {
   headRow: RepositoryRow;
   message: string;
   deleteHead: boolean;
+  strategy: 'merge' | 'squash' | 'rebase';
 }
 
 async function mergeCrossForkPull(env: Env, input: MergeCrossForkInput): Promise<{ status: 200 | 400 | 403 | 404 | 409 | 413 | 500; body: unknown }> {
@@ -124,6 +125,7 @@ async function mergeCrossForkPull(env: Env, input: MergeCrossForkInput): Promise
       authorName: input.email.split('@', 1)[0] || input.email,
       authorEmail: input.email,
       message: input.message,
+      strategy: input.strategy,
     })) as { type?: string; commitOid?: string; conflicts?: string[]; reason?: string; deletedHead?: boolean };
   } catch (error) {
     return { status: 500, body: { error: error instanceof Error ? error.message : 'Merge failed' } };
@@ -188,6 +190,7 @@ function registerUserPullMergeRoutes(app: PullApp): void {
     }
     if (pull.status === 'merged') return c.json({ error: 'pull request is already merged' }, 400);
     if (pull.status === 'closed') return c.json({ error: 'closed pull requests cannot be merged' }, 400);
+    if ((pull as { is_draft?: number | null }).is_draft === 1) return c.json({ error: 'draft pull requests cannot be merged' }, 409);
     // Fail fast on blocking reviews before touching git.
     const reviews = await scope.get(Tokens.PullRequestService).listReviews(row.id, number);
     if (PullRequestService.isBlockedByReviews(reviews)) return c.json({ error: 'pull request has unresolved change requests' }, 409);
@@ -197,14 +200,15 @@ function registerUserPullMergeRoutes(app: PullApp): void {
     const rule = await scope.get(Tokens.BranchProtectionService).matchForRepo(row.id, pull.base_branch).catch(() => null);
     const gate = BranchProtectionService.checkMergeBlocked({ rule, reviews, creatorEmail: pull.creator_email });
     if (gate.blocked) return c.json({ error: gate.reason ?? 'pull request is blocked by branch protection' }, 409);
-    const body = (await c.req.json().catch(() => ({}))) as { message?: string; deleteHead?: boolean };
+    const body = (await c.req.json().catch(() => ({}))) as { message?: string; deleteHead?: boolean; strategy?: string };
     const rawMessage = typeof body.message === 'string' ? body.message.trim() : '';
     const message = rawMessage ? rawMessage.slice(0, 1000) : `Merge pull request #${number}: ${pull.title}`;
     const deleteHead = body.deleteHead === true;
+    const strategy = body.strategy === 'squash' || body.strategy === 'rebase' ? body.strategy : 'merge';
     const fullName = `${owner}/${repoName}`;
     const head = await resolveHeadRepo(c.env, pull);
     if (head) {
-      const result = await mergeCrossForkPull(c.env, { email, scope, rowId: row.id, number, pull, fullName, headFullName: head.fullName, headRow: head.row, message, deleteHead });
+      const result = await mergeCrossForkPull(c.env, { email, scope, rowId: row.id, number, pull, fullName, headFullName: head.fullName, headRow: head.row, message, deleteHead, strategy });
       return c.json(result.body, result.status);
     }
     // Refresh oids from git truth (branches may have moved since PR creation).
@@ -242,6 +246,7 @@ function registerUserPullMergeRoutes(app: PullApp): void {
         authorEmail: email,
         message,
         deleteHead,
+        strategy,
       })) as { type?: string; commitOid?: string; conflicts?: string[]; reason?: string; deletedHead?: boolean };
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'Merge failed' }, 500);

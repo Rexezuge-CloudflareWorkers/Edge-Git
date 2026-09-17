@@ -14,6 +14,7 @@ import { Markdown } from '../shared/Markdown';
 import { RefreshButton } from '../shared/RefreshButton';
 import { CloneButton } from './CloneButton';
 import { ForkButton } from './ForkButton';
+import { ForkSyncButton } from './ForkSyncButton';
 import { BranchActions } from './BranchActions';
 import { BlobView } from './BlobView';
 import { FileBrowser } from './FileBrowser';
@@ -432,12 +433,17 @@ export function CodeTab({
               <VisibilityBadge isPrivate={repoMeta.isPrivate} />
             </div>
             {repoMeta.forkedFrom && (
-              <p className="mt-2 text-xs text-[var(--color-text-muted)]">
-                {t('forks.forkedFrom', 'Forked From')}{' '}
-                <Link className="text-[var(--color-accent)] hover:underline font-mono" to={`/${repoMeta.forkedFrom}`}>
-                  {repoMeta.forkedFrom}
-                </Link>
-              </p>
+              <>
+                <p className="mt-2 text-xs text-[var(--color-text-muted)]">
+                  {t('forks.forkedFrom', 'Forked From')}{' '}
+                  <Link className="text-[var(--color-accent)] hover:underline font-mono" to={`/${repoMeta.forkedFrom}`}>
+                    {repoMeta.forkedFrom}
+                  </Link>
+                </p>
+                <div className="mt-2">
+                  <ForkSyncButton owner={owner} repo={repo} upstreamFull={repoMeta.forkedFrom} branch={defaultBranch ?? 'main'} showNotice={showNotice} />
+                </div>
+              </>
             )}
             <dl className="mt-4 space-y-2.5 text-sm">
               <div className="flex items-center justify-between gap-2">

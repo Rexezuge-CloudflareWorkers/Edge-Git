@@ -129,6 +129,96 @@ export class MergeService {
     await git.deleteBranch({ fs: this.fs, gitdir: this.gitdir, ref: branch });
   }
 
+  private toAuthor(input: MergeAuthor): { name: string; email: string; timestamp: number; timezoneOffset: number } {
+    return { ...input, timestamp: Math.floor(Date.now() / 1000), timezoneOffset: 0 };
+  }
+
+  /**
+   * Squash merge: single new commit on the base branch with the head tree.
+   * Always succeeds when both oids exist (no 3-way content merge), which is
+   * why GitHub offers it alongside merge commits.
+   */
+  public async squashMerge(input: { baseBranch: string; headOid: string; author: MergeAuthor; message?: string }): Promise<MergeOutcome> {
+    if (!isValidBranchName(input.baseBranch)) throw new Error(`invalid base branch: ${input.baseBranch}`);
+    if (!/^[0-9a-f]{40}$/.test(input.headOid)) throw new Error('invalid head oid');
+    const baseRef = `refs/heads/${input.baseBranch}`;
+    const baseOid = await this.resolveRef(baseRef);
+    if (!baseOid) throw new Error(`base branch not found: ${input.baseBranch}`);
+    if (baseOid === input.headOid) return { type: 'already-merged', commitOid: baseOid };
+    const mergeBase = await this.findMergeBase([baseOid, input.headOid]);
+    if (mergeBase === input.headOid) return { type: 'already-merged', commitOid: baseOid };
+    let headTree: string;
+    let headMessage: string;
+    try {
+      const head = await git.readCommit({ fs: this.fs, gitdir: this.gitdir, oid: input.headOid, cache: this.cache });
+      headTree = head.commit.tree;
+      headMessage = head.commit.message;
+    } catch {
+      throw new Error('head commit not found');
+    }
+    const author = this.toAuthor(input.author);
+    const message = input.message?.trim() ? input.message.trim().slice(0, 1000) : headMessage.trim() || `Squash merge ${input.headOid.slice(0, 7)}`;
+    const oid = await git.writeCommit({
+      fs: this.fs,
+      gitdir: this.gitdir,
+      commit: { message: `${message}\n`, tree: headTree, parent: [baseOid], author, committer: author },
+    });
+    await git.writeRef({ fs: this.fs, gitdir: this.gitdir, ref: baseRef, value: oid, force: true });
+    this.clearCache();
+    return { type: 'fast-forward', commitOid: oid };
+  }
+
+  /**
+   * Rebase merge v1: fast-forward when possible, else single-commit replay.
+   * Multi-commit non-fast-forward heads return a conflict (use squash/merge)
+   * rather than risking an incorrect tree replay.
+   */
+  public async rebaseMerge(input: { baseBranch: string; headOid: string; author: MergeAuthor }): Promise<MergeOutcome> {
+    if (!isValidBranchName(input.baseBranch)) throw new Error(`invalid base branch: ${input.baseBranch}`);
+    if (!/^[0-9a-f]{40}$/.test(input.headOid)) throw new Error('invalid head oid');
+    const baseRef = `refs/heads/${input.baseBranch}`;
+    const baseOid = await this.resolveRef(baseRef);
+    if (!baseOid) throw new Error(`base branch not found: ${input.baseBranch}`);
+    if (baseOid === input.headOid) return { type: 'already-merged', commitOid: baseOid };
+    const mergeBase = await this.findMergeBase([baseOid, input.headOid]);
+    if (mergeBase === input.headOid) return { type: 'already-merged', commitOid: baseOid };
+    if (mergeBase === baseOid) {
+      await git.writeRef({ fs: this.fs, gitdir: this.gitdir, ref: baseRef, value: input.headOid, force: true });
+      this.clearCache();
+      return { type: 'fast-forward', commitOid: input.headOid };
+    }
+    let headOnly: Array<{ oid: string }> = [];
+    try {
+      const log = await git.log({ fs: this.fs, gitdir: this.gitdir, ref: input.headOid, cache: this.cache });
+      headOnly = [];
+      for (const entry of log) {
+        if (entry.oid === mergeBase) break;
+        headOnly.push({ oid: entry.oid });
+        if (headOnly.length > 100) break;
+      }
+    } catch {
+      return { type: 'conflict', conflicts: [], reason: 'rebase failed: unable to read head history' };
+    }
+    if (headOnly.length !== 1) {
+      return { type: 'conflict', conflicts: [], reason: 'rebase requires a linear single-commit head; use squash or merge' };
+    }
+    try {
+      const head = await git.readCommit({ fs: this.fs, gitdir: this.gitdir, oid: input.headOid, cache: this.cache });
+      const author = this.toAuthor(input.author);
+      const oid = await git.writeCommit({
+        fs: this.fs,
+        gitdir: this.gitdir,
+        commit: { message: head.commit.message.endsWith('\n') ? head.commit.message : `${head.commit.message}\n`, tree: head.commit.tree, parent: [baseOid], author, committer: author },
+      });
+      await git.writeRef({ fs: this.fs, gitdir: this.gitdir, ref: baseRef, value: oid, force: true });
+      this.clearCache();
+      return { type: 'fast-forward', commitOid: oid };
+    } catch (error) {
+      logger.error(`(rebase) failed ${baseRef} <- ${input.headOid}: ${String(error)}`);
+      throw error;
+    }
+  }
+
   public async mergeBranches(input: { baseBranch: string; headOid: string; author: MergeAuthor; message?: string }): Promise<MergeOutcome> {
     if (!isValidBranchName(input.baseBranch)) throw new Error(`invalid base branch: ${input.baseBranch}`);
     if (!/^[0-9a-f]{40}$/.test(input.headOid)) throw new Error('invalid head oid');

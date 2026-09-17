@@ -40,12 +40,13 @@ export function IssuesTab({
   const [saving, setSaving] = useState(false);
 
   const [reloadKey, setReloadKey] = useState(0);
+  const [labelFilter, setLabelFilter] = useState('');
 
   useEffect(() => {
     const authOpt = authorized === true ? { isAuthed: true as const } : { isAuthed: false as const };
     const run = async () => {
       try {
-        const list = await listIssues(owner, repo, authOpt);
+        const list = await listIssues(owner, repo, { ...authOpt, label: labelFilter.trim() || undefined });
         setIssues(list);
         onCountChange?.(list.length);
       } catch (error) {
@@ -55,7 +56,7 @@ export function IssuesTab({
       }
     };
     void run();
-  }, [owner, repo, showNotice, onCountChange, reloadKey, t, authorized]);
+  }, [owner, repo, showNotice, onCountChange, reloadKey, t, authorized, labelFilter]);
 
   const refresh = () => {
     setLoading(true);
@@ -106,6 +107,9 @@ export function IssuesTab({
           <CardTitle>{t('issues.issues', 'Issues')}</CardTitle>
           <RefreshButton onRefresh={refresh} loading={loading} />
         </CardHeader>
+        <div className="mb-3 flex gap-2">
+          <Input placeholder={t('issues.filterByLabel', 'Filter By Label…')} value={labelFilter} onChange={(e) => setLabelFilter(e.target.value)} />
+        </div>
         {!loading && issues.length === 0 ? (
           <div className="text-center text-[var(--color-text-muted)] py-10 text-sm">
             <CircleDot className="h-6 w-6 mx-auto mb-3" />

@@ -12,6 +12,7 @@ export interface IssueRow {
   creator_email: string;
   created_at: number;
   updated_at: number;
+  milestone_id?: string | null;
 }
 
 export interface CommentRow {

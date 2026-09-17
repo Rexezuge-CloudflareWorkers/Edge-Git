@@ -365,14 +365,22 @@ class RepoWorker extends DurableObject<Env> {
     authorEmail: string;
     message?: string;
     deleteHead?: boolean;
+    strategy?: 'merge' | 'squash' | 'rebase';
   }): Promise<unknown> {
     await this.prepare();
-    const outcome = await this.git.mergeBranches({
-      baseBranch: args.baseBranch,
-      headOid: args.headOid,
-      author: { name: args.authorName, email: args.authorEmail },
-      message: args.message,
-    });
+    const strategy = args.strategy ?? 'merge';
+    const author = { name: args.authorName, email: args.authorEmail };
+    const outcome =
+      strategy === 'squash'
+        ? await this.git.squashMerge({ baseBranch: args.baseBranch, headOid: args.headOid, author, message: args.message })
+        : strategy === 'rebase'
+          ? await this.git.rebaseMerge({ baseBranch: args.baseBranch, headOid: args.headOid, author })
+          : await this.git.mergeBranches({
+              baseBranch: args.baseBranch,
+              headOid: args.headOid,
+              author,
+              message: args.message,
+            });
     if (outcome.type !== 'conflict') {
       this.git.clearCache();
     }
@@ -404,6 +412,12 @@ class RepoWorker extends DurableObject<Env> {
     } catch {
       return { deleted: false };
     }
+  }
+
+  public async getBlame(args: { ref?: string; filepath: string }): Promise<unknown> {
+    await this.prepare();
+    if (!args.filepath || args.filepath.length > 500) return null;
+    return this.readModel.getBlame(args.ref ?? 'HEAD', args.filepath);
   }
 }
 

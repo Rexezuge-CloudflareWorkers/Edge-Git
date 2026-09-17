@@ -200,6 +200,8 @@ export interface PullRequest {
   merged_at: number | null;
   created_at: number;
   updated_at: number;
+  milestone_id?: string | null;
+  is_draft?: number | null;
 }
 
 export interface PullReview {

@@ -88,6 +88,7 @@ class PullRequestService {
     creatorEmail: string;
     headRepositoryId?: string | null;
     headFullName?: string | null;
+    isDraft?: boolean;
   }): Promise<{ id: string; number: number }> {
     const title = input.title.trim();
     if (!title) throw new BadRequestError('title is required');
@@ -133,6 +134,9 @@ class PullRequestService {
           headRepositoryId,
           headFullName,
         });
+        if (input.isDraft === true) {
+          await dao.setDraft(id, true, now).catch(() => undefined);
+        }
         return { id, number };
       } catch (error) {
         lastError = error;
@@ -168,6 +172,7 @@ class PullRequestService {
     const pr = await this.getByNumber(input.repositoryId, input.number);
     if (pr.status === 'merged') throw new BadRequestError('pull request is already merged');
     if (pr.status === 'closed') throw new BadRequestError('closed pull requests cannot be merged');
+    if ((pr as { is_draft?: number | null }).is_draft === 1) throw new BadRequestError('draft pull requests cannot be merged');
     // changes_requested blocks merge: any latest blocking review vetoes.
     const dao = await this.deps.pullRequestDAO();
     const reviews = await dao.listReviews(pr.id);
@@ -244,6 +249,16 @@ class PullRequestService {
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     await dao.updateOids(pr.id, { baseOid: input.baseOid, headOid: input.headOid, mergeBaseOid: input.mergeBaseOid }, now);
     const updated = await dao.getByNumber(input.repositoryId, input.number);
+    if (!updated) throw new NotFoundError('Pull request not found');
+    return updated;
+  }
+
+  public async setDraft(repositoryId: string, number: number, isDraft: boolean): Promise<PullRequestRow> {
+    const pr = await this.getByNumber(repositoryId, number);
+    if (pr.status === 'merged') throw new BadRequestError('merged pull requests cannot be drafted');
+    const dao = await this.deps.pullRequestDAO();
+    await dao.setDraft(pr.id, isDraft, TimestampUtil.getCurrentUnixTimestampInSeconds());
+    const updated = await dao.getByNumber(repositoryId, number);
     if (!updated) throw new NotFoundError('Pull request not found');
     return updated;
   }

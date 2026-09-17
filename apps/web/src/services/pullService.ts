@@ -26,15 +26,16 @@ async function tryAuthedFirst<T>(authedPath: string, publicPath: string, isAuthe
   }
 }
 
-export async function listPulls(owner: string, repo: string, opts?: ReadOpts): Promise<PullRequest[]> {
-  const data = await tryAuthedFirst<{ pulls?: PullRequest[] }>(authedBase(owner, repo), publicBase(owner, repo), opts?.isAuthed);
+export async function listPulls(owner: string, repo: string, opts?: ReadOpts & { label?: string }): Promise<PullRequest[]> {
+  const suffix = opts?.label ? `?label=${encodeURIComponent(opts.label)}` : '';
+  const data = await tryAuthedFirst<{ pulls?: PullRequest[] }>(`${authedBase(owner, repo)}${suffix}`, `${publicBase(owner, repo)}${suffix}`, opts?.isAuthed);
   return data.pulls ?? [];
 }
 
 export async function createPull(
   owner: string,
   repo: string,
-  input: { title: string; body?: string; baseBranch: string; headBranch: string; headOwner?: string; headRepo?: string },
+  input: { title: string; body?: string; baseBranch: string; headBranch: string; headOwner?: string; headRepo?: string; isDraft?: boolean },
 ): Promise<{ id: string; number: number }> {
   return apiPost<{ id: string; number: number }>(authedBase(owner, repo), input);
 }
@@ -119,7 +120,7 @@ export async function mergePull(
   owner: string,
   repo: string,
   number: number,
-  input?: { message?: string; deleteHead?: boolean },
+  input?: { message?: string; deleteHead?: boolean; strategy?: 'merge' | 'squash' | 'rebase' },
 ): Promise<{ pull: PullRequest; merge: { type?: string; commitOid?: string; deletedHead?: boolean } }> {
   return apiPost<{ pull: PullRequest; merge: { type?: string; commitOid?: string; deletedHead?: boolean } }>(`${authedPull(owner, repo, number)}/merge`, input ?? {});
 }

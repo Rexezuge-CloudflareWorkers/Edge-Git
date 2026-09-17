@@ -21,6 +21,8 @@ export interface PullRequestRow {
   updated_at: number;
   head_repository_id?: string | null;
   head_full_name?: string | null;
+  milestone_id?: string | null;
+  is_draft?: number | null;
 }
 
 export interface PullRequestReviewRow {
@@ -180,6 +182,14 @@ class PullRequestDAO extends BaseDAO {
           .run(),
       'update pull request oids',
     );
+  }
+
+  public async setDraft(id: string, isDraft: boolean, now: number): Promise<void> {
+    await this.database.prepare('UPDATE pull_requests SET is_draft = ?, updated_at = ? WHERE id = ?').bind(isDraft ? 1 : 0, now, id).run().catch(() => undefined);
+  }
+
+  public async setMilestone(id: string, milestoneId: string | null, now: number): Promise<void> {
+    await this.database.prepare('UPDATE pull_requests SET milestone_id = ?, updated_at = ? WHERE id = ?').bind(milestoneId, id, now).run().catch(() => undefined);
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {

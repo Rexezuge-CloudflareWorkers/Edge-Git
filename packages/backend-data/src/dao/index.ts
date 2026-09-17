@@ -21,6 +21,8 @@ export { BranchProtectionDAO } from './BranchProtectionDAO';
 export type { BranchProtectionRuleRow } from './BranchProtectionDAO';
 export { SearchDAO } from './SearchDAO';
 export type { CodeHit, SearchOptions } from './SearchDAO';
+export { CollaborationDAO } from './CollaborationDAO';
+export type { LabelRow, MilestoneRow, PullReviewerRow } from './CollaborationDAO';
 export { StarDAO } from './StarDAO';
 export { WatchDAO } from './WatchDAO';
 export { EventDAO } from './EventDAO';
