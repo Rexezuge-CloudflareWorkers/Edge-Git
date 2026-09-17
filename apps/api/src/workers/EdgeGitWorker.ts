@@ -3,7 +3,6 @@ import { fromHono } from 'chanfana';
 import type { HonoOpenAPIRouterType } from 'chanfana';
 import { Hono } from 'hono';
 import { MiddlewareHandlers } from '@/middleware';
-import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { RESERVED_NAMESPACE_NAMES } from '@edge-git/shared/constants';
 import { SPA_HTML } from '@/generated/spa-shell';
 import { registerGitRoutes } from './routes/GitRoutes';
@@ -44,9 +43,6 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     // User home (public shell; data is gated per-endpoint). /user stays the
     // Cloudflare Access entry point and redirects into the authenticated app.
     app.get('/', (c) => {
-      if (!ConfigurationManager.spa.isServeFromWorker(c.env)) {
-        return c.notFound();
-      }
       return c.html(SPA_HTML);
     });
     app.get('/user', (c) => c.redirect('/user/' + new URL(c.req.url).search));
@@ -102,9 +98,6 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     // authenticated /user/* app.
     // Git Smart HTTP paths never reach here: they match exact routes above.
     app.get('*', (c) => {
-      if (!ConfigurationManager.spa.isServeFromWorker(c.env)) {
-        return c.notFound();
-      }
       const path: string = new URL(c.req.url).pathname;
       if (path === '/' || path === '/settings' || path === '/new' || path === '/search' || path === '/notifications' || path.startsWith('/user/')) {
         return c.html(SPA_HTML);

@@ -19,7 +19,6 @@ import {
   DEFAULT_MAX_RULES_PER_REPO,
   DEFAULT_MAX_TOKENS_PER_USER,
   DEFAULT_MAX_TOKEN_EXPIRY_DAYS,
-  DEFAULT_SERVE_SPA_FROM_WORKER,
   DEFAULT_SITE_URL,
   DEFAULT_WEBHOOK_DELIVERY_RETENTION_DAYS,
   DEFAULT_WEBHOOK_MAX_ATTEMPTS,
@@ -52,10 +51,6 @@ class ConfigurationManager {
     getMaxMergeDiffFiles: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_MERGE_DIFF_FILES', DEFAULT_MAX_MERGE_DIFF_FILES),
     getMaxFileBytes: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_FILE_BYTES', DEFAULT_MAX_FILE_BYTES),
     getMaxRulesPerRepo: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_RULES_PER_REPO', DEFAULT_MAX_RULES_PER_REPO),
-  };
-
-  public static readonly spa = {
-    isServeFromWorker: (env: unknown): boolean => EnvParser.boolean(env, 'SERVE_SPA_FROM_WORKER', DEFAULT_SERVE_SPA_FROM_WORKER),
   };
 
   public static readonly site = {

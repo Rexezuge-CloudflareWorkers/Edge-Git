@@ -4,8 +4,8 @@ Scope: Wrangler bindings, build output, env vars. Parent index: `../../../AGENTS
 
 - Root `@edge-git/monorepo`, pnpm workspaces (`apps/*`, `packages/*`).
 - `apps/web/vite.config.ts` proxies `/user` + `/repos` → `http://localhost:8787` in dev; `closeBundle` embeds `dist/index.html` into `apps/api/src/generated/spa-shell.ts` (`SPA_HTML`) on build.
-- `apps/api/wrangler.template.jsonc` is the config template — copy to `wrangler.jsonc` per deployer; no committed `wrangler.jsonc`. Local `wrangler.jsonc` uses `DEV_AUTH_EMAIL=test@example.com`, `SERVE_SPA_FROM_WORKER=false`.
-- Worker serves SPA only from `/`, `/new`, `/settings`, `/:owner/:repo`, `/user/*` catch-all in `EdgeGitWorker` (non-matching paths return `404`) so Smart HTTP routes are never intercepted.
+- `apps/api/wrangler.template.jsonc` is the config template — copy to `wrangler.jsonc` per deployer; no committed `wrangler.jsonc`. Local `wrangler.jsonc` uses `DEV_AUTH_EMAIL=test@example.com`.
+- The Worker always serves the SPA from `/`, `/new`, `/settings`, `/:owner/:repo`, `/user/*` catch-all in `EdgeGitWorker` (non-matching paths return `404`) so Smart HTTP routes are never intercepted.
 - Bindings: D1 `DB`, DOs `REPO` (`RepoWorker`, `getByName(fullName)`, 5GB, `/repo` bare) / `CRON_TASKS` (`CronTasksWorker`, `idFromName('global')`), cron `*/10 * * * *`; no KV/R2/Queues/AI bindings.
 
 ## Required vars (no defaults)
@@ -20,7 +20,7 @@ Scope: Wrangler bindings, build output, env vars. Parent index: `../../../AGENTS
 
 | Group | Vars (default) |
 |---|---|
-| App | `DEBUG_MODE` (`false`), `SITE_URL` (`""`), `SERVE_SPA_FROM_WORKER` (`true`) |
+| App | `DEBUG_MODE` (`false`), `SITE_URL` (`""`) |
 | Limits | `MAX_REPOS_PER_USER` (`100`), `MAX_TOKENS_PER_USER` (`5`), `MAX_TOKEN_EXPIRY_DAYS` (`90`) |
 | Git | `MAX_PACK_OBJECTS` (`10000`), `GIT_CACHE_TTL_SECONDS` (`3600`), `MAX_FETCH_WANTS` (`64`), `MAX_FETCH_HAVES` (`512`), `MAX_PUSH_COMMANDS` (`100`), `MAX_PACK_BYTES` (`52428800`), `MAX_FETCH_BODY_BYTES` (`1048576`) |
 | Retention | `BACKGROUND_TASK_RUN_RETENTION_DAYS` (`30`), `AUDIT_LOG_RETENTION_DAYS` (`90`) |

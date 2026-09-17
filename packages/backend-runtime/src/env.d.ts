@@ -13,7 +13,6 @@ declare global {
     POLICY_AUD?: string;
     TEAM_DOMAIN?: string;
     SITE_URL?: string;
-    SERVE_SPA_FROM_WORKER?: string;
     MAX_REPOS_PER_USER?: string;
     MAX_TOKENS_PER_USER?: string;
     MAX_TOKEN_EXPIRY_DAYS?: string;
