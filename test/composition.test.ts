@@ -22,6 +22,8 @@ const daoMocks = vi.hoisted(() => ({
   WatchDAO: vi.fn(),
   EventDAO: vi.fn(),
   NotificationDAO: vi.fn(),
+  WebhookDAO: vi.fn(),
+  WebhookDeliveryDAO: vi.fn(),
 }));
 
 vi.mock('@edge-git/backend-data/dao', () => ({
@@ -39,6 +41,8 @@ vi.mock('@edge-git/backend-data/dao', () => ({
   WatchDAO: daoMocks.WatchDAO,
   EventDAO: daoMocks.EventDAO,
   NotificationDAO: daoMocks.NotificationDAO,
+  WebhookDAO: daoMocks.WebhookDAO,
+  WebhookDeliveryDAO: daoMocks.WebhookDeliveryDAO,
 }));
 
 const EXPECTED_TOKENS = [
@@ -60,6 +64,8 @@ const EXPECTED_TOKENS = [
   'WatchDAO',
   'EventDAO',
   'NotificationDAO',
+  'WebhookDAO',
+  'WebhookDeliveryDAO',
   'AccessAuthService',
   'TokenService',
   'BranchProtectionService',
@@ -73,6 +79,8 @@ const EXPECTED_TOKENS = [
   'WatchService',
   'ActivityService',
   'NotificationService',
+  'WebhookService',
+  'WebhookDeliveryService',
 ] as const;
 
 function makeEnv() {
@@ -129,6 +137,12 @@ beforeEach(() => {
   daoMocks.NotificationDAO.mockImplementation(function (this: unknown, db: unknown) {
     return { kind: 'NotificationDAO', db };
   });
+  daoMocks.WebhookDAO.mockImplementation(function (this: unknown, db: unknown) {
+    return { kind: 'WebhookDAO', db };
+  });
+  daoMocks.WebhookDeliveryDAO.mockImplementation(function (this: unknown, db: unknown) {
+    return { kind: 'WebhookDeliveryDAO', db };
+  });
 });
 
 describe('Tokens registry', () => {
@@ -184,6 +198,8 @@ describe('createRequestScope', () => {
       [Tokens.WatchDAO, daoMocks.WatchDAO],
       [Tokens.EventDAO, daoMocks.EventDAO],
       [Tokens.NotificationDAO, daoMocks.NotificationDAO],
+      [Tokens.WebhookDAO, daoMocks.WebhookDAO],
+      [Tokens.WebhookDeliveryDAO, daoMocks.WebhookDeliveryDAO],
     ] as const;
     for (const [token, ctor] of pairs) {
       const factory = scope.get(token);

@@ -7,6 +7,7 @@ import {
   DEFAULT_MAX_FILE_BYTES,
   DEFAULT_MAX_FETCH_HAVES,
   DEFAULT_MAX_FETCH_WANTS,
+  DEFAULT_MAX_HOOKS_PER_REPO,
   DEFAULT_MAX_MERGE_DIFF_FILES,
   DEFAULT_MAX_PACK_BYTES,
   DEFAULT_MAX_PACK_OBJECTS,
@@ -17,6 +18,11 @@ import {
   DEFAULT_MAX_TOKEN_EXPIRY_DAYS,
   DEFAULT_SERVE_SPA_FROM_WORKER,
   DEFAULT_SITE_URL,
+  DEFAULT_WEBHOOK_DELIVERY_RETENTION_DAYS,
+  DEFAULT_WEBHOOK_MAX_ATTEMPTS,
+  DEFAULT_WEBHOOK_MAX_CONSECUTIVE_FAILURES,
+  DEFAULT_WEBHOOK_MAX_PAYLOAD_BYTES,
+  DEFAULT_WEBHOOK_TIMEOUT_MS,
 } from './ConfigurationDefaults';
 import { EnvParser } from './EnvParser';
 
@@ -61,6 +67,18 @@ class ConfigurationManager {
     getTaskRunRetentionDays: (env: unknown): number =>
       EnvParser.positiveInt(env, 'BACKGROUND_TASK_RUN_RETENTION_DAYS', DEFAULT_BACKGROUND_TASK_RUN_RETENTION_DAYS),
     getAuditLogRetentionDays: (env: unknown): number => EnvParser.positiveInt(env, 'AUDIT_LOG_RETENTION_DAYS', DEFAULT_AUDIT_LOG_RETENTION_DAYS),
+  };
+
+  public static readonly webhooks = {
+    getMaxPerRepo: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_HOOKS_PER_REPO', DEFAULT_MAX_HOOKS_PER_REPO),
+    getDeliveryRetentionDays: (env: unknown): number =>
+      EnvParser.positiveInt(env, 'WEBHOOK_DELIVERY_RETENTION_DAYS', DEFAULT_WEBHOOK_DELIVERY_RETENTION_DAYS),
+    getMaxAttempts: (env: unknown): number => EnvParser.positiveInt(env, 'WEBHOOK_MAX_ATTEMPTS', DEFAULT_WEBHOOK_MAX_ATTEMPTS),
+    getTimeoutMs: (env: unknown): number => EnvParser.positiveInt(env, 'WEBHOOK_TIMEOUT_MS', DEFAULT_WEBHOOK_TIMEOUT_MS),
+    getMaxConsecutiveFailures: (env: unknown): number =>
+      EnvParser.positiveInt(env, 'WEBHOOK_MAX_CONSECUTIVE_FAILURES', DEFAULT_WEBHOOK_MAX_CONSECUTIVE_FAILURES),
+    getMaxPayloadBytes: (env: unknown): number =>
+      EnvParser.positiveInt(env, 'WEBHOOK_MAX_PAYLOAD_BYTES', DEFAULT_WEBHOOK_MAX_PAYLOAD_BYTES),
   };
 
   public static getDebugMode(env: unknown): boolean {

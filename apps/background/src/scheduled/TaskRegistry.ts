@@ -5,6 +5,7 @@ import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { BaseScheduledTask } from './IScheduledTask';
 import type { ScheduledTask } from './IScheduledTask';
 import { SearchBackfillTask } from './SearchBackfillTask';
+import { WebhookDeliveryTask } from './WebhookDeliveryTask';
 
 const logger = createLogger('CronTasks');
 
@@ -46,10 +47,25 @@ class SocialPruningTask extends BaseScheduledTask {
     if (prunedEvents > 0 || prunedNotifications > 0) {
       logger.info(`Pruned ${prunedEvents} repo events and ${prunedNotifications} read notifications`);
     }
+    const webhookRetentionDays = ConfigurationManager.webhooks.getDeliveryRetentionDays(env);
+    const webhookCutoff = TimestampUtil.getCurrentUnixTimestampInSeconds() - webhookRetentionDays * 86_400;
+    const prunedDeliveries = await scope
+      .get(Tokens.WebhookDeliveryService)
+      .pruneOlderThan(webhookCutoff, 500)
+      .catch(() => 0);
+    if (prunedDeliveries > 0) {
+      logger.info(`Pruned ${prunedDeliveries} webhook deliveries`);
+    }
   }
 }
 
-const CRON_TASK_DEFINITIONS: ScheduledTask[] = [new ExpiredTokenPruningTask(), new BackgroundTaskRunPruningTask(), new SearchBackfillTask(), new SocialPruningTask()];
+const CRON_TASK_DEFINITIONS: ScheduledTask[] = [
+  new ExpiredTokenPruningTask(),
+  new BackgroundTaskRunPruningTask(),
+  new SearchBackfillTask(),
+  new SocialPruningTask(),
+  new WebhookDeliveryTask(),
+];
 
 async function runScheduledTasks(env: Env, cron: string, scheduledTime: number): Promise<void> {
   logger.info(`Running scheduled tasks for ${cron} at ${scheduledTime}`);
@@ -61,4 +77,5 @@ async function runScheduledTasks(env: Env, cron: string, scheduledTime: number):
 
 export { CRON_TASK_DEFINITIONS, runScheduledTasks, ExpiredTokenPruningTask, BackgroundTaskRunPruningTask, SocialPruningTask };
 export { SearchBackfillTask } from './SearchBackfillTask';
+export { WebhookDeliveryTask } from './WebhookDeliveryTask';
 export type { ScheduledTask } from './IScheduledTask';

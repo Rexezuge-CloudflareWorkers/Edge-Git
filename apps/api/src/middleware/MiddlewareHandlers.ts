@@ -5,6 +5,7 @@ import { coversScope } from '@edge-git/backend-services/auth';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { getBasicCredentials, getBearerToken } from '@edge-git/git-protocol';
 import { UnauthorizedError, ForbiddenError } from '@edge-git/backend-errors';
+import { flushDueWebhookDeliveries } from '@/workers/routes/SocialEmit';
 
 type RequestContext = Context<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -107,9 +108,30 @@ async function gitAuthForRepo(
   }
 }
 
+async function webhookFlushHandler(c: RequestContext, next: Next): Promise<Response | void> {
+  await next();
+  if (['GET', 'HEAD', 'OPTIONS'].includes(c.req.method)) return;
+  try {
+    const waitUntil = (c.executionCtx as ExecutionContext | undefined)?.waitUntil?.bind(c.executionCtx);
+    if (typeof waitUntil === 'function') {
+      waitUntil(flushDueWebhookDeliveries(c.env));
+    }
+  } catch {
+    // Flush is best-effort; cron covers the gap.
+  }
+}
+
 class MiddlewareHandlers {
   public static userAuthentication(): (c: RequestContext, next: Next) => Promise<Response | void> {
     return userAuthenticationHandler;
+  }
+
+  // Immediate webhook dispatch for mutating requests: any handler that
+  // enqueued deliveries (issues, PRs, pushes, stars…) gets them POSTed via
+  // `waitUntil` right after the response, without adding latency. The cron
+  // sweeper retries whatever fails. Reads never trigger a flush.
+  public static webhookFlush(): (c: RequestContext, next: Next) => Promise<Response | void> {
+    return webhookFlushHandler;
   }
 
   public static async requireUser(c: RequestContext): Promise<string | Response> {

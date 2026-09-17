@@ -31,3 +31,7 @@ export { EventDAO } from './EventDAO';
 export type { RepoEventRow, RepoEventType } from './EventDAO';
 export { NotificationDAO } from './NotificationDAO';
 export type { NotificationRow } from './NotificationDAO';
+export { WebhookDAO } from './WebhookDAO';
+export type { RepoWebhookRow } from './WebhookDAO';
+export { WebhookDeliveryDAO } from './WebhookDeliveryDAO';
+export type { WebhookDeliveryRow } from './WebhookDeliveryDAO';

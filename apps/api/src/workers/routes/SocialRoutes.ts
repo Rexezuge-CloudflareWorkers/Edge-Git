@@ -2,6 +2,7 @@ import type { Hono } from 'hono';
 import { requireVisibleRepo, resolvePublicViewer, toRepoJson, withPublicRepo } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
+import { emitWebhookEvent } from './SocialEmit';
 
 type SocialApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -63,6 +64,13 @@ function registerUserSocialRoutes(app: SocialApp): void {
     if (!row) return c.json({ error: 'Not found' }, 404);
     const scope = createRequestScope(c.env);
     await scope.get(Tokens.StarService).star(row.id, email);
+    await emitWebhookEvent(c.env, {
+      repositoryId: row.id,
+      fullName: `${owner}/${repoName}`,
+      actorEmail: email,
+      event: 'star',
+      action: 'starred',
+    });
     return c.json({ starred: true, ...(await getCounts(c.env, row.id)) });
   });
 
@@ -74,6 +82,13 @@ function registerUserSocialRoutes(app: SocialApp): void {
     if (!row) return c.json({ error: 'Not found' }, 404);
     const scope = createRequestScope(c.env);
     await scope.get(Tokens.StarService).unstar(row.id, email);
+    await emitWebhookEvent(c.env, {
+      repositoryId: row.id,
+      fullName: `${owner}/${repoName}`,
+      actorEmail: email,
+      event: 'star',
+      action: 'unstarred',
+    });
     return c.json({ starred: false, ...(await getCounts(c.env, row.id)) });
   });
 
@@ -85,6 +100,13 @@ function registerUserSocialRoutes(app: SocialApp): void {
     if (!row) return c.json({ error: 'Not found' }, 404);
     const scope = createRequestScope(c.env);
     await scope.get(Tokens.WatchService).watch(row.id, email);
+    await emitWebhookEvent(c.env, {
+      repositoryId: row.id,
+      fullName: `${owner}/${repoName}`,
+      actorEmail: email,
+      event: 'watch',
+      action: 'watching',
+    });
     return c.json({ watching: true, ...(await getCounts(c.env, row.id)) });
   });
 
@@ -96,6 +118,13 @@ function registerUserSocialRoutes(app: SocialApp): void {
     if (!row) return c.json({ error: 'Not found' }, 404);
     const scope = createRequestScope(c.env);
     await scope.get(Tokens.WatchService).unwatch(row.id, email);
+    await emitWebhookEvent(c.env, {
+      repositoryId: row.id,
+      fullName: `${owner}/${repoName}`,
+      actorEmail: email,
+      event: 'watch',
+      action: 'unwatched',
+    });
     return c.json({ watching: false, ...(await getCounts(c.env, row.id)) });
   });
 
