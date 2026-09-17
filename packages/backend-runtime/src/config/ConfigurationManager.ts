@@ -1,6 +1,11 @@
 import {
   DEFAULT_AUDIT_LOG_RETENTION_DAYS,
   DEFAULT_BACKGROUND_TASK_RUN_RETENTION_DAYS,
+  DEFAULT_CHECK_CUSTOMJS_ENABLED,
+  DEFAULT_CHECK_CUSTOMJS_MAX_CPU_MS,
+  DEFAULT_CHECK_CUSTOMJS_MAX_FETCHES,
+  DEFAULT_CHECK_CUSTOMJS_MAX_SCRIPT_BYTES,
+  DEFAULT_CHECK_CUSTOMJS_MEMORY_MB,
   DEFAULT_CHECK_RETENTION_DAYS,
   DEFAULT_CHECK_TIMEOUT_SECONDS,
   DEFAULT_DEBUG_MODE,
@@ -155,6 +160,14 @@ class ConfigurationManager {
     getTimeoutSeconds: (env: unknown): number =>
       EnvParser.positiveInt(env, 'CHECK_TIMEOUT_SECONDS', DEFAULT_CHECK_TIMEOUT_SECONDS),
     getRetentionDays: (env: unknown): number => EnvParser.positiveInt(env, 'CHECK_RETENTION_DAYS', DEFAULT_CHECK_RETENTION_DAYS),
+    isCustomJsEnabled: (env: unknown): boolean => EnvParser.boolean(env, 'CHECK_CUSTOMJS_ENABLED', DEFAULT_CHECK_CUSTOMJS_ENABLED),
+    getCustomJsMaxCpuMs: (env: unknown): number =>
+      EnvParser.positiveInt(env, 'CHECK_CUSTOMJS_MAX_CPU_MS', DEFAULT_CHECK_CUSTOMJS_MAX_CPU_MS),
+    getCustomJsMaxScriptBytes: (env: unknown): number =>
+      EnvParser.positiveInt(env, 'CHECK_CUSTOMJS_MAX_SCRIPT_BYTES', DEFAULT_CHECK_CUSTOMJS_MAX_SCRIPT_BYTES),
+    getCustomJsMaxFetches: (env: unknown): number =>
+      EnvParser.positiveInt(env, 'CHECK_CUSTOMJS_MAX_FETCHES', DEFAULT_CHECK_CUSTOMJS_MAX_FETCHES),
+    getCustomJsMemoryMb: (env: unknown): number => EnvParser.positiveInt(env, 'CHECK_CUSTOMJS_MEMORY_MB', DEFAULT_CHECK_CUSTOMJS_MEMORY_MB),
   };
 }
 

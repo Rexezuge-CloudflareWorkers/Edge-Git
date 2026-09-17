@@ -9,6 +9,7 @@
     "./RepoWorker": "./src/RepoWorker.ts",
     "./CronTasksWorker": "./src/CronTasksWorker.ts",
     "./CheckRunnerWorker": "./src/checks/CheckRunnerWorker.ts",
+    "./checks/*": "./src/checks/*.ts",
     "./PushHandler": "./src/PushHandler.ts",
     "./scheduled": "./src/scheduled/index.ts",
     "./scheduled/*": "./src/scheduled/*.ts",
@@ -24,7 +25,9 @@
     "@edge-git/backend-services": "workspace:*",
     "@edge-git/git-protocol": "workspace:*",
     "@edge-git/git-service": "workspace:*",
-    "@edge-git/shared": "workspace:*"
+    "@edge-git/shared": "workspace:*",
+    "@jitl/quickjs-wasmfile-release-asyncify": "^0.32.0",
+    "quickjs-emscripten": "0.32.0"
   },
   "devDependencies": {
     "@types/node": "26.5.1",
