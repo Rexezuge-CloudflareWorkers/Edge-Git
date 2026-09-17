@@ -2,8 +2,11 @@ import type {
   AuditLogDAO,
   BranchProtectionDAO,
   CollaborationDAO,
+  DeployKeyDAO,
   DiscussionDAO,
+  ImportDAO,
   IssueDAO,
+  MirrorDAO,
   NamespaceDAO,
   OrganizationDAO,
   OrganizationMemberDAO,
@@ -13,10 +16,12 @@ import type {
   ReleaseDAO,
   RepoCollaboratorDAO,
   RepositoryDAO,
+  SecuritySettingsDAO,
   SnippetDAO,
   TeamDAO,
   TeamMemberDAO,
   TeamRepoGrantDAO,
+  TokenRepoGrantDAO,
   UserAccessTokenDAO,
   UserDAO,
   WebhookDAO,
@@ -43,6 +48,10 @@ import type { PullRequestService } from '../pull/PullRequestService';
 import type { PullThreadService } from '../pull/PullThreadService';
 import type { OrganizationService } from '../org/OrganizationService';
 import type { TeamService } from '../team/TeamService';
+import type { ImportService } from '../transfer/ImportService';
+import type { MirrorService } from '../transfer/MirrorService';
+import type { DeployKeyService } from '../deploykey/DeployKeyService';
+import type { SecuritySettingsService } from '../security/SecuritySettingsService';
 import type { AuditService } from '../audit/AuditService';
 import type { PermissionService } from '../permission/PermissionService';
 import type { SearchService } from '../search/SearchService';
@@ -102,6 +111,11 @@ const Tokens = {
   TeamMemberDAO: Symbol('TeamMemberDAO') as Token<() => Promise<TeamMemberDAO>>,
   TeamRepoGrantDAO: Symbol('TeamRepoGrantDAO') as Token<() => Promise<TeamRepoGrantDAO>>,
   AuditLogDAO: Symbol('AuditLogDAO') as Token<() => Promise<AuditLogDAO>>,
+  ImportDAO: Symbol('ImportDAO') as Token<() => Promise<ImportDAO>>,
+  MirrorDAO: Symbol('MirrorDAO') as Token<() => Promise<MirrorDAO>>,
+  DeployKeyDAO: Symbol('DeployKeyDAO') as Token<() => Promise<DeployKeyDAO>>,
+  TokenRepoGrantDAO: Symbol('TokenRepoGrantDAO') as Token<() => Promise<TokenRepoGrantDAO>>,
+  SecuritySettingsDAO: Symbol('SecuritySettingsDAO') as Token<() => Promise<SecuritySettingsDAO>>,
   AccessAuthService: Symbol('AccessAuthService') as Token<AccessAuthService>,
   TokenService: Symbol('TokenService') as Token<TokenService>,
   BranchProtectionService: Symbol('BranchProtectionService') as Token<BranchProtectionService>,
@@ -128,6 +142,10 @@ const Tokens = {
   DiscussionService: Symbol('DiscussionService') as Token<DiscussionService>,
   WikiService: Symbol('WikiService') as Token<WikiService>,
   SnippetService: Symbol('SnippetService') as Token<SnippetService>,
+  ImportService: Symbol('ImportService') as Token<ImportService>,
+  MirrorService: Symbol('MirrorService') as Token<MirrorService>,
+  DeployKeyService: Symbol('DeployKeyService') as Token<DeployKeyService>,
+  SecuritySettingsService: Symbol('SecuritySettingsService') as Token<SecuritySettingsService>,
 } satisfies Record<string, Token<unknown>>;
 
 export { Tokens };

@@ -7,7 +7,6 @@ import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { getBasicCredentials, getBearerToken } from '@edge-git/git-protocol';
 import { UnauthorizedError, ForbiddenError } from '@edge-git/backend-errors';
 import { flushDueWebhookDeliveries } from '@/workers/routes/SocialEmit';
-
 type RequestContext = Context<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
 async function authenticateUserIdentity(c: RequestContext): Promise<string> {
@@ -51,6 +50,17 @@ async function resolvePatToEmail(env: Env, pat: string): Promise<AuthenticatedTo
   return createRequestScope(env).get(Tokens.TokenService).authenticateWithPAT(pat);
 }
 
+// Deploy keys are per-repo git-only credentials. A valid key scoped to this
+// repo authenticates without a user identity (userEmail stays null, so push
+// activity attribution is skipped but the git operation proceeds).
+async function resolveDeployKey(env: Env, key: string, repoId: string, service: 'git-upload-pack' | 'git-receive-pack'): Promise<'admin' | 'write' | 'read' | null> {
+  const scope = createRequestScope(env);
+  const found = await scope.get(Tokens.DeployKeyService).authenticateWithKey(key);
+  if (!found || found.repositoryId !== repoId) return null;
+  if (service === 'git-receive-pack' && found.permission !== 'write') return null;
+  return found.permission;
+}
+
 async function gitAuthForRepo(
   c: RequestContext,
   owner: string,
@@ -86,8 +96,20 @@ async function gitAuthForRepo(
     return unauthorizedGit();
   }
 
+  let identity: AuthenticatedToken | null = null;
   try {
-    const identity = await resolvePatToEmail(env, pat);
+    identity = await resolvePatToEmail(env, pat);
+  } catch {
+    identity = null;
+  }
+  if (!identity) {
+    // Fall back to per-repo deploy keys (same 401 either way — the key
+    // itself is the secret, so no existence oracle is created).
+    const keyRole = await resolveDeployKey(env, pat, repo.id, service);
+    if (!keyRole) return unauthorizedGit();
+    return { userEmail: null, repo, role: keyRole, scopes: ['deploy-key'] };
+  }
+  {
     const userEmail = identity.email;
     // PATs are git-scoped: fetch needs repo:read, push needs repo:write.
     // Insufficient scope is 403 (the token authenticated, so unlike the
@@ -95,6 +117,16 @@ async function gitAuthForRepo(
     const requiredScope = service === 'git-upload-pack' ? 'repo:read' : 'repo:write';
     if (!coversScope(identity.scopes, requiredScope)) {
       return new Response('Forbidden', { status: 403 });
+    }
+    // Fine-grained tokens: a non-empty grant set restricts the token to
+    // the listed repos. No grant for this repo hides existence (401);
+    // an insufficient grant scope is 403.
+    if (identity.repoGrants.length > 0) {
+      const grant = identity.repoGrants.find((g) => g.repositoryId === repo.id);
+      if (!grant) return unauthorizedGit();
+      if (!coversScope([grant.scope], requiredScope)) {
+        return new Response('Forbidden', { status: 403 });
+      }
     }
     const role = await permission.getRole(userEmail, repo);
     if (!role) return unauthorizedGit();
@@ -109,8 +141,6 @@ async function gitAuthForRepo(
       // context may not carry the variable on raw git routes — best-effort
     }
     return { userEmail, repo, role, scopes: identity.scopes };
-  } catch {
-    return unauthorizedGit();
   }
 }
 

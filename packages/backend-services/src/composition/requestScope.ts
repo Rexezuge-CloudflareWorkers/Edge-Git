@@ -1,5 +1,5 @@
 import { BranchProtectionDAO, CollaborationDAO, DiscussionDAO, IssueDAO, NamespaceDAO, OrganizationDAO, OrganizationMemberDAO, ProjectDAO, PullRequestDAO, PullThreadDAO, ReleaseDAO, RepoCollaboratorDAO, RepositoryDAO, SearchDAO, SnippetDAO, UserAccessTokenDAO, UserDAO, WikiDAO } from '@edge-git/backend-data/dao';
-import { AuditLogDAO, EventDAO, NotificationDAO, StarDAO, TeamDAO, TeamMemberDAO, TeamRepoGrantDAO, WatchDAO, WebhookDAO, WebhookDeliveryDAO } from '@edge-git/backend-data/dao';
+import { AuditLogDAO, DeployKeyDAO, EventDAO, ImportDAO, MirrorDAO, NotificationDAO, SecuritySettingsDAO, StarDAO, TeamDAO, TeamMemberDAO, TeamRepoGrantDAO, TokenRepoGrantDAO, WatchDAO, WebhookDAO, WebhookDeliveryDAO } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { Container } from '@edge-git/backend-runtime/di';
 import { AppConfiguration } from '@edge-git/backend-runtime/config';
@@ -31,6 +31,10 @@ import { DiscussionService } from '@edge-git/backend-services/discussion';
 import { ProjectService } from '@edge-git/backend-services/project';
 import { ReleaseService } from '@edge-git/backend-services/release';
 import { SnippetService } from '@edge-git/backend-services/snippet';
+import { ImportService } from '@edge-git/backend-services/transfer/ImportService';
+import { MirrorService } from '@edge-git/backend-services/transfer/MirrorService';
+import { DeployKeyService } from '@edge-git/backend-services/deploykey';
+import { SecuritySettingsService } from '@edge-git/backend-services/security';
 import { WikiService } from '@edge-git/backend-services/wiki';
 import { Tokens } from './tokens';
 
@@ -99,6 +103,11 @@ function createRequestScope(env: RequestScopeEnv): Container {
   const teamMemberDAO = memoize(() => Promise.resolve(new TeamMemberDAO(env.DB)));
   const teamGrantDAO = memoize(() => Promise.resolve(new TeamRepoGrantDAO(env.DB)));
   const auditLogDAO = memoize(() => Promise.resolve(new AuditLogDAO(env.DB)));
+  const importDAO = memoize(() => Promise.resolve(new ImportDAO(env.DB)));
+  const mirrorDAO = memoize(() => Promise.resolve(new MirrorDAO(env.DB)));
+  const deployKeyDAO = memoize(() => Promise.resolve(new DeployKeyDAO(env.DB)));
+  const tokenGrantDAO = memoize(() => Promise.resolve(new TokenRepoGrantDAO(env.DB)));
+  const securitySettingsDAO = memoize(() => Promise.resolve(new SecuritySettingsDAO(env.DB)));
   scope.bindValue(Tokens.UserDAO, userDAO);
   scope.bindValue(Tokens.RepositoryDAO, repositoryDAO);
   scope.bindValue(Tokens.UserAccessTokenDAO, tokenDAO);
@@ -127,9 +136,14 @@ function createRequestScope(env: RequestScopeEnv): Container {
   scope.bindValue(Tokens.TeamMemberDAO, teamMemberDAO);
   scope.bindValue(Tokens.TeamRepoGrantDAO, teamGrantDAO);
   scope.bindValue(Tokens.AuditLogDAO, auditLogDAO);
+  scope.bindValue(Tokens.ImportDAO, importDAO);
+  scope.bindValue(Tokens.MirrorDAO, mirrorDAO);
+  scope.bindValue(Tokens.DeployKeyDAO, deployKeyDAO);
+  scope.bindValue(Tokens.TokenRepoGrantDAO, tokenGrantDAO);
+  scope.bindValue(Tokens.SecuritySettingsDAO, securitySettingsDAO);
 
   scope.bind(Tokens.AccessAuthService, () => new AccessAuthService(env as never));
-  scope.bind(Tokens.TokenService, () => new TokenService(env as never, { tokenDAO }));
+  scope.bind(Tokens.TokenService, () => new TokenService(env as never, { tokenDAO, repositoryDAO, tokenGrantDAO }));
   scope.bind(Tokens.BranchProtectionService, () => new BranchProtectionService(env as never, { branchProtectionDAO }));
   scope.bind(
     Tokens.ForkService,
@@ -137,7 +151,7 @@ function createRequestScope(env: RequestScopeEnv): Container {
   );
   scope.bind(
     Tokens.RepoService,
-    () => new RepoService(env as never, { repositoryDAO, issueDAO, pullRequestDAO, pullThreadDAO, branchProtectionDAO, userDAO, organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO, starDAO, watchDAO, eventDAO, notificationDAO, releaseDAO, projectDAO, discussionDAO, wikiDAO }),
+    () => new RepoService(env as never, { repositoryDAO, issueDAO, pullRequestDAO, pullThreadDAO, branchProtectionDAO, userDAO, organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO, starDAO, watchDAO, eventDAO, notificationDAO, releaseDAO, projectDAO, discussionDAO, wikiDAO, importDAO, mirrorDAO, deployKeyDAO, tokenGrantDAO, securitySettingsDAO }),
   );
   scope.bind(Tokens.UserService, () => new UserService(env as never, { userDAO, namespaceDAO, organizationDAO, repositoryDAO }));
   scope.bind(Tokens.IssueService, () => new IssueService(env as never, { issueDAO }));
@@ -177,6 +191,10 @@ function createRequestScope(env: RequestScopeEnv): Container {
   scope.bind(Tokens.WikiService, () => new WikiService(env as never, { wikiDAO }));
   scope.bind(Tokens.SnippetService, () => new SnippetService(env as never, { snippetDAO }));
   scope.bind(Tokens.WatchService, () => new WatchService(env as never, { watchDAO }));
+  scope.bind(Tokens.ImportService, () => new ImportService(env as never, { importDAO }));
+  scope.bind(Tokens.MirrorService, () => new MirrorService(env as never, { mirrorDAO }));
+  scope.bind(Tokens.DeployKeyService, () => new DeployKeyService(env as never, { deployKeyDAO }));
+  scope.bind(Tokens.SecuritySettingsService, () => new SecuritySettingsService(env as never, { settingsDAO: securitySettingsDAO }));
   scope.bind(Tokens.ActivityService, () => new ActivityService(env as never, { eventDAO }));
   scope.bind(Tokens.WebhookService, () => new WebhookService(env as never, { webhookDAO }));
   scope.bind(Tokens.WebhookDeliveryService, () => new WebhookDeliveryService(env as never, { webhookDAO, deliveryDAO: webhookDeliveryDAO }));

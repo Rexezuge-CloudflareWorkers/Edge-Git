@@ -1,15 +1,16 @@
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
-import { UserAccessTokenDAO } from '@edge-git/backend-data/dao';
+import { RepositoryDAO, TokenRepoGrantDAO, UserAccessTokenDAO } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { BadRequestError, UnauthorizedError } from '@edge-git/backend-errors';
-import type { TokenScope, UserAccessTokenMetadata } from '@edge-git/shared';
+import { BadRequestError, NotFoundError, UnauthorizedError } from '@edge-git/backend-errors';
+import type { TokenScope, TokenRepoGrantMetadata, UserAccessTokenMetadata } from '@edge-git/shared';
 import { TimestampUtil, UUIDUtil, CryptoUtil } from '@edge-git/shared/utils';
-import { DEFAULT_TOKEN_SCOPES, coversScope, normalizeTokenScopes } from './TokenScopes';
+import { DEFAULT_TOKEN_SCOPES, TOKEN_SCOPES, coversScope, normalizeTokenScopes } from './TokenScopes';
 
 interface TokenServiceEnv {
   DB: D1Queryable;
   MAX_TOKENS_PER_USER?: string;
   MAX_TOKEN_EXPIRY_DAYS?: string;
+  MAX_TOKEN_REPO_GRANTS?: string;
 }
 
 interface CreatedToken {
@@ -18,15 +19,29 @@ interface CreatedToken {
   name: string;
   expiresAt: number;
   scopes: TokenScope[];
+  prefix: string;
+}
+
+interface RepoGrantInput {
+  repositoryId: string;
+  scope: TokenScope;
 }
 
 interface AuthenticatedToken {
   email: string;
   scopes: TokenScope[];
+  tokenId: string;
+  repoGrants: RepoGrantInput[];
 }
 
 interface TokenServiceDeps {
   tokenDAO?: () => Promise<UserAccessTokenDAO>;
+  repositoryDAO?: () => Promise<RepositoryDAO>;
+  tokenGrantDAO?: () => Promise<TokenRepoGrantDAO>;
+}
+
+function tokenPrefixOf(token: string): string {
+  return token.slice(0, 12);
 }
 
 class TokenService {
@@ -38,6 +53,8 @@ class TokenService {
   ) {
     this.deps = {
       tokenDAO: () => Promise.resolve(new UserAccessTokenDAO(env.DB)),
+      repositoryDAO: () => Promise.resolve(new RepositoryDAO(env.DB)),
+      tokenGrantDAO: () => Promise.resolve(new TokenRepoGrantDAO(env.DB)),
       ...deps,
     };
   }
@@ -53,7 +70,13 @@ class TokenService {
     const tokenData: UserAccessTokenMetadata | undefined = await dao.getByTokenHash(tokenHash, now);
     if (tokenData) {
       await dao.updateLastUsedByHash(tokenHash, now);
-      return { email: tokenData.userEmail.toLowerCase(), scopes: tokenData.scopes };
+      const grants = await this.deps.tokenGrantDAO().then((d) => d.listByToken(tokenData.tokenId).catch(() => []));
+      return {
+        email: tokenData.userEmail.toLowerCase(),
+        scopes: tokenData.scopes,
+        tokenId: tokenData.tokenId,
+        repoGrants: grants.map((g) => ({ repositoryId: g.repository_id, scope: g.scope })),
+      };
     }
     throw new UnauthorizedError('Your personal access token is invalid or has expired.');
   }
@@ -62,7 +85,39 @@ class TokenService {
     return coversScope(held, required);
   }
 
-  public async createToken(userEmail: string, name: string, expiresInDays?: number, scopes?: unknown): Promise<CreatedToken> {
+  private async resolveGrantInputs(grants: unknown): Promise<RepoGrantInput[]> {
+    if (grants === undefined || grants === null) return [];
+    if (!Array.isArray(grants)) throw new BadRequestError('repoGrants must be an array of {owner, name, scope}');
+    const max = ConfigurationManager.transfer.getMaxTokenRepoGrants(this.env);
+    if (grants.length > max) throw new BadRequestError(`At most ${max} repository grants per token`);
+    const repoDAO = await this.deps.repositoryDAO();
+    const resolved: RepoGrantInput[] = [];
+    const seen = new Set<string>();
+    for (const entry of grants) {
+      const owner = typeof (entry as { owner?: unknown }).owner === 'string' ? ((entry as { owner: string }).owner.trim()) : '';
+      const rawName = typeof (entry as { name?: unknown }).name === 'string' ? ((entry as { name: string }).name.trim()) : '';
+      const name = rawName.endsWith('.git') ? rawName.slice(0, -4) : rawName;
+      if (!owner || !name) throw new BadRequestError('Each repoGrant needs owner and name');
+      const scope = (entry as { scope?: unknown }).scope;
+      if (typeof scope !== 'string' || !(TOKEN_SCOPES as readonly string[]).includes(scope)) {
+        throw new BadRequestError(`Each repoGrant scope must be one of ${TOKEN_SCOPES.join(', ')}`);
+      }
+      const repo = await repoDAO.getByOwnerAndName(owner, name).catch(() => null);
+      if (!repo) throw new NotFoundError(`Repository not found: ${owner}/${name}`);
+      if (seen.has(repo.id)) throw new BadRequestError(`Duplicate grant for ${owner}/${name}`);
+      seen.add(repo.id);
+      resolved.push({ repositoryId: repo.id, scope: scope as TokenScope });
+    }
+    return resolved;
+  }
+
+  public async createToken(
+    userEmail: string,
+    name: string,
+    expiresInDays?: number,
+    scopes?: unknown,
+    repoGrants?: unknown,
+  ): Promise<CreatedToken> {
     const dao = await this.deps.tokenDAO();
     const normalized = userEmail.toLowerCase();
     const maxTokens: number = ConfigurationManager.token.getMaxPerUser(this.env);
@@ -76,25 +131,77 @@ class TokenService {
       throw new BadRequestError(`Token expiry cannot exceed ${maxExpiryInDays} days`);
     }
     const effectiveScopes: TokenScope[] = scopes === undefined ? [...DEFAULT_TOKEN_SCOPES] : normalizeTokenScopes(scopes);
+    const resolvedGrants = await this.resolveGrantInputs(repoGrants);
     const tokenId: string = UUIDUtil.getRandomUUID();
     const token: string = UUIDUtil.getRandomUUIDNoDash() + UUIDUtil.getRandomUUIDNoDash();
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const expiresAt: number = TimestampUtil.addDays(now, effectiveExpiryInDays);
     const tokenHash = await TokenService.hashToken(token);
-    await dao.create(tokenId, normalized, tokenHash, name, expiresAt, now, effectiveScopes);
-    return { tokenId, token, name, expiresAt, scopes: effectiveScopes };
+    const prefix = tokenPrefixOf(token);
+    await dao.create(tokenId, normalized, tokenHash, name, expiresAt, now, effectiveScopes, prefix);
+    if (resolvedGrants.length > 0) {
+      const grantDAO = await this.deps.tokenGrantDAO();
+      await grantDAO.setGrants(tokenId, resolvedGrants, now).catch(() => undefined);
+    }
+    return { tokenId, token, name, expiresAt, scopes: effectiveScopes, prefix };
   }
 
   public async listTokens(userEmail: string): Promise<UserAccessTokenMetadata[]> {
     const dao = await this.deps.tokenDAO();
-    return dao.getByUserEmail(userEmail);
+    const tokens = await dao.getByUserEmail(userEmail);
+    const grantDAO = await this.deps.tokenGrantDAO();
+    const repoDAO = await this.deps.repositoryDAO();
+    const enriched: UserAccessTokenMetadata[] = [];
+    for (const token of tokens) {
+      const grants = await grantDAO.listByToken(token.tokenId).catch(() => []);
+      const detailed: TokenRepoGrantMetadata[] = [];
+      for (const grant of grants) {
+        const meta = await this.grantMetadata(repoDAO, grant);
+        if (meta) detailed.push(meta);
+      }
+      enriched.push({ ...token, repoGrants: detailed });
+    }
+    return enriched;
+  }
+
+  private async grantMetadata(
+    repoDAO: RepositoryDAO,
+    grant: { token_id: string; repository_id: string; scope: TokenScope },
+  ): Promise<TokenRepoGrantMetadata | null> {
+    const repo = await repoDAO.getById(grant.repository_id).catch(() => null);
+    if (!repo) return null;
+    return {
+      tokenId: grant.token_id,
+      repositoryId: grant.repository_id,
+      owner: repo.owner,
+      name: repo.name,
+      fullName: `${repo.owner}/${repo.name}`,
+      scope: grant.scope,
+    };
+  }
+
+  public async rotateToken(tokenId: string, userEmail: string): Promise<{ token: string; expiresAt: number; prefix: string }> {
+    const dao = await this.deps.tokenDAO();
+    const tokens = await dao.getByUserEmail(userEmail);
+    const existing = tokens.find((t) => t.tokenId === tokenId);
+    if (!existing) throw new NotFoundError('Token not found');
+    const maxExpiry = ConfigurationManager.token.getMaxExpiryDays(this.env);
+    const lifetimeDays = Math.min(Math.max(Math.round((existing.expiresAt - existing.createdAt) / 86_400), 1), maxExpiry);
+    const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
+    const raw = UUIDUtil.getRandomUUIDNoDash() + UUIDUtil.getRandomUUIDNoDash();
+    const rotated = await dao.rotate(tokenId, userEmail, await TokenService.hashToken(raw), tokenPrefixOf(raw), TimestampUtil.addDays(now, lifetimeDays));
+    if (!rotated) throw new NotFoundError('Token not found');
+    const current = await dao.getByUserEmail(userEmail);
+    const refreshed = current.find((t) => t.tokenId === tokenId);
+    return { token: raw, expiresAt: refreshed?.expiresAt ?? TimestampUtil.addDays(now, lifetimeDays), prefix: tokenPrefixOf(raw) };
   }
 
   public async deleteToken(tokenId: string, userEmail: string): Promise<void> {
     const dao = await this.deps.tokenDAO();
     await dao.delete(tokenId, userEmail);
+    await this.deps.tokenGrantDAO().then((d) => d.deleteByToken(tokenId).catch(() => undefined));
   }
 }
 
 export { TokenService };
-export type { CreatedToken, AuthenticatedToken, TokenServiceDeps, TokenServiceEnv };
+export type { CreatedToken, AuthenticatedToken, RepoGrantInput, TokenServiceDeps, TokenServiceEnv };

@@ -3,6 +3,7 @@ import {
   DEFAULT_BACKGROUND_TASK_RUN_RETENTION_DAYS,
   DEFAULT_DEBUG_MODE,
   DEFAULT_GIT_CACHE_TTL_SECONDS,
+  DEFAULT_IMPORT_CLAIM_STALE_SECONDS,
   DEFAULT_MAX_ASSETS_PER_RELEASE,
   DEFAULT_MAX_ASSET_BYTES,
   DEFAULT_MAX_CARDS_PER_COLUMN,
@@ -12,7 +13,12 @@ import {
   DEFAULT_MAX_FILE_BYTES,
   DEFAULT_MAX_FETCH_HAVES,
   DEFAULT_MAX_FETCH_WANTS,
+  DEFAULT_MAX_DEPLOY_KEYS_PER_REPO,
+  DEFAULT_MAX_EXPORT_BYTES,
   DEFAULT_MAX_FILES_PER_SNIPPET,
+  DEFAULT_MAX_IMPORT_BYTES,
+  DEFAULT_MAX_IMPORT_REFS,
+  DEFAULT_MAX_MIRROR_FAILURES,
   DEFAULT_MAX_HOOKS_PER_REPO,
   DEFAULT_MAX_MERGE_DIFF_FILES,
   DEFAULT_MAX_PACK_BYTES,
@@ -29,6 +35,7 @@ import {
   DEFAULT_MAX_TEAM_MEMBERS,
   DEFAULT_MAX_TOKENS_PER_USER,
   DEFAULT_MAX_TOKEN_EXPIRY_DAYS,
+  DEFAULT_MAX_TOKEN_REPO_GRANTS,
   DEFAULT_MAX_WIKI_BODY_BYTES,
   DEFAULT_MAX_WIKI_PAGES_PER_REPO,
   DEFAULT_SITE_URL,
@@ -121,6 +128,19 @@ class ConfigurationManager {
     getMaxPerOrg: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_TEAMS_PER_ORG', DEFAULT_MAX_TEAMS_PER_ORG),
     getMaxMembers: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_TEAM_MEMBERS', DEFAULT_MAX_TEAM_MEMBERS),
     getMaxGrants: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_TEAM_GRANTS', DEFAULT_MAX_TEAM_GRANTS),
+  };
+
+  public static readonly transfer = {
+    getMaxImportBytes: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_IMPORT_BYTES', DEFAULT_MAX_IMPORT_BYTES),
+    getMaxImportRefs: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_IMPORT_REFS', DEFAULT_MAX_IMPORT_REFS),
+    getMaxExportBytes: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_EXPORT_BYTES', DEFAULT_MAX_EXPORT_BYTES),
+    getMaxDeployKeysPerRepo: (env: unknown): number =>
+      EnvParser.positiveInt(env, 'MAX_DEPLOY_KEYS_PER_REPO', DEFAULT_MAX_DEPLOY_KEYS_PER_REPO),
+    getMaxTokenRepoGrants: (env: unknown): number =>
+      EnvParser.positiveInt(env, 'MAX_TOKEN_REPO_GRANTS', DEFAULT_MAX_TOKEN_REPO_GRANTS),
+    getMaxMirrorFailures: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_MIRROR_FAILURES', DEFAULT_MAX_MIRROR_FAILURES),
+    getImportClaimStaleSeconds: (env: unknown): number =>
+      EnvParser.positiveInt(env, 'IMPORT_CLAIM_STALE_SECONDS', DEFAULT_IMPORT_CLAIM_STALE_SECONDS),
   };
 
   public static getDebugMode(env: unknown): boolean {

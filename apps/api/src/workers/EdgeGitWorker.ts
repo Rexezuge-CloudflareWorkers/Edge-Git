@@ -22,6 +22,10 @@ import { registerSearchRoutes } from './routes/SearchRoutes';
 import { registerUserNotificationRoutes } from './routes/NotificationRoutes';
 import { registerSocialRoutes, registerUserSocialRoutes } from './routes/SocialRoutes';
 import { registerWebhookRoutes } from './routes/WebhookRoutes';
+import { registerImportRoutes } from './routes/ImportRoutes';
+import { registerMirrorRoutes } from './routes/MirrorRoutes';
+import { registerDeployKeyRoutes } from './routes/DeployKeyRoutes';
+import { registerSecurityRoutes } from './routes/SecurityRoutes';
 import { registerReleaseAssetPublicRoutes, registerReleaseAssetUserRoutes } from './routes/ReleaseAssetRoutes';
 import { registerReleasePublicRoutes, registerReleaseUserRoutes } from './routes/ReleaseRoutes';
 import { registerProjectPublicRoutes, registerProjectUserRoutes } from './routes/ProjectRoutes';
@@ -115,6 +119,10 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
   registerReleaseUserRoutes(app);
   registerReleaseAssetUserRoutes(app);
   registerWebhookRoutes(app);
+  registerImportRoutes(app);
+  registerMirrorRoutes(app);
+  registerDeployKeyRoutes(app);
+  registerSecurityRoutes(app);
 
     // SPA catch-all — public shell for user home (/), profile home
     // (/:username, GitHub-style), repo home (/:owner/:repo), and the legacy

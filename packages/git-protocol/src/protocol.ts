@@ -13,3 +13,11 @@ export {
 export type { FetchResponseOptions } from './FetchResponseBuilder';
 export { getBasicCredentials, getBearerToken } from './AuthHeaders';
 export { ZERO_OID, isZeroOid, branchNameFromRef, checkStaticPushProtection } from './ProtectionPolicy';
+export {
+  fetchRemotePack,
+  parseUploadPackAdvertisement,
+  buildUploadPackRequest,
+  decodeUploadPackResponse,
+  normalizePublicGitUrl,
+} from './RemoteImportClient';
+export type { RemoteRef, RemotePack, RemoteGitFetcher } from './RemoteImportClient';

@@ -7,6 +7,8 @@ import type { ScheduledTask } from './IScheduledTask';
 import { AuditLogCleanupTask } from './AuditLogCleanupTask';
 import { SearchBackfillTask } from './SearchBackfillTask';
 import { WebhookDeliveryTask } from './WebhookDeliveryTask';
+import { ImportSweeperTask } from './ImportSweeperTask';
+import { MirrorSyncTask } from './MirrorSyncTask';
 
 const logger = createLogger('CronTasks');
 
@@ -67,6 +69,8 @@ const CRON_TASK_DEFINITIONS: ScheduledTask[] = [
   new SocialPruningTask(),
   new AuditLogCleanupTask(),
   new WebhookDeliveryTask(),
+  new ImportSweeperTask(),
+  new MirrorSyncTask(),
 ];
 
 async function runScheduledTasks(env: Env, cron: string, scheduledTime: number): Promise<void> {
@@ -81,4 +85,6 @@ export { CRON_TASK_DEFINITIONS, runScheduledTasks, ExpiredTokenPruningTask, Back
 export { AuditLogCleanupTask } from './AuditLogCleanupTask';
 export { SearchBackfillTask } from './SearchBackfillTask';
 export { WebhookDeliveryTask } from './WebhookDeliveryTask';
+export { ImportSweeperTask } from './ImportSweeperTask';
+export { MirrorSyncTask } from './MirrorSyncTask';
 export type { ScheduledTask } from './IScheduledTask';

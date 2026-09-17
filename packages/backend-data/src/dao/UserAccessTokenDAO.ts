@@ -11,6 +11,7 @@ export interface TokenRow {
   last_used_at: number | null;
   created_at: number;
   scopes?: string | null;
+  token_prefix?: string | null;
 }
 
 function parseScopes(raw: string | null | undefined): TokenScope[] {
@@ -36,6 +37,7 @@ function toMetadata(row: TokenRow): UserAccessTokenMetadata {
     lastUsedAt: row.last_used_at,
     createdAt: row.created_at,
     scopes: parseScopes(row.scopes),
+    tokenPrefix: row.token_prefix ?? null,
   };
 }
 
@@ -52,8 +54,24 @@ class UserAccessTokenDAO extends BaseDAO {
     expiresAt: number,
     now: number,
     scopes?: readonly TokenScope[] | null,
+    tokenPrefix?: string | null,
   ): Promise<void> {
     const serialized = scopes && scopes.length > 0 ? JSON.stringify([...scopes]) : null;
+    try {
+      await this.withRetry(
+        () =>
+          this.database
+            .prepare(
+              'INSERT INTO user_access_tokens (token_id, user_email, token_hash, name, expires_at, last_used_at, created_at, scopes, token_prefix) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)',
+            )
+            .bind(tokenId, userEmail.toLowerCase(), tokenHash, name, expiresAt, now, serialized, tokenPrefix ?? null)
+            .run(),
+        'create access token',
+      );
+      return;
+    } catch {
+      // Fallback for DBs without the 0016 prefix column: retry with scopes.
+    }
     if (serialized !== null) {
       try {
         await this.withRetry(
@@ -111,6 +129,18 @@ class UserAccessTokenDAO extends BaseDAO {
       () => this.database.prepare('DELETE FROM user_access_tokens WHERE token_id = ? AND lower(user_email) = lower(?)').bind(tokenId, userEmail).run(),
       'delete access token',
     );
+  }
+
+  public async rotate(tokenId: string, userEmail: string, newHash: string, newPrefix: string, newExpiresAt: number): Promise<boolean> {
+    const result = await this.withRetry(
+      () =>
+        this.database
+          .prepare('UPDATE user_access_tokens SET token_hash = ?, token_prefix = ?, expires_at = ?, last_used_at = NULL WHERE token_id = ? AND lower(user_email) = lower(?)')
+          .bind(newHash, newPrefix, newExpiresAt, tokenId, userEmail)
+          .run(),
+      'rotate access token',
+    );
+    return ((result.meta as { changes?: number })?.changes ?? 0) > 0;
   }
 
   public async pruneExpired(now: number, limit: number): Promise<number> {

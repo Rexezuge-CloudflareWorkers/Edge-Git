@@ -10,7 +10,8 @@
     "./CronTasksWorker": "./src/CronTasksWorker.ts",
     "./PushHandler": "./src/PushHandler.ts",
     "./scheduled": "./src/scheduled/index.ts",
-    "./scheduled/*": "./src/scheduled/*.ts"
+    "./scheduled/*": "./src/scheduled/*.ts",
+    "./transfer/*": "./src/transfer/*.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

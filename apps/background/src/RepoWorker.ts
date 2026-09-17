@@ -296,6 +296,44 @@ class RepoWorker extends DurableObject<Env> {
   }
 
   /**
+   * Ancestry check for mirror fast-forward validation (local oldOid must
+   * be an ancestor of the mirrored newOid). Runs after the mirrored
+   * objects are indexed so history covers the new commits.
+   */
+  public async isAncestor(ancestor: string, oid: string): Promise<boolean> {
+    await this.prepare();
+    if (!/^[0-9a-f]{40}$/.test(ancestor) || !/^[0-9a-f]{40}$/.test(oid)) return false;
+    try {
+      return await this.git.isAncestor(ancestor, oid);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Update existing refs to new oids (mirror fast-forward). Callers must
+   * have validated ancestry first; results report per-ref ok flags and
+   * never throw for ref-level failures.
+   */
+  public async updateRefs(updates: Array<{ ref: string; oldOid: string; newOid: string }>): Promise<unknown> {
+    await this.prepare();
+    const pending = (updates ?? []).filter(
+      (u) => typeof u.ref === 'string' && (u.ref.startsWith('refs/heads/') || u.ref.startsWith('refs/tags/')) && /^[0-9a-f]{40}$/.test(u.oldOid) && /^[0-9a-f]{40}$/.test(u.newOid),
+    );
+    if (pending.length === 0) return { updated: [] };
+    const results = await this.git.applyRefUpdates(
+      pending.map((u) => ({ oldOid: u.oldOid, newOid: u.newOid, ref: u.ref })),
+      false,
+    );
+    this.git.clearCache();
+    const updated: string[] = [];
+    for (const [i, result] of results.entries()) {
+      if (result.ok) updated.push(pending[i].ref);
+    }
+    return { updated };
+  }
+
+  /**
    * Export a packfile for the given wants (fork copy, cross-fork PR
    * materialization). Bounded by the repo pack limits; over-limit exports
    * throw `PackLimitError` so callers fail closed.
