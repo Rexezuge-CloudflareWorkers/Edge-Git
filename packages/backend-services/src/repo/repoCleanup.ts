@@ -1,15 +1,20 @@
 import type {
   BranchProtectionDAO,
+  DeployKeyDAO,
   DiscussionDAO,
   EventDAO,
+  ImportDAO,
   IssueDAO,
+  MirrorDAO,
   NotificationDAO,
   ProjectDAO,
   PullRequestDAO,
   PullThreadDAO,
   ReleaseDAO,
   RepoCollaboratorDAO,
+  SecuritySettingsDAO,
   StarDAO,
+  TokenRepoGrantDAO,
   WatchDAO,
   WikiDAO,
 } from '@edge-git/backend-data/dao';
@@ -32,6 +37,11 @@ interface RepoCleanupDeps {
   projectDAO: () => Promise<ProjectDAO>;
   discussionDAO: () => Promise<DiscussionDAO>;
   wikiDAO: () => Promise<WikiDAO>;
+  importDAO: () => Promise<ImportDAO>;
+  mirrorDAO: () => Promise<MirrorDAO>;
+  deployKeyDAO: () => Promise<DeployKeyDAO>;
+  tokenGrantDAO: () => Promise<TokenRepoGrantDAO>;
+  securitySettingsDAO: () => Promise<SecuritySettingsDAO>;
 }
 
 async function cleanupRepoSidecars(deps: RepoCleanupDeps, repoId: string): Promise<void> {
@@ -50,6 +60,11 @@ async function cleanupRepoSidecars(deps: RepoCleanupDeps, repoId: string): Promi
     deps.projectDAO,
     deps.discussionDAO,
     deps.wikiDAO,
+    deps.importDAO,
+    deps.mirrorDAO,
+    deps.deployKeyDAO,
+    deps.tokenGrantDAO,
+    deps.securitySettingsDAO,
   ];
   for (const factory of factories) {
     try {

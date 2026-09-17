@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { KeyRound } from 'lucide-react';
-import type { TokenMetadata, TokenScope } from '../../types';
-import { createToken, listTokens, revokeToken } from '../../services/tokenService';
+import type { RepoGrantInput, TokenMetadata, TokenScope } from '../../types';
+import { createToken, listTokens, revokeToken, rotateToken } from '../../services/tokenService';
 import { formatExpiryTimestamp } from '../../lib/format';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
-import { Input, Label } from '../ui/Input';
+import { Input, Label, Select } from '../ui/Input';
 import { RefreshButton } from '../shared/RefreshButton';
 import { ReadOnlyField } from '../shared/ReadOnlyField';
 import { ConfirmDeleteModal } from '../modals/ConfirmDeleteModal';
@@ -20,8 +20,14 @@ export function TokensTab({ showNotice }: { showNotice: (type: 'success' | 'erro
   const [name, setName] = useState('');
   const [scopes, setScopes] = useState<TokenScope[]>([...ALL_SCOPES]);
   const [expiresInDays, setExpiresInDays] = useState('');
+  const [grants, setGrants] = useState<RepoGrantInput[]>([]);
+  const [grantOwner, setGrantOwner] = useState('');
+  const [grantRepo, setGrantRepo] = useState('');
+  const [grantScope, setGrantScope] = useState<TokenScope>('repo:read');
   const [saving, setSaving] = useState(false);
   const [lastCreated, setLastCreated] = useState<string | null>(null);
+  const [lastRotated, setLastRotated] = useState<string | null>(null);
+  const [rotatingId, setRotatingId] = useState<string | null>(null);
   const [revoking, setRevoking] = useState<TokenMetadata | null>(null);
 
   const [reloadKey, setReloadKey] = useState(0);
@@ -48,6 +54,20 @@ export function TokensTab({ showNotice }: { showNotice: (type: 'success' | 'erro
     setScopes((prev) => (prev.includes(scope) ? prev.filter((s) => s !== scope) : [...prev, scope]));
   };
 
+  const addGrant = () => {
+    const owner = grantOwner.trim();
+    const repo = grantRepo.trim();
+    if (!owner || !repo) return;
+    if (grants.some((g) => g.owner.toLowerCase() === owner.toLowerCase() && g.name.toLowerCase() === repo.toLowerCase())) return;
+    setGrants((prev) => [...prev, { owner, name: repo, scope: grantScope }]);
+    setGrantOwner('');
+    setGrantRepo('');
+  };
+
+  const removeGrant = (index: number) => {
+    setGrants((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (scopes.length === 0) {
@@ -61,9 +81,11 @@ export function TokensTab({ showNotice }: { showNotice: (type: 'success' | 'erro
     }
     setSaving(true);
     try {
-      const created = await createToken(name.trim(), [...scopes], expiry);
+      const created = await createToken(name.trim(), [...scopes], expiry, grants.length > 0 ? grants : undefined);
       setLastCreated(created.token);
+      setLastRotated(null);
       setName('');
+      setGrants([]);
       showNotice('success', t('tokens.tokenCreated', 'Token Created. Copy It Now — It Will Not Be Shown Again.'));
       setLoading(true);
       setReloadKey((k) => k + 1);
@@ -71,6 +93,22 @@ export function TokensTab({ showNotice }: { showNotice: (type: 'success' | 'erro
       showNotice('error', error instanceof Error ? error.message : 'Failed To Create Token.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const rotate = async (tokenId: string) => {
+    setRotatingId(tokenId);
+    try {
+      const rotated = await rotateToken(tokenId);
+      setLastRotated(rotated.token);
+      setLastCreated(null);
+      showNotice('success', t('tokens.tokenRotated', 'Token Rotated. The Old Secret Stopped Working. Copy The New One Now.'));
+      setLoading(true);
+      setReloadKey((k) => k + 1);
+    } catch (error) {
+      showNotice('error', error instanceof Error ? error.message : 'Failed To Rotate Token.');
+    } finally {
+      setRotatingId(null);
     }
   };
 
@@ -130,17 +168,61 @@ export function TokensTab({ showNotice }: { showNotice: (type: 'success' | 'erro
             </div>
             <p className="mt-1 text-xs text-[var(--color-text-muted)]">{t('tokens.scopesHint', 'Fetch Needs repo:read. Push Needs repo:write. Admin Covers Both.')}</p>
           </fieldset>
+          <fieldset>
+            <Label>{t('tokens.repoGrants', 'Restrict To Repositories (Optional)')}</Label>
+            <div className="mt-1.5 flex gap-2 flex-wrap">
+              <div className="w-36">
+                <Input placeholder={t('tokens.grantOwner', 'Owner')} value={grantOwner} onChange={(e) => setGrantOwner(e.target.value)} />
+              </div>
+              <div className="w-36">
+                <Input placeholder={t('tokens.grantRepo', 'Repository')} value={grantRepo} onChange={(e) => setGrantRepo(e.target.value)} />
+              </div>
+              <Select aria-label={t('tokens.grantScope', 'Grant Scope')} value={grantScope} onChange={(e) => setGrantScope(e.target.value as TokenScope)}>
+                {ALL_SCOPES.map((scope) => (
+                  <option key={scope} value={scope}>
+                    {scope}
+                  </option>
+                ))}
+              </Select>
+              <Button type="button" variant="secondary" size="sm" onClick={addGrant}>
+                {t('tokens.addGrant', 'Add')}
+              </Button>
+            </div>
+            {grants.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {grants.map((grant, index) => (
+                  <li key={`${grant.owner}/${grant.name}`} className="text-sm text-[var(--color-text-secondary)] flex items-center gap-2">
+                    <span className="font-mono">
+                      {grant.owner}/{grant.name} ({grant.scope})
+                    </span>
+                    <Button type="button" variant="danger" size="sm" onClick={() => removeGrant(index)}>
+                      {t('common.remove', 'Remove')}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">{t('tokens.grantsHint', 'Empty Means All Repositories You Can See.')}</p>
+          </fieldset>
         </form>
         {lastCreated && (
           <div className="mt-4">
             <ReadOnlyField label={t('tokens.newToken', 'New Token (Copy Once)')} value={lastCreated} showCopy />
           </div>
         )}
+        {lastRotated && (
+          <div className="mt-4">
+            <ReadOnlyField label={t('tokens.rotatedToken', 'Rotated Token (Copy Once)')} value={lastRotated} showCopy />
+          </div>
+        )}
         <ul className="mt-4 divide-y divide-[var(--color-border)]">
           {tokens.map((token) => (
             <li key={token.tokenId} className="py-3 flex items-center justify-between gap-3 first:pt-0 last:pb-0">
               <div className="min-w-0">
-                <p className="font-medium text-[var(--color-text-primary)] truncate">{token.name}</p>
+                <p className="font-medium text-[var(--color-text-primary)] truncate">
+                  {token.name}
+                  {token.tokenPrefix && <span className="ml-2 font-mono text-xs text-[var(--color-text-muted)]">{token.tokenPrefix}…</span>}
+                </p>
                 <p className="text-xs text-[var(--color-text-muted)]">{formatExpiryTimestamp(token.expiresAt)}</p>
                 <p className="mt-1 flex gap-1.5 flex-wrap">
                   {(token.scopes ?? []).map((scope) => (
@@ -149,10 +231,24 @@ export function TokensTab({ showNotice }: { showNotice: (type: 'success' | 'erro
                     </span>
                   ))}
                 </p>
+                {(token.repoGrants ?? []).length > 0 && (
+                  <p className="mt-1 flex gap-1.5 flex-wrap">
+                    {(token.repoGrants ?? []).map((grant) => (
+                      <span key={grant.fullName} className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-[var(--color-surface)] text-[var(--color-text-secondary)]">
+                        {grant.fullName}:{grant.scope}
+                      </span>
+                    ))}
+                  </p>
+                )}
               </div>
-              <Button variant="danger" size="sm" onClick={() => setRevoking(token)}>
-                {t('tokens.revoke', 'Revoke')}
-              </Button>
+              <div className="flex gap-2 shrink-0">
+                <Button variant="secondary" size="sm" loading={rotatingId === token.tokenId} onClick={() => void rotate(token.tokenId)}>
+                  {t('tokens.rotate', 'Rotate')}
+                </Button>
+                <Button variant="danger" size="sm" onClick={() => setRevoking(token)}>
+                  {t('tokens.revoke', 'Revoke')}
+                </Button>
+              </div>
             </li>
           ))}
         </ul>

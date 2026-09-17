@@ -5,6 +5,9 @@ import { deleteRepo, loadBranches, setDefaultBranch, updateRepo } from '../../se
 import { BranchProtectionCard } from './BranchProtectionCard';
 import { CollaboratorsCard } from './CollaboratorsCard';
 import { WebhooksCard } from './WebhooksCard';
+import { TransferCard } from './TransferCard';
+import { DeployKeysCard } from './DeployKeysCard';
+import { SecretScanCard } from './SecretScanCard';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Label, Select, Textarea } from '../ui/Input';
@@ -143,6 +146,12 @@ export function RepoSettingsTab({
       <BranchProtectionCard owner={owner} repo={repo} showNotice={showNotice} />
 
       <WebhooksCard owner={owner} repo={repo} showNotice={showNotice} />
+
+      <TransferCard owner={owner} repo={repo} showNotice={showNotice} />
+
+      <DeployKeysCard owner={owner} repo={repo} showNotice={showNotice} />
+
+      <SecretScanCard owner={owner} repo={repo} showNotice={showNotice} />
 
       <Card>
         <CardHeader>

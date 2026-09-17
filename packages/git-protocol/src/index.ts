@@ -20,8 +20,13 @@ export {
   isZeroOid,
   branchNameFromRef,
   checkStaticPushProtection,
+  fetchRemotePack,
+  parseUploadPackAdvertisement,
+  buildUploadPackRequest,
+  decodeUploadPackResponse,
+  normalizePublicGitUrl,
   getBasicCredentials,
   getBearerToken,
 } from './protocol';
-export type { AdvertiseRefs, Command, FetchCountLimits, FetchRequest, FetchResponseOptions, ReceiveCountLimits } from './protocol';
+export type { AdvertiseRefs, Command, FetchCountLimits, FetchRequest, FetchResponseOptions, ReceiveCountLimits, RemoteRef, RemotePack, RemoteGitFetcher } from './protocol';
 export type { ProtectedRefRule, RefUpdateResult } from './types';

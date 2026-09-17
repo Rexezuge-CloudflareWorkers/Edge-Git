@@ -1,3 +1,5 @@
+import type { TokenRepoGrantMetadata } from './transfer';
+
 export interface RepositoryMetadata {
   id: string;
   ownerEmail: string;
@@ -21,7 +23,21 @@ export interface UserAccessTokenMetadata {
   lastUsedAt: number | null;
   createdAt: number;
   scopes: TokenScope[];
+  tokenPrefix: string | null;
+  repoGrants?: TokenRepoGrantMetadata[];
 }
+
+export type { TokenRepoGrantMetadata } from './transfer';
+export type {
+  RepoImportStatus,
+  RepoImportMetadata,
+  RepoMirrorMetadata,
+  DeployKeyPermission,
+  DeployKeyMetadata,
+  SecretScanMode,
+  SecretFinding,
+  RepoSecuritySettingsMetadata,
+} from './transfer';
 
 export interface BranchProtectionRuleMetadata {
   id: string;

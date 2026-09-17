@@ -1,10 +1,11 @@
 import type { Hono } from 'hono';
 import { gitAuthForRepo } from '@/middleware';
 import { getRepoStub } from '../repoStub';
-import { advertiseUploadPack, advertiseReceivePack, branchNameFromRef, parseReceivePackRequest } from '@edge-git/git-protocol';
+import { advertiseUploadPack, advertiseReceivePack, branchNameFromRef, buildReportStatus, parseReceivePackRequest } from '@edge-git/git-protocol';
 import type { ProtectedRefRule } from '@edge-git/git-protocol';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { BranchProtectionService } from '@edge-git/backend-services/protection';
+import { scanBytes } from '@edge-git/backend-services/security';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { recordAndNotify } from './SocialEmit';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
@@ -72,6 +73,41 @@ function registerGitRoutes(app: GitApp): void {
     if (body.byteLength > maxPackBytes) {
       return c.text(`ERR pack too large: ${body.byteLength} > ${maxPackBytes} bytes`, 413);
     }
+    // Push-time secret scanning (warn by default, block when configured).
+    // Warn mode lets the push through and flags it via a response header;
+    // block mode rejects the whole push pre-receive style like branch
+    // protection. Scanning runs on the raw pack bytes in the API layer so
+    // the DO stays D1-free.
+    let secretWarning = 0;
+    try {
+      const mode = await createRequestScope(c.env).get(Tokens.SecuritySettingsService).getMode(auth.repo.id);
+      if (mode !== 'off') {
+        const findings = scanBytes(body);
+        if (findings.length > 0) {
+          if (mode === 'block') {
+            const ids = findings.map((f) => f.ruleId).join(', ');
+            let refNames: string[] = [];
+            try {
+              refNames = parseReceivePackRequest(body).commands.map((cmd) => cmd.ref);
+            } catch {
+              refNames = [];
+            }
+            if (refNames.length === 0) return c.text(`push blocked: possible secret detected (${ids})`, 403);
+            const blocked = buildReportStatus(
+              refNames.map((ref) => ({ ref, ok: false as const, error: `push blocked: possible secret detected (${ids})` })),
+              true,
+            );
+            return new Response(blocked.body, {
+              status: blocked.status,
+              headers: { 'Content-Type': 'application/x-git-receive-pack-result', 'Cache-Control': 'no-cache' },
+            });
+          }
+          secretWarning = findings.length;
+        }
+      }
+    } catch {
+      // Scanning never fails the push; block-mode errors above return early.
+    }
     // Branch protection is resolved here (D1) and passed into the DO (which
     // owns git truth but cannot read D1). Unresolvable (legacy DBs) means
     // no rules — the DO then behaves as before.
@@ -97,7 +133,11 @@ function registerGitRoutes(app: GitApp): void {
     }
     return new Response(res.body, {
       status: res.status,
-      headers: { 'Content-Type': 'application/x-git-receive-pack-result', 'Cache-Control': 'no-cache' },
+      headers: {
+        'Content-Type': 'application/x-git-receive-pack-result',
+        'Cache-Control': 'no-cache',
+        ...((secretWarning > 0) && { 'X-EdgeGit-Secret-Warning': `${secretWarning} possible secret(s) detected; rotate any exposed credentials` }),
+      },
     });
   });
 }

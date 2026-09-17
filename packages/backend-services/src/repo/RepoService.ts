@@ -2,7 +2,9 @@ import {
   BranchProtectionDAO,
   DiscussionDAO,
   EventDAO,
+  ImportDAO,
   IssueDAO,
+  MirrorDAO,
   NamespaceDAO,
   NotificationDAO,
   OrganizationDAO,
@@ -11,9 +13,12 @@ import {
   PullRequestDAO,
   PullThreadDAO,
   ReleaseDAO,
+  DeployKeyDAO,
   RepoCollaboratorDAO,
   RepositoryDAO,
+  SecuritySettingsDAO,
   StarDAO,
+  TokenRepoGrantDAO,
   UserDAO,
   WatchDAO,
   WikiDAO,
@@ -54,6 +59,11 @@ interface RepoServiceDeps {
   projectDAO?: () => Promise<ProjectDAO>;
   discussionDAO?: () => Promise<DiscussionDAO>;
   wikiDAO?: () => Promise<WikiDAO>;
+  importDAO?: () => Promise<ImportDAO>;
+  mirrorDAO?: () => Promise<MirrorDAO>;
+  deployKeyDAO?: () => Promise<DeployKeyDAO>;
+  tokenGrantDAO?: () => Promise<TokenRepoGrantDAO>;
+  securitySettingsDAO?: () => Promise<SecuritySettingsDAO>;
 }
 
 class RepoService {
@@ -82,6 +92,11 @@ class RepoService {
       projectDAO: () => Promise.resolve(new ProjectDAO(env.DB)),
       discussionDAO: () => Promise.resolve(new DiscussionDAO(env.DB)),
       wikiDAO: () => Promise.resolve(new WikiDAO(env.DB)),
+      importDAO: () => Promise.resolve(new ImportDAO(env.DB)),
+      mirrorDAO: () => Promise.resolve(new MirrorDAO(env.DB)),
+      deployKeyDAO: () => Promise.resolve(new DeployKeyDAO(env.DB)),
+      tokenGrantDAO: () => Promise.resolve(new TokenRepoGrantDAO(env.DB)),
+      securitySettingsDAO: () => Promise.resolve(new SecuritySettingsDAO(env.DB)),
       ...deps,
     };
   }

@@ -46,6 +46,12 @@
     "./wiki/*": "./src/wiki/*.ts",
     "./release": "./src/release/index.ts",
     "./release/*": "./src/release/*.ts",
+    "./transfer": "./src/transfer/index.ts",
+    "./transfer/*": "./src/transfer/*.ts",
+    "./deploykey": "./src/deploykey/index.ts",
+    "./deploykey/*": "./src/deploykey/*.ts",
+    "./security": "./src/security/index.ts",
+    "./security/*": "./src/security/*.ts",
     "./composition": "./src/composition/index.ts",
     "./composition/*": "./src/composition/*.ts"
   },

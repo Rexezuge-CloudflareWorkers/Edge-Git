@@ -284,6 +284,13 @@ importers:
         version: 6.0.3
 
   packages/git-protocol:
+    dependencies:
+      '@edge-git/backend-errors':
+        specifier: workspace:*
+        version: link:../backend-errors
+      '@edge-git/shared':
+        specifier: workspace:*
+        version: link:../shared
     devDependencies:
       '@types/node':
         specifier: 26.5.1

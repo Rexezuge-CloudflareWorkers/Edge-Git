@@ -17,3 +17,6 @@ export * from './social/index';
 export * from './webhook/index';
 export * from './wiki/index';
 export * from './release/index';
+export * from './transfer/index';
+export * from './deploykey/index';
+export * from './security/index';

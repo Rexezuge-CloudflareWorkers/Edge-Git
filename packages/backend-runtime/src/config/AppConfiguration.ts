@@ -4,6 +4,9 @@ import {
   DEFAULT_BACKGROUND_TASK_RUN_RETENTION_DAYS,
   DEFAULT_DEBUG_MODE,
   DEFAULT_GIT_CACHE_TTL_SECONDS,
+  DEFAULT_IMPORT_CLAIM_STALE_SECONDS,
+  DEFAULT_MAX_DEPLOY_KEYS_PER_REPO,
+  DEFAULT_MAX_EXPORT_BYTES,
   DEFAULT_MAX_ASSETS_PER_RELEASE,
   DEFAULT_MAX_ASSET_BYTES,
   DEFAULT_MAX_CARDS_PER_COLUMN,
@@ -14,7 +17,10 @@ import {
   DEFAULT_MAX_FETCH_WANTS,
   DEFAULT_MAX_FILES_PER_SNIPPET,
   DEFAULT_MAX_HOOKS_PER_REPO,
+  DEFAULT_MAX_IMPORT_BYTES,
+  DEFAULT_MAX_IMPORT_REFS,
   DEFAULT_MAX_MERGE_DIFF_FILES,
+  DEFAULT_MAX_MIRROR_FAILURES,
   DEFAULT_MAX_PACK_BYTES,
   DEFAULT_MAX_PACK_OBJECTS,
   DEFAULT_MAX_PROJECTS_PER_REPO,
@@ -29,6 +35,7 @@ import {
   DEFAULT_MAX_TEAMS_PER_ORG,
   DEFAULT_MAX_TOKENS_PER_USER,
   DEFAULT_MAX_TOKEN_EXPIRY_DAYS,
+  DEFAULT_MAX_TOKEN_REPO_GRANTS,
   DEFAULT_MAX_WIKI_BODY_BYTES,
   DEFAULT_MAX_WIKI_PAGES_PER_REPO,
   DEFAULT_SITE_URL,
@@ -201,6 +208,34 @@ class AppConfiguration {
 
   public getMaxTeamGrants(): number {
     return EnvParser.positiveInt(this.env, 'MAX_TEAM_GRANTS', DEFAULT_MAX_TEAM_GRANTS);
+  }
+
+  public getMaxImportBytes(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_IMPORT_BYTES', DEFAULT_MAX_IMPORT_BYTES);
+  }
+
+  public getMaxImportRefs(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_IMPORT_REFS', DEFAULT_MAX_IMPORT_REFS);
+  }
+
+  public getMaxExportBytes(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_EXPORT_BYTES', DEFAULT_MAX_EXPORT_BYTES);
+  }
+
+  public getMaxDeployKeysPerRepo(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_DEPLOY_KEYS_PER_REPO', DEFAULT_MAX_DEPLOY_KEYS_PER_REPO);
+  }
+
+  public getMaxTokenRepoGrants(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_TOKEN_REPO_GRANTS', DEFAULT_MAX_TOKEN_REPO_GRANTS);
+  }
+
+  public getMaxMirrorFailures(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_MIRROR_FAILURES', DEFAULT_MAX_MIRROR_FAILURES);
+  }
+
+  public getImportClaimStaleSeconds(): number {
+    return EnvParser.positiveInt(this.env, 'IMPORT_CLAIM_STALE_SECONDS', DEFAULT_IMPORT_CLAIM_STALE_SECONDS);
   }
 
   public isDemoMode(): boolean {

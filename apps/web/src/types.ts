@@ -305,6 +305,9 @@ export interface MergePreview {
 
 export type TokenScope = 'repo:read' | 'repo:write' | 'admin';
 
+export type { TokenRepoGrant, RotatedToken, RepoGrantInput, RepoImportStatus, RepoImportJob, RepoMirror, RepoExport, DeployKeyPermission, DeployKey, CreatedDeployKey, SecretScanMode, RepoSecuritySettings } from './transferTypes';
+import type { TokenRepoGrant } from './transferTypes';
+
 export interface TokenMetadata {
   tokenId: string;
   name: string;
@@ -312,6 +315,8 @@ export interface TokenMetadata {
   lastUsedAt: number | null;
   createdAt: number;
   scopes: TokenScope[];
+  tokenPrefix?: string | null;
+  repoGrants?: TokenRepoGrant[];
 }
 
 export interface CreatedToken {
@@ -320,6 +325,7 @@ export interface CreatedToken {
   name: string;
   expiresAt: number;
   scopes: TokenScope[];
+  prefix?: string;
 }
 
 export interface BranchProtectionRule {

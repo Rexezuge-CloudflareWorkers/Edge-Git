@@ -4,6 +4,7 @@ import { getRepoStub } from '../repoStub';
 import { requireVisibleRepo, toServiceStatus } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
+import { scanBytes } from '@edge-git/backend-services/security';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 
 type RepoApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -109,6 +110,28 @@ function parseExpectedOid(value: unknown): { ok: true; value: string | null | un
   return { ok: true, value };
 }
 
+// Push-time secret scanning for web editor saves (warn by default, block
+// when configured). Returns a 403 JSON response in block mode, the finding
+// count in warn mode (surfaced via response header), or null when clean/off.
+async function checkSecretContent(
+  env: Env,
+  repoId: string,
+  content: Uint8Array,
+): Promise<{ blocked: { error: string } } | { warning: number } | null> {
+  try {
+    const mode = await createRequestScope(env).get(Tokens.SecuritySettingsService).getMode(repoId);
+    if (mode === 'off') return null;
+    const findings = scanBytes(content);
+    if (findings.length === 0) return null;
+    if (mode === 'block') {
+      return { blocked: { error: `Save blocked: possible secret detected (${findings.map((f) => f.ruleId).join(', ')})` } };
+    }
+    return { warning: findings.length };
+  } catch {
+    return null;
+  }
+}
+
 // Authenticated single-file writes — `write+` only. POST upserts UTF-8 text
 // files (create or update, binary rejected); DELETE removes a file. Both
 // accept an optional `expectedOid` branch tip for optimistic concurrency
@@ -141,6 +164,9 @@ function registerFileWriteRoutes(app: RepoApp): void {
       if (!gate.ok) return c.json({ error: gate.status === 404 ? 'Not found' : 'Forbidden' }, gate.status);
       const blocked = await checkProtectedBranch(c.env, gate.repo.id, branch);
       if (blocked) return c.json({ error: blocked.error }, 403);
+      const secret = await checkSecretContent(c.env, gate.repo.id, content);
+      if (secret && 'blocked' in secret) return c.json({ error: secret.blocked.error }, 403);
+      const secretWarning = secret && 'warning' in secret ? secret.warning : 0;
       const rawMessage = typeof body.message === 'string' ? body.message.trim() : '';
       const message = (rawMessage || `Update ${filePath}`).slice(0, 1000);
       const result = (await getRepoStub(c.env, `${owner}/${repoName}`).commitFile({
@@ -156,6 +182,7 @@ function registerFileWriteRoutes(app: RepoApp): void {
       if (result.ok) {
         void indexWrittenFile(c.env, gate.repo.id, filePath, body.contentBase64, (result as { commitOid?: unknown }).commitOid);
       }
+      if (secretWarning > 0) c.header('X-EdgeGit-Secret-Warning', `${secretWarning} possible secret(s) detected; rotate any exposed credentials`);
       return c.json(out, status);
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'Failed to save file' }, toServiceStatus(error));
