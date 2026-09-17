@@ -9,15 +9,13 @@ import { Badge } from '../components/ui/Badge';
 import { VisibilityBadge } from '../components/ui/Badge';
 import { OrgSettingsCard } from '../components/org/OrgSettingsCard';
 import { OrgMembersManager } from '../components/org/OrgMembersManager';
+import { OrgTeamsManager } from '../components/org/OrgTeamsManager';
+import { OrgAuditLogCard } from '../components/org/OrgAuditLogCard';
 import { cn } from '../lib/utils';
 
 type ProfileTab = 'repositories' | 'organizations' | 'people' | 'manage';
 
-export function ProfileView({
-  showNotice,
-}: {
-  showNotice: (type: 'success' | 'error', text: string) => void;
-}) {
+export function ProfileView({ showNotice }: { showNotice: (type: 'success' | 'error', text: string) => void }) {
   const { username = '' } = useParams<{ username: string }>();
   const { t } = useTranslation();
   const [profile, setProfile] = useState<UserOrOrgProfile | null>(null);
@@ -122,8 +120,12 @@ export function ProfileView({
           </div>
           <p className="text-xs text-[var(--color-text-muted)] mt-1">
             {t('profile.repoCount', '{{count}} Repositories', { count: profile.repoCount ?? repos.length })}
-            {!isOrg && profile.orgCount != null ? ` · ${t('profile.orgCount', '{{count}} Organizations', { count: profile.orgCount })}` : ''}
-            {isOrg && profile.memberCount != null ? ` · ${t('profile.memberCount', '{{count}} Members', { count: profile.memberCount })}` : ''}
+            {!isOrg && profile.orgCount != null
+              ? ` · ${t('profile.orgCount', '{{count}} Organizations', { count: profile.orgCount })}`
+              : ''}
+            {isOrg && profile.memberCount != null
+              ? ` · ${t('profile.memberCount', '{{count}} Members', { count: profile.memberCount })}`
+              : ''}
           </p>
         </div>
       </Card>
@@ -233,6 +235,8 @@ export function ProfileView({
       {visibleTab === 'manage' && isOrg && canManageOrg && (
         <div className="space-y-4">
           <OrgMembersManager org={profile.username} showNotice={showNotice} />
+          <OrgTeamsManager org={profile.username} showNotice={showNotice} />
+          <OrgAuditLogCard org={profile.username} showNotice={showNotice} />
           <OrgSettingsCard org={{ username: profile.username }} showNotice={showNotice} />
         </div>
       )}

@@ -1,4 +1,5 @@
 import type {
+  AuditLogDAO,
   BranchProtectionDAO,
   CollaborationDAO,
   DiscussionDAO,
@@ -13,6 +14,9 @@ import type {
   RepoCollaboratorDAO,
   RepositoryDAO,
   SnippetDAO,
+  TeamDAO,
+  TeamMemberDAO,
+  TeamRepoGrantDAO,
   UserAccessTokenDAO,
   UserDAO,
   WebhookDAO,
@@ -38,6 +42,8 @@ import type { IssueService } from '../issue/IssueService';
 import type { PullRequestService } from '../pull/PullRequestService';
 import type { PullThreadService } from '../pull/PullThreadService';
 import type { OrganizationService } from '../org/OrganizationService';
+import type { TeamService } from '../team/TeamService';
+import type { AuditService } from '../audit/AuditService';
 import type { PermissionService } from '../permission/PermissionService';
 import type { SearchService } from '../search/SearchService';
 import type { ActivityService } from '../social/ActivityService';
@@ -92,6 +98,10 @@ const Tokens = {
   DiscussionDAO: Symbol('DiscussionDAO') as Token<() => Promise<DiscussionDAO>>,
   WikiDAO: Symbol('WikiDAO') as Token<() => Promise<WikiDAO>>,
   SnippetDAO: Symbol('SnippetDAO') as Token<() => Promise<SnippetDAO>>,
+  TeamDAO: Symbol('TeamDAO') as Token<() => Promise<TeamDAO>>,
+  TeamMemberDAO: Symbol('TeamMemberDAO') as Token<() => Promise<TeamMemberDAO>>,
+  TeamRepoGrantDAO: Symbol('TeamRepoGrantDAO') as Token<() => Promise<TeamRepoGrantDAO>>,
+  AuditLogDAO: Symbol('AuditLogDAO') as Token<() => Promise<AuditLogDAO>>,
   AccessAuthService: Symbol('AccessAuthService') as Token<AccessAuthService>,
   TokenService: Symbol('TokenService') as Token<TokenService>,
   BranchProtectionService: Symbol('BranchProtectionService') as Token<BranchProtectionService>,
@@ -102,6 +112,8 @@ const Tokens = {
   PullRequestService: Symbol('PullRequestService') as Token<PullRequestService>,
   PullThreadService: Symbol('PullThreadService') as Token<PullThreadService>,
   OrganizationService: Symbol('OrganizationService') as Token<OrganizationService>,
+  TeamService: Symbol('TeamService') as Token<TeamService>,
+  AuditService: Symbol('AuditService') as Token<AuditService>,
   PermissionService: Symbol('PermissionService') as Token<PermissionService>,
   SearchService: Symbol('SearchService') as Token<SearchService>,
   StarService: Symbol('StarService') as Token<StarService>,

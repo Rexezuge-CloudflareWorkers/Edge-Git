@@ -24,6 +24,9 @@ import {
   DEFAULT_MAX_RULES_PER_REPO,
   DEFAULT_MAX_SNIPPET_BYTES,
   DEFAULT_MAX_SNIPPETS_PER_USER,
+  DEFAULT_MAX_TEAM_GRANTS,
+  DEFAULT_MAX_TEAM_MEMBERS,
+  DEFAULT_MAX_TEAMS_PER_ORG,
   DEFAULT_MAX_TOKENS_PER_USER,
   DEFAULT_MAX_TOKEN_EXPIRY_DAYS,
   DEFAULT_MAX_WIKI_BODY_BYTES,
@@ -186,6 +189,18 @@ class AppConfiguration {
 
   public getMaxSnippetBytes(): number {
     return EnvParser.positiveInt(this.env, 'MAX_SNIPPET_BYTES', DEFAULT_MAX_SNIPPET_BYTES);
+  }
+
+  public getMaxTeamsPerOrg(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_TEAMS_PER_ORG', DEFAULT_MAX_TEAMS_PER_ORG);
+  }
+
+  public getMaxTeamMembers(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_TEAM_MEMBERS', DEFAULT_MAX_TEAM_MEMBERS);
+  }
+
+  public getMaxTeamGrants(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_TEAM_GRANTS', DEFAULT_MAX_TEAM_GRANTS);
   }
 
   public isDemoMode(): boolean {

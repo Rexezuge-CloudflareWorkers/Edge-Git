@@ -1,6 +1,6 @@
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { matchCodeowners, parseCodeowners } from '@edge-git/backend-services/collab';
-import { normalizeCodeownerHandle } from '@edge-git/backend-services/collab';
+import { normalizeCodeownerHandle, parseCodeownerTeam } from '@edge-git/backend-services/collab';
 import { getRepoStub } from '../repoStub';
 
 interface CodeownerRule {
@@ -73,6 +73,21 @@ async function resolveCodeownerEmails(env: Env, handles: readonly string[], excl
   const out: string[] = [];
   for (const handle of handles) {
     if (out.length >= MAX_RESOLVED_OWNERS) break;
+    // `org/team` tokens expand to team member emails (best-effort).
+    const team = parseCodeownerTeam(handle);
+    if (team) {
+      try {
+        const emails = await scope.get(Tokens.TeamService).listMemberEmails(team.org, team.team);
+        for (const email of emails) {
+          if (out.length >= MAX_RESOLVED_OWNERS) break;
+          const lower = email.toLowerCase();
+          if (lower && lower !== excluded && !out.includes(lower)) out.push(lower);
+        }
+      } catch {
+        // unresolvable team — skip like before
+      }
+      continue;
+    }
     const normalized = normalizeCodeownerHandle(handle);
     if (!normalized) {
       // Raw emails pass through without a directory lookup.

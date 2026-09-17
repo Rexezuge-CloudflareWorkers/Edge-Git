@@ -25,6 +25,10 @@ const daoMocks = vi.hoisted(() => ({
   WebhookDAO: vi.fn(),
   WebhookDeliveryDAO: vi.fn(),
   ReleaseDAO: vi.fn(),
+  TeamDAO: vi.fn(),
+  TeamMemberDAO: vi.fn(),
+  TeamRepoGrantDAO: vi.fn(),
+  AuditLogDAO: vi.fn(),
 }));
 
 vi.mock('@edge-git/backend-data/dao', () => ({
@@ -45,6 +49,10 @@ vi.mock('@edge-git/backend-data/dao', () => ({
   WebhookDAO: daoMocks.WebhookDAO,
   WebhookDeliveryDAO: daoMocks.WebhookDeliveryDAO,
   ReleaseDAO: daoMocks.ReleaseDAO,
+  TeamDAO: daoMocks.TeamDAO,
+  TeamMemberDAO: daoMocks.TeamMemberDAO,
+  TeamRepoGrantDAO: daoMocks.TeamRepoGrantDAO,
+  AuditLogDAO: daoMocks.AuditLogDAO,
 }));
 
 const EXPECTED_TOKENS = [
@@ -69,6 +77,10 @@ const EXPECTED_TOKENS = [
   'WebhookDAO',
   'WebhookDeliveryDAO',
   'ReleaseDAO',
+  'TeamDAO',
+  'TeamMemberDAO',
+  'TeamRepoGrantDAO',
+  'AuditLogDAO',
   'AccessAuthService',
   'TokenService',
   'BranchProtectionService',
@@ -85,6 +97,8 @@ const EXPECTED_TOKENS = [
   'WebhookService',
   'WebhookDeliveryService',
   'ReleaseService',
+  'TeamService',
+  'AuditService',
 ] as const;
 
 function makeEnv() {
@@ -150,6 +164,18 @@ beforeEach(() => {
   daoMocks.ReleaseDAO.mockImplementation(function (this: unknown, db: unknown) {
     return { kind: 'ReleaseDAO', db };
   });
+  daoMocks.TeamDAO.mockImplementation(function (this: unknown, db: unknown) {
+    return { kind: 'TeamDAO', db };
+  });
+  daoMocks.TeamMemberDAO.mockImplementation(function (this: unknown, db: unknown) {
+    return { kind: 'TeamMemberDAO', db };
+  });
+  daoMocks.TeamRepoGrantDAO.mockImplementation(function (this: unknown, db: unknown) {
+    return { kind: 'TeamRepoGrantDAO', db };
+  });
+  daoMocks.AuditLogDAO.mockImplementation(function (this: unknown, db: unknown) {
+    return { kind: 'AuditLogDAO', db };
+  });
 });
 
 describe('Tokens registry', () => {
@@ -208,6 +234,10 @@ describe('createRequestScope', () => {
       [Tokens.WebhookDAO, daoMocks.WebhookDAO],
       [Tokens.WebhookDeliveryDAO, daoMocks.WebhookDeliveryDAO],
       [Tokens.ReleaseDAO, daoMocks.ReleaseDAO],
+      [Tokens.TeamDAO, daoMocks.TeamDAO],
+      [Tokens.TeamMemberDAO, daoMocks.TeamMemberDAO],
+      [Tokens.TeamRepoGrantDAO, daoMocks.TeamRepoGrantDAO],
+      [Tokens.AuditLogDAO, daoMocks.AuditLogDAO],
     ] as const;
     for (const [token, ctor] of pairs) {
       const factory = scope.get(token);

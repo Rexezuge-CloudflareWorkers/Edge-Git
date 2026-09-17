@@ -16,6 +16,8 @@ import { registerIssueRoutes, registerUserIssueRoutes } from './routes/IssueRout
 import { registerPullRoutes, registerUserPullMergeRoutes, registerUserPullRoutes, registerPullThreadRoutes, registerUserPullThreadRoutes } from './routes/PullRoutes';
 import { registerUserProfileRoutes, registerUserSettingsRoutes } from './routes/UserRoutes';
 import { registerOrgRoutes } from './routes/OrgRoutes';
+import { registerTeamRoutes } from './routes/TeamRoutes';
+import { registerAuditRoutes } from './routes/AuditRoutes';
 import { registerSearchRoutes } from './routes/SearchRoutes';
 import { registerUserNotificationRoutes } from './routes/NotificationRoutes';
 import { registerSocialRoutes, registerUserSocialRoutes } from './routes/SocialRoutes';
@@ -56,6 +58,10 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     // `waitUntil` (cron retries the rest). Registered before the routes so
     // Hono executes the middleware first.
     app.use('/:owner/:repo/git-receive-pack', MiddlewareHandlers.webhookFlush());
+    // Audit-everything: records pushes (email resolved in-handler via
+    // `gitAuthForRepo`, missing → `unknown`). Fetches stay unaudited —
+    // anonymous clone volume would explode D1 writes.
+    app.use('/:owner/:repo/git-receive-pack', MiddlewareHandlers.activityAudit());
 
     registerGitRoutes(app);
     registerRepoRoutes(app);
@@ -75,12 +81,17 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
   registerCollabPublicRoutes(app);
 
     // Protected UI/API surface
+    // Audit-everything runs BEFORE authentication so denied requests are
+    // captured too (email read in `finally`, missing → `unknown`).
+    app.use('/user/*', MiddlewareHandlers.activityAudit());
     app.use('/user/*', MiddlewareHandlers.userAuthentication());
     app.use('/user/*', MiddlewareHandlers.webhookFlush());
 
     registerUserRepoRoutes(app);
     registerUserSettingsRoutes(app);
     registerOrgRoutes(app);
+    registerTeamRoutes(app);
+    registerAuditRoutes(app);
 
     const openapi: AppRouter = fromHono(app, { docs_url: '/docs' });
 

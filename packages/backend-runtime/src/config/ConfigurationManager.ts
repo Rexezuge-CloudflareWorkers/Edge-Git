@@ -24,6 +24,9 @@ import {
   DEFAULT_MAX_RULES_PER_REPO,
   DEFAULT_MAX_SNIPPET_BYTES,
   DEFAULT_MAX_SNIPPETS_PER_USER,
+  DEFAULT_MAX_TEAMS_PER_ORG,
+  DEFAULT_MAX_TEAM_GRANTS,
+  DEFAULT_MAX_TEAM_MEMBERS,
   DEFAULT_MAX_TOKENS_PER_USER,
   DEFAULT_MAX_TOKEN_EXPIRY_DAYS,
   DEFAULT_MAX_WIKI_BODY_BYTES,
@@ -112,6 +115,12 @@ class ConfigurationManager {
     getMaxFilesPerSnippet: (env: unknown): number =>
       EnvParser.positiveInt(env, 'MAX_FILES_PER_SNIPPET', DEFAULT_MAX_FILES_PER_SNIPPET),
     getMaxSnippetBytes: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_SNIPPET_BYTES', DEFAULT_MAX_SNIPPET_BYTES),
+  };
+
+  public static readonly teams = {
+    getMaxPerOrg: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_TEAMS_PER_ORG', DEFAULT_MAX_TEAMS_PER_ORG),
+    getMaxMembers: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_TEAM_MEMBERS', DEFAULT_MAX_TEAM_MEMBERS),
+    getMaxGrants: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_TEAM_GRANTS', DEFAULT_MAX_TEAM_GRANTS),
   };
 
   public static getDebugMode(env: unknown): boolean {
