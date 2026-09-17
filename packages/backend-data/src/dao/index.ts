@@ -9,6 +9,8 @@ export { IssueDAO } from './IssueDAO';
 export type { IssueRow, CommentRow } from './IssueDAO';
 export { PullRequestDAO } from './PullRequestDAO';
 export type { PullRequestRow, PullRequestReviewRow, PullRequestCommentRow } from './PullRequestDAO';
+export { PullThreadDAO } from './PullThreadDAO';
+export type { PullReviewThreadRow, PullThreadCommentRow } from './PullThreadDAO';
 export { NamespaceDAO } from './NamespaceDAO';
 export type { NamespaceRow, NamespaceKind } from './NamespaceDAO';
 export { OrganizationDAO } from './OrganizationDAO';

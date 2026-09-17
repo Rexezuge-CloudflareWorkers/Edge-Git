@@ -30,5 +30,5 @@ Add new env vars in `ConfigurationDefaults.ts` (+ `ConfigurationManager` getter 
 ## Dependency injection (`packages/backend-runtime/src/di/` + `config/`)
 
 - `AppConfiguration` — injectable instance view over env parsing (one method per setting); `ConfigurationManager` statics remain as thin facade. Prefer injecting `AppConfiguration` in new services; mock via constructor deps.
-- `Container` — minimal Factory + Singleton DI (`bind`/`bindValue`/`get`/`resolve`/`createChild`). `composition/` in `backend-services` still exports `*Factory` shims; `scope.get(Tokens.X)` + `createRequestScope(env)` is the Otter-parity target, not yet wired.
+- `Container` — minimal Factory + Singleton DI (`bind`/`bindValue`/`get`/`resolve`/`createChild`). `createRequestScope(env)` in `backend-services/composition` is the standard composition root (`scope.get(Tokens.X)`); the old `*Factory` shims were removed.
 - `createServiceContext(env, overrides?)` — single request-scoped `{ env, logger, clock }`; prefer extending `ServiceContext` over new `*Env` interfaces; never reintroduce `as` env casts.

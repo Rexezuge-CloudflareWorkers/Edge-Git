@@ -8,6 +8,7 @@ import { ensureHeadObjects, getCrossRepoPreview, isPackLimitError, resolveHeadRe
 import { openCrossForkPull } from './PullMergeRoutes';
 import { parsePullNumber } from './PullShared';
 import type { MergePreviewShape, PullApp } from './PullShared';
+import { resolveCodeownerEmails, suggestCodeownerHandles } from './CodeownerHelpers';
 
 function registerUserPullRoutes(app: PullApp): void {
   app.get('/user/repos/:owner/:repo/pulls', async (c) => {
@@ -16,7 +17,14 @@ function registerUserPullRoutes(app: PullApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, c.get('AuthenticatedUserEmailAddress'));
     if (!row) return c.json({ error: 'Not found' }, 404);
     const scope = createRequestScope(c.env);
-    const pulls = await scope.get(Tokens.PullRequestService).listByRepo(row.id, 50);
+    const q = (c.req.query('q') ?? '').trim();
+    let pulls = q
+      ? await scope
+          .get(Tokens.SearchService)
+          .searchPulls(q, c.get('AuthenticatedUserEmailAddress'), { limit: 50, repoId: row.id })
+          .catch(() => null)
+      : null;
+    if (!pulls) pulls = await scope.get(Tokens.PullRequestService).listByRepo(row.id, 50);
     const label = c.req.query('label');
     if (!label) return c.json({ pulls });
     try {
@@ -71,7 +79,8 @@ function registerUserPullRoutes(app: PullApp): void {
     }
     if (!preview?.baseOid || !preview?.headOid) return c.json({ error: 'base or head branch not found' }, 400);
     try {
-      const created = await createRequestScope(c.env)
+      const scope = createRequestScope(c.env);
+      const created = await scope
         .get(Tokens.PullRequestService)
         .createPull({
           repositoryId: row.id,
@@ -86,6 +95,21 @@ function registerUserPullRoutes(app: PullApp): void {
           creatorEmail: email,
           isDraft: body.isDraft === true,
         });
+      // CODEOWNERS auto-request: best-effort reviewer seeding from the
+      // owners of the changed paths; never fails PR creation.
+      try {
+        const suggested = await suggestCodeownerHandles(c.env, fullName, {
+          baseBranch,
+          baseOid: preview.baseOid,
+          headOid: preview.headOid,
+        });
+        const ownerEmails = await resolveCodeownerEmails(c.env, suggested.owners, email);
+        if (ownerEmails.length > 0) {
+          await scope.get(Tokens.CollaborationService).requestReviewers(created.id, ownerEmails);
+        }
+      } catch {
+        // best-effort codeowner auto-request
+      }
       await recordAndNotify(c.env, {
         repositoryId: row.id,
         fullName,

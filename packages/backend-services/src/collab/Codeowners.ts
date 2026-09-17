@@ -43,4 +43,17 @@ function matchCodeowners(rules: readonly CodeownerRule[], path: string): string[
   return best?.owners ?? [];
 }
 
-export { matchCodeowners, parseCodeowners };
+export { matchCodeowners, parseCodeowners, normalizeCodeownerHandle };
+
+/**
+ * Normalize a CODEOWNERS owner token to a resolvable username, or null when
+ * the token cannot map to a single user (teams `org/team`, emails are passed
+ * through by the caller, malformed tokens are skipped).
+ */
+function normalizeCodeownerHandle(raw: string): string | null {
+  const handle = raw.trim();
+  if (!handle || handle.includes('/')) return null;
+  const stripped = handle.startsWith('@') ? handle.slice(1) : handle;
+  if (!/^[\w.-]{1,100}$/.test(stripped)) return null;
+  return stripped;
+}

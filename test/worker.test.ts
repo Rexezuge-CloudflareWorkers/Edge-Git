@@ -656,7 +656,7 @@ describe('scheduled tasks', () => {
   it('prunes expired tokens', async () => {
     const db = createApiFakeDb();
     const env = { DB: db } as unknown as Env;
-    const svc = (await import('@edge-git/backend-services/auth')).TokenServiceFactory.create({ DB: db });
+    const svc = new (await import('@edge-git/backend-services/auth')).TokenService({ DB: db });
     await svc.createToken('a@x.co', 't1');
     db.tokens.push({ token_id: 'old', user_email: 'a@x.co', token_hash: 'h', name: 'old', expires_at: 1, last_used_at: null, created_at: 1 });
     await runScheduledTasks(env, '*/10 * * * *', Date.now());

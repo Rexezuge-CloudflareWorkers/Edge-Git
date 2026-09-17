@@ -96,14 +96,5 @@ class TokenService {
   }
 }
 
-/**
-@deprecated Prefer `createRequestScope(env).get(Tokens.TokenService)`; this thin wrapper only preserves backward compatibility.
-*/
-class TokenServiceFactory {
-  public static create(env: TokenServiceEnv): TokenService {
-    return new TokenService(env);
-  }
-}
-
-export { TokenService, TokenServiceFactory };
+export { TokenService };
 export type { CreatedToken, AuthenticatedToken, TokenServiceDeps, TokenServiceEnv };

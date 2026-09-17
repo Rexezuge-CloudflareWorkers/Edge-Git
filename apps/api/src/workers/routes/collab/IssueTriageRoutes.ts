@@ -1,0 +1,52 @@
+import { toServiceStatus } from '../PublicViewerResolver';
+import { requireVisibleRepo } from '../PublicViewerResolver';
+import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { RepoService } from '@edge-git/backend-services/repo';
+import { getIssueMetaSafe, needWrite, parseNumber } from './CollabHelpers';
+import type { CollabApp } from './CollabHelpers';
+
+function registerCollabIssueTriageRoutes(app: CollabApp): void {
+  // Issue triage: labels / assignees / milestone + meta
+  app.get('/user/repos/:owner/:repo/issues/:number/meta', async (c) => {
+    const owner = c.req.param('owner');
+    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const row = await requireVisibleRepo(c.env, owner, repoName, c.get('AuthenticatedUserEmailAddress'));
+    if (!row) return c.json({ error: 'Not found' }, 404);
+    const number = parseNumber(c.req.param('number'));
+    if (number === null) return c.json({ error: 'Not found' }, 404);
+    try {
+      const issue = await createRequestScope(c.env).get(Tokens.IssueService).getByNumber(row.id, number);
+      const meta = await getIssueMetaSafe(c.env, issue.id);
+      return c.json({ issue, ...meta, milestoneId: (issue as { milestone_id?: string | null }).milestone_id ?? null });
+    } catch (error) {
+      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+    }
+  });
+
+  for (const kind of ['labels', 'assignees', 'milestone'] as const) {
+    app.put(`/user/repos/:owner/:repo/issues/:number/${kind}`, async (c) => {
+      const email = c.get('AuthenticatedUserEmailAddress');
+      const owner = c.req.param('owner');
+      const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+      const row = await requireVisibleRepo(c.env, owner, repoName, email);
+      if (!row) return c.json({ error: 'Not found' }, 404);
+      if (!(await needWrite(c.env, owner, repoName, email))) return c.json({ error: 'Forbidden' }, 403);
+      const number = parseNumber(c.req.param('number'));
+      if (number === null) return c.json({ error: 'Not found' }, 404);
+      const body = (await c.req.json().catch(() => ({}))) as { labelIds?: string[]; assignees?: string[]; milestoneId?: string | null };
+      try {
+        const scope = createRequestScope(c.env);
+        const issue = await scope.get(Tokens.IssueService).getByNumber(row.id, number);
+        const collab = scope.get(Tokens.CollaborationService);
+        if (kind === 'labels') await collab.setIssueLabels(issue.id, row.id, body.labelIds ?? []);
+        else if (kind === 'assignees') await collab.setIssueAssignees(issue.id, body.assignees ?? []);
+        else await collab.setIssueMilestone(issue.id, row.id, body.milestoneId ?? null);
+        return c.json({ ok: true });
+      } catch (error) {
+        return c.json({ error: error instanceof Error ? error.message : 'Failed to update issue' }, toServiceStatus(error));
+      }
+    });
+  }
+}
+
+export { registerCollabIssueTriageRoutes };

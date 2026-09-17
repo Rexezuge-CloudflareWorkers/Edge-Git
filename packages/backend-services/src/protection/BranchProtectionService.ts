@@ -76,11 +76,16 @@ class BranchProtectionService {
   /**
    * Count distinct approvers from latest-per-author reviews, excluding the
    * PR creator (self-approval never counts). `commented` reviews are neutral.
+   * Dismissed reviews never count.
    */
-  public static countApprovals(reviews: Array<{ author_email: string; state: string }>, creatorEmail: string): number {
+  public static countApprovals(
+    reviews: Array<{ author_email: string; state: string; dismissed?: number | null }>,
+    creatorEmail: string,
+  ): number {
     const creator = creatorEmail.toLowerCase();
     const latestByAuthor = new Map<string, string>();
     for (const review of reviews) {
+      if (review.dismissed === 1) continue;
       latestByAuthor.set(review.author_email.toLowerCase(), review.state);
     }
     let approvals = 0;
@@ -93,12 +98,15 @@ class BranchProtectionService {
   /**
    * Merge gate for a protected base branch: `changes_requested` vetoes
    * (shared with `PullRequestService.isBlockedByReviews`), then the approval
-   * quorum applies. Returns a human-readable reason when blocked.
+   * quorum applies, then the CODEOWNERS quorum (when owners resolve for the
+   * changed paths: at least one non-creator owner approval is required).
+   * Returns a human-readable reason when blocked.
    */
   public static checkMergeBlocked(input: {
     rule: BranchProtectionRuleMetadata | null;
-    reviews: Array<{ author_email: string; state: string }>;
+    reviews: Array<{ author_email: string; state: string; dismissed?: number | null }>;
     creatorEmail: string;
+    codeowners?: { owners: string[] };
   }): { blocked: boolean; reason: string | null } {
     if (PullRequestService.isBlockedByReviews(input.reviews)) {
       return { blocked: true, reason: 'pull request has unresolved change requests' };
@@ -108,6 +116,25 @@ class BranchProtectionService {
       const approvals = this.countApprovals(input.reviews, input.creatorEmail);
       if (approvals < required) {
         return { blocked: true, reason: `pull request requires ${required} approvals (${approvals} so far)` };
+      }
+    }
+    const owners = (input.codeowners?.owners ?? []).map((o) => o.toLowerCase());
+    if (owners.length > 0) {
+      const creator = input.creatorEmail.toLowerCase();
+      const latestByAuthor = new Map<string, string>();
+      for (const review of input.reviews) {
+        if (review.dismissed === 1) continue;
+        latestByAuthor.set(review.author_email.toLowerCase(), review.state);
+      }
+      let ownerApproved = false;
+      for (const [author, state] of latestByAuthor) {
+        if (author !== creator && state === 'approved' && owners.includes(author)) {
+          ownerApproved = true;
+          break;
+        }
+      }
+      if (!ownerApproved) {
+        return { blocked: true, reason: 'pull request requires approval from a code owner' };
       }
     }
     return { blocked: false, reason: null };
@@ -194,14 +221,5 @@ function parseStatusChecks(input: unknown): string[] {
   return checks;
 }
 
-/**
-@deprecated Prefer `createRequestScope(env).get(Tokens.BranchProtectionService)`; this thin wrapper only preserves backward compatibility.
-*/
-class BranchProtectionServiceFactory {
-  public static create(env: BranchProtectionServiceEnv): BranchProtectionService {
-    return new BranchProtectionService(env);
-  }
-}
-
-export { BranchProtectionService, BranchProtectionServiceFactory, MAX_REQUIRED_APPROVALS };
+export { BranchProtectionService, MAX_REQUIRED_APPROVALS };
 export type { BranchProtectionServiceDeps, BranchProtectionServiceEnv };

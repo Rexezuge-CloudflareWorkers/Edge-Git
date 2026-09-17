@@ -212,6 +212,10 @@ export interface PullReview {
   body: string | null;
   commit_oid: string | null;
   created_at: number;
+  dismissed?: number | null;
+  dismissed_by?: string | null;
+  dismissed_at?: number | null;
+  dismiss_reason?: string | null;
 }
 
 export interface PullComment {
@@ -220,6 +224,29 @@ export interface PullComment {
   author_email: string;
   body: string;
   created_at: number;
+}
+
+export interface PullThreadComment {
+  id: string;
+  thread_id: string;
+  author_email: string;
+  body: string;
+  created_at: number;
+}
+
+export interface PullReviewThread {
+  id: string;
+  pull_request_id: string;
+  path: string;
+  line: number | null;
+  side: 'old' | 'new';
+  commit_oid: string | null;
+  status: 'open' | 'resolved';
+  author_email: string;
+  created_at: number;
+  resolved_by: string | null;
+  resolved_at: number | null;
+  comments: PullThreadComment[];
 }
 
 export interface PullDiffChange {

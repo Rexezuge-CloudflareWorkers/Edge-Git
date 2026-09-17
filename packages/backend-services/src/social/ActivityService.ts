@@ -61,11 +61,5 @@ class ActivityService {
   }
 }
 
-class ActivityServiceFactory {
-  public static create(env: ActivityServiceEnv): ActivityService {
-    return new ActivityService(env);
-  }
-}
-
-export { ActivityService, ActivityServiceFactory };
+export { ActivityService };
 export type { ActivityServiceDeps, ActivityServiceEnv, RecordEventInput };

@@ -1,2 +1,2 @@
-export { RepoService, RepoServiceFactory } from './RepoService';
+export { RepoService } from './RepoService';
 export type { RepoServiceDeps, RepoServiceEnv } from './RepoService';

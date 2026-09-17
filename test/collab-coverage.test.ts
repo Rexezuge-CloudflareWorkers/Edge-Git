@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { EdgeGitWorker } from '@/workers/EdgeGitWorker';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { CollaborationDAO, PullRequestDAO } from '@edge-git/backend-data/dao';
-import { CollaborationService, CollaborationServiceFactory } from '@edge-git/backend-services/collab';
+import { CollaborationService } from '@edge-git/backend-services/collab';
 import { PullRequestService } from '@edge-git/backend-services/pull';
 // NOTE: relative imports bypass packages/git-service/src/index.ts, which
 // re-exports the `dofs` runtime (unparsable in the node test env).
@@ -386,7 +386,7 @@ describe('CollaborationService full coverage', () => {
     const db = createFullFakeDb();
     seedRepo(db);
     const svc = new CollaborationService({ DB: db });
-    expect(CollaborationServiceFactory.create({ DB: db })).toBeInstanceOf(CollaborationService);
+    expect(svc).toBeInstanceOf(CollaborationService);
     const { id: labelId } = await svc.createLabel('r1', { name: 'bug', color: '#FF0000', description: '  Bugs  ' });
     await expect(svc.createLabel('r1', { name: 'bug' })).rejects.toThrow('already exists');
     await expect(svc.createLabel('r1', { name: 'BUG' })).rejects.toThrow('already exists');

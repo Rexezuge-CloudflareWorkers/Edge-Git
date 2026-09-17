@@ -68,6 +68,7 @@ export function PullsTab({
   const [reloadKey, setReloadKey] = useState(0);
   const [crossBranches, setCrossBranches] = useState<string[]>([]);
   const [labelFilter, setLabelFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [isDraft, setIsDraft] = useState(false);
 
   const isCrossRepo = headRepo.toLowerCase() !== currentFull.toLowerCase();
@@ -79,7 +80,7 @@ export function PullsTab({
     const run = async () => {
       try {
         const [list, b, forks] = await Promise.all([
-          listPulls(owner, repo, { ...authOpt, label: labelFilter.trim() || undefined }),
+          listPulls(owner, repo, { ...authOpt, label: labelFilter.trim() || undefined, q: searchQuery.trim().length >= 2 ? searchQuery.trim() : undefined }),
           loadBranches(owner, repo, authOpt).catch(() => ({ branches: [], currentBranch: null })),
           listForks(owner, repo, authOpt).catch(() => ({ forks: [], count: 0 })),
         ]);
@@ -101,7 +102,7 @@ export function PullsTab({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [owner, repo, reloadKey, authorized, labelFilter]);
+  }, [owner, repo, reloadKey, authorized, labelFilter, searchQuery]);
 
   useEffect(() => {
     if (!isCrossRepo) return;
@@ -228,6 +229,7 @@ export function PullsTab({
         </CardHeader>
         <div className="mb-3 flex gap-2">
           <Input placeholder={t('pulls.filterByLabel', 'Filter By Label…')} value={labelFilter} onChange={(e) => setLabelFilter(e.target.value)} />
+          <Input placeholder={t('pulls.searchPulls', 'Search Pull Requests…')} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
         </div>
         {!loading && pulls.length === 0 ? (
           <div className="text-center text-[var(--color-text-muted)] py-10 text-sm">

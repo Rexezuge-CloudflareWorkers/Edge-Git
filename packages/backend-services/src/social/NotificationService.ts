@@ -179,11 +179,5 @@ class NotificationService {
   }
 }
 
-class NotificationServiceFactory {
-  public static create(env: NotificationServiceEnv): NotificationService {
-    return new NotificationService(env);
-  }
-}
-
-export { NotificationService, NotificationServiceFactory, MAX_FANOUT_RECIPIENTS };
+export { NotificationService, MAX_FANOUT_RECIPIENTS };
 export type { FanOutInput, NotificationServiceDeps, NotificationServiceEnv };

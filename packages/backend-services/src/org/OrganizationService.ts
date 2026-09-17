@@ -264,14 +264,5 @@ class OrganizationService {
   }
 }
 
-/**
-@deprecated Prefer `createRequestScope(env).get(Tokens.OrganizationService)`; kept for backward compatibility.
-*/
-class OrganizationServiceFactory {
-  public static create(env: OrganizationServiceEnv): OrganizationService {
-    return new OrganizationService(env);
-  }
-}
-
-export { OrganizationService, OrganizationServiceFactory };
+export { OrganizationService };
 export type { OrganizationServiceDeps, OrganizationServiceEnv };

@@ -229,14 +229,5 @@ class CollaborationService {
   }
 }
 
-/**
-@deprecated Prefer `createRequestScope(env).get(Tokens.CollaborationService)`; this thin wrapper only preserves backward compatibility.
-*/
-class CollaborationServiceFactory {
-  public static create(env: CollaborationServiceEnv): CollaborationService {
-    return new CollaborationService(env);
-  }
-}
-
-export { CollaborationService, CollaborationServiceFactory };
+export { CollaborationService };
 export type { CollaborationServiceDeps, CollaborationServiceEnv };

@@ -9,6 +9,7 @@ import { RepoService } from '@edge-git/backend-services/repo';
 import { getCrossRepoPreview, isPackLimitError, resolveHeadRepo } from './CrossFork';
 import { parsePullNumber } from './PullShared';
 import type { MergePreviewShape, PullApp } from './PullShared';
+import { resolveCodeownerEmails, suggestCodeownerHandles } from './CodeownerHelpers';
 
 interface OpenCrossForkInput {
   email: string;
@@ -35,7 +36,8 @@ async function openCrossForkPull(env: Env, input: OpenCrossForkInput): Promise<{
   }
   if (!preview.preview?.baseOid || !preview.preview?.headOid) return { status: 400, body: { error: 'base or head branch not found' } };
   try {
-    const created = await createRequestScope(env)
+    const scope = createRequestScope(env);
+    const created = await scope
       .get(Tokens.PullRequestService)
       .createPull({
         repositoryId: input.rowId,
@@ -51,6 +53,20 @@ async function openCrossForkPull(env: Env, input: OpenCrossForkInput): Promise<{
         headRepositoryId: headRow.id,
         headFullName,
       });
+    // CODEOWNERS auto-request: best-effort, never fails PR creation.
+    try {
+      const suggested = await suggestCodeownerHandles(env, input.fullName, {
+        baseBranch: input.baseBranch,
+        baseOid: preview.preview.baseOid,
+        headOid: preview.preview.headOid,
+      });
+      const ownerEmails = await resolveCodeownerEmails(env, suggested.owners, input.email);
+      if (ownerEmails.length > 0) {
+        await scope.get(Tokens.CollaborationService).requestReviewers(created.id, ownerEmails);
+      }
+    } catch {
+      // best-effort codeowner auto-request
+    }
     await recordAndNotify(env, {
       repositoryId: input.rowId,
       fullName: input.fullName,
@@ -197,15 +213,25 @@ function registerUserPullMergeRoutes(app: PullApp): void {
     // Branch protection: the base branch may require N approvals (excluding
     // the PR creator). Applies to same-repo and cross-fork merges alike.
     // Missing protection table on legacy DBs means no rule (fall through).
+    // CODEOWNERS enforcement is best-effort: when owners resolve for the
+    // changed paths, one non-creator owner approval is required; when the
+    // CODEOWNERS file or diff is unreadable there is no owner quorum.
     const rule = await scope.get(Tokens.BranchProtectionService).matchForRepo(row.id, pull.base_branch).catch(() => null);
-    const gate = BranchProtectionService.checkMergeBlocked({ rule, reviews, creatorEmail: pull.creator_email });
+    const fullName = `${owner}/${repoName}`;
+    const codeownerEmails = await suggestCodeownerHandles(c.env, fullName, {
+      baseBranch: pull.base_branch,
+      baseOid: pull.base_oid ?? null,
+      headOid: pull.head_oid ?? null,
+    })
+      .then((suggested) => resolveCodeownerEmails(c.env, suggested.owners, pull.creator_email))
+      .catch(() => [] as string[]);
+    const gate = BranchProtectionService.checkMergeBlocked({ rule, reviews, creatorEmail: pull.creator_email, codeowners: { owners: codeownerEmails } });
     if (gate.blocked) return c.json({ error: gate.reason ?? 'pull request is blocked by branch protection' }, 409);
     const body = (await c.req.json().catch(() => ({}))) as { message?: string; deleteHead?: boolean; strategy?: string };
     const rawMessage = typeof body.message === 'string' ? body.message.trim() : '';
     const message = rawMessage ? rawMessage.slice(0, 1000) : `Merge pull request #${number}: ${pull.title}`;
     const deleteHead = body.deleteHead === true;
     const strategy = body.strategy === 'squash' || body.strategy === 'rebase' ? body.strategy : 'merge';
-    const fullName = `${owner}/${repoName}`;
     const head = await resolveHeadRepo(c.env, pull);
     if (head) {
       const result = await mergeCrossForkPull(c.env, { email, scope, rowId: row.id, number, pull, fullName, headFullName: head.fullName, headRow: head.row, message, deleteHead, strategy });

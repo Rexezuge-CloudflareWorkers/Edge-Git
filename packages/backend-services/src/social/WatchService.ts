@@ -58,11 +58,5 @@ class WatchService {
   }
 }
 
-class WatchServiceFactory {
-  public static create(env: WatchServiceEnv): WatchService {
-    return new WatchService(env);
-  }
-}
-
-export { WatchService, WatchServiceFactory };
+export { WatchService };
 export type { WatchServiceDeps, WatchServiceEnv };

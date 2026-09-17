@@ -13,7 +13,7 @@ import { registerRuleRoutes } from './routes/RuleRoutes';
 import { registerFileWriteRoutes } from './routes/FileWriteRoutes';
 import { registerTokenRoutes } from './routes/TokenRoutes';
 import { registerIssueRoutes, registerUserIssueRoutes } from './routes/IssueRoutes';
-import { registerPullRoutes, registerUserPullMergeRoutes, registerUserPullRoutes } from './routes/PullRoutes';
+import { registerPullRoutes, registerUserPullMergeRoutes, registerUserPullRoutes, registerPullThreadRoutes, registerUserPullThreadRoutes } from './routes/PullRoutes';
 import { registerUserProfileRoutes, registerUserSettingsRoutes } from './routes/UserRoutes';
 import { registerOrgRoutes } from './routes/OrgRoutes';
 import { registerSearchRoutes } from './routes/SearchRoutes';
@@ -53,6 +53,7 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     registerForkRoutes(app);
     registerIssueRoutes(app);
     registerPullRoutes(app);
+    registerPullThreadRoutes(app);
   registerUserProfileRoutes(app);
   registerSearchRoutes(app);
   registerSocialRoutes(app);
@@ -76,6 +77,7 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     registerUserIssueRoutes(app);
   registerUserPullRoutes(app);
   registerUserPullMergeRoutes(app);
+  registerUserPullThreadRoutes(app);
   registerUserSocialRoutes(app);
   registerUserNotificationRoutes(app);
   registerCollabUserRoutes(app);

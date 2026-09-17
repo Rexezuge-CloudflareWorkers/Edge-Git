@@ -1,6 +1,7 @@
 import { BaseDAO } from './BaseDAO';
 import type { D1Queryable } from '../utils/D1Types';
 import type { IssueRow } from './IssueDAO';
+import type { PullRequestRow } from './PullRequestDAO';
 import type { RepositoryRow } from './RepositoryDAO';
 
 interface SearchOptions {
@@ -108,6 +109,44 @@ class SearchDAO extends BaseDAO {
         }
         params.push(limit);
         const result = await this.database.prepare(`SELECT * FROM issues WHERE ${likes} ORDER BY updated_at DESC LIMIT ?`).bind(...params).all<IssueRow>();
+        return result.results ?? [];
+      } catch {
+        return [];
+      }
+    }
+  }
+
+  public async searchPulls(query: string, opts: SearchOptions = {}): Promise<PullRequestRow[]> {
+    const limit = clampLimit(opts.limit);
+    const tokens = query.trim().split(/\s+/).filter(Boolean).slice(0, 10);
+    if (tokens.length === 0) return [];
+    const ftsQuery = tokens.map((t) => `"${t.replaceAll('"', '""')}"*`).join(' AND ');
+    try {
+      const base = opts.repoId
+        ? `SELECT p.* FROM pull_fts f JOIN pull_requests p ON p.id = f.pull_id WHERE pull_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
+        : `SELECT p.* FROM pull_fts f JOIN pull_requests p ON p.id = f.pull_id WHERE pull_fts MATCH ? ORDER BY rank LIMIT ?`;
+      const result = await (opts.repoId
+        ? this.database.prepare(base).bind(ftsQuery, opts.repoId, limit)
+        : this.database.prepare(base).bind(ftsQuery, limit)
+      ).all<PullRequestRow>();
+      return result.results ?? [];
+    } catch {
+      const likes = tokens.map(() => `(lower(title) LIKE ? ESCAPE '!' OR lower(COALESCE(body, '')) LIKE ? ESCAPE '!')`).join(' AND ');
+      const params: unknown[] = [];
+      for (const t of tokens) {
+        const pattern = `%${escapeLike(t.toLowerCase())}%`;
+        params.push(pattern, pattern);
+      }
+      try {
+        if (opts.repoId) {
+          const result = await this.database
+            .prepare(`SELECT * FROM pull_requests WHERE repository_id = ? AND ${likes} ORDER BY number DESC LIMIT ?`)
+            .bind(opts.repoId, ...params, limit)
+            .all<PullRequestRow>();
+          return result.results ?? [];
+        }
+        params.push(limit);
+        const result = await this.database.prepare(`SELECT * FROM pull_requests WHERE ${likes} ORDER BY updated_at DESC LIMIT ?`).bind(...params).all<PullRequestRow>();
         return result.results ?? [];
       } catch {
         return [];

@@ -7,6 +7,7 @@ import {
   OrganizationDAO,
   OrganizationMemberDAO,
   PullRequestDAO,
+  PullThreadDAO,
   RepoCollaboratorDAO,
   RepositoryDAO,
   StarDAO,
@@ -32,6 +33,7 @@ interface RepoServiceDeps {
   repositoryDAO?: () => Promise<RepositoryDAO>;
   issueDAO?: () => Promise<IssueDAO>;
   pullRequestDAO?: () => Promise<PullRequestDAO>;
+  pullThreadDAO?: () => Promise<PullThreadDAO>;
   branchProtectionDAO?: () => Promise<BranchProtectionDAO>;
   userDAO?: () => Promise<UserDAO>;
   organizationDAO?: () => Promise<OrganizationDAO>;
@@ -55,6 +57,7 @@ class RepoService {
       repositoryDAO: () => Promise.resolve(new RepositoryDAO(env.DB)),
       issueDAO: () => Promise.resolve(new IssueDAO(env.DB)),
       pullRequestDAO: () => Promise.resolve(new PullRequestDAO(env.DB)),
+      pullThreadDAO: () => Promise.resolve(new PullThreadDAO(env.DB)),
       branchProtectionDAO: () => Promise.resolve(new BranchProtectionDAO(env.DB)),
       userDAO: () => Promise.resolve(new UserDAO(env.DB)),
       organizationDAO: () => Promise.resolve(new OrganizationDAO(env.DB)),
@@ -331,6 +334,12 @@ class RepoService {
       // ignore — legacy DBs without pull_requests tables
     }
     try {
+      const pullThreadDAO = await this.deps.pullThreadDAO();
+      await pullThreadDAO.deleteByRepo(repo.id);
+    } catch {
+      // ignore — legacy DBs without pull_review_threads tables
+    }
+    try {
       const protectionDAO = await this.deps.branchProtectionDAO();
       await protectionDAO.deleteByRepo(repo.id);
     } catch {
@@ -372,14 +381,5 @@ class RepoService {
   }
 }
 
-/**
-@deprecated Prefer `createRequestScope(env).get(Tokens.RepoService)`; this thin wrapper only preserves backward compatibility.
-*/
-class RepoServiceFactory {
-  public static create(env: RepoServiceEnv): RepoService {
-    return new RepoService(env);
-  }
-}
-
-export { RepoService, RepoServiceFactory };
+export { RepoService };
 export type { RepoServiceDeps, RepoServiceEnv };
