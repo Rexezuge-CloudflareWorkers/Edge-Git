@@ -6,6 +6,7 @@ import { FetchHandler } from './FetchHandler';
 import type { FetchLimits } from './FetchHandler';
 import { PushHandler } from './PushHandler';
 import { ReadModelService } from './ReadModelService';
+import { ReleaseAssetStore } from './ReleaseAssetStore';
 
 // NOTE: intentionally still extends the real `DurableObject` rather than
 // `AbstractDurableObjectWorker` (see return notes): the abstract base does
@@ -22,6 +23,7 @@ class RepoWorker extends DurableObject<Env> {
   private readonly fetchHandler: FetchHandler;
   private readonly pushHandler: PushHandler;
   private readonly readModel: ReadModelService;
+  private readonly releaseAssets: ReleaseAssetStore;
 
   private fullNameValue: string | undefined;
 
@@ -35,6 +37,7 @@ class RepoWorker extends DurableObject<Env> {
     this.fetchHandler = new FetchHandler({ git: this.git, env, getFullName: () => this.fullNameValue });
     this.pushHandler = new PushHandler({ isoGitFs: this.isoGitFs, git: this.git, getFullName: () => this.fullNameValue });
     this.readModel = new ReadModelService(this.git);
+    this.releaseAssets = new ReleaseAssetStore(this.isoGitFs, env);
 
     // NOTE: Do NOT call blockConcurrencyWhile here. `new Fs()` already
     // schedules its own blockConcurrencyWhile(ensureSchema). Nesting a second
@@ -418,6 +421,32 @@ class RepoWorker extends DurableObject<Env> {
     await this.prepare();
     if (!args.filepath || args.filepath.length > 500) return null;
     return this.readModel.getBlame(args.ref ?? 'HEAD', args.filepath);
+  }
+
+  /**
+   * Store a release asset's bytes in the DO filesystem (outside `/repo` so
+   * git history is untouched). Bounded by `MAX_ASSET_BYTES`; returns a
+   * discriminated union — never throws except for oversized payloads — so
+   * it survives DO RPC boundaries.
+   */
+  public async storeReleaseAsset(args: { releaseId: string; assetId: string; bytes: Uint8Array }): Promise<unknown> {
+    await this.prepare();
+    return this.releaseAssets.store(args);
+  }
+
+  public async getReleaseAsset(args: { releaseId: string; assetId: string }): Promise<Uint8Array | null> {
+    await this.prepare();
+    return this.releaseAssets.load(args);
+  }
+
+  public async deleteReleaseAsset(args: { releaseId: string; assetId: string }): Promise<{ deleted: boolean }> {
+    await this.prepare();
+    return this.releaseAssets.remove(args);
+  }
+
+  public async deleteReleaseAssets(args: { releaseId: string }): Promise<{ deleted: number }> {
+    await this.prepare();
+    return this.releaseAssets.removeAll(args);
   }
 }
 

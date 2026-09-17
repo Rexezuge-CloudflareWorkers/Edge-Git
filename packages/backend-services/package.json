@@ -32,6 +32,8 @@
     "./webhook/*": "./src/webhook/*.ts",
     "./collab": "./src/collab/index.ts",
     "./collab/*": "./src/collab/*.ts",
+    "./release": "./src/release/index.ts",
+    "./release/*": "./src/release/*.ts",
     "./composition": "./src/composition/index.ts",
     "./composition/*": "./src/composition/*.ts"
   },

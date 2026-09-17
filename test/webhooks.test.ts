@@ -325,7 +325,7 @@ function json(method: string, body: unknown): RequestInit {
 
 describe('webhook event helpers', () => {
   it('lists the supported webhook events', () => {
-    expect([...WEBHOOK_EVENTS]).toEqual(['push', 'repository', 'issues', 'issue_comment', 'pull_request', 'pull_request_review', 'fork', 'star', 'watch', 'ping']);
+    expect([...WEBHOOK_EVENTS]).toEqual(['push', 'repository', 'issues', 'issue_comment', 'pull_request', 'pull_request_review', 'fork', 'star', 'watch', 'release', 'ping']);
   });
 
   it('normalizes event subscriptions', () => {
@@ -348,6 +348,8 @@ describe('webhook event helpers', () => {
     expect(mapRepoEventToWebhookEvent('pr_reviewed')).toBe('pull_request_review');
     expect(mapRepoEventToWebhookEvent('pr_commented')).toBe('pull_request_review');
     expect(mapRepoEventToWebhookEvent('fork_created')).toBe('fork');
+    expect(mapRepoEventToWebhookEvent('release_created')).toBe('release');
+    expect(mapRepoEventToWebhookEvent('release_published')).toBe('release');
   });
 
   it('validates hook URLs with a best-effort SSRF guard', () => {

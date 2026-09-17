@@ -13,7 +13,9 @@ export type RepoEventType =
   | 'pr_merged'
   | 'pr_reviewed'
   | 'pr_commented'
-  | 'fork_created';
+  | 'fork_created'
+  | 'release_created'
+  | 'release_published';
 
 export interface RepoEventRow {
   id: string;

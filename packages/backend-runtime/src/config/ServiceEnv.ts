@@ -24,6 +24,9 @@ interface ServiceEnv {
   MAX_PACK_BYTES?: string;
   MAX_FETCH_BODY_BYTES?: string;
   MAX_MERGE_DIFF_FILES?: string;
+  MAX_RELEASES_PER_REPO?: string;
+  MAX_ASSETS_PER_RELEASE?: string;
+  MAX_ASSET_BYTES?: string;
   BACKGROUND_TASK_RUN_RETENTION_DAYS?: string;
   AUDIT_LOG_RETENTION_DAYS?: string;
   LOG_LEVEL?: string;

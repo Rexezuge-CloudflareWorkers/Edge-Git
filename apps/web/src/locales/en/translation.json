@@ -283,6 +283,29 @@
     "resolved": "Resolved",
     "open": "Open"
   },
+  "releases": {
+    "newRelease": "New Release",
+    "releases": "Releases",
+    "noReleases": "No Releases Yet.",
+    "createRelease": "Create Draft Release",
+    "tagPlaceholder": "Tag (e.g. v1.0.0)",
+    "pickTag": "Pick An Existing Tag",
+    "namePlaceholder": "Title (Optional)",
+    "bodyPlaceholder": "Release Notes (Optional)",
+    "draft": "Draft",
+    "prerelease": "Prerelease",
+    "publish": "Publish",
+    "published": "Release Published.",
+    "publishedBy": "By {{email}} · {{date}}",
+    "created": "Release Created.",
+    "deleted": "Release Deleted.",
+    "deleteConfirm": "Delete This Release? Assets Are Removed Too.",
+    "uploadAsset": "Upload Asset",
+    "assetUploaded": "Asset Uploaded.",
+    "assetDeleted": "Asset Deleted.",
+    "failedToCreate": "Failed To Create Release.",
+    "actionFailed": "Release Action Failed."
+  },
   "commits": {
     "history": "Commit History",
     "backToHistory": "Back To History",
@@ -436,6 +459,7 @@
     "failedToLoadCommit": "Failed To Load Commit.",
     "failedToLoadCompare": "Failed To Load Comparison.",
     "failedToLoadCommits": "Failed To Load Commits.",
+    "failedToLoadReleases": "Failed To Load Releases.",
     "fileNotFound": "File Not Found.",
     "languageLoadFailed": "Unable To Load Language.",
     "languageSaveFailed": "Unable To Save Language.",
@@ -478,7 +502,9 @@
       "pr_merged": "Merged A Pull Request",
       "pr_reviewed": "Reviewed A Pull Request",
       "pr_commented": "Commented On A Pull Request",
-      "fork_created": "Forked This Repository"
+      "fork_created": "Forked This Repository",
+      "release_created": "Created A Release",
+      "release_published": "Published A Release"
     }
   },
   "notifications": {

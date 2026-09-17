@@ -1,0 +1,205 @@
+import type { Hono } from 'hono';
+import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { RepoService } from '@edge-git/backend-services/repo';
+import { getRepoStub } from '../repoStub';
+import { recordAndNotify } from './SocialEmit';
+import { requireVisibleRepo, resolvePublicViewer, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+
+type ReleaseApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
+
+async function viewerCanSeeDrafts(env: Env, viewerEmail: string | null, owner: string, repoName: string): Promise<boolean> {
+  try {
+    const scope = createRequestScope(env);
+    const row = await scope.get(Tokens.RepoService).getByOwnerAndName(owner, repoName);
+    if (!row) return false;
+    const role = await scope.get(Tokens.PermissionService).getRole(viewerEmail, row);
+    return role === 'write' || role === 'admin';
+  } catch {
+    return false;
+  }
+}
+
+async function tagExists(env: Env, fullName: string, tagName: string): Promise<boolean> {
+  try {
+    const tags = (await getRepoStub(env, fullName).getTags()) as Array<{ name: string }>;
+    return tags.some((t) => t.name === tagName);
+  } catch {
+    return false;
+  }
+}
+
+function registerReleasePublicRoutes(app: ReleaseApp): void {
+  app.get('/repos/:owner/:repo/releases', async (c) => {
+    return withPublicRepo(c as never, async (row) => {
+      try {
+        const viewerEmail = await resolvePublicViewer(c as never);
+        const canSeeDrafts = await viewerCanSeeDrafts(c.env, viewerEmail, row.owner, row.name);
+        const releases = await createRequestScope(c.env).get(Tokens.ReleaseService).listReleases(row.id);
+        return c.json({ releases: canSeeDrafts ? releases : releases.filter((r) => !r.isDraft) });
+      } catch {
+        return c.json({ releases: [] });
+      }
+    });
+  });
+
+  app.get('/repos/:owner/:repo/releases/:tag', async (c) => {
+    return withPublicRepo(c as never, async (row) => {
+      try {
+        const scope = createRequestScope(c.env);
+        const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
+        if (release.isDraft) {
+          const viewerEmail = await resolvePublicViewer(c as never);
+          if (!(await viewerCanSeeDrafts(c.env, viewerEmail, row.owner, row.name))) return c.json({ error: 'Not found' }, 404);
+        }
+        const assets = await scope.get(Tokens.ReleaseService).listAssets(row.id, release.tagName);
+        return c.json({ release, assets });
+      } catch (error) {
+        return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      }
+    });
+  });
+}
+
+function registerReleaseUserRoutes(app: ReleaseApp): void {
+  app.get('/user/repos/:owner/:repo/releases', async (c) => {
+    const email = c.get('AuthenticatedUserEmailAddress');
+    const owner = c.req.param('owner');
+    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const row = await requireVisibleRepo(c.env, owner, repoName, email);
+    if (!row) return c.json({ error: 'Not found' }, 404);
+    try {
+      const scope = createRequestScope(c.env);
+      const releases = await scope.get(Tokens.ReleaseService).listReleases(row.id);
+      const canSeeDrafts = await viewerCanSeeDrafts(c.env, email, owner, repoName);
+      return c.json({ releases: canSeeDrafts ? releases : releases.filter((r) => !r.isDraft) });
+    } catch {
+      return c.json({ releases: [] });
+    }
+  });
+
+  app.post('/user/repos/:owner/:repo/releases', async (c) => {
+    const email = c.get('AuthenticatedUserEmailAddress');
+    const owner = c.req.param('owner');
+    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const row = await requireVisibleRepo(c.env, owner, repoName, email);
+    if (!row) return c.json({ error: 'Not found' }, 404);
+    try {
+      await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
+    } catch {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
+    const body = (await c.req.json().catch(() => ({}))) as { tagName?: unknown; name?: unknown; body?: unknown; isDraft?: unknown; isPrerelease?: unknown };
+    try {
+      const scope = createRequestScope(c.env);
+      const isDraft = body.isDraft === undefined || body.isDraft === true;
+      if (!isDraft && typeof body.tagName === 'string') {
+        const fullName = `${row.owner}/${row.name}`;
+        if (!(await tagExists(c.env, fullName, body.tagName.trim().replace(/\.git$/i, '')))) {
+          return c.json({ error: 'git tag does not exist yet — create the tag first or save as draft' }, 400);
+        }
+      }
+      const release = await scope.get(Tokens.ReleaseService).createRelease(row.id, { tagName: body.tagName, name: body.name, body: body.body, isDraft: body.isDraft, isPrerelease: body.isPrerelease }, email);
+      const fullName = `${row.owner}/${row.name}`;
+      void recordAndNotify(c.env, {
+        repositoryId: row.id,
+        fullName,
+        actorEmail: email,
+        type: 'release_created',
+        title: `Release ${release.tagName} created`,
+        subjectType: 'release',
+        subjectOid: null,
+        payload: { tag: release.tagName, draft: release.isDraft },
+      });
+      return c.json({ release }, 201);
+    } catch (error) {
+      return c.json({ error: error instanceof Error ? error.message : 'Failed to create release' }, toServiceStatus(error));
+    }
+  });
+
+  app.get('/user/repos/:owner/:repo/releases/:tag', async (c) => {
+    const email = c.get('AuthenticatedUserEmailAddress');
+    const owner = c.req.param('owner');
+    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const row = await requireVisibleRepo(c.env, owner, repoName, email);
+    if (!row) return c.json({ error: 'Not found' }, 404);
+    try {
+      const scope = createRequestScope(c.env);
+      const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
+      if (release.isDraft && !(await viewerCanSeeDrafts(c.env, email, owner, repoName))) return c.json({ error: 'Not found' }, 404);
+      const assets = await scope.get(Tokens.ReleaseService).listAssets(row.id, release.tagName);
+      return c.json({ release, assets });
+    } catch (error) {
+      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+    }
+  });
+
+  app.patch('/user/repos/:owner/:repo/releases/:tag', async (c) => {
+    const email = c.get('AuthenticatedUserEmailAddress');
+    const owner = c.req.param('owner');
+    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const row = await requireVisibleRepo(c.env, owner, repoName, email);
+    if (!row) return c.json({ error: 'Not found' }, 404);
+    try {
+      await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
+    } catch {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
+    const body = (await c.req.json().catch(() => ({}))) as { name?: unknown; body?: unknown; isDraft?: unknown; isPrerelease?: unknown };
+    try {
+      const scope = createRequestScope(c.env);
+      const before = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
+      if (before.isDraft && body.isDraft === false) {
+        const fullName = `${row.owner}/${row.name}`;
+        if (!(await tagExists(c.env, fullName, before.tagName))) {
+          return c.json({ error: 'git tag does not exist yet — push the tag before publishing' }, 400);
+        }
+      }
+      const release = await scope.get(Tokens.ReleaseService).updateRelease(row.id, c.req.param('tag'), body);
+      if (before.isDraft && !release.isDraft) {
+        const fullName = `${row.owner}/${row.name}`;
+        void recordAndNotify(c.env, {
+          repositoryId: row.id,
+          fullName,
+          actorEmail: email,
+          type: 'release_published',
+          title: `Release ${release.tagName} published`,
+          subjectType: 'release',
+          subjectOid: null,
+          payload: { tag: release.tagName, prerelease: release.isPrerelease },
+        });
+      }
+      return c.json({ release });
+    } catch (error) {
+      return c.json({ error: error instanceof Error ? error.message : 'Failed to update release' }, toServiceStatus(error));
+    }
+  });
+
+  app.delete('/user/repos/:owner/:repo/releases/:tag', async (c) => {
+    const email = c.get('AuthenticatedUserEmailAddress');
+    const owner = c.req.param('owner');
+    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const row = await requireVisibleRepo(c.env, owner, repoName, email);
+    if (!row) return c.json({ error: 'Not found' }, 404);
+    try {
+      await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
+    } catch {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
+    try {
+      const scope = createRequestScope(c.env);
+      const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
+      try {
+        await getRepoStub(c.env, `${row.owner}/${row.name}`).deleteReleaseAssets({ releaseId: release.id });
+      } catch {
+        // best-effort DO cleanup; D1 delete below still runs
+      }
+      await scope.get(Tokens.ReleaseService).deleteRelease(row.id, release.tagName);
+      return c.json({ ok: true });
+    } catch (error) {
+      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+    }
+  });
+}
+
+export { registerReleasePublicRoutes, registerReleaseUserRoutes, viewerCanSeeDrafts };
+export type { ReleaseApp };

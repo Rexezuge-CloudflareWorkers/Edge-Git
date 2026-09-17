@@ -312,7 +312,9 @@ export type RepoEventType =
   | 'pr_merged'
   | 'pr_reviewed'
   | 'pr_commented'
-  | 'fork_created';
+  | 'fork_created'
+  | 'release_created'
+  | 'release_published';
 
 export interface RepoEvent {
   id: string;
@@ -351,6 +353,7 @@ export type WebhookEventName =
   | 'fork'
   | 'star'
   | 'watch'
+  | 'release'
   | 'ping';
 
 export interface RepoWebhook {
