@@ -80,19 +80,14 @@ describe('RepoService visibility branches', () => {
 });
 
 describe('UserService profile branches', () => {
-  it('validates, updates display, and handles missing users', async () => {
-    const store = new Map<string, { email: string; username: string | null; display_name: string | null }>([
-      ['a@x.co', { email: 'a@x.co', username: 'alice', display_name: null }],
-    ]);
+  it('validates and handles missing users', async () => {
+    const store = new Map<string, { email: string; username: string | null }>([['a@x.co', { email: 'a@x.co', username: 'alice' }]]);
     const svc = new UserService({ DB: {} } as never, {
       userDAO: async () =>
         ({
           upsertUser: async () => undefined,
           getByEmail: async (e: string) => store.get(e) ?? null,
           getByUsernameCi: async () => null,
-          setDisplayName: async (e: string, d: string | null) => {
-            store.get(e)!.display_name = d;
-          },
           ensureUsername: async () => undefined,
         }) as never,
       namespaceDAO: async () => ({ isTaken: async () => false, claimIgnore: async () => undefined }) as never,
@@ -101,11 +96,7 @@ describe('UserService profile branches', () => {
     expect(() => UserService.validateUsername('bad name!')).toThrow('Invalid');
     await expect(svc.getProfileByEmail('missing@x.co')).rejects.toThrow('not found');
     await expect(svc.getByUsername('alice')).resolves.toBeNull();
-    const updated = await svc.updateProfile('a@x.co', { displayName: '  Alice A  ' });
-    expect(updated.displayName).toBe('Alice A');
-    const cleared = await svc.updateProfile('a@x.co', { displayName: '   ' });
-    expect(cleared.displayName).toBeNull();
-    await expect(svc.updateProfile('missing@x.co', {})).rejects.toThrow('not found');
+    await expect(svc.getProfileByEmail('a@x.co')).resolves.toMatchObject({ email: 'a@x.co', username: 'alice' });
     await svc.upsertUser('new@x.co');
   });
 });

@@ -124,7 +124,7 @@ function createProfileFakeDb() {
       run(): Promise<{ success: boolean; meta?: { changes?: number } }> {
         if (q.startsWith('INSERT INTO users (email, created_at)')) {
           const [email, created_at] = params as [string, number];
-          if (!state.users.some((u) => u.email === email)) state.users.push({ email, created_at, username: null, display_name: null, updated_at: null });
+          if (!state.users.some((u) => u.email === email)) state.users.push({ email, created_at, username: null, updated_at: null });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE users SET username = COALESCE(username, ?)')) {
@@ -150,8 +150,8 @@ function createProfileFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO organizations (id, username, username_ci')) {
-          const [id, username, username_ci, display_name, creator_email, created_at, updated_at] = params as Array<string | number | null>;
-          state.orgs.push({ id, username, username_ci, display_name, creator_email, created_at, updated_at });
+          const [id, username, username_ci, creator_email, created_at, updated_at] = params as Array<string | number | null>;
+          state.orgs.push({ id, username, username_ci, creator_email, created_at, updated_at });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('DELETE FROM organization_members WHERE org_id = ?')) {

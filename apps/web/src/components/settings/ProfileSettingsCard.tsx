@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { CurrentUser } from '../../types';
-import { renameCurrentUsername, loadCurrentUser, updateCurrentUser } from '../../services/userService';
+import { renameCurrentUsername, loadCurrentUser } from '../../services/userService';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Input, Label } from '../ui/Input';
@@ -16,40 +16,25 @@ export function ProfileSettingsCard({
   showNotice: (type: 'success' | 'error', text: string) => void;
 }) {
   const { t } = useTranslation();
-  const [displayName, setDisplayName] = useState(user.displayName ?? '');
   const [newUsername, setNewUsername] = useState(user.username ?? '');
   const [saving, setSaving] = useState(false);
 
-  const dirtyDisplay = displayName.trim() !== (user.displayName ?? '');
   const trimmedUsername = newUsername.trim();
   const dirtyUsername = trimmedUsername !== '' && trimmedUsername !== (user.username ?? '');
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!dirtyUsername) return;
     setSaving(true);
     try {
-      let updated: CurrentUser | null = dirtyDisplay
-        ? await updateCurrentUser({
-            displayName: displayName.trim() === '' ? null : displayName.trim(),
-          })
-        : null;
-      if (dirtyUsername) {
-        updated = await renameCurrentUsername(trimmedUsername);
-      }
-      if (updated) {
-        setUser(updated);
-        setDisplayName(updated.displayName ?? '');
-        setNewUsername(updated.username ?? '');
-        showNotice('success', t('settings.settingsUpdated', 'Profile Settings Updated.'));
-      }
+      const updated = await renameCurrentUsername(trimmedUsername);
+      setUser(updated);
+      setNewUsername(updated.username ?? '');
+      showNotice('success', t('settings.settingsUpdated', 'Profile Settings Updated.'));
     } catch (error) {
-      // Partial success: a display-name update may have succeeded before a
-      // failed rename. Refresh local state from the server when possible so
-      // the form does not show stale values.
       try {
         const current = await loadCurrentUser();
         setUser(current);
-        setDisplayName(current.displayName ?? '');
         setNewUsername(current.username ?? '');
       } catch {
         // Ignore refresh failures — the error notice below is authoritative.
@@ -73,16 +58,6 @@ export function ProfileSettingsCard({
       </dl>
       <form onSubmit={submit} className="space-y-4">
         <div className="space-y-1.5">
-          <Label htmlFor="user-display-name">{t('settings.displayName', 'Display Name')}</Label>
-          <Input
-            id="user-display-name"
-            placeholder={t('settings.displayNamePlaceholder', 'Your Display Name')}
-            value={displayName}
-            maxLength={100}
-            onChange={(e) => setDisplayName(e.target.value)}
-          />
-        </div>
-        <div className="space-y-1.5">
           <Label htmlFor="user-username">{t('settings.username', 'Username')}</Label>
           <Input
             id="user-username"
@@ -95,7 +70,7 @@ export function ProfileSettingsCard({
             {t('settings.renameHint', 'Renaming Changes All Repository URLs Under Your Account.')}
           </p>
         </div>
-        <Button type="submit" variant="primary" size="sm" loading={saving} disabled={!dirtyDisplay && !dirtyUsername}>
+        <Button type="submit" variant="primary" size="sm" loading={saving} disabled={!dirtyUsername}>
           {t('common.saveChanges', 'Save Changes')}
         </Button>
       </form>

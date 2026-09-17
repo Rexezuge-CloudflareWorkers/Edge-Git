@@ -72,7 +72,7 @@ class OrganizationService {
     return org;
   }
 
-  public async createOrganization(creatorEmail: string, username: string, displayName?: string | null): Promise<OrganizationRow> {
+  public async createOrganization(creatorEmail: string, username: string): Promise<OrganizationRow> {
     const handle = username.trim();
     OrganizationService.validateOrgName(handle);
     const handleCi = handle.toLowerCase();
@@ -101,7 +101,7 @@ class OrganizationService {
 
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const id = UUIDUtil.getRandomUUID();
-    await orgDAO.create({ id, username: handle, displayName: displayName ?? null, creatorEmail: normalizedCreator, now });
+    await orgDAO.create({ id, username: handle, creatorEmail: normalizedCreator, now });
     try {
       await namespaceDAO.claim({ usernameCi: handleCi, kind: 'org', orgId: id, now });
     } catch {
@@ -186,16 +186,6 @@ class OrganizationService {
       if (org) orgs.push(org);
     }
     return orgs;
-  }
-
-  public async updateDisplayName(orgUsername: string, actorEmail: string, displayName: string | null): Promise<OrganizationRow> {
-    const org = await this.requireOwner(orgUsername, actorEmail);
-    const clean = displayName?.trim() ? displayName.trim().slice(0, 100) : null;
-    const orgDAO = await this.deps.organizationDAO();
-    await orgDAO.updateDisplayName(org.id, clean, TimestampUtil.getCurrentUnixTimestampInSeconds());
-    const updated = await orgDAO.getById(org.id);
-    if (!updated) throw new NotFoundError('Organization not found');
-    return updated;
   }
 
   public async rename(orgUsername: string, actorEmail: string, newUsername: string): Promise<OrganizationRow> {

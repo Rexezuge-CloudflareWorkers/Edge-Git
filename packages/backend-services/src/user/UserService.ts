@@ -112,11 +112,11 @@ class UserService {
     return `${base}-${Date.now().toString(36)}`;
   }
 
-  public async getProfileByEmail(email: string): Promise<{ email: string; username: string | null; displayName: string | null }> {
+  public async getProfileByEmail(email: string): Promise<{ email: string; username: string | null }> {
     const dao = await this.deps.userDAO();
     const row = await dao.getByEmail(email.toLowerCase());
     if (!row) throw new NotFoundError('User not found');
-    return { email: row.email, username: row.username ?? null, displayName: row.display_name ?? null };
+    return { email: row.email, username: row.username ?? null };
   }
 
   public async getByUsername(username: string): Promise<UserRow | null> {
@@ -182,17 +182,6 @@ class UserService {
     return { email: normalized, username: handle };
   }
 
-  public async updateProfile(email: string, patch: { displayName?: string | null }): Promise<{ email: string; username: string | null; displayName: string | null }> {
-    const normalized = email.toLowerCase();
-    const dao = await this.deps.userDAO();
-    const existing = await dao.getByEmail(normalized);
-    if (!existing) throw new NotFoundError('User not found');
-    if (patch.displayName !== undefined) {
-      const displayName = patch.displayName?.trim() ? patch.displayName.trim().slice(0, 100) : null;
-      await dao.setDisplayName(normalized, displayName, TimestampUtil.getCurrentUnixTimestampInSeconds());
-    }
-    return this.getProfileByEmail(normalized);
-  }
 }
 
 /**

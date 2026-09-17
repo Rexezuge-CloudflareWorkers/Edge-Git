@@ -11,27 +11,23 @@ export function OrgSettingsCard({
   org,
   showNotice,
 }: {
-  org: { username: string; displayName: string | null };
+  org: { username: string };
   showNotice: (type: 'success' | 'error', text: string) => void;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [displayName, setDisplayName] = useState(org.displayName ?? '');
   const [newUsername, setNewUsername] = useState(org.username);
   const [saving, setSaving] = useState(false);
   const [confirmingDisband, setConfirmingDisband] = useState(false);
 
-  const dirtyDisplay = displayName.trim() !== (org.displayName ?? '');
   const dirtyUsername = newUsername.trim() !== org.username && newUsername.trim() !== '';
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!dirtyUsername) return;
     setSaving(true);
     try {
-      const patch: { displayName?: string | null; username?: string } = {};
-      if (dirtyDisplay) patch.displayName = displayName.trim() === '' ? null : displayName.trim();
-      if (dirtyUsername) patch.username = newUsername.trim();
-      const updated = await updateOrg(org.username, patch);
+      const updated = await updateOrg(org.username, { username: newUsername.trim() });
       showNotice('success', t('orgs.settingsUpdated', 'Organization Settings Updated.'));
       if (updated.username === org.username) {
         void navigate(0);
@@ -65,21 +61,11 @@ export function OrgSettingsCard({
         </CardHeader>
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="org-display-name">{t('orgs.displayName', 'Display Name')}</Label>
-            <Input
-              id="org-display-name"
-              placeholder={t('orgs.displayNamePlaceholder', 'Organization Display Name')}
-              value={displayName}
-              maxLength={100}
-              onChange={(e) => setDisplayName(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1.5">
             <Label htmlFor="org-username">{t('orgs.username', 'Username')}</Label>
             <Input id="org-username" value={newUsername} maxLength={39} onChange={(e) => setNewUsername(e.target.value)} />
             <p className="text-xs text-[var(--color-text-muted)]">{t('orgs.renameHint', 'Renaming Changes All Repository URLs Under This Organization.')}</p>
           </div>
-          <Button type="submit" variant="primary" size="sm" loading={saving} disabled={!dirtyDisplay && !dirtyUsername}>
+          <Button type="submit" variant="primary" size="sm" loading={saving} disabled={!dirtyUsername}>
             {t('common.saveChanges', 'Save Changes')}
           </Button>
         </form>

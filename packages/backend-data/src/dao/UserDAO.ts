@@ -5,7 +5,6 @@ export interface UserRow {
   email: string;
   created_at: number;
   username: string | null;
-  display_name: string | null;
   updated_at: number | null;
 }
 
@@ -36,13 +35,6 @@ class UserDAO extends BaseDAO {
     await this.withRetry(
       () => this.database.prepare('UPDATE users SET username = ?, updated_at = ? WHERE email = ?').bind(username, now, email).run(),
       'set username',
-    );
-  }
-
-  public async setDisplayName(email: string, displayName: string | null, now: number): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('UPDATE users SET display_name = ?, updated_at = ? WHERE email = ?').bind(displayName, now, email).run(),
-      'set display name',
     );
   }
 

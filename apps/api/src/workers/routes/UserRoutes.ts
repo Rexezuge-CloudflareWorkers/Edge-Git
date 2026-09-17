@@ -78,7 +78,6 @@ function registerUserProfileRoutes(app: UserApp): void {
       return c.json({
         type: 'user',
         username: user.username,
-        displayName: user.display_name ?? null,
         repoCount,
         orgCount,
         viewerIsSelf,
@@ -124,7 +123,6 @@ function registerUserProfileRoutes(app: UserApp): void {
     return c.json({
       type: 'org',
       username: org.username,
-      displayName: org.display_name ?? null,
       repoCount,
       memberCount,
       viewerIsMember,
@@ -191,11 +189,11 @@ function registerUserProfileRoutes(app: UserApp): void {
     const orgs = await orgService.listOrgsForUser(user.email).catch(() => []);
     const viewerIsSelf = (viewerEmail ?? '').toLowerCase() === user.email.toLowerCase();
     if (viewerIsSelf) {
-      return c.json({ username: user.username, orgs: orgs.map((o) => ({ username: o.username, displayName: o.display_name ?? null })) });
+      return c.json({ username: user.username, orgs: orgs.map((o) => ({ username: o.username })) });
     }
     const permission = scope.get(Tokens.PermissionService);
     const repoDao = await scope.get(Tokens.RepositoryDAO)().catch(() => null);
-    const visible: Array<{ username: string; displayName: string | null }> = [];
+    const visible: Array<{ username: string }> = [];
     for (const org of orgs) {
       let show = false;
       if (viewerEmail) {
@@ -206,28 +204,13 @@ function registerUserProfileRoutes(app: UserApp): void {
         const repos = await repoDao.listByOrgId(org.id, 5).catch(() => []);
         show = await hasVisibleRepo(repos, (repo) => permission.getRole(viewerEmail, repo as never).catch(() => null));
       }
-      if (show) visible.push({ username: org.username, displayName: org.display_name ?? null });
+      if (show) visible.push({ username: org.username });
     }
     return c.json({ username: user.username, orgs: visible });
   });
 }
 
 function registerUserSettingsRoutes(app: UserApp): void {
-
-  app.patch('/user/me', async (c) => {
-    const email = c.get('AuthenticatedUserEmailAddress');
-    const body = (await c.req.json().catch(() => ({}))) as { displayName?: string | null };
-    if (body.displayName !== undefined && body.displayName !== null && typeof body.displayName !== 'string') {
-      return c.json({ error: 'Invalid displayName' }, 400);
-    }
-    try {
-      const profile = await createRequestScope(c.env).get(Tokens.UserService).updateProfile(email, { displayName: body.displayName ?? null });
-      return c.json({ email: profile.email, username: profile.username, displayName: profile.displayName });
-    } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to update profile' }, toServiceStatus(error));
-    }
-  });
-
   app.patch('/user/me/username', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const body = (await c.req.json().catch(() => ({}))) as { username?: string };
@@ -258,7 +241,7 @@ function registerUserSettingsRoutes(app: UserApp): void {
         }
       }
       const profile = await scope.get(Tokens.UserService).getProfileByEmail(email);
-      return c.json({ email: profile.email, username: profile.username, displayName: profile.displayName });
+      return c.json({ email: profile.email, username: profile.username });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to rename';
       const status = message.includes('taken') || message.includes('Invalid') ? 400 : toServiceStatus(error);
