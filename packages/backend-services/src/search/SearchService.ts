@@ -1,5 +1,5 @@
 import { IssueDAO, RepositoryDAO, SearchDAO } from '@edge-git/backend-data/dao';
-import type { CodeHit, IssueRow, PullRequestRow, RepositoryRow } from '@edge-git/backend-data/dao';
+import type { CodeHit, DiscussionRow, IssueRow, PullRequestRow, RepositoryRow, SnippetRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError } from '@edge-git/backend-errors';
 import { TimestampUtil } from '@edge-git/shared/utils';
@@ -20,7 +20,7 @@ const MAX_QUERY_LENGTH = 200;
 const MAX_LIMIT = 50;
 const MAX_INDEX_BYTES = 20_000;
 
-type SearchType = 'repos' | 'issues' | 'pulls' | 'code';
+type SearchType = 'repos' | 'issues' | 'pulls' | 'code' | 'discussions' | 'snippets';
 
 class SearchService {
   private readonly deps: Required<SearchServiceDeps>;
@@ -55,6 +55,8 @@ class SearchService {
     if (raw === 'issues') return 'issues';
     if (raw === 'pulls') return 'pulls';
     if (raw === 'code') return 'code';
+    if (raw === 'discussions') return 'discussions';
+    if (raw === 'snippets') return 'snippets';
     return 'repos';
   }
 
@@ -199,6 +201,41 @@ class SearchService {
   public async removeFile(repoId: string, path: string): Promise<void> {
     const dao = await this.deps.searchDAO();
     await dao.deleteCodeFile(repoId, path);
+  }
+
+  public async searchDiscussions(
+    query: string,
+    viewerEmail: string | null,
+    opts: { limit?: number; repoId?: string } = {},
+  ): Promise<DiscussionRow[]> {
+    const q = SearchService.sanitizeQuery(query);
+    const limit = SearchService.clampLimit(opts.limit ?? 20);
+    const dao = await this.deps.searchDAO();
+    const candidates = await dao.searchDiscussions(q, { limit: Math.min(limit * 3, MAX_LIMIT), repoId: opts.repoId });
+    const permission = await this.deps.permissionService().catch(() => this.permissionServiceSync());
+    const repositoryDAO = await this.deps.repositoryDAO().catch(() => null);
+    const repoCache = new Map<string, RepositoryRow | null>();
+    const visible: DiscussionRow[] = [];
+    for (const discussion of candidates) {
+      let repo: RepositoryRow | null | undefined = repoCache.get(discussion.repository_id);
+      if (repo === undefined) {
+        repo = repositoryDAO ? await repositoryDAO.getById(discussion.repository_id).catch(() => null) : null;
+        repoCache.set(discussion.repository_id, repo ?? null);
+      }
+      if (!repo) continue;
+      const role = await permission.getRole(viewerEmail, repo).catch(() => null);
+      if (role) visible.push(discussion);
+      if (visible.length >= limit) break;
+    }
+    return visible;
+  }
+
+  public async searchSnippets(query: string, opts: { limit?: number } = {}): Promise<SnippetRow[]> {
+    const q = SearchService.sanitizeQuery(query);
+    const limit = SearchService.clampLimit(opts.limit ?? 20);
+    const dao = await this.deps.searchDAO();
+    // SnippetDAO.searchSnippets already restricts to public rows.
+    return dao.searchSnippets(q, { limit });
   }
 
   public async clearRepo(repoId: string): Promise<void> {

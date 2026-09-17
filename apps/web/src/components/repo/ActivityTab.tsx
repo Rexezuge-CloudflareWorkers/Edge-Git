@@ -24,6 +24,16 @@ const EVENT_LABELS: Record<string, string> = {
   fork_created: 'Forked This Repository',
   release_created: 'Created A Release',
   release_published: 'Published A Release',
+  project_created: 'Created A Project',
+  project_closed: 'Closed A Project',
+  project_reopened: 'Reopened A Project',
+  discussion_opened: 'Opened A Discussion',
+  discussion_answered: 'Answered A Discussion',
+  discussion_locked: 'Locked A Discussion',
+  discussion_commented: 'Commented On A Discussion',
+  wiki_created: 'Created A Wiki Page',
+  wiki_updated: 'Updated A Wiki Page',
+  snippet_created: 'Created A Snippet',
 };
 
 function eventTarget(event: RepoEvent): string | null {

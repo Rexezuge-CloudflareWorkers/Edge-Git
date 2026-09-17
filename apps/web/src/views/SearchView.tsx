@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Card } from '../components/ui/Card';
-import { searchCode, searchIssues, searchPulls, searchRepos } from '../services/searchService';
+import { searchCode, searchDiscussions, searchIssues, searchPulls, searchRepos, searchSnippets } from '../services/searchService';
 import type { CodeHit } from '../services/searchService';
-import type { Issue, PullRequest, Repo } from '../types';
+import type { Discussion, Issue, PullRequest, Repo, Snippet } from '../types';
 
-type SearchTab = 'repos' | 'issues' | 'pulls' | 'code';
+type SearchTab = 'repos' | 'issues' | 'pulls' | 'code' | 'discussions' | 'snippets';
 
 function parseTab(raw: string | null): SearchTab {
-  const tabs: SearchTab[] = ['repos', 'issues', 'pulls', 'code'];
+  const tabs: SearchTab[] = ['repos', 'issues', 'pulls', 'code', 'discussions', 'snippets'];
   return raw !== null && tabs.includes(raw as SearchTab) ? (raw as SearchTab) : 'repos';
 }
 
@@ -22,6 +22,8 @@ export function SearchView({ showNotice }: { showNotice: (type: 'success' | 'err
   const [issues, setIssues] = useState<Issue[]>([]);
   const [pulls, setPulls] = useState<PullRequest[]>([]);
   const [code, setCode] = useState<CodeHit[]>([]);
+  const [discussions, setDiscussions] = useState<Discussion[]>([]);
+  const [snippets, setSnippets] = useState<Snippet[]>([]);
   const [loading, setLoading] = useState(query.length >= 2);
   // Clear stale hits when the query changes (render-phase adjustment avoids
   // set-state-in-effect while keeping old results from flashing).
@@ -32,6 +34,8 @@ export function SearchView({ showNotice }: { showNotice: (type: 'success' | 'err
     setIssues([]);
     setPulls([]);
     setCode([]);
+    setDiscussions([]);
+    setSnippets([]);
     setLoading(true);
   }
 
@@ -45,7 +49,11 @@ export function SearchView({ showNotice }: { showNotice: (type: 'success' | 'err
           ? searchPulls(query, 20).then(setPulls)
           : type === 'code'
             ? searchCode(query, 20).then(setCode)
-            : searchRepos(query, 20).then(setRepos);
+            : type === 'discussions'
+              ? searchDiscussions(query, 20).then(setDiscussions)
+              : type === 'snippets'
+                ? searchSnippets(query, 20).then(setSnippets)
+                : searchRepos(query, 20).then(setRepos);
     run
       .catch(() => {
         if (!cancelled) showNotice('error', t('errors.failedToSearch', 'Failed To Load Search Results.'));
@@ -79,6 +87,14 @@ export function SearchView({ showNotice }: { showNotice: (type: 'success' | 'err
         <span aria-hidden="true">·</span>
         <button type="button" onClick={() => switchTab('code')} className={type === 'code' ? 'font-semibold' : ''}>
           {t('search.code', 'Code')}
+        </button>
+        <span aria-hidden="true">·</span>
+        <button type="button" onClick={() => switchTab('discussions')} className={type === 'discussions' ? 'font-semibold' : ''}>
+          {t('search.discussions', 'Discussions')}
+        </button>
+        <span aria-hidden="true">·</span>
+        <button type="button" onClick={() => switchTab('snippets')} className={type === 'snippets' ? 'font-semibold' : ''}>
+          {t('search.snippets', 'Snippets')}
         </button>
       </div>
       {loading ? (
@@ -134,6 +150,40 @@ export function SearchView({ showNotice }: { showNotice: (type: 'success' | 'err
                   {p.full_name}#{p.number} — {p.title}
                 </Link>
                 {p.body ? <p className="mt-1 text-sm text-[var(--color-text-secondary)] line-clamp-2">{p.body}</p> : null}
+              </Card>
+            ))
+          )}
+        </div>
+      ) : type === 'discussions' ? (
+        <div className="grid gap-3">
+          {discussions.length === 0 ? (
+            <Card>
+              <p className="text-sm text-[var(--color-text-secondary)]">{t('search.noDiscussions', 'No Discussions Found.')}</p>
+            </Card>
+          ) : (
+            discussions.map((d) => (
+              <Card key={d.id}>
+                <p className="font-semibold text-[var(--color-accent)]">
+                  {d.title}
+                </p>
+                {d.body ? <p className="mt-1 text-sm text-[var(--color-text-secondary)] line-clamp-2">{d.body}</p> : null}
+              </Card>
+            ))
+          )}
+        </div>
+      ) : type === 'snippets' ? (
+        <div className="grid gap-3">
+          {snippets.length === 0 ? (
+            <Card>
+              <p className="text-sm text-[var(--color-text-secondary)]">{t('search.noSnippets', 'No Snippets Found.')}</p>
+            </Card>
+          ) : (
+            snippets.map((s) => (
+              <Card key={s.id}>
+                <Link to="/snippets" className="font-semibold text-[var(--color-accent)]">
+                  {s.title || s.id.slice(0, 8)}
+                </Link>
+                <p className="mt-1 text-xs text-[var(--color-text-secondary)]">{s.ownerEmail}</p>
               </Card>
             ))
           )}

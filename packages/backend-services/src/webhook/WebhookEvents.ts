@@ -13,6 +13,11 @@ const WEBHOOK_EVENTS: readonly WebhookEventName[] = [
   'star',
   'watch',
   'release',
+  'project',
+  'discussion',
+  'discussion_comment',
+  'wiki',
+  'snippet',
   'ping',
 ];
 
@@ -65,6 +70,26 @@ function mapRepoEventToWebhookEvent(type: RepoEventType): WebhookEventName | nul
     case 'release_created':
     case 'release_published': {
       return 'release';
+    }
+    case 'project_created':
+    case 'project_closed':
+    case 'project_reopened': {
+      return 'project';
+    }
+    case 'discussion_opened':
+    case 'discussion_answered':
+    case 'discussion_locked': {
+      return 'discussion';
+    }
+    case 'discussion_commented': {
+      return 'discussion_comment';
+    }
+    case 'wiki_created':
+    case 'wiki_updated': {
+      return 'wiki';
+    }
+    case 'snippet_created': {
+      return 'snippet';
     }
     default: {
       return null;

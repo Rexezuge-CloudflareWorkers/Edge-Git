@@ -1,11 +1,13 @@
 import {
   BranchProtectionDAO,
+  DiscussionDAO,
   EventDAO,
   IssueDAO,
   NamespaceDAO,
   NotificationDAO,
   OrganizationDAO,
   OrganizationMemberDAO,
+  ProjectDAO,
   PullRequestDAO,
   PullThreadDAO,
   ReleaseDAO,
@@ -14,6 +16,7 @@ import {
   StarDAO,
   UserDAO,
   WatchDAO,
+  WikiDAO,
 } from '@edge-git/backend-data/dao';
 import type { RepositoryRow, RepoRole } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
@@ -22,6 +25,7 @@ import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { isReservedNamespaceName } from '@edge-git/shared/constants';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 import { PermissionService } from '../permission/PermissionService';
+import { cleanupRepoSidecars } from './repoCleanup';
 
 interface RepoServiceEnv {
   DB: D1Queryable;
@@ -47,6 +51,9 @@ interface RepoServiceDeps {
   eventDAO?: () => Promise<EventDAO>;
   notificationDAO?: () => Promise<NotificationDAO>;
   releaseDAO?: () => Promise<ReleaseDAO>;
+  projectDAO?: () => Promise<ProjectDAO>;
+  discussionDAO?: () => Promise<DiscussionDAO>;
+  wikiDAO?: () => Promise<WikiDAO>;
 }
 
 class RepoService {
@@ -72,6 +79,9 @@ class RepoService {
       eventDAO: () => Promise.resolve(new EventDAO(env.DB)),
       notificationDAO: () => Promise.resolve(new NotificationDAO(env.DB)),
       releaseDAO: () => Promise.resolve(new ReleaseDAO(env.DB)),
+      projectDAO: () => Promise.resolve(new ProjectDAO(env.DB)),
+      discussionDAO: () => Promise.resolve(new DiscussionDAO(env.DB)),
+      wikiDAO: () => Promise.resolve(new WikiDAO(env.DB)),
       ...deps,
     };
   }
@@ -332,62 +342,7 @@ class RepoService {
 
   public async deleteRepo(owner: string, name: string, userEmail: string): Promise<{ id: string }> {
     const repo = await this.requireOwner(owner, name, userEmail);
-    const issueDAO = await this.deps.issueDAO();
-    await issueDAO.deleteByRepo(repo.id);
-    try {
-      const pullRequestDAO = await this.deps.pullRequestDAO();
-      await pullRequestDAO.deleteByRepo(repo.id);
-    } catch {
-      // ignore — legacy DBs without pull_requests tables
-    }
-    try {
-      const pullThreadDAO = await this.deps.pullThreadDAO();
-      await pullThreadDAO.deleteByRepo(repo.id);
-    } catch {
-      // ignore — legacy DBs without pull_review_threads tables
-    }
-    try {
-      const protectionDAO = await this.deps.branchProtectionDAO();
-      await protectionDAO.deleteByRepo(repo.id);
-    } catch {
-      // ignore — legacy DBs without branch_protection_rules table
-    }
-    try {
-      const collabDao = await this.deps.repoCollaboratorDAO();
-      await collabDao.deleteByRepo(repo.id);
-    } catch {
-      // ignore — legacy DBs without collaborators table
-    }
-    try {
-      const starDao = await this.deps.starDAO();
-      await starDao.deleteByRepo(repo.id);
-    } catch {
-      // ignore — legacy DBs without repo_stars table
-    }
-    try {
-      const watchDao = await this.deps.watchDAO();
-      await watchDao.deleteByRepo(repo.id);
-    } catch {
-      // ignore — legacy DBs without repo_watches table
-    }
-    try {
-      const eventDao = await this.deps.eventDAO();
-      await eventDao.deleteByRepo(repo.id);
-    } catch {
-      // ignore — legacy DBs without repo_events table
-    }
-    try {
-      const notificationDao = await this.deps.notificationDAO();
-      await notificationDao.deleteByRepo(repo.id);
-    } catch {
-      // ignore — legacy DBs without notifications table
-    }
-    try {
-      const releaseDao = await this.deps.releaseDAO();
-      await releaseDao.deleteByRepo(repo.id);
-    } catch {
-      // ignore — legacy DBs without releases tables
-    }
+    await cleanupRepoSidecars(this.deps, repo.id);
     const repositoryDAO = await this.deps.repositoryDAO();
     await repositoryDAO.deleteById(repo.id);
     return { id: repo.id };

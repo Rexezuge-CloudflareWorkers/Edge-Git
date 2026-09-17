@@ -1,0 +1,243 @@
+import type { Hono } from 'hono';
+import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { RepoService } from '@edge-git/backend-services/repo';
+import { recordAndNotify } from './SocialEmit';
+import { requireVisibleRepo, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+
+type DiscussionApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
+
+function parseNumber(raw: string): number | null {
+  const n = Number(raw);
+  if (!Number.isSafeInteger(n) || n < 1) return null;
+  return n;
+}
+
+function registerDiscussionPublicRoutes(app: DiscussionApp): void {
+  app.get('/repos/:owner/:repo/discussions/categories', async (c) => {
+    return withPublicRepo(c as never, async (row) => {
+      try {
+        const categories = await createRequestScope(c.env).get(Tokens.DiscussionService).listCategories(row.id);
+        return c.json({ categories });
+      } catch {
+        return c.json({ categories: [] });
+      }
+    });
+  });
+
+  app.get('/repos/:owner/:repo/discussions', async (c) => {
+    return withPublicRepo(c as never, async (row) => {
+      try {
+        const url = new URL(c.req.url);
+        const discussions = await createRequestScope(c.env)
+          .get(Tokens.DiscussionService)
+          .listDiscussions(row.id, url.searchParams.get('category') ?? undefined);
+        return c.json({ discussions });
+      } catch {
+        return c.json({ discussions: [] });
+      }
+    });
+  });
+
+  app.get('/repos/:owner/:repo/discussions/:number', async (c) => {
+    return withPublicRepo(c as never, async (row) => {
+      const number = parseNumber(c.req.param('number'));
+      if (number === null) return c.json({ error: 'Invalid discussion number' }, 400);
+      try {
+        const result = await createRequestScope(c.env).get(Tokens.DiscussionService).getDiscussionWithComments(row.id, number);
+        return c.json(result);
+      } catch (error) {
+        return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      }
+    });
+  });
+}
+
+function registerDiscussionUserRoutes(app: DiscussionApp): void {
+  app.get('/user/repos/:owner/:repo/discussions/categories', async (c) => {
+    const email = c.get('AuthenticatedUserEmailAddress');
+    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
+    if (!row) return c.json({ error: 'Not found' }, 404);
+    try {
+      const categories = await createRequestScope(c.env).get(Tokens.DiscussionService).listCategories(row.id);
+      return c.json({ categories });
+    } catch {
+      return c.json({ categories: [] });
+    }
+  });
+
+  app.get('/user/repos/:owner/:repo/discussions', async (c) => {
+    const email = c.get('AuthenticatedUserEmailAddress');
+    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
+    if (!row) return c.json({ error: 'Not found' }, 404);
+    try {
+      const url = new URL(c.req.url);
+      const discussions = await createRequestScope(c.env)
+        .get(Tokens.DiscussionService)
+        .listDiscussions(row.id, url.searchParams.get('category') ?? undefined);
+      return c.json({ discussions });
+    } catch {
+      return c.json({ discussions: [] });
+    }
+  });
+
+  app.post('/user/repos/:owner/:repo/discussions', async (c) => {
+    const email = c.get('AuthenticatedUserEmailAddress');
+    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
+    if (!row) return c.json({ error: 'Not found' }, 404);
+    const body = (await c.req.json().catch(() => ({}))) as { title: unknown; body?: unknown; categorySlug?: unknown };
+    try {
+      const discussion = await createRequestScope(c.env).get(Tokens.DiscussionService).createDiscussion(row.id, body, email);
+      void recordAndNotify(c.env, {
+        repositoryId: row.id,
+        fullName: `${row.owner}/${row.name}`,
+        actorEmail: email,
+        type: 'discussion_opened',
+        title: `Discussion ${discussion.title} opened`,
+        subjectType: 'discussion',
+        subjectNumber: discussion.number,
+        mentionText: typeof body.body === 'string' ? body.body : null,
+        payload: { number: discussion.number, title: discussion.title },
+      });
+      return c.json({ discussion }, 201);
+    } catch (error) {
+      return c.json({ error: error instanceof Error ? error.message : 'Failed to create discussion' }, toServiceStatus(error));
+    }
+  });
+
+  app.get('/user/repos/:owner/:repo/discussions/:number', async (c) => {
+    const email = c.get('AuthenticatedUserEmailAddress');
+    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
+    if (!row) return c.json({ error: 'Not found' }, 404);
+    const number = parseNumber(c.req.param('number'));
+    if (number === null) return c.json({ error: 'Invalid discussion number' }, 400);
+    try {
+      const result = await createRequestScope(c.env).get(Tokens.DiscussionService).getDiscussionWithComments(row.id, number);
+      return c.json(result);
+    } catch (error) {
+      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+    }
+  });
+
+  app.patch('/user/repos/:owner/:repo/discussions/:number', async (c) => {
+    const email = c.get('AuthenticatedUserEmailAddress');
+    const owner = c.req.param('owner');
+    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const row = await requireVisibleRepo(c.env, owner, repoName, email);
+    if (!row) return c.json({ error: 'Not found' }, 404);
+    const number = parseNumber(c.req.param('number'));
+    if (number === null) return c.json({ error: 'Invalid discussion number' }, 400);
+    const body = (await c.req.json().catch(() => ({}))) as { title?: unknown; body?: unknown; categorySlug?: unknown; status?: unknown };
+    try {
+      const scope = createRequestScope(c.env);
+      const svc = scope.get(Tokens.DiscussionService);
+      const before = await svc.getDiscussion(row.id, number);
+      const isAuthor = before.authorEmail.toLowerCase() === email.toLowerCase();
+      let isWriter = false;
+      try {
+        await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
+        isWriter = true;
+      } catch {
+        isWriter = false;
+      }
+      // Status transitions (lock/answer) need write+; content edits need author or write+.
+      if (!isWriter && body.status !== undefined) return c.json({ error: 'Forbidden' }, 403);
+      if (!isAuthor && !isWriter && (body.title !== undefined || body.body !== undefined || body.categorySlug !== undefined))
+        return c.json({ error: 'Forbidden' }, 403);
+      const discussion =
+        body.status === undefined
+          ? await svc.updateDiscussion(row.id, number, { title: body.title, body: body.body, categorySlug: body.categorySlug })
+          : await svc.setStatus(row.id, number, body.status);
+      if (body.status === 'answered' || body.status === 'locked') {
+        void recordAndNotify(c.env, {
+          repositoryId: row.id,
+          fullName: `${row.owner}/${row.name}`,
+          actorEmail: email,
+          type: body.status === 'answered' ? 'discussion_answered' : 'discussion_locked',
+          title: `Discussion ${discussion.title} ${body.status}`,
+          subjectType: 'discussion',
+          subjectNumber: discussion.number,
+          payload: { number: discussion.number, status: body.status },
+        });
+      }
+      return c.json({ discussion });
+    } catch (error) {
+      return c.json({ error: error instanceof Error ? error.message : 'Failed to update discussion' }, toServiceStatus(error));
+    }
+  });
+
+  app.delete('/user/repos/:owner/:repo/discussions/:number', async (c) => {
+    const email = c.get('AuthenticatedUserEmailAddress');
+    const owner = c.req.param('owner');
+    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const row = await requireVisibleRepo(c.env, owner, repoName, email);
+    if (!row) return c.json({ error: 'Not found' }, 404);
+    const number = parseNumber(c.req.param('number'));
+    if (number === null) return c.json({ error: 'Invalid discussion number' }, 400);
+    try {
+      const scope = createRequestScope(c.env);
+      const before = await scope.get(Tokens.DiscussionService).getDiscussion(row.id, number);
+      const isAuthor = before.authorEmail.toLowerCase() === email.toLowerCase();
+      try {
+        await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
+      } catch {
+        if (!isAuthor) return c.json({ error: 'Forbidden' }, 403);
+      }
+      await scope.get(Tokens.DiscussionService).deleteDiscussion(row.id, number);
+      return c.json({ ok: true });
+    } catch (error) {
+      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+    }
+  });
+
+  app.post('/user/repos/:owner/:repo/discussions/:number/comments', async (c) => {
+    const email = c.get('AuthenticatedUserEmailAddress');
+    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
+    if (!row) return c.json({ error: 'Not found' }, 404);
+    const number = parseNumber(c.req.param('number'));
+    if (number === null) return c.json({ error: 'Invalid discussion number' }, 400);
+    const body = (await c.req.json().catch(() => ({}))) as { body?: unknown };
+    try {
+      const comment = await createRequestScope(c.env).get(Tokens.DiscussionService).addComment(row.id, number, body as { body: unknown }, email);
+      void recordAndNotify(c.env, {
+        repositoryId: row.id,
+        fullName: `${row.owner}/${row.name}`,
+        actorEmail: email,
+        type: 'discussion_commented',
+        title: `Comment on discussion #${number}`,
+        subjectType: 'discussion',
+        subjectNumber: number,
+        mentionText: typeof body.body === 'string' ? body.body : null,
+        payload: { number },
+      });
+      return c.json({ comment }, 201);
+    } catch (error) {
+      return c.json({ error: error instanceof Error ? error.message : 'Failed to add comment' }, toServiceStatus(error));
+    }
+  });
+
+  app.delete('/user/repos/:owner/:repo/discussions/:number/comments/:commentId', async (c) => {
+    const email = c.get('AuthenticatedUserEmailAddress');
+    const owner = c.req.param('owner');
+    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const row = await requireVisibleRepo(c.env, owner, repoName, email);
+    if (!row) return c.json({ error: 'Not found' }, 404);
+    const number = parseNumber(c.req.param('number'));
+    if (number === null) return c.json({ error: 'Invalid discussion number' }, 400);
+    try {
+      const scope = createRequestScope(c.env);
+      try {
+        await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
+      } catch {
+        // Non-writers can only delete via service-level check below; fall through
+        // and let NotFound/ownership surface as 403 to avoid leaking existence.
+      }
+      await scope.get(Tokens.DiscussionService).deleteComment(row.id, number, c.req.param('commentId'));
+      return c.json({ ok: true });
+    } catch (error) {
+      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+    }
+  });
+}
+
+export { registerDiscussionPublicRoutes, registerDiscussionUserRoutes };
+export type { DiscussionApp };

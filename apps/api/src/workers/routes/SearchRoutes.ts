@@ -50,6 +50,14 @@ function registerSearchRoutes(app: SearchApp): void {
           const code = await svc.searchCode(q, viewerEmail, { limit, repoId: row.id });
           return c.json({ type, query: q, code });
         }
+        if (type === 'discussions') {
+          const discussions = await svc.searchDiscussions(q, viewerEmail, { limit, repoId: row.id });
+          return c.json({ type, query: q, discussions });
+        }
+        if (type === 'snippets') {
+          const snippets = await svc.searchSnippets(q, { limit });
+          return c.json({ type, query: q, snippets });
+        }
         const repos = await svc.searchRepos(q, viewerEmail, limit);
         return c.json({ type, query: q, repos: repos.filter((r) => r.id === row.id).map((r) => toRepoJson(r)) });
       }
@@ -64,6 +72,14 @@ function registerSearchRoutes(app: SearchApp): void {
       if (type === 'code') {
         const code = await svc.searchCode(q, viewerEmail, { limit });
         return c.json({ type, query: q, code });
+      }
+      if (type === 'discussions') {
+        const discussions = await svc.searchDiscussions(q, viewerEmail, { limit });
+        return c.json({ type, query: q, discussions });
+      }
+      if (type === 'snippets') {
+        const snippets = await svc.searchSnippets(q, { limit });
+        return c.json({ type, query: q, snippets });
       }
       const repos = await svc.searchRepos(q, viewerEmail, limit);
       return c.json({ type, query: q, repos: repos.map((r) => toRepoJson(r)) });

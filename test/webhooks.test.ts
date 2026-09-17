@@ -325,7 +325,7 @@ function json(method: string, body: unknown): RequestInit {
 
 describe('webhook event helpers', () => {
   it('lists the supported webhook events', () => {
-    expect([...WEBHOOK_EVENTS]).toEqual(['push', 'repository', 'issues', 'issue_comment', 'pull_request', 'pull_request_review', 'fork', 'star', 'watch', 'release', 'ping']);
+    expect([...WEBHOOK_EVENTS]).toEqual(['push', 'repository', 'issues', 'issue_comment', 'pull_request', 'pull_request_review', 'fork', 'star', 'watch', 'release', 'project', 'discussion', 'discussion_comment', 'wiki', 'snippet', 'ping']);
   });
 
   it('normalizes event subscriptions', () => {
@@ -350,6 +350,16 @@ describe('webhook event helpers', () => {
     expect(mapRepoEventToWebhookEvent('fork_created')).toBe('fork');
     expect(mapRepoEventToWebhookEvent('release_created')).toBe('release');
     expect(mapRepoEventToWebhookEvent('release_published')).toBe('release');
+    expect(mapRepoEventToWebhookEvent('project_created')).toBe('project');
+    expect(mapRepoEventToWebhookEvent('project_closed')).toBe('project');
+    expect(mapRepoEventToWebhookEvent('project_reopened')).toBe('project');
+    expect(mapRepoEventToWebhookEvent('discussion_opened')).toBe('discussion');
+    expect(mapRepoEventToWebhookEvent('discussion_answered')).toBe('discussion');
+    expect(mapRepoEventToWebhookEvent('discussion_locked')).toBe('discussion');
+    expect(mapRepoEventToWebhookEvent('discussion_commented')).toBe('discussion_comment');
+    expect(mapRepoEventToWebhookEvent('wiki_created')).toBe('wiki');
+    expect(mapRepoEventToWebhookEvent('wiki_updated')).toBe('wiki');
+    expect(mapRepoEventToWebhookEvent('snippet_created')).toBe('snippet');
   });
 
   it('validates hook URLs with a best-effort SSRF guard', () => {

@@ -1,6 +1,10 @@
 export * from './auth/index';
+export * from './collab/index';
+export * from './discussion/index';
 export * from './fork/index';
+export * from './project/index';
 export * from './repo/index';
+export * from './snippet/index';
 export * from './user/index';
 export * from './issue/index';
 export * from './pull/index';
@@ -9,4 +13,5 @@ export * from './permission/index';
 export * from './search/index';
 export * from './social/index';
 export * from './webhook/index';
+export * from './wiki/index';
 export * from './release/index';

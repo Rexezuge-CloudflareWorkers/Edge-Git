@@ -73,6 +73,17 @@ export function Header({
             />
           </form>
 
+          <button
+            type="button"
+            onClick={() => navigate('/snippets')}
+            className={cn(
+              'px-3.5 py-1.5 rounded-md text-sm transition-colors duration-150 hidden md:block',
+              'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]',
+            )}
+          >
+            {t('header.snippets', 'Snippets')}
+          </button>
+
           {userEmail && (
             <nav className="flex items-center rounded-lg bg-[var(--color-surface-2)] p-1 gap-0.5">
               <button

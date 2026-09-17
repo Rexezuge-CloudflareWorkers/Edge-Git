@@ -1,19 +1,23 @@
 import type {
   BranchProtectionDAO,
   CollaborationDAO,
+  DiscussionDAO,
   IssueDAO,
   NamespaceDAO,
   OrganizationDAO,
   OrganizationMemberDAO,
+  ProjectDAO,
   PullRequestDAO,
   PullThreadDAO,
   ReleaseDAO,
   RepoCollaboratorDAO,
   RepositoryDAO,
+  SnippetDAO,
   UserAccessTokenDAO,
   UserDAO,
   WebhookDAO,
   WebhookDeliveryDAO,
+  WikiDAO,
 } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import type { Token } from '@edge-git/backend-runtime/di';
@@ -23,9 +27,13 @@ import type { TokenService } from '../auth/TokenService';
 import type { WebhookDeliveryService } from '../webhook/WebhookDeliveryService';
 import type { WebhookService } from '../webhook/WebhookService';
 import type { BranchProtectionService } from '../protection/BranchProtectionService';
+import type { DiscussionService } from '../discussion/DiscussionService';
 import type { ForkService } from '../fork/ForkService';
+import type { ProjectService } from '../project/ProjectService';
 import type { RepoService } from '../repo/RepoService';
+import type { SnippetService } from '../snippet/SnippetService';
 import type { UserService } from '../user/UserService';
+import type { WikiService } from '../wiki/WikiService';
 import type { IssueService } from '../issue/IssueService';
 import type { PullRequestService } from '../pull/PullRequestService';
 import type { PullThreadService } from '../pull/PullThreadService';
@@ -80,6 +88,10 @@ const Tokens = {
   WebhookDAO: Symbol('WebhookDAO') as Token<() => Promise<WebhookDAO>>,
   WebhookDeliveryDAO: Symbol('WebhookDeliveryDAO') as Token<() => Promise<WebhookDeliveryDAO>>,
   ReleaseDAO: Symbol('ReleaseDAO') as Token<() => Promise<ReleaseDAO>>,
+  ProjectDAO: Symbol('ProjectDAO') as Token<() => Promise<ProjectDAO>>,
+  DiscussionDAO: Symbol('DiscussionDAO') as Token<() => Promise<DiscussionDAO>>,
+  WikiDAO: Symbol('WikiDAO') as Token<() => Promise<WikiDAO>>,
+  SnippetDAO: Symbol('SnippetDAO') as Token<() => Promise<SnippetDAO>>,
   AccessAuthService: Symbol('AccessAuthService') as Token<AccessAuthService>,
   TokenService: Symbol('TokenService') as Token<TokenService>,
   BranchProtectionService: Symbol('BranchProtectionService') as Token<BranchProtectionService>,
@@ -100,6 +112,10 @@ const Tokens = {
   WebhookDeliveryService: Symbol('WebhookDeliveryService') as Token<WebhookDeliveryService>,
   CollaborationService: Symbol('CollaborationService') as Token<CollaborationService>,
   ReleaseService: Symbol('ReleaseService') as Token<ReleaseService>,
+  ProjectService: Symbol('ProjectService') as Token<ProjectService>,
+  DiscussionService: Symbol('DiscussionService') as Token<DiscussionService>,
+  WikiService: Symbol('WikiService') as Token<WikiService>,
+  SnippetService: Symbol('SnippetService') as Token<SnippetService>,
 } satisfies Record<string, Token<unknown>>;
 
 export { Tokens };

@@ -1,4 +1,4 @@
-import { BranchProtectionDAO, CollaborationDAO, IssueDAO, NamespaceDAO, OrganizationDAO, OrganizationMemberDAO, PullRequestDAO, PullThreadDAO, ReleaseDAO, RepoCollaboratorDAO, RepositoryDAO, SearchDAO, UserAccessTokenDAO, UserDAO } from '@edge-git/backend-data/dao';
+import { BranchProtectionDAO, CollaborationDAO, DiscussionDAO, IssueDAO, NamespaceDAO, OrganizationDAO, OrganizationMemberDAO, ProjectDAO, PullRequestDAO, PullThreadDAO, ReleaseDAO, RepoCollaboratorDAO, RepositoryDAO, SearchDAO, SnippetDAO, UserAccessTokenDAO, UserDAO, WikiDAO } from '@edge-git/backend-data/dao';
 import { EventDAO, NotificationDAO, StarDAO, WatchDAO, WebhookDAO, WebhookDeliveryDAO } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { Container } from '@edge-git/backend-runtime/di';
@@ -25,7 +25,11 @@ import { WatchService } from '@edge-git/backend-services/social/WatchService';
 import { WebhookDeliveryService } from '@edge-git/backend-services/webhook/WebhookDeliveryService';
 import { WebhookService } from '@edge-git/backend-services/webhook/WebhookService';
 import { CollaborationService } from '@edge-git/backend-services/collab';
+import { DiscussionService } from '@edge-git/backend-services/discussion';
+import { ProjectService } from '@edge-git/backend-services/project';
 import { ReleaseService } from '@edge-git/backend-services/release';
+import { SnippetService } from '@edge-git/backend-services/snippet';
+import { WikiService } from '@edge-git/backend-services/wiki';
 import { Tokens } from './tokens';
 
 // Minimal structural env for scope creation. Secrets are resolved lazily and
@@ -85,6 +89,10 @@ function createRequestScope(env: RequestScopeEnv): Container {
   const webhookDAO = memoize(() => Promise.resolve(new WebhookDAO(env.DB)));
   const webhookDeliveryDAO = memoize(() => Promise.resolve(new WebhookDeliveryDAO(env.DB)));
   const releaseDAO = memoize(() => Promise.resolve(new ReleaseDAO(env.DB)));
+  const projectDAO = memoize(() => Promise.resolve(new ProjectDAO(env.DB)));
+  const discussionDAO = memoize(() => Promise.resolve(new DiscussionDAO(env.DB)));
+  const wikiDAO = memoize(() => Promise.resolve(new WikiDAO(env.DB)));
+  const snippetDAO = memoize(() => Promise.resolve(new SnippetDAO(env.DB)));
   scope.bindValue(Tokens.UserDAO, userDAO);
   scope.bindValue(Tokens.RepositoryDAO, repositoryDAO);
   scope.bindValue(Tokens.UserAccessTokenDAO, tokenDAO);
@@ -105,6 +113,10 @@ function createRequestScope(env: RequestScopeEnv): Container {
   scope.bindValue(Tokens.WebhookDAO, webhookDAO);
   scope.bindValue(Tokens.WebhookDeliveryDAO, webhookDeliveryDAO);
   scope.bindValue(Tokens.ReleaseDAO, releaseDAO);
+  scope.bindValue(Tokens.ProjectDAO, projectDAO);
+  scope.bindValue(Tokens.DiscussionDAO, discussionDAO);
+  scope.bindValue(Tokens.WikiDAO, wikiDAO);
+  scope.bindValue(Tokens.SnippetDAO, snippetDAO);
 
   scope.bind(Tokens.AccessAuthService, () => new AccessAuthService(env as never));
   scope.bind(Tokens.TokenService, () => new TokenService(env as never, { tokenDAO }));
@@ -115,7 +127,7 @@ function createRequestScope(env: RequestScopeEnv): Container {
   );
   scope.bind(
     Tokens.RepoService,
-    () => new RepoService(env as never, { repositoryDAO, issueDAO, pullRequestDAO, pullThreadDAO, branchProtectionDAO, userDAO, organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO, starDAO, watchDAO, eventDAO, notificationDAO, releaseDAO }),
+    () => new RepoService(env as never, { repositoryDAO, issueDAO, pullRequestDAO, pullThreadDAO, branchProtectionDAO, userDAO, organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO, starDAO, watchDAO, eventDAO, notificationDAO, releaseDAO, projectDAO, discussionDAO, wikiDAO }),
   );
   scope.bind(Tokens.UserService, () => new UserService(env as never, { userDAO, namespaceDAO, organizationDAO, repositoryDAO }));
   scope.bind(Tokens.IssueService, () => new IssueService(env as never, { issueDAO }));
@@ -145,6 +157,10 @@ function createRequestScope(env: RequestScopeEnv): Container {
   scope.bind(Tokens.StarService, () => new StarService(env as never, { starDAO }));
   scope.bind(Tokens.CollaborationService, () => new CollaborationService(env as never, { collaborationDAO }));
   scope.bind(Tokens.ReleaseService, () => new ReleaseService(env as never, { releaseDAO }));
+  scope.bind(Tokens.ProjectService, () => new ProjectService(env as never, { projectDAO }));
+  scope.bind(Tokens.DiscussionService, () => new DiscussionService(env as never, { discussionDAO }));
+  scope.bind(Tokens.WikiService, () => new WikiService(env as never, { wikiDAO }));
+  scope.bind(Tokens.SnippetService, () => new SnippetService(env as never, { snippetDAO }));
   scope.bind(Tokens.WatchService, () => new WatchService(env as never, { watchDAO }));
   scope.bind(Tokens.ActivityService, () => new ActivityService(env as never, { eventDAO }));
   scope.bind(Tokens.WebhookService, () => new WebhookService(env as never, { webhookDAO }));

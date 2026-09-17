@@ -6,19 +6,28 @@ import {
   DEFAULT_GIT_CACHE_TTL_SECONDS,
   DEFAULT_MAX_ASSETS_PER_RELEASE,
   DEFAULT_MAX_ASSET_BYTES,
+  DEFAULT_MAX_CARDS_PER_COLUMN,
+  DEFAULT_MAX_COLUMNS_PER_PROJECT,
+  DEFAULT_MAX_DISCUSSIONS_PER_REPO,
   DEFAULT_MAX_FETCH_BODY_BYTES,
   DEFAULT_MAX_FETCH_HAVES,
   DEFAULT_MAX_FETCH_WANTS,
+  DEFAULT_MAX_FILES_PER_SNIPPET,
   DEFAULT_MAX_HOOKS_PER_REPO,
   DEFAULT_MAX_MERGE_DIFF_FILES,
   DEFAULT_MAX_PACK_BYTES,
   DEFAULT_MAX_PACK_OBJECTS,
+  DEFAULT_MAX_PROJECTS_PER_REPO,
   DEFAULT_MAX_PUSH_COMMANDS,
   DEFAULT_MAX_RELEASES_PER_REPO,
   DEFAULT_MAX_REPOS_PER_USER,
   DEFAULT_MAX_RULES_PER_REPO,
+  DEFAULT_MAX_SNIPPET_BYTES,
+  DEFAULT_MAX_SNIPPETS_PER_USER,
   DEFAULT_MAX_TOKENS_PER_USER,
   DEFAULT_MAX_TOKEN_EXPIRY_DAYS,
+  DEFAULT_MAX_WIKI_BODY_BYTES,
+  DEFAULT_MAX_WIKI_PAGES_PER_REPO,
   DEFAULT_SITE_URL,
   DEFAULT_WEBHOOK_DELIVERY_RETENTION_DAYS,
   DEFAULT_WEBHOOK_MAX_ATTEMPTS,
@@ -141,6 +150,42 @@ class AppConfiguration {
 
   public getMaxAssetBytes(): number {
     return EnvParser.positiveInt(this.env, 'MAX_ASSET_BYTES', DEFAULT_MAX_ASSET_BYTES);
+  }
+
+  public getMaxProjectsPerRepo(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_PROJECTS_PER_REPO', DEFAULT_MAX_PROJECTS_PER_REPO);
+  }
+
+  public getMaxColumnsPerProject(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_COLUMNS_PER_PROJECT', DEFAULT_MAX_COLUMNS_PER_PROJECT);
+  }
+
+  public getMaxCardsPerColumn(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_CARDS_PER_COLUMN', DEFAULT_MAX_CARDS_PER_COLUMN);
+  }
+
+  public getMaxDiscussionsPerRepo(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_DISCUSSIONS_PER_REPO', DEFAULT_MAX_DISCUSSIONS_PER_REPO);
+  }
+
+  public getMaxWikiPagesPerRepo(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_WIKI_PAGES_PER_REPO', DEFAULT_MAX_WIKI_PAGES_PER_REPO);
+  }
+
+  public getMaxWikiBodyBytes(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_WIKI_BODY_BYTES', DEFAULT_MAX_WIKI_BODY_BYTES);
+  }
+
+  public getMaxSnippetsPerUser(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_SNIPPETS_PER_USER', DEFAULT_MAX_SNIPPETS_PER_USER);
+  }
+
+  public getMaxFilesPerSnippet(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_FILES_PER_SNIPPET', DEFAULT_MAX_FILES_PER_SNIPPET);
+  }
+
+  public getMaxSnippetBytes(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_SNIPPET_BYTES', DEFAULT_MAX_SNIPPET_BYTES);
   }
 
   public isDemoMode(): boolean {
