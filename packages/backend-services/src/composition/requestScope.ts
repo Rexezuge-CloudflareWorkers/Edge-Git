@@ -1,5 +1,5 @@
 import { BranchProtectionDAO, CollaborationDAO, DiscussionDAO, IssueDAO, NamespaceDAO, OrganizationDAO, OrganizationMemberDAO, ProjectDAO, PullRequestDAO, PullThreadDAO, ReleaseDAO, RepoCollaboratorDAO, RepositoryDAO, SearchDAO, SnippetDAO, UserAccessTokenDAO, UserDAO, WikiDAO } from '@edge-git/backend-data/dao';
-import { EventDAO, NotificationDAO, StarDAO, WatchDAO, WebhookDAO, WebhookDeliveryDAO } from '@edge-git/backend-data/dao';
+import { AuditLogDAO, EventDAO, NotificationDAO, StarDAO, TeamDAO, TeamMemberDAO, TeamRepoGrantDAO, WatchDAO, WebhookDAO, WebhookDeliveryDAO } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { Container } from '@edge-git/backend-runtime/di';
 import { AppConfiguration } from '@edge-git/backend-runtime/config';
@@ -16,6 +16,8 @@ import { IssueService } from '@edge-git/backend-services/issue';
 import { PullRequestService } from '@edge-git/backend-services/pull';
 import { PullThreadService } from '@edge-git/backend-services/pull/PullThreadService';
 import { OrganizationService } from '@edge-git/backend-services/org';
+import { TeamService } from '@edge-git/backend-services/team';
+import { AuditService } from '@edge-git/backend-services/audit';
 import { PermissionService } from '@edge-git/backend-services/permission';
 import { SearchService } from '@edge-git/backend-services/search';
 import { ActivityService } from '@edge-git/backend-services/social/ActivityService';
@@ -93,6 +95,10 @@ function createRequestScope(env: RequestScopeEnv): Container {
   const discussionDAO = memoize(() => Promise.resolve(new DiscussionDAO(env.DB)));
   const wikiDAO = memoize(() => Promise.resolve(new WikiDAO(env.DB)));
   const snippetDAO = memoize(() => Promise.resolve(new SnippetDAO(env.DB)));
+  const teamDAO = memoize(() => Promise.resolve(new TeamDAO(env.DB)));
+  const teamMemberDAO = memoize(() => Promise.resolve(new TeamMemberDAO(env.DB)));
+  const teamGrantDAO = memoize(() => Promise.resolve(new TeamRepoGrantDAO(env.DB)));
+  const auditLogDAO = memoize(() => Promise.resolve(new AuditLogDAO(env.DB)));
   scope.bindValue(Tokens.UserDAO, userDAO);
   scope.bindValue(Tokens.RepositoryDAO, repositoryDAO);
   scope.bindValue(Tokens.UserAccessTokenDAO, tokenDAO);
@@ -117,6 +123,10 @@ function createRequestScope(env: RequestScopeEnv): Container {
   scope.bindValue(Tokens.DiscussionDAO, discussionDAO);
   scope.bindValue(Tokens.WikiDAO, wikiDAO);
   scope.bindValue(Tokens.SnippetDAO, snippetDAO);
+  scope.bindValue(Tokens.TeamDAO, teamDAO);
+  scope.bindValue(Tokens.TeamMemberDAO, teamMemberDAO);
+  scope.bindValue(Tokens.TeamRepoGrantDAO, teamGrantDAO);
+  scope.bindValue(Tokens.AuditLogDAO, auditLogDAO);
 
   scope.bind(Tokens.AccessAuthService, () => new AccessAuthService(env as never));
   scope.bind(Tokens.TokenService, () => new TokenService(env as never, { tokenDAO }));
@@ -138,8 +148,13 @@ function createRequestScope(env: RequestScopeEnv): Container {
     () => new OrganizationService(env as never, { organizationDAO, organizationMemberDAO, namespaceDAO, userDAO, repositoryDAO }),
   );
   scope.bind(
+    Tokens.TeamService,
+    () => new TeamService(env as never, { teamDAO, teamMemberDAO, teamGrantDAO, organizationDAO, organizationMemberDAO, userDAO, repositoryDAO }),
+  );
+  scope.bind(Tokens.AuditService, () => new AuditService(env as never, { auditLogDAO, organizationDAO, organizationMemberDAO }));
+  scope.bind(
     Tokens.PermissionService,
-    () => new PermissionService(env as never, { organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO }),
+    () => new PermissionService(env as never, { organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO, teamMemberDAO, teamGrantDAO, teamDAO }),
   );
   scope.bind(
     Tokens.SearchService,
@@ -150,7 +165,7 @@ function createRequestScope(env: RequestScopeEnv): Container {
         issueDAO,
         permissionService: () =>
           Promise.resolve(
-            new PermissionService(env as never, { organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO }),
+            new PermissionService(env as never, { organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO, teamMemberDAO, teamGrantDAO, teamDAO }),
           ),
       }),
   );
@@ -174,7 +189,7 @@ function createRequestScope(env: RequestScopeEnv): Container {
         userDAO,
         repositoryDAO,
         permissionService: () =>
-          Promise.resolve(new PermissionService(env as never, { organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO })),
+          Promise.resolve(new PermissionService(env as never, { organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO, teamMemberDAO, teamGrantDAO, teamDAO })),
       }),
   );
   // Lazy bind so unit tests mocking `@edge-git/backend-runtime/config` with

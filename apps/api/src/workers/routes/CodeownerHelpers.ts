@@ -1,6 +1,6 @@
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { matchCodeowners, parseCodeowners } from '@edge-git/backend-services/collab';
-import { normalizeCodeownerHandle } from '@edge-git/backend-services/collab';
+import { normalizeCodeownerHandle, parseCodeownerTeam } from '@edge-git/backend-services/collab';
 import { getRepoStub } from '../repoStub';
 
 interface CodeownerRule {
@@ -67,12 +67,40 @@ async function suggestCodeownerHandles(
   return { owners: fallback, rules: rules.length };
 }
 
+async function collectTeamMemberEmails(
+  env: Env,
+  team: { org: string; team: string },
+  excludeEmail: string,
+  remaining: number,
+): Promise<string[]> {
+  if (remaining <= 0) return [];
+  try {
+    const emails = await createRequestScope(env).get(Tokens.TeamService).listMemberEmails(team.org, team.team);
+    const collected: string[] = [];
+    for (const email of emails) {
+      const lower = email.toLowerCase();
+      if (lower && lower !== excludeEmail && !collected.includes(lower)) collected.push(lower);
+    }
+    return collected.slice(0, remaining);
+  } catch {
+    // Unresolvable team — skip like before.
+    return [];
+  }
+}
+
 async function resolveCodeownerEmails(env: Env, handles: readonly string[], excludeEmail?: string): Promise<string[]> {
   const excluded = (excludeEmail ?? '').toLowerCase();
   const scope = createRequestScope(env);
   const out: string[] = [];
   for (const handle of handles) {
     if (out.length >= MAX_RESOLVED_OWNERS) break;
+    // `org/team` tokens expand to team member emails (best-effort).
+    const team = parseCodeownerTeam(handle);
+    if (team) {
+      const collected = await collectTeamMemberEmails(env, team, excluded, MAX_RESOLVED_OWNERS - out.length);
+      out.push(...collected.filter((email) => !out.includes(email)));
+      continue;
+    }
     const normalized = normalizeCodeownerHandle(handle);
     if (!normalized) {
       // Raw emails pass through without a directory lookup.

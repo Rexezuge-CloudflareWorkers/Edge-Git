@@ -51,6 +51,41 @@ export interface Collaborator {
   role: 'admin' | 'write' | 'read';
 }
 
+export interface Team {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface TeamMember {
+  email: string;
+  username: string | null;
+  role: 'admin' | 'member';
+}
+
+export interface TeamRepoGrant {
+  repoId: string;
+  fullName: string | null;
+  role: 'admin' | 'write' | 'read';
+}
+
+export interface AuditLogEntry {
+  id: string;
+  timestamp: number;
+  userEmail: string;
+  action: string;
+  resource: string | null;
+  method: string;
+  path: string;
+  statusCode: number;
+  detail: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+}
+
 export interface BranchesResponse {
   branches: string[];
   currentBranch: string | null;

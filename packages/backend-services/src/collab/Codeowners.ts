@@ -43,7 +43,7 @@ function matchCodeowners(rules: readonly CodeownerRule[], path: string): string[
   return best?.owners ?? [];
 }
 
-export { matchCodeowners, parseCodeowners, normalizeCodeownerHandle };
+export { matchCodeowners, parseCodeowners, normalizeCodeownerHandle, parseCodeownerTeam };
 
 /**
  * Normalize a CODEOWNERS owner token to a resolvable username, or null when
@@ -56,4 +56,18 @@ function normalizeCodeownerHandle(raw: string): string | null {
   const stripped = handle.startsWith('@') ? handle.slice(1) : handle;
   if (!/^[\w.-]{1,100}$/.test(stripped)) return null;
   return stripped;
+}
+
+/**
+ * Parse an `org/team` CODEOWNERS token (optionally `@`-prefixed) into its
+ * org + team slugs, or null when the token is a plain user/email handle.
+ * Previously such tokens were skipped entirely (normalize → null).
+ */
+function parseCodeownerTeam(raw: string): { org: string; team: string } | null {
+  const handle = raw.trim().replace(/^@/, '');
+  const parts = handle.split('/');
+  if (parts.length !== 2) return null;
+  const [org, team] = parts.map((p) => p.trim());
+  if (!org || !team || !/^[\w.-]{1,100}$/.test(org) || !/^[\w.-]{1,100}$/.test(team)) return null;
+  return { org, team };
 }

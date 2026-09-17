@@ -2,6 +2,7 @@ import { Context, Next } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import type { AccessIdentityContext, AuthenticatedToken } from '@edge-git/backend-services/auth';
 import { coversScope } from '@edge-git/backend-services/auth';
+import { AuditService } from '@edge-git/backend-services/audit';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { getBasicCredentials, getBearerToken } from '@edge-git/git-protocol';
 import { UnauthorizedError, ForbiddenError } from '@edge-git/backend-errors';
@@ -102,6 +103,11 @@ async function gitAuthForRepo(
     if (rank < need) {
       return new Response('Forbidden', { status: 403 });
     }
+    try {
+      c.set('AuthenticatedUserEmailAddress', userEmail);
+    } catch {
+      // context may not carry the variable on raw git routes — best-effort
+    }
     return { userEmail, repo, role, scopes: identity.scopes };
   } catch {
     return unauthorizedGit();
@@ -121,6 +127,47 @@ async function webhookFlushHandler(c: RequestContext, next: Next): Promise<Respo
   }
 }
 
+// Audit-everything (AccessBridge activityAudit pattern): records every
+// request on the mounted prefixes — including reads and the audit readers
+// themselves — via `waitUntil`, never failing the request. Must be
+// registered BEFORE authentication middleware so denied requests are also
+// captured (`AuthenticatedUserEmailAddress` is read in `finally`, after
+// downstream auth has run; missing → `unknown`).
+async function activityAuditHandler(c: RequestContext, next: Next): Promise<Response | void> {
+  let status = 500;
+  try {
+    await next();
+    try {
+      status = c.res.status;
+    } catch {
+      status = 200;
+    }
+  } catch (error: unknown) {
+    throw error;
+  } finally {
+    try {
+      let email = 'unknown';
+      try {
+        email = (c.get('AuthenticatedUserEmailAddress')) ?? 'unknown';
+      } catch {
+        email = 'unknown';
+      }
+      const event = AuditService.buildRequestEvent(c.req.raw, email, status);
+      const scope = createRequestScope(c.env);
+      const record = scope.get(Tokens.AuditService).record(event);
+      const waitUntil = (c.executionCtx as ExecutionContext | undefined)?.waitUntil?.bind(c.executionCtx);
+      if (typeof waitUntil === 'function') {
+        waitUntil(record);
+      } else {
+        // No execution context (unit tests): fire-and-forget, never throws.
+        void record.catch(() => undefined);
+      }
+    } catch {
+      // Auditing must never fail the request.
+    }
+  }
+}
+
 class MiddlewareHandlers {
   public static userAuthentication(): (c: RequestContext, next: Next) => Promise<Response | void> {
     return userAuthenticationHandler;
@@ -132,6 +179,10 @@ class MiddlewareHandlers {
   // sweeper retries whatever fails. Reads never trigger a flush.
   public static webhookFlush(): (c: RequestContext, next: Next) => Promise<Response | void> {
     return webhookFlushHandler;
+  }
+
+  public static activityAudit(): (c: RequestContext, next: Next) => Promise<Response | void> {
+    return activityAuditHandler;
   }
 
   public static async requireUser(c: RequestContext): Promise<string | Response> {

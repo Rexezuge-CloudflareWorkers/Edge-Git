@@ -1,5 +1,5 @@
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
-import { NamespaceDAO, OrganizationDAO, OrganizationMemberDAO, RepoCollaboratorDAO } from '@edge-git/backend-data/dao';
+import { NamespaceDAO, OrganizationDAO, OrganizationMemberDAO, RepoCollaboratorDAO, TeamDAO, TeamMemberDAO, TeamRepoGrantDAO } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import type { RepoRole } from '@edge-git/backend-data/dao';
 
@@ -14,6 +14,9 @@ interface PermissionServiceDeps {
   organizationMemberDAO?: () => Promise<OrganizationMemberDAO>;
   repoCollaboratorDAO?: () => Promise<RepoCollaboratorDAO>;
   namespaceDAO?: () => Promise<NamespaceDAO>;
+  teamDAO?: () => Promise<TeamDAO>;
+  teamMemberDAO?: () => Promise<TeamMemberDAO>;
+  teamGrantDAO?: () => Promise<TeamRepoGrantDAO>;
 }
 
 const ROLE_RANK: Record<RepoPermission, number> = { read: 1, write: 2, admin: 3 };
@@ -30,6 +33,9 @@ class PermissionService {
       organizationMemberDAO: () => Promise.resolve(new OrganizationMemberDAO(env.DB)),
       repoCollaboratorDAO: () => Promise.resolve(new RepoCollaboratorDAO(env.DB)),
       namespaceDAO: () => Promise.resolve(new NamespaceDAO(env.DB)),
+      teamDAO: () => Promise.resolve(new TeamDAO(env.DB)),
+      teamMemberDAO: () => Promise.resolve(new TeamMemberDAO(env.DB)),
+      teamGrantDAO: () => Promise.resolve(new TeamRepoGrantDAO(env.DB)),
       ...deps,
     };
   }
@@ -100,13 +106,23 @@ class PermissionService {
       } catch {
         // missing table → fall through to collaborator/public checks
       }
+      let best: RepoPermission | null = null;
       try {
         const collabDAO = await this.deps.repoCollaboratorDAO();
         const grant = await collabDAO.get(repo.id, viewer);
-        if (grant) return grant.role;
+        if (grant) best = grant.role;
       } catch {
         // ignore
       }
+      // Team-derived grants (org repos only): max of direct + team grants.
+      // Missing team tables (legacy DBs/fakes) fall through silently.
+      try {
+        const teamBest = await this.getTeamRole(orgId, repo.id, viewer);
+        if (teamBest && (!best || ROLE_RANK[teamBest] > ROLE_RANK[best])) best = teamBest;
+      } catch {
+        // ignore
+      }
+      if (best) return best;
       return isPrivate ? null : 'read';
     }
 
@@ -121,6 +137,33 @@ class PermissionService {
       // ignore
     }
     return isPrivate ? null : 'read';
+  }
+
+  /**
+   * Best team-derived role for a viewer on an org repo: for every grant on
+   * this repo, checks membership in the granting team (scoped to the same
+   * org) and returns the max role. Teams never apply to user-owned repos.
+   */
+  private async getTeamRole(orgId: string, repoId: string, viewer: string): Promise<RepoPermission | null> {
+    const grantDAO = await this.deps.teamGrantDAO();
+    const grants = await grantDAO.listByRepo(repoId).catch(() => []);
+    if (grants.length === 0) return null;
+    const memberDAO = await this.deps.teamMemberDAO();
+    const teamDAO = await this.deps.teamDAO();
+    let best: RepoPermission | null = null;
+    for (const grant of grants) {
+      try {
+        const team = await teamDAO.getById(grant.team_id).catch(() => null);
+        if (!team || team.org_id !== orgId) continue;
+        const membership = await memberDAO.get(grant.team_id, viewer).catch(() => null);
+        if (!membership) continue;
+        const role = grant.role;
+        if (!best || ROLE_RANK[role] > ROLE_RANK[best]) best = role;
+      } catch {
+        continue;
+      }
+    }
+    return best;
   }
 }
 

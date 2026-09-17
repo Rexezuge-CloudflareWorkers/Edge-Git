@@ -29,6 +29,9 @@ declare global {
     MAX_ASSET_BYTES?: string;
     BACKGROUND_TASK_RUN_RETENTION_DAYS?: string;
     AUDIT_LOG_RETENTION_DAYS?: string;
+    MAX_TEAMS_PER_ORG?: string;
+    MAX_TEAM_MEMBERS?: string;
+    MAX_TEAM_GRANTS?: string;
   }
 
   type CloudflareEnv = Env;

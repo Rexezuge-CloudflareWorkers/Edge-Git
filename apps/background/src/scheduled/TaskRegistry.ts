@@ -4,6 +4,7 @@ import { createLogger } from '@edge-git/backend-runtime/logger';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { BaseScheduledTask } from './IScheduledTask';
 import type { ScheduledTask } from './IScheduledTask';
+import { AuditLogCleanupTask } from './AuditLogCleanupTask';
 import { SearchBackfillTask } from './SearchBackfillTask';
 import { WebhookDeliveryTask } from './WebhookDeliveryTask';
 
@@ -64,6 +65,7 @@ const CRON_TASK_DEFINITIONS: ScheduledTask[] = [
   new BackgroundTaskRunPruningTask(),
   new SearchBackfillTask(),
   new SocialPruningTask(),
+  new AuditLogCleanupTask(),
   new WebhookDeliveryTask(),
 ];
 
@@ -76,6 +78,7 @@ async function runScheduledTasks(env: Env, cron: string, scheduledTime: number):
 }
 
 export { CRON_TASK_DEFINITIONS, runScheduledTasks, ExpiredTokenPruningTask, BackgroundTaskRunPruningTask, SocialPruningTask };
+export { AuditLogCleanupTask } from './AuditLogCleanupTask';
 export { SearchBackfillTask } from './SearchBackfillTask';
 export { WebhookDeliveryTask } from './WebhookDeliveryTask';
 export type { ScheduledTask } from './IScheduledTask';

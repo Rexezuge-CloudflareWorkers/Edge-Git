@@ -9,6 +9,8 @@ export * from './user/index';
 export * from './issue/index';
 export * from './pull/index';
 export * from './org/index';
+export * from './team/index';
+export * from './audit/index';
 export * from './permission/index';
 export * from './search/index';
 export * from './social/index';
