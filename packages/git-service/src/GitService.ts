@@ -204,6 +204,18 @@ export class GitService {
     return this.merger.mergeBranches(input);
   }
 
+  async squashMerge(input: { baseBranch: string; headOid: string; author: { name: string; email: string }; message?: string }) {
+    return this.merger.squashMerge(input);
+  }
+
+  async rebaseMerge(input: { baseBranch: string; headOid: string; author: { name: string; email: string } }) {
+    return this.merger.rebaseMerge(input);
+  }
+
+  async getBlame(ref: string, filepath: string) {
+    return this.history.getBlame(ref, filepath);
+  }
+
   async deleteBranch(branch: string): Promise<void> {
     await this.merger.deleteBranch(branch);
   }

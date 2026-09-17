@@ -17,6 +17,7 @@ import { fetchUpgraded, useUpgradeFetchState } from '../../lib/upgradeFetch';
 import { formatTimestamp } from '../../lib/format';
 import { Markdown } from '../shared/Markdown';
 import { headLabel } from './PullsTab';
+import { getCodeowners, getPullMeta, requestReviewers, setPullDraft } from '../../services/collabService';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Select, Textarea } from '../ui/Input';
@@ -57,6 +58,10 @@ export function PullDetail({
   const [conflictReason, setConflictReason] = useState<string | null>(null);
   const [mergeMessage, setMergeMessage] = useState('');
   const [deleteHead, setDeleteHead] = useState(false);
+  const [strategy, setStrategy] = useState<'merge' | 'squash' | 'rebase'>('merge');
+  const [reviewerInput, setReviewerInput] = useState('');
+  const [metaLabels, setMetaLabels] = useState<Array<{ name: string }>>([]);
+  const [codeowners, setCodeowners] = useState<string[]>([]);
 
   const useAuthed = authorized === true;
   // Single-flight reads across the auth upgrade (see upgradeFetch). Keys are
@@ -85,8 +90,7 @@ export function PullDetail({
       if (pullRes.status === 'loaded') {
         setPull(pullRes.data);
         setStatus('ready');
-      }
-      const [c, r, d] = await Promise.all([
+      }      const [c, r, d] = await Promise.all([
         fetchUpgraded(commentsStateRef.current, `${key}/comments`, () => listPullComments(owner, repo, number, authOpt))
           .then((res) => (res.status === 'loaded' ? res.data : null))
           .catch(() => [] as PullComment[]),
@@ -111,6 +115,20 @@ export function PullDetail({
       }
     };
     void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [owner, repo, number, useAuthed]);
+
+  useEffect(() => {
+    if (!useAuthed) return;
+    let cancelled = false;
+    void getPullMeta(owner, repo, number).then((meta) => {
+      if (!cancelled) setMetaLabels(meta.labels ?? []);
+    }).catch(() => undefined);
+    void getCodeowners(owner, repo, number).then((res) => {
+      if (!cancelled) setCodeowners(res.owners ?? []);
+    }).catch(() => undefined);
     return () => {
       cancelled = true;
     };
@@ -196,6 +214,7 @@ export function PullDetail({
       const result = await mergePull(owner, repo, number, {
         message: mergeMessage.trim() || undefined,
         deleteHead,
+        strategy,
       });
       setPull(result.pull);
       showNotice('success', t('pulls.pullMerged', 'Pull Request Merged.'));
@@ -234,9 +253,17 @@ export function PullDetail({
       <Card>
         <div className="flex items-center gap-2 flex-wrap">
           <PullStatusBadge status={pull.status} />
+          {(pull as { is_draft?: number }).is_draft === 1 && <Badge variant="warning">{t('pulls.draft', 'Draft')}</Badge>}
           <span className="text-xs text-[var(--color-text-muted)]">#{pull.number}</span>
           <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">{pull.title}</h1>
         </div>
+        {metaLabels.length > 0 && (
+          <div className="mt-2 flex gap-1 flex-wrap">
+            {metaLabels.map((l) => (
+              <Badge key={l.name} variant="neutral">{l.name}</Badge>
+            ))}
+          </div>
+        )}
         <p className="mt-1 text-xs text-[var(--color-text-muted)] font-mono">
           {pull.base_branch} ← {headLabel(pull)}
         </p>
@@ -252,10 +279,25 @@ export function PullDetail({
           </div>
         )}
         {canManage && pull.status !== 'merged' && (
-          <div className="mt-4">
+          <div className="mt-4 flex gap-2 flex-wrap">
             <Button type="button" variant="secondary" size="sm" loading={toggling} onClick={() => void toggleStatus()}>
               {pull.status === 'open' ? t('pulls.closePull', 'Close Pull Request') : t('pulls.reopenPull', 'Reopen Pull Request')}
             </Button>
+            {pull.status === 'open' && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  const next = (pull as { is_draft?: number }).is_draft !== 1;
+                  void setPullDraft(owner, repo, number, next)
+                    .then(() => getPull(owner, repo, number, { isAuthed: true }).then(setPull).catch(() => undefined))
+                    .catch((error) => showNotice('error', error instanceof Error ? error.message : 'Failed To Update Draft.'));
+                }}
+              >
+                {(pull as { is_draft?: number }).is_draft === 1 ? t('pulls.markReady', 'Mark Ready For Review') : t('pulls.markDraft', 'Mark As Draft')}
+              </Button>
+            )}
           </div>
         )}
       </Card>
@@ -308,6 +350,14 @@ export function PullDetail({
               onChange={(e) => setMergeMessage(e.target.value)}
               rows={2}
             />
+            <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
+              <span>{t('pulls.strategy', 'Strategy')}</span>
+              <Select value={strategy} onChange={(e) => setStrategy(e.target.value as 'merge' | 'squash' | 'rebase')}>
+                <option value="merge">merge</option>
+                <option value="squash">squash</option>
+                <option value="rebase">rebase</option>
+              </Select>
+            </label>
             {(pull.head_full_name ?? pull.full_name).toLowerCase() !== pull.full_name.toLowerCase() || pull.head_branch !== pull.base_branch ? (
               <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
                 <input type="checkbox" checked={deleteHead} onChange={(e) => setDeleteHead(e.target.checked)} />
@@ -344,6 +394,36 @@ export function PullDetail({
         <CardHeader>
           <CardTitle>{t('pulls.reviews', 'Reviews')}</CardTitle>
         </CardHeader>
+        {codeowners.length > 0 && (
+          <p className="mb-2 text-xs text-[var(--color-text-muted)]">
+            {t('pulls.suggestedReviewers', 'Suggested Reviewers: {{owners}}', { owners: codeowners.join(', ') })}
+          </p>
+        )}
+        {canWrite && pull.status === 'open' && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!reviewerInput.trim()) return;
+              void requestReviewers(owner, repo, number, [reviewerInput.trim()])
+                .then(() => {
+                  setReviewerInput('');
+                  showNotice('success', t('pulls.reviewRequested', 'Review Requested.'));
+                })
+                .catch((error) => showNotice('error', error instanceof Error ? error.message : t('errors.failedToRequestReview', 'Failed To Request Review.')));
+            }}
+            className="mb-3 flex gap-2"
+          >
+            <input
+              className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-base)] px-3 py-2 text-sm"
+              placeholder={t('pulls.requestReviewerPlaceholder', 'Request Reviewer (Email Or Username)…')}
+              value={reviewerInput}
+              onChange={(e) => setReviewerInput(e.target.value)}
+            />
+            <Button type="submit" variant="secondary" size="sm">
+              {t('pulls.requestReview', 'Request')}
+            </Button>
+          </form>
+        )}
         {reviews.length === 0 ? (
           <p className="text-sm text-[var(--color-text-muted)]">{t('pulls.noReviews', 'No Reviews Yet.')}</p>
         ) : (

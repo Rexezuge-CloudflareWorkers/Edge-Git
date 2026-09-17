@@ -16,8 +16,26 @@ function parseIssueNumber(raw: string | undefined): number | null {
 function registerIssueRoutes(app: IssueApp): void {
   app.get('/repos/:owner/:repo/issues', async (c) => {
     return withPublicRepo(c as never, async (row) => {
-      const issues = await createRequestScope(c.env).get(Tokens.IssueService).listByRepo(row.id, 50);
-      return c.json({ issues });
+      const scope = createRequestScope(c.env);
+      const issues = await scope.get(Tokens.IssueService).listByRepo(row.id, 50);
+      const label = c.req.query('label');
+      const assignee = c.req.query('assignee')?.toLowerCase();
+      const milestone = c.req.query('milestone');
+      if (!label && !assignee && !milestone) return c.json({ issues });
+      try {
+        const collab = scope.get(Tokens.CollaborationService);
+        const filtered: typeof issues = [];
+        for (const issue of issues) {
+          if (milestone && (issue as { milestone_id?: string | null }).milestone_id !== milestone) continue;
+          const meta = await collab.getIssueMeta(issue.id).catch(() => ({ labels: [], assignees: [] }));
+          if (label && (meta.labels as Array<{ name: string }>).every((l) => l.name.toLowerCase() !== label.toLowerCase())) continue;
+          if (assignee && (meta.assignees as string[]).every((a) => a.toLowerCase() !== assignee)) continue;
+          filtered.push(issue);
+        }
+        return c.json({ issues: filtered });
+      } catch {
+        return c.json({ issues });
+      }
     });
   });
 
@@ -54,8 +72,26 @@ function registerUserIssueRoutes(app: IssueApp): void {
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, c.get('AuthenticatedUserEmailAddress'));
     if (!row) return c.json({ error: 'Not found' }, 404);
-    const issues = await createRequestScope(c.env).get(Tokens.IssueService).listByRepo(row.id, 50);
-    return c.json({ issues });
+    const scope = createRequestScope(c.env);
+    const issues = await scope.get(Tokens.IssueService).listByRepo(row.id, 50);
+    const label = c.req.query('label');
+    const assignee = c.req.query('assignee')?.toLowerCase();
+    const milestone = c.req.query('milestone');
+    if (!label && !assignee && !milestone) return c.json({ issues });
+    try {
+      const collab = scope.get(Tokens.CollaborationService);
+      const filtered: typeof issues = [];
+      for (const issue of issues) {
+        if (milestone && (issue as { milestone_id?: string | null }).milestone_id !== milestone) continue;
+        const meta = await collab.getIssueMeta(issue.id).catch(() => ({ labels: [], assignees: [] }));
+        if (label && (meta.labels as Array<{ name: string }>).every((l) => l.name.toLowerCase() !== label.toLowerCase())) continue;
+        if (assignee && (meta.assignees as string[]).every((a) => a.toLowerCase() !== assignee)) continue;
+        filtered.push(issue);
+      }
+      return c.json({ issues: filtered });
+    } catch {
+      return c.json({ issues });
+    }
   });
 
   app.post('/user/repos/:owner/:repo/issues', async (c) => {

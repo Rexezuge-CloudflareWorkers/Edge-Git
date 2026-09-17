@@ -62,3 +62,7 @@ export { ActivityService, ActivityServiceFactory } from '../social/ActivityServi
 @deprecated Prefer `createRequestScope(env).get(Tokens.NotificationService)`; kept for backward compatibility during migration.
 */
 export { NotificationService, NotificationServiceFactory } from '../social/NotificationService';
+/**
+@deprecated Prefer `createRequestScope(env).get(Tokens.CollaborationService)`; kept for backward compatibility during migration.
+*/
+export { CollaborationService, CollaborationServiceFactory } from '../collab/CollaborationService';

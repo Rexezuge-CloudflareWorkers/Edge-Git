@@ -15,8 +15,21 @@ function registerUserPullRoutes(app: PullApp): void {
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, c.get('AuthenticatedUserEmailAddress'));
     if (!row) return c.json({ error: 'Not found' }, 404);
-    const pulls = await createRequestScope(c.env).get(Tokens.PullRequestService).listByRepo(row.id, 50);
-    return c.json({ pulls });
+    const scope = createRequestScope(c.env);
+    const pulls = await scope.get(Tokens.PullRequestService).listByRepo(row.id, 50);
+    const label = c.req.query('label');
+    if (!label) return c.json({ pulls });
+    try {
+      const collab = scope.get(Tokens.CollaborationService);
+      const filtered = [];
+      for (const pull of pulls) {
+        const meta = await collab.getPullMeta(pull.id).catch(() => ({ labels: [] }));
+        if ((meta.labels as Array<{ name: string }>).some((l) => l.name.toLowerCase() === label.toLowerCase())) filtered.push(pull);
+      }
+      return c.json({ pulls: filtered });
+    } catch {
+      return c.json({ pulls });
+    }
   });
 
   // Open a PR: any visible user (read+) may propose. Branches are resolved
@@ -29,7 +42,7 @@ function registerUserPullRoutes(app: PullApp): void {
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return c.json({ error: 'Not found' }, 404);
-    const body = (await c.req.json().catch(() => ({}))) as { title?: string; body?: string; baseBranch?: string; headBranch?: string; headOwner?: string; headRepo?: string };
+    const body = (await c.req.json().catch(() => ({}))) as { title?: string; body?: string; baseBranch?: string; headBranch?: string; headOwner?: string; headRepo?: string; isDraft?: boolean };
     if (!body.title?.trim()) return c.json({ error: 'title is required' }, 400);
     if (!body.baseBranch?.trim() || !body.headBranch?.trim()) return c.json({ error: 'baseBranch and headBranch are required' }, 400);
     if (!PullRequestService.isValidBranchName(body.baseBranch.trim()) || !PullRequestService.isValidBranchName(body.headBranch.trim())) {
@@ -71,6 +84,7 @@ function registerUserPullRoutes(app: PullApp): void {
           headOid: preview.headOid,
           mergeBaseOid: preview.mergeBase ?? null,
           creatorEmail: email,
+          isDraft: body.isDraft === true,
         });
       await recordAndNotify(c.env, {
         repositoryId: row.id,
@@ -229,6 +243,12 @@ function registerUserPullRoutes(app: PullApp): void {
         body: body.body ?? null,
         commitOid: body.commitOid ?? null,
       });
+      try {
+        const status = body.state === 'approved' ? 'approved' : body.state === 'changes_requested' ? 'changes_requested' : 'pending';
+        await scope.get(Tokens.CollaborationService).syncReviewerStatus(pull.id, email, status).catch(() => undefined);
+      } catch {
+        // best-effort reviewer status sync
+      }
       await recordAndNotify(c.env, {
         repositoryId: row.id,
         fullName: `${owner}/${repoName}`,

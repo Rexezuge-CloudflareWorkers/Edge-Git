@@ -26,8 +26,12 @@ async function tryAuthedFirst<T>(authedPath: string, publicPath: string, isAuthe
   }
 }
 
-export async function listIssues(owner: string, repo: string, opts?: ReadOpts): Promise<Issue[]> {
-  const data = await tryAuthedFirst<{ issues?: Issue[] }>(authedBase(owner, repo), publicBase(owner, repo), opts?.isAuthed);
+export async function listIssues(owner: string, repo: string, opts?: ReadOpts & { label?: string; assignee?: string }): Promise<Issue[]> {
+  const q = new URLSearchParams();
+  if (opts?.label) q.set('label', opts.label);
+  if (opts?.assignee) q.set('assignee', opts.assignee);
+  const suffix = q.toString() ? `?${q.toString()}` : '';
+  const data = await tryAuthedFirst<{ issues?: Issue[] }>(`${authedBase(owner, repo)}${suffix}`, `${publicBase(owner, repo)}${suffix}`, opts?.isAuthed);
   return data.issues ?? [];
 }
 

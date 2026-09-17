@@ -19,6 +19,7 @@ import { registerOrgRoutes } from './routes/OrgRoutes';
 import { registerSearchRoutes } from './routes/SearchRoutes';
 import { registerUserNotificationRoutes } from './routes/NotificationRoutes';
 import { registerSocialRoutes, registerUserSocialRoutes } from './routes/SocialRoutes';
+import { registerCollabPublicRoutes, registerCollabUserRoutes } from './routes/CollabRoutes';
 
 type AppRouter = HonoOpenAPIRouterType<{
   Bindings: Env;
@@ -52,9 +53,10 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     registerForkRoutes(app);
     registerIssueRoutes(app);
     registerPullRoutes(app);
-    registerUserProfileRoutes(app);
-    registerSearchRoutes(app);
-    registerSocialRoutes(app);
+  registerUserProfileRoutes(app);
+  registerSearchRoutes(app);
+  registerSocialRoutes(app);
+  registerCollabPublicRoutes(app);
 
     // Protected UI/API surface
     app.use('/user/*', MiddlewareHandlers.userAuthentication());
@@ -72,10 +74,11 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     registerUserForkRoutes(app);
     registerTokenRoutes(app);
     registerUserIssueRoutes(app);
-    registerUserPullRoutes(app);
-    registerUserPullMergeRoutes(app);
-    registerUserSocialRoutes(app);
-    registerUserNotificationRoutes(app);
+  registerUserPullRoutes(app);
+  registerUserPullMergeRoutes(app);
+  registerUserSocialRoutes(app);
+  registerUserNotificationRoutes(app);
+  registerCollabUserRoutes(app);
 
     // SPA catch-all — public shell for user home (/), profile home
     // (/:username, GitHub-style), repo home (/:owner/:repo), and the legacy

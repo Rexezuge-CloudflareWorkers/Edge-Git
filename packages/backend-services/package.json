@@ -28,6 +28,8 @@
     "./search/*": "./src/search/*.ts",
     "./social": "./src/social/index.ts",
     "./social/*": "./src/social/*.ts",
+    "./collab": "./src/collab/index.ts",
+    "./collab/*": "./src/collab/*.ts",
     "./composition": "./src/composition/index.ts",
     "./composition/*": "./src/composition/*.ts"
   },

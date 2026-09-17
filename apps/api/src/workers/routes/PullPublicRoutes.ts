@@ -8,8 +8,21 @@ import type { MergePreviewShape, PullApp } from './PullShared';
 function registerPullRoutes(app: PullApp): void {
   app.get('/repos/:owner/:repo/pulls', async (c) => {
     return withPublicRepo(c as never, async (row) => {
-      const pulls = await createRequestScope(c.env).get(Tokens.PullRequestService).listByRepo(row.id, 50);
-      return c.json({ pulls });
+      const scope = createRequestScope(c.env);
+      const pulls = await scope.get(Tokens.PullRequestService).listByRepo(row.id, 50);
+      const label = c.req.query('label');
+      if (!label) return c.json({ pulls });
+      try {
+        const collab = scope.get(Tokens.CollaborationService);
+        const filtered = [];
+        for (const pull of pulls) {
+          const meta = await collab.getPullMeta(pull.id).catch(() => ({ labels: [] }));
+          if ((meta.labels as Array<{ name: string }>).some((l) => l.name.toLowerCase() === label.toLowerCase())) filtered.push(pull);
+        }
+        return c.json({ pulls: filtered });
+      } catch {
+        return c.json({ pulls });
+      }
     });
   });
 

@@ -67,6 +67,8 @@ export function PullsTab({
   const [saving, setSaving] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [crossBranches, setCrossBranches] = useState<string[]>([]);
+  const [labelFilter, setLabelFilter] = useState('');
+  const [isDraft, setIsDraft] = useState(false);
 
   const isCrossRepo = headRepo.toLowerCase() !== currentFull.toLowerCase();
   const headBranches = isCrossRepo ? crossBranches : branches;
@@ -77,7 +79,7 @@ export function PullsTab({
     const run = async () => {
       try {
         const [list, b, forks] = await Promise.all([
-          listPulls(owner, repo, authOpt),
+          listPulls(owner, repo, { ...authOpt, label: labelFilter.trim() || undefined }),
           loadBranches(owner, repo, authOpt).catch(() => ({ branches: [], currentBranch: null })),
           listForks(owner, repo, authOpt).catch(() => ({ forks: [], count: 0 })),
         ]);
@@ -99,7 +101,7 @@ export function PullsTab({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [owner, repo, reloadKey, authorized]);
+  }, [owner, repo, reloadKey, authorized, labelFilter]);
 
   useEffect(() => {
     if (!isCrossRepo) return;
@@ -151,9 +153,11 @@ export function PullsTab({
         baseBranch: base,
         headBranch,
         ...(isCrossRepo && slash > 0 && { headOwner: headRepo.slice(0, slash), headRepo: headRepo.slice(slash + 1) }),
+        ...(isDraft && { isDraft: true }),
       });
       setTitle('');
       setBody('');
+      setIsDraft(false);
       showNotice('success', t('pulls.pullCreated', 'Pull Request Created.'));
       await navigate(`/${owner}/${repo}/pulls/${created.number}`);
     } catch (error) {
@@ -206,6 +210,10 @@ export function PullsTab({
               </label>
             </div>
             <Textarea placeholder={t('pulls.descriptionPlaceholder', 'Description (Optional)')} value={body} onChange={(e) => setBody(e.target.value)} rows={3} />
+            <label className="flex items-center gap-2 text-sm text-[var(--color-text-muted)]">
+              <input type="checkbox" checked={isDraft} onChange={(e) => setIsDraft(e.target.checked)} />
+              {t('pulls.draft', 'Draft Pull Request')}
+            </label>
             <Button type="submit" variant="primary" size="sm" loading={saving}>
               {t('pulls.createPull', 'Create Pull Request')}
             </Button>
@@ -218,6 +226,9 @@ export function PullsTab({
           <CardTitle>{t('pulls.pulls', 'Pull Requests')}</CardTitle>
           <RefreshButton onRefresh={refresh} loading={loading} />
         </CardHeader>
+        <div className="mb-3 flex gap-2">
+          <Input placeholder={t('pulls.filterByLabel', 'Filter By Label…')} value={labelFilter} onChange={(e) => setLabelFilter(e.target.value)} />
+        </div>
         {!loading && pulls.length === 0 ? (
           <div className="text-center text-[var(--color-text-muted)] py-10 text-sm">
             <GitPullRequest className="h-6 w-6 mx-auto mb-3" />
