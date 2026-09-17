@@ -53,7 +53,6 @@
   "vars": {
     "DEBUG_MODE": "false",
     "SITE_URL": "",
-    "SERVE_SPA_FROM_WORKER": "true",
     "POLICY_AUD": "",
     "TEAM_DOMAIN": "",
     "MAX_REPOS_PER_USER": "100",

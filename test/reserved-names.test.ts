@@ -123,7 +123,7 @@ describe('reserved namespace strings', () => {
 describe('reserved namespace worker shell', () => {
   it('returns 404 for reserved single-segment paths, shell for regular profiles', async () => {
     const worker = new EdgeGitWorker() as unknown as { onRequest(r: Request, e: unknown, c: unknown): Promise<Response> };
-    const env = { DB: emptyDb(), SERVE_SPA_FROM_WORKER: 'true' };
+    const env = { DB: emptyDb() };
     // Reserved names that are not real app routes must never serve the profile shell.
     for (const path of ['/api', '/login', '/ADMIN', '/orgs']) {
       const res = await worker.onRequest(new Request(`https://git.example.com${path}`), env, ctx);

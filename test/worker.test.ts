@@ -518,10 +518,6 @@ describe('EdgeGitWorker HTTP surface', () => {
     expect(shell.status).toBe(200);
     expect(shell.headers.get('content-type')).toContain('text/html');
 
-    const noServeEnv = { ...anonEnv, SERVE_SPA_FROM_WORKER: 'false' };
-    const gated = await worker.onRequest(new Request('https://git.example.com/alice/pub/issues/1'), noServeEnv, ctx);
-    expect(gated.status).toBe(404);
-
     const tooDeep = await worker.onRequest(new Request('https://git.example.com/alice/pub/issues/1/extra'), anonEnv, ctx);
     expect(tooDeep.status).toBe(404);
   });

@@ -19,7 +19,6 @@ import {
   DEFAULT_MAX_RULES_PER_REPO,
   DEFAULT_MAX_TOKENS_PER_USER,
   DEFAULT_MAX_TOKEN_EXPIRY_DAYS,
-  DEFAULT_SERVE_SPA_FROM_WORKER,
   DEFAULT_SITE_URL,
   DEFAULT_WEBHOOK_DELIVERY_RETENTION_DAYS,
   DEFAULT_WEBHOOK_MAX_ATTEMPTS,
@@ -50,10 +49,6 @@ class AppConfiguration {
     let url = EnvParser.string(this.env, 'SITE_URL', DEFAULT_SITE_URL);
     while (url.endsWith('/')) url = url.slice(0, -1);
     return url;
-  }
-
-  public isServeSpaFromWorker(): boolean {
-    return EnvParser.boolean(this.env, 'SERVE_SPA_FROM_WORKER', DEFAULT_SERVE_SPA_FROM_WORKER);
   }
 
   public getMaxReposPerUser(): number {

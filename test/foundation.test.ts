@@ -69,7 +69,6 @@ describe('configuration surface', () => {
     const env = {
       DEBUG_MODE: 'true',
       SITE_URL: 'https://git.example.com/',
-      SERVE_SPA_FROM_WORKER: 'false',
       DEMO_MODE: 'true',
       MAX_REPOS_PER_USER: '3',
       MAX_TOKENS_PER_USER: '2',
@@ -81,7 +80,6 @@ describe('configuration surface', () => {
     };
     expect(ConfigurationManager.getDebugMode(env)).toBe(true);
     expect(ConfigurationManager.site.getSiteUrl(env)).toBe('https://git.example.com');
-    expect(ConfigurationManager.spa.isServeFromWorker(env)).toBe(false);
     expect(ConfigurationManager.auth.isDemoMode(env)).toBe(true);
     expect(ConfigurationManager.repo.getMaxPackObjects(env)).toBe(11);
     expect(ConfigurationManager.repo.getCacheTtlSeconds(env)).toBe(13);
@@ -97,7 +95,6 @@ describe('configuration surface', () => {
     expect(app.getTaskRunRetentionDays()).toBe(17);
     expect(app.getAuditLogRetentionDays()).toBe(19);
     expect(app.isDemoMode()).toBe(true);
-    expect(app.isServeSpaFromWorker()).toBe(false);
   });
 });
 

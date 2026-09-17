@@ -17,7 +17,6 @@
   ],
   "vars": {
     "DEV_AUTH_EMAIL": "test@example.com",
-    "SERVE_SPA_FROM_WORKER": "false",
     "SITE_URL": "https://example.com"
   }
 }
