@@ -22,7 +22,7 @@ function memoizeModule(loader: () => Promise<QuickJSAsyncWASMModule>): () => Pro
 
 const getQuickJSModule = memoizeModule(async () => {
   try {
-    const imported = (await import(/* @vite-ignore */ '../../wasm/quickjs-async.wasm')) as { default?: WebAssembly.Module };
+    const imported = await import(/* @vite-ignore */ './quickjsWasm');
     if (imported?.default) {
       return newQuickJSAsyncWASMModule(newVariant(RELEASE_ASYNC, { wasmModule: imported.default }));
     }
