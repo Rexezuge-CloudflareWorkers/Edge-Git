@@ -11,12 +11,16 @@ import type {
   RepositoryDAO,
   UserAccessTokenDAO,
   UserDAO,
+  WebhookDAO,
+  WebhookDeliveryDAO,
 } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import type { Token } from '@edge-git/backend-runtime/di';
 import type { AppConfiguration } from '@edge-git/backend-runtime/config';
 import type { AccessAuthService } from '../auth/AccessAuthService';
 import type { TokenService } from '../auth/TokenService';
+import type { WebhookDeliveryService } from '../webhook/WebhookDeliveryService';
+import type { WebhookService } from '../webhook/WebhookService';
 import type { BranchProtectionService } from '../protection/BranchProtectionService';
 import type { ForkService } from '../fork/ForkService';
 import type { RepoService } from '../repo/RepoService';
@@ -71,6 +75,8 @@ const Tokens = {
   WatchDAO: Symbol('WatchDAO') as Token<() => Promise<import('@edge-git/backend-data/dao').WatchDAO>>,
   EventDAO: Symbol('EventDAO') as Token<() => Promise<import('@edge-git/backend-data/dao').EventDAO>>,
   NotificationDAO: Symbol('NotificationDAO') as Token<() => Promise<import('@edge-git/backend-data/dao').NotificationDAO>>,
+  WebhookDAO: Symbol('WebhookDAO') as Token<() => Promise<WebhookDAO>>,
+  WebhookDeliveryDAO: Symbol('WebhookDeliveryDAO') as Token<() => Promise<WebhookDeliveryDAO>>,
   AccessAuthService: Symbol('AccessAuthService') as Token<AccessAuthService>,
   TokenService: Symbol('TokenService') as Token<TokenService>,
   BranchProtectionService: Symbol('BranchProtectionService') as Token<BranchProtectionService>,
@@ -87,6 +93,8 @@ const Tokens = {
   WatchService: Symbol('WatchService') as Token<WatchService>,
   ActivityService: Symbol('ActivityService') as Token<ActivityService>,
   NotificationService: Symbol('NotificationService') as Token<NotificationService>,
+  WebhookService: Symbol('WebhookService') as Token<WebhookService>,
+  WebhookDeliveryService: Symbol('WebhookDeliveryService') as Token<WebhookDeliveryService>,
   CollaborationService: Symbol('CollaborationService') as Token<CollaborationService>,
 } satisfies Record<string, Token<unknown>>;
 

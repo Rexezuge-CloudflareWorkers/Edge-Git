@@ -7,6 +7,7 @@ import {
   DEFAULT_MAX_FETCH_BODY_BYTES,
   DEFAULT_MAX_FETCH_HAVES,
   DEFAULT_MAX_FETCH_WANTS,
+  DEFAULT_MAX_HOOKS_PER_REPO,
   DEFAULT_MAX_MERGE_DIFF_FILES,
   DEFAULT_MAX_PACK_BYTES,
   DEFAULT_MAX_PACK_OBJECTS,
@@ -17,6 +18,11 @@ import {
   DEFAULT_MAX_TOKEN_EXPIRY_DAYS,
   DEFAULT_SERVE_SPA_FROM_WORKER,
   DEFAULT_SITE_URL,
+  DEFAULT_WEBHOOK_DELIVERY_RETENTION_DAYS,
+  DEFAULT_WEBHOOK_MAX_ATTEMPTS,
+  DEFAULT_WEBHOOK_MAX_CONSECUTIVE_FAILURES,
+  DEFAULT_WEBHOOK_MAX_PAYLOAD_BYTES,
+  DEFAULT_WEBHOOK_TIMEOUT_MS,
 } from './ConfigurationDefaults';
 
 /**
@@ -101,6 +107,30 @@ class AppConfiguration {
 
   public getAuditLogRetentionDays(): number {
     return EnvParser.positiveInt(this.env, 'AUDIT_LOG_RETENTION_DAYS', DEFAULT_AUDIT_LOG_RETENTION_DAYS);
+  }
+
+  public getMaxHooksPerRepo(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_HOOKS_PER_REPO', DEFAULT_MAX_HOOKS_PER_REPO);
+  }
+
+  public getWebhookDeliveryRetentionDays(): number {
+    return EnvParser.positiveInt(this.env, 'WEBHOOK_DELIVERY_RETENTION_DAYS', DEFAULT_WEBHOOK_DELIVERY_RETENTION_DAYS);
+  }
+
+  public getWebhookMaxAttempts(): number {
+    return EnvParser.positiveInt(this.env, 'WEBHOOK_MAX_ATTEMPTS', DEFAULT_WEBHOOK_MAX_ATTEMPTS);
+  }
+
+  public getWebhookTimeoutMs(): number {
+    return EnvParser.positiveInt(this.env, 'WEBHOOK_TIMEOUT_MS', DEFAULT_WEBHOOK_TIMEOUT_MS);
+  }
+
+  public getWebhookMaxConsecutiveFailures(): number {
+    return EnvParser.positiveInt(this.env, 'WEBHOOK_MAX_CONSECUTIVE_FAILURES', DEFAULT_WEBHOOK_MAX_CONSECUTIVE_FAILURES);
+  }
+
+  public getWebhookMaxPayloadBytes(): number {
+    return EnvParser.positiveInt(this.env, 'WEBHOOK_MAX_PAYLOAD_BYTES', DEFAULT_WEBHOOK_MAX_PAYLOAD_BYTES);
   }
 
   public isDemoMode(): boolean {

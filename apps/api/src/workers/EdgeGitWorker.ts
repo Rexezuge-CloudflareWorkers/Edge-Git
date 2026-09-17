@@ -20,6 +20,7 @@ import { registerOrgRoutes } from './routes/OrgRoutes';
 import { registerSearchRoutes } from './routes/SearchRoutes';
 import { registerUserNotificationRoutes } from './routes/NotificationRoutes';
 import { registerSocialRoutes, registerUserSocialRoutes } from './routes/SocialRoutes';
+import { registerWebhookRoutes } from './routes/WebhookRoutes';
 import { registerCollabPublicRoutes, registerCollabUserRoutes } from './routes/CollabRoutes';
 
 type AppRouter = HonoOpenAPIRouterType<{
@@ -49,6 +50,11 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     app.get('/user', (c) => c.redirect('/user/' + new URL(c.req.url).search));
     app.get('/health', (c) => c.json({ ok: true, service: 'edge-git' }));
 
+    // Immediate webhook dispatch runs after mutating handlers via
+    // `waitUntil` (cron retries the rest). Registered before the routes so
+    // Hono executes the middleware first.
+    app.use('/:owner/:repo/git-receive-pack', MiddlewareHandlers.webhookFlush());
+
     registerGitRoutes(app);
     registerRepoRoutes(app);
     registerForkRoutes(app);
@@ -62,6 +68,7 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
 
     // Protected UI/API surface
     app.use('/user/*', MiddlewareHandlers.userAuthentication());
+    app.use('/user/*', MiddlewareHandlers.webhookFlush());
 
     registerUserRepoRoutes(app);
     registerUserSettingsRoutes(app);
@@ -82,6 +89,7 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
   registerUserSocialRoutes(app);
   registerUserNotificationRoutes(app);
   registerCollabUserRoutes(app);
+  registerWebhookRoutes(app);
 
     // SPA catch-all — public shell for user home (/), profile home
     // (/:username, GitHub-style), repo home (/:owner/:repo), and the legacy

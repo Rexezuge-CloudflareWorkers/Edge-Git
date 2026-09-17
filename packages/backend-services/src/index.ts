@@ -8,3 +8,4 @@ export * from './org/index';
 export * from './permission/index';
 export * from './search/index';
 export * from './social/index';
+export * from './webhook/index';

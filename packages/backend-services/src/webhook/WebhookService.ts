@@ -1,0 +1,221 @@
+import { WebhookDAO } from '@edge-git/backend-data/dao';
+import type { RepoWebhookRow } from '@edge-git/backend-data/dao';
+import type { D1Queryable } from '@edge-git/backend-data/utils';
+import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
+import { ConfigurationManager } from '@edge-git/backend-runtime/config';
+import type { RepoWebhookMetadata, WebhookEventName } from '@edge-git/shared';
+import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
+import { generateHookSecret, maskUrl, normalizeEvents, secretSuffix, validateWebhookUrl } from './WebhookEvents';
+
+interface WebhookServiceEnv {
+  DB: D1Queryable;
+  MAX_HOOKS_PER_REPO?: string;
+}
+
+interface WebhookServiceDeps {
+  webhookDAO?: () => Promise<WebhookDAO>;
+}
+
+const MIN_CUSTOM_SECRET_LENGTH = 16;
+const MAX_SECRET_LENGTH = 256;
+
+function toDeliveryStatus(raw: string | null): 'success' | 'failure' | null {
+  switch (raw) {
+    case 'success': {
+      return 'success';
+    }
+    case 'failure': {
+      return 'failure';
+    }
+    default: {
+      return null;
+    }
+  }
+}
+
+function parseStoredEvents(raw: string): WebhookEventName[] {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return normalizeEvents(parsed);
+  } catch {
+    return [];
+  }
+}
+
+function toPublic(row: RepoWebhookRow): RepoWebhookMetadata {
+  return {
+    id: row.id,
+    repositoryId: row.repository_id,
+    fullName: row.full_name,
+    urlMasked: maskUrl(row.url),
+    hasSecret: row.secret.length > 0,
+    secretSuffix: row.secret_suffix,
+    events: parseStoredEvents(row.events),
+    isActive: row.is_active === 1,
+    consecutiveFailures: row.consecutive_failures,
+    lastDeliveryAt: row.last_delivery_at,
+    lastDeliveryStatus: toDeliveryStatus(row.last_delivery_status),
+    creatorEmail: row.creator_email,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function normalizeSecret(input: unknown): string {
+  if (input === undefined || input === null) return generateHookSecret();
+  if (input === '') return generateHookSecret();
+  if (typeof input !== 'string' || input.length < MIN_CUSTOM_SECRET_LENGTH || input.length > MAX_SECRET_LENGTH) {
+    throw new BadRequestError(`secret must be ${MIN_CUSTOM_SECRET_LENGTH}-${MAX_SECRET_LENGTH} characters (omit to auto-generate)`);
+  }
+  return input;
+}
+
+class WebhookService {
+  private readonly deps: Required<WebhookServiceDeps>;
+
+  constructor(
+    private readonly env: WebhookServiceEnv,
+    deps: WebhookServiceDeps = {},
+  ) {
+    this.deps = {
+      webhookDAO: () => Promise.resolve(new WebhookDAO(env.DB)),
+      ...deps,
+    };
+  }
+
+  public static toPublic(row: RepoWebhookRow): RepoWebhookMetadata {
+    return toPublic(row);
+  }
+
+  public async listHooks(repositoryId: string): Promise<RepoWebhookMetadata[]> {
+    const dao = await this.deps.webhookDAO();
+    const rows = await dao.listByRepo(repositoryId);
+    return rows.map(toPublic);
+  }
+
+  public async getHook(hookId: string, repositoryId: string): Promise<RepoWebhookMetadata> {
+    const dao = await this.deps.webhookDAO();
+    const row = await dao.getByIdAndRepo(hookId, repositoryId).catch(() => null);
+    if (!row) throw new NotFoundError('Webhook not found.');
+    return toPublic(row);
+  }
+
+  public async createHook(input: {
+    repositoryId: string;
+    fullName: string;
+    url: string;
+    events?: unknown;
+    secret?: unknown;
+    creatorEmail: string;
+  }): Promise<{ hook: RepoWebhookMetadata; secret: string }> {
+    const url = input.url?.trim() ?? '';
+    try {
+      validateWebhookUrl(url);
+    } catch (error) {
+      throw new BadRequestError(error instanceof Error ? error.message : 'Invalid webhook URL.');
+    }
+    let events: WebhookEventName[];
+    try {
+      events = normalizeEvents(input.events ?? ['push']);
+    } catch (error) {
+      throw new BadRequestError(error instanceof Error ? error.message : 'Invalid webhook events.');
+    }
+    const secret = normalizeSecret(input.secret);
+    const dao = await this.deps.webhookDAO();
+    const max = ConfigurationManager.webhooks.getMaxPerRepo(this.env);
+    const count = await dao.countByRepo(input.repositoryId).catch(() => 0);
+    if (count >= max) throw new BadRequestError(`Maximum ${max} webhooks per repository`);
+    const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
+    const id = UUIDUtil.getRandomUUID();
+    await dao.create({
+      id,
+      repositoryId: input.repositoryId,
+      fullName: input.fullName,
+      url,
+      urlPrefix: url.slice(0, 30),
+      secret,
+      secretSuffix: secretSuffix(secret),
+      eventsJson: JSON.stringify(events),
+      creatorEmail: input.creatorEmail.toLowerCase(),
+      now,
+    });
+    const hook: RepoWebhookMetadata = {
+      id,
+      repositoryId: input.repositoryId,
+      fullName: input.fullName,
+      urlMasked: maskUrl(url),
+      hasSecret: true,
+      secretSuffix: secretSuffix(secret),
+      events,
+      isActive: true,
+      consecutiveFailures: 0,
+      lastDeliveryAt: null,
+      lastDeliveryStatus: null,
+      creatorEmail: input.creatorEmail.toLowerCase(),
+      createdAt: now,
+      updatedAt: now,
+    };
+    return { hook, secret };
+  }
+
+  public async updateHook(
+    hookId: string,
+    repositoryId: string,
+    patch: { url?: string; events?: unknown; isActive?: boolean },
+  ): Promise<RepoWebhookMetadata> {
+    const dao = await this.deps.webhookDAO();
+    const row = await dao.getByIdAndRepo(hookId, repositoryId).catch(() => null);
+    if (!row) throw new NotFoundError('Webhook not found.');
+    let url: string | undefined;
+    let urlPrefix: string | undefined;
+    if (patch.url !== undefined) {
+      url = patch.url.trim();
+      try {
+        validateWebhookUrl(url);
+      } catch (error) {
+        throw new BadRequestError(error instanceof Error ? error.message : 'Invalid webhook URL.');
+      }
+      urlPrefix = url.slice(0, 30);
+    }
+    let eventsJson: string | undefined;
+    if (patch.events !== undefined) {
+      try {
+        eventsJson = JSON.stringify(normalizeEvents(patch.events));
+      } catch (error) {
+        throw new BadRequestError(error instanceof Error ? error.message : 'Invalid webhook events.');
+      }
+    }
+    if (patch.isActive !== undefined && typeof patch.isActive !== 'boolean') {
+      throw new BadRequestError('isActive must be a boolean');
+    }
+    const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
+    await dao.update(hookId, repositoryId, { url, urlPrefix, eventsJson, isActive: patch.isActive, now });
+    const updated = await dao.getByIdAndRepo(hookId, repositoryId);
+    if (!updated) throw new NotFoundError('Webhook not found.');
+    return toPublic(updated);
+  }
+
+  public async rotateHookSecret(hookId: string, repositoryId: string): Promise<{ hook: RepoWebhookMetadata; secret: string }> {
+    const dao = await this.deps.webhookDAO();
+    const row = await dao.getByIdAndRepo(hookId, repositoryId).catch(() => null);
+    if (!row) throw new NotFoundError('Webhook not found.');
+    // Fresh unique secret per rotation — never reused, never derived from a
+    // shared platform key.
+    const secret = generateHookSecret();
+    const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
+    await dao.rotateSecret(hookId, repositoryId, secret, secretSuffix(secret), now);
+    const updated = await dao.getByIdAndRepo(hookId, repositoryId);
+    if (!updated) throw new NotFoundError('Webhook not found.');
+    return { hook: toPublic(updated), secret };
+  }
+
+  public async deleteHook(hookId: string, repositoryId: string): Promise<void> {
+    const dao = await this.deps.webhookDAO();
+    const row = await dao.getByIdAndRepo(hookId, repositoryId).catch(() => null);
+    if (!row) throw new NotFoundError('Webhook not found.');
+    await dao.deleteById(hookId, repositoryId);
+  }
+}
+
+export { WebhookService };
+export type { WebhookServiceDeps, WebhookServiceEnv };

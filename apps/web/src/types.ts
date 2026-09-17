@@ -340,3 +340,47 @@ export interface NotificationItem {
   is_read: number;
   created_at: number;
 }
+
+export type WebhookEventName =
+  | 'push'
+  | 'repository'
+  | 'issues'
+  | 'issue_comment'
+  | 'pull_request'
+  | 'pull_request_review'
+  | 'fork'
+  | 'star'
+  | 'watch'
+  | 'ping';
+
+export interface RepoWebhook {
+  id: string;
+  repositoryId: string;
+  fullName: string;
+  urlMasked: string;
+  hasSecret: boolean;
+  secretSuffix: string;
+  events: WebhookEventName[];
+  isActive: boolean;
+  consecutiveFailures: number;
+  lastDeliveryAt: number | null;
+  lastDeliveryStatus: 'success' | 'failure' | null;
+  creatorEmail: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface WebhookDelivery {
+  id: string;
+  hookId: string;
+  repositoryId: string;
+  event: string;
+  eventId: string | null;
+  status: 'pending' | 'success' | 'failed';
+  attempts: number;
+  nextRetryAt: number;
+  lastHttpStatus: number | null;
+  lastError: string | null;
+  createdAt: number;
+  updatedAt: number;
+}

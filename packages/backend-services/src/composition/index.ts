@@ -18,4 +18,6 @@ export { StarService } from '../social/StarService';
 export { WatchService } from '../social/WatchService';
 export { ActivityService } from '../social/ActivityService';
 export { NotificationService } from '../social/NotificationService';
+export { WebhookService } from '../webhook/WebhookService';
+export { WebhookDeliveryService } from '../webhook/WebhookDeliveryService';
 export { CollaborationService } from '../collab/CollaborationService';
