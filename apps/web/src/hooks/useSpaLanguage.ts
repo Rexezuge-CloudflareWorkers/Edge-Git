@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LANGUAGE_STORAGE_KEY, detectInitialLanguage, loadLanguage, normalizeLanguage } from '../i18n';
-import { apiPatch } from '../lib/api';
 import type { CurrentUser } from '../types';
 
 interface UseSpaLanguageInput {
@@ -106,12 +105,6 @@ function useSpaLanguage({ user, showNotice, setUser }: UseSpaLanguageInput) {
           localStorage.setItem(LANGUAGE_STORAGE_KEY, normalized);
         } catch {
           // Ignore storage errors.
-        }
-        try {
-          // Best-effort backend persistence; ignored until the API supports it.
-          await apiPatch<CurrentUser>('/user/me', { preferredLanguage: normalized });
-        } catch {
-          // Local-only fallback: language choice is already applied + stored.
         }
         if (user) setUser({ ...user, preferredLanguage: normalized });
         setLanguage(normalized);

@@ -102,7 +102,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     try {
       const profile = await createRequestScope(c.env).get(Tokens.UserService).getProfileByEmail(email);
-      return c.json({ email: profile.email, username: profile.username, displayName: profile.displayName });
+      return c.json({ email: profile.email, username: profile.username });
     } catch {
       return c.json({ email });
     }

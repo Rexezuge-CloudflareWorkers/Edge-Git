@@ -16,7 +16,6 @@ export function OrgCreateModal({
 }) {
   const { t } = useTranslation();
   const [username, setUsername] = useState('');
-  const [displayName, setDisplayName] = useState('');
   const [saving, setSaving] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
@@ -24,7 +23,7 @@ export function OrgCreateModal({
     if (!username.trim()) return;
     setSaving(true);
     try {
-      const org = await createOrg({ username: username.trim(), displayName: displayName.trim() || null });
+      const org = await createOrg({ username: username.trim() });
       showNotice('success', t('orgs.created', 'Organization {{username}} Created.', { username: org.username }));
       onCreated(org.username);
     } catch (error) {
@@ -47,16 +46,6 @@ export function OrgCreateModal({
             maxLength={39}
             onChange={(e) => setUsername(e.target.value)}
             required
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="org-create-display">{t('orgs.displayName', 'Display Name')}</Label>
-          <Input
-            id="org-create-display"
-            placeholder={t('orgs.displayNamePlaceholder', 'Organization Display Name')}
-            value={displayName}
-            maxLength={100}
-            onChange={(e) => setDisplayName(e.target.value)}
           />
         </div>
         <div className="flex gap-3 justify-end">

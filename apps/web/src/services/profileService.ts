@@ -16,20 +16,20 @@ export async function listProfileOrgs(username: string): Promise<OrgSummary[]> {
 }
 
 export async function listMyOrgs(): Promise<OrgSummary[]> {
-  const data = await apiGet<{ orgs?: Array<{ username: string; displayName: string | null }> }>('/user/orgs');
+  const data = await apiGet<{ orgs?: Array<{ username: string }> }>('/user/orgs');
   return data.orgs ?? [];
 }
 
-export async function createOrg(input: { username: string; displayName?: string | null }): Promise<OrgSummary> {
+export async function createOrg(input: { username: string }): Promise<OrgSummary> {
   return apiPost<OrgSummary>('/user/orgs', input);
 }
 
-export async function loadOrgAuthed(org: string): Promise<{ id?: string; username: string; displayName: string | null; members: OrgMember[]; viewerRole: 'owner' | 'member' | null }> {
-  const data = await apiGet<{ id?: string; username: string; displayName: string | null; members?: OrgMember[]; viewerRole?: 'owner' | 'member' | null }>(`/user/orgs/${encodeURIComponent(org)}`);
-  return { id: data.id, username: data.username, displayName: data.displayName ?? null, members: data.members ?? [], viewerRole: data.viewerRole ?? null };
+export async function loadOrgAuthed(org: string): Promise<{ id?: string; username: string; members: OrgMember[]; viewerRole: 'owner' | 'member' | null }> {
+  const data = await apiGet<{ id?: string; username: string; members?: OrgMember[]; viewerRole?: 'owner' | 'member' | null }>(`/user/orgs/${encodeURIComponent(org)}`);
+  return { id: data.id, username: data.username, members: data.members ?? [], viewerRole: data.viewerRole ?? null };
 }
 
-export async function updateOrg(org: string, patch: { displayName?: string | null; username?: string }): Promise<OrgSummary> {
+export async function updateOrg(org: string, patch: { username?: string }): Promise<OrgSummary> {
   return apiPatch<OrgSummary>(`/user/orgs/${encodeURIComponent(org)}`, patch);
 }
 

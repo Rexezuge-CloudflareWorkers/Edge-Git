@@ -5,7 +5,6 @@ export interface OrganizationRow {
   id: string;
   username: string;
   username_ci: string;
-  display_name: string | null;
   creator_email: string;
   created_at: number;
   updated_at: number;
@@ -16,20 +15,12 @@ class OrganizationDAO extends BaseDAO {
     super(database);
   }
 
-  public async create(input: {
-    id: string;
-    username: string;
-    displayName?: string | null;
-    creatorEmail: string;
-    now: number;
-  }): Promise<void> {
+  public async create(input: { id: string; username: string; creatorEmail: string; now: number }): Promise<void> {
     await this.withRetry(
       () =>
         this.database
-          .prepare(
-            'INSERT INTO organizations (id, username, username_ci, display_name, creator_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          )
-          .bind(input.id, input.username, input.username.toLowerCase(), input.displayName ?? null, input.creatorEmail, input.now, input.now)
+          .prepare('INSERT INTO organizations (id, username, username_ci, creator_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
+          .bind(input.id, input.username, input.username.toLowerCase(), input.creatorEmail, input.now, input.now)
           .run(),
       'create organization',
     );
@@ -50,13 +41,6 @@ class OrganizationDAO extends BaseDAO {
     await this.withRetry(
       () => this.database.prepare('UPDATE organizations SET username = ?, username_ci = ?, updated_at = ? WHERE id = ?').bind(username, username.toLowerCase(), now, id).run(),
       'rename organization',
-    );
-  }
-
-  public async updateDisplayName(id: string, displayName: string | null, now: number): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('UPDATE organizations SET display_name = ?, updated_at = ? WHERE id = ?').bind(displayName, now, id).run(),
-      'update organization display name',
     );
   }
 

@@ -233,7 +233,7 @@ describe('RepoService org creation', () => {
 
 describe('OrganizationService happy paths', () => {
   function orgHarness() {
-    const orgs = new Map<string, { id: string; username: string; username_ci: string; display_name: string | null }>();
+    const orgs = new Map<string, { id: string; username: string; username_ci: string }>();
     const members = new Map<string, Map<string, string>>();
     const namespaces = new Set<string>(['alice']);
     return {
@@ -253,8 +253,8 @@ describe('OrganizationService happy paths', () => {
           }) as never,
         organizationDAO: async () =>
           ({
-            create: async (input: { id: string; username: string; displayName?: string | null }) => {
-              orgs.set(input.id, { id: input.id, username: input.username, username_ci: input.username.toLowerCase(), display_name: input.displayName ?? null });
+            create: async (input: { id: string; username: string }) => {
+              orgs.set(input.id, { id: input.id, username: input.username, username_ci: input.username.toLowerCase() });
             },
             getById: async (id: string) => orgs.get(id) ?? null,
             getByUsernameCi: async (ci: string) => [...orgs.values()].find((o) => o.username_ci === ci) ?? null,
@@ -262,9 +262,6 @@ describe('OrganizationService happy paths', () => {
               const o = orgs.get(id)!;
               o.username = username;
               o.username_ci = username.toLowerCase();
-            },
-            updateDisplayName: async (id: string, displayName: string | null) => {
-              orgs.get(id)!.display_name = displayName;
             },
             deleteById: async (id: string) => {
               orgs.delete(id);
@@ -306,9 +303,9 @@ describe('OrganizationService happy paths', () => {
     };
   }
 
-  it('creates, lists, renames, updates display, manages members, and disbands', async () => {
+  it('creates, lists, renames, manages members, and disbands', async () => {
     const h = orgHarness();
-    const created = await h.service.createOrganization('alice@x.co', 'acme', 'Acme');
+    const created = await h.service.createOrganization('alice@x.co', 'acme');
     expect(created.username).toBe('acme');
     await expect(h.service.createOrganization('b@x.co', 'alice')).rejects.toThrow('taken');
     await expect(h.service.createOrganization('b@x.co', 'bad name!')).rejects.toThrow('Invalid');
@@ -320,8 +317,6 @@ describe('OrganizationService happy paths', () => {
     expect(listed).toHaveLength(2);
     const renamed = await h.service.rename('acme', 'alice@x.co', 'acme-new');
     expect(renamed.username).toBe('acme-new');
-    const withDisplay = await h.service.updateDisplayName('acme-new', 'alice@x.co', 'Acme Inc');
-    expect(withDisplay.display_name).toBe('Acme Inc');
     expect(await h.service.resolveEmail('alice')).toBe('alice@x.co');
     expect(await h.service.resolveEmail('Bob@X.Co')).toBe('bob@x.co');
     await h.service.removeMember('acme-new', 'alice@x.co', 'bob@x.co');

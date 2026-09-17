@@ -9,11 +9,11 @@ type OrgApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: 
 function registerOrgRoutes(app: OrgApp): void {
   app.post('/user/orgs', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const body = (await c.req.json().catch(() => ({}))) as { username?: string; displayName?: string | null };
+    const body = (await c.req.json().catch(() => ({}))) as { username?: string };
     if (!body.username) return c.json({ error: 'username is required' }, 400);
     try {
-      const org = await createRequestScope(c.env).get(Tokens.OrganizationService).createOrganization(email, body.username, body.displayName ?? null);
-      return c.json({ id: org.id, username: org.username, displayName: org.display_name ?? null }, 201);
+      const org = await createRequestScope(c.env).get(Tokens.OrganizationService).createOrganization(email, body.username);
+      return c.json({ id: org.id, username: org.username }, 201);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create organization';
       const status = message.includes('taken') || message.includes('Invalid') ? 400 : toServiceStatus(error);
@@ -24,7 +24,7 @@ function registerOrgRoutes(app: OrgApp): void {
   app.get('/user/orgs', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const orgs = await createRequestScope(c.env).get(Tokens.OrganizationService).listOrgsForUser(email);
-    return c.json({ orgs: orgs.map((o) => ({ id: o.id, username: o.username, displayName: o.display_name ?? null })) });
+    return c.json({ orgs: orgs.map((o) => ({ id: o.id, username: o.username })) });
   });
 
   app.get('/user/orgs/:org', async (c) => {
@@ -35,7 +35,7 @@ function registerOrgRoutes(app: OrgApp): void {
       const org = await scope.get(Tokens.OrganizationService).requireMember(orgName, email);
       const members = await scope.get(Tokens.OrganizationService).listMembers(org.username, email);
       const viewerRole = await scope.get(Tokens.OrganizationService).getMemberRole(org.id, email).catch(() => null);
-      return c.json({ id: org.id, username: org.username, displayName: org.display_name ?? null, members, viewerRole });
+      return c.json({ id: org.id, username: org.username, members, viewerRole });
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
     }
@@ -44,13 +44,10 @@ function registerOrgRoutes(app: OrgApp): void {
   app.patch('/user/orgs/:org', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const orgName = c.req.param('org');
-    const body = (await c.req.json().catch(() => ({}))) as { displayName?: string | null; username?: string };
+    const body = (await c.req.json().catch(() => ({}))) as { username?: string };
     try {
       const scope = createRequestScope(c.env);
       let org = await scope.get(Tokens.OrganizationService).requireOwner(orgName, email);
-      if (body.displayName !== undefined) {
-        org = await scope.get(Tokens.OrganizationService).updateDisplayName(org.username, email, body.displayName);
-      }
       if (body.username) {
         const before = org.username;
         org = await scope.get(Tokens.OrganizationService).rename(org.username, email, body.username);
@@ -73,7 +70,7 @@ function registerOrgRoutes(app: OrgApp): void {
           }
         }
       }
-      return c.json({ id: org.id, username: org.username, displayName: org.display_name ?? null });
+      return c.json({ id: org.id, username: org.username });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to update organization';
       const status = message.includes('taken') || message.includes('Invalid') ? 400 : toServiceStatus(error);

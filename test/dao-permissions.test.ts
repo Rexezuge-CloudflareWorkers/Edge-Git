@@ -114,8 +114,8 @@ function createPermFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO organizations')) {
-          const [id, username, username_ci, display_name, creator_email, created_at, updated_at] = params as Array<string | number | null>;
-          state.orgs.push({ id, username, username_ci, display_name, creator_email, created_at, updated_at });
+          const [id, username, username_ci, creator_email, created_at, updated_at] = params as Array<string | number | null>;
+          state.orgs.push({ id, username, username_ci, creator_email, created_at, updated_at });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE organizations SET username')) {
@@ -124,14 +124,6 @@ function createPermFakeDb() {
             row.username = params[0];
             row.username_ci = params[1];
             row.updated_at = params[2];
-          }
-          return Promise.resolve({ success: true, meta: { changes: 1 } });
-        }
-        if (q.startsWith('UPDATE organizations SET display_name')) {
-          const row = state.orgs.find((o) => o.id === params[2]);
-          if (row) {
-            row.display_name = params[0];
-            row.updated_at = params[1];
           }
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
@@ -199,7 +191,7 @@ function createPermFakeDb() {
         }
         if (q.startsWith('INSERT INTO users')) {
           const [email, created_at] = params as Array<string | number>;
-          if (!state.users.some((u) => u.email === email)) state.users.push({ email, created_at, username: null, display_name: null, updated_at: null });
+          if (!state.users.some((u) => u.email === email)) state.users.push({ email, created_at, username: null, updated_at: null });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE users SET username')) {
@@ -214,14 +206,6 @@ function createPermFakeDb() {
               row.username = params[0];
               row.updated_at = params[1];
             }
-          }
-          return Promise.resolve({ success: true, meta: { changes: 1 } });
-        }
-        if (q.startsWith('UPDATE users SET display_name')) {
-          const row = state.users.find((u) => u.email === params[2]);
-          if (row) {
-            row.display_name = params[0];
-            row.updated_at = params[1];
           }
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
@@ -269,16 +253,14 @@ describe('NamespaceDAO', () => {
 });
 
 describe('OrganizationDAO', () => {
-  it('creates, renames, updates display, and deletes', async () => {
+  it('creates, renames, and deletes', async () => {
     const { db } = createPermFakeDb();
     const dao = new OrganizationDAO(db);
-    await dao.create({ id: 'o1', username: 'acme', displayName: 'Acme', creatorEmail: 'a@x.co', now: 1 });
+    await dao.create({ id: 'o1', username: 'acme', creatorEmail: 'a@x.co', now: 1 });
     await expect(dao.getById('o1')).resolves.toMatchObject({ username: 'acme' });
     await expect(dao.getByUsernameCi('acme')).resolves.toMatchObject({ id: 'o1' });
     await dao.rename('o1', 'acme-new', 2);
     await expect(dao.getById('o1')).resolves.toMatchObject({ username: 'acme-new' });
-    await dao.updateDisplayName('o1', 'Acme Inc', 3);
-    await expect(dao.getById('o1')).resolves.toMatchObject({ display_name: 'Acme Inc' });
     await dao.deleteById('o1');
     await expect(dao.getById('o1')).resolves.toBeNull();
   });
@@ -334,7 +316,7 @@ describe('RepoCollaboratorDAO', () => {
 });
 
 describe('UserDAO usernames', () => {
-  it('ensures, sets username/display, and case-insensitive lookup', async () => {
+  it('ensures, sets username, and case-insensitive lookup', async () => {
     const { db } = createPermFakeDb();
     const dao = new UserDAO(db);
     await dao.upsertUser('a@x.co', 1);
@@ -343,8 +325,7 @@ describe('UserDAO usernames', () => {
     await expect(dao.getByEmail('a@x.co')).resolves.toMatchObject({ username: 'Alice' });
     await expect(dao.getByUsernameCi('alice')).resolves.toMatchObject({ email: 'a@x.co' });
     await dao.setUsername('a@x.co', 'alice-new', 3);
-    await dao.setDisplayName('a@x.co', 'Alice A', 4);
-    await expect(dao.getByEmail('a@x.co')).resolves.toMatchObject({ username: 'alice-new', display_name: 'Alice A' });
+    await expect(dao.getByEmail('a@x.co')).resolves.toMatchObject({ username: 'alice-new' });
   });
 });
 

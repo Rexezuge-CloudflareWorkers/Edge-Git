@@ -1,12 +1,9 @@
 export interface CurrentUser {
   email: string;
   username?: string | null;
-  displayName?: string | null;
   /**
-   * Preferred UI language (BCP 47 tag). Optional: the backend does not persist
-   * it yet, so the SPA treats a missing value as "use localStorage > navigator
-   * > en" and persists language changes locally (best-effort `PATCH /user/me`
-   * when the backend starts accepting it).
+   * Preferred UI language (BCP 47 tag). Optional: persisted locally only
+   * (`localStorage > navigator > en`).
    */
   preferredLanguage?: string | null;
 }
@@ -31,7 +28,6 @@ export type ProfileType = 'user' | 'org';
 export interface UserOrOrgProfile {
   type: ProfileType;
   username: string;
-  displayName: string | null;
   repoCount?: number | null;
   orgCount?: number | null;
   memberCount?: number | null;
@@ -42,7 +38,6 @@ export interface UserOrOrgProfile {
 
 export interface OrgSummary {
   username: string;
-  displayName: string | null;
 }
 
 export interface OrgMember {

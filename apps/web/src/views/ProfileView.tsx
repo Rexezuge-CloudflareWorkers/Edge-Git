@@ -120,7 +120,6 @@ export function ProfileView({
               {isOrg ? t('profile.organization', 'Organization') : t('profile.user', 'User')}
             </Badge>
           </div>
-          {profile.displayName && <p className="text-sm text-[var(--color-text-secondary)] truncate">{profile.displayName}</p>}
           <p className="text-xs text-[var(--color-text-muted)] mt-1">
             {t('profile.repoCount', '{{count}} Repositories', { count: profile.repoCount ?? repos.length })}
             {!isOrg && profile.orgCount != null ? ` · ${t('profile.orgCount', '{{count}} Organizations', { count: profile.orgCount })}` : ''}
@@ -195,7 +194,6 @@ export function ProfileView({
                     <Link to={`/${o.username}`} className="font-medium text-[var(--color-accent)] hover:underline truncate">
                       {o.username}
                     </Link>
-                    {o.displayName && <p className="text-sm text-[var(--color-text-secondary)] truncate">{o.displayName}</p>}
                   </div>
                 </li>
               ))}
@@ -235,7 +233,7 @@ export function ProfileView({
       {visibleTab === 'manage' && isOrg && canManageOrg && (
         <div className="space-y-4">
           <OrgMembersManager org={profile.username} showNotice={showNotice} />
-          <OrgSettingsCard org={{ username: profile.username, displayName: profile.displayName }} showNotice={showNotice} />
+          <OrgSettingsCard org={{ username: profile.username }} showNotice={showNotice} />
         </div>
       )}
     </div>
