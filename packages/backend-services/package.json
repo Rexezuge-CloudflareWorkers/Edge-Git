@@ -28,6 +28,8 @@
     "./permission/*": "./src/permission/*.ts",
     "./protection": "./src/protection/index.ts",
     "./protection/*": "./src/protection/*.ts",
+    "./checks": "./src/checks/index.ts",
+    "./checks/*": "./src/checks/*.ts",
     "./search": "./src/search/index.ts",
     "./search/*": "./src/search/*.ts",
     "./social": "./src/social/index.ts",

@@ -1,12 +1,15 @@
 import {
   DEFAULT_AUDIT_LOG_RETENTION_DAYS,
   DEFAULT_BACKGROUND_TASK_RUN_RETENTION_DAYS,
+  DEFAULT_CHECK_RETENTION_DAYS,
+  DEFAULT_CHECK_TIMEOUT_SECONDS,
   DEFAULT_DEBUG_MODE,
   DEFAULT_GIT_CACHE_TTL_SECONDS,
   DEFAULT_IMPORT_CLAIM_STALE_SECONDS,
   DEFAULT_MAX_ASSETS_PER_RELEASE,
   DEFAULT_MAX_ASSET_BYTES,
   DEFAULT_MAX_CARDS_PER_COLUMN,
+  DEFAULT_MAX_CHECKS_PER_SHA,
   DEFAULT_MAX_COLUMNS_PER_PROJECT,
   DEFAULT_MAX_DISCUSSIONS_PER_REPO,
   DEFAULT_MAX_FETCH_BODY_BYTES,
@@ -146,6 +149,13 @@ class ConfigurationManager {
   public static getDebugMode(env: unknown): boolean {
     return EnvParser.boolean(env, 'DEBUG_MODE', DEFAULT_DEBUG_MODE);
   }
+
+  public static readonly checks = {
+    getMaxPerSha: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_CHECKS_PER_SHA', DEFAULT_MAX_CHECKS_PER_SHA),
+    getTimeoutSeconds: (env: unknown): number =>
+      EnvParser.positiveInt(env, 'CHECK_TIMEOUT_SECONDS', DEFAULT_CHECK_TIMEOUT_SECONDS),
+    getRetentionDays: (env: unknown): number => EnvParser.positiveInt(env, 'CHECK_RETENTION_DAYS', DEFAULT_CHECK_RETENTION_DAYS),
+  };
 }
 
 export { ConfigurationManager };

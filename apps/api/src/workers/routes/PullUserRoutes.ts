@@ -1,6 +1,7 @@
 import { getRepoStub } from '../repoStub';
 import { requireVisibleRepo, toServiceStatus } from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
+import { triggerRequiredChecks } from './TriggerChecks';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { PullRequestService } from '@edge-git/backend-services/pull';
 import { RepoService } from '@edge-git/backend-services/repo';
@@ -121,6 +122,14 @@ function registerUserPullRoutes(app: PullApp): void {
         subjectOid: preview.headOid,
         mentionText: `${body.title}\n${body.body ?? ''}`,
       });
+      // CI: queue required checks for the base branch against the head SHA.
+      await triggerRequiredChecks(c.env, {
+        repositoryId: row.id,
+        fullName,
+        branch: baseBranch,
+        headSha: preview.headOid,
+        actorEmail: email,
+      }).catch(() => undefined);
       return c.json(created, 201);
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'Failed to create pull request' }, toServiceStatus(error));

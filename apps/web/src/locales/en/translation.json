@@ -112,6 +112,9 @@
     "requirePr": "Require Pull Request",
     "blockForcePush": "Block Force Push",
     "blockDeletion": "Block Deletion",
+    "requireStatusChecks": "Required Status Checks",
+    "checksPlaceholder": "Required Checks (e.g. secret-scan, diff-limit)",
+    "checks": "Checks: {{contexts}}",
     "prRequired": "PR Required",
     "directPushOk": "Direct Push Allowed",
     "approvals": "{{count}} Approvals",
@@ -176,6 +179,13 @@
     "deleted": "Branch Deleted.",
     "defaultBranch": "Default Branch",
     "defaultUpdated": "Default Branch Updated."
+  },
+  "checks": {
+    "title": "Status Checks",
+    "success": "Passing",
+    "failure": "Failing",
+    "pending": "Pending",
+    "noChecks": "No Checks Reported For This Commit Yet."
   },
   "files": {
     "edit": "Edit",

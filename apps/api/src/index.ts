@@ -7,4 +7,4 @@ export default {
   scheduled: (event: ScheduledController, env: Env, ctx: ExecutionContext) => worker.scheduled(event, env, ctx),
 };
 
-export { CronTasksWorker, RepoWorker } from '@edge-git/background';
+export { CronTasksWorker, RepoWorker, CheckRunnerWorker } from '@edge-git/background';

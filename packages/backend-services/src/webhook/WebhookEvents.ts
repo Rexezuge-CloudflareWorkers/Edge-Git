@@ -18,6 +18,8 @@ const WEBHOOK_EVENTS: readonly WebhookEventName[] = [
   'discussion_comment',
   'wiki',
   'snippet',
+  'check_run',
+  'check_suite',
   'ping',
 ];
 

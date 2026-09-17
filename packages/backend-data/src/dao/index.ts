@@ -63,3 +63,5 @@ export { TokenRepoGrantDAO } from './TokenRepoGrantDAO';
 export type { TokenRepoGrantRow } from './TokenRepoGrantDAO';
 export { SecuritySettingsDAO } from './SecuritySettingsDAO';
 export type { SecretScanMode, SecuritySettingsRow } from './SecuritySettingsDAO';
+export { CheckRunDAO } from './CheckRunDAO';
+export type { CheckRunRow } from './CheckRunDAO';

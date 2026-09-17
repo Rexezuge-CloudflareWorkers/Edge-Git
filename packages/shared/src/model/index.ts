@@ -48,8 +48,10 @@ export interface BranchProtectionRuleMetadata {
   blockForcePush: boolean;
   blockDeletion: boolean;
   /*
-   * Stored-but-ignored in v1 (no CI yet); kept so payloads stay
-   * forward-compatible.
+   * Required status check contexts (e.g. `secret-scan`). Enforced at PR merge
+   * time by CheckService: every listed context must report success (neutral /
+   * skipped count as passing) on the merge head SHA, otherwise merge 409s.
+   * Direct pushes are unaffected (merge-gate only).
    */
   requireStatusChecks: string[];
   createdBy: string;
@@ -144,6 +146,8 @@ export type WebhookEventName =
   | 'discussion_comment'
   | 'wiki'
   | 'snippet'
+  | 'check_run'
+  | 'check_suite'
   | 'ping';
 
 export interface RepoWebhookMetadata {
@@ -282,4 +286,33 @@ export interface SnippetFileMetadata {
   filename: string;
   body: string;
   createdAt: number;
+}
+
+export type CheckRunStatus = 'queued' | 'in_progress' | 'completed';
+
+export type CheckConclusion =
+  | 'success'
+  | 'failure'
+  | 'neutral'
+  | 'cancelled'
+  | 'skipped'
+  | 'timed_out'
+  | 'action_required';
+
+export type CheckCombinedState = 'pending' | 'success' | 'failure';
+
+export interface CheckRunMetadata {
+  id: string;
+  repositoryId: string;
+  headSha: string;
+  context: string;
+  status: CheckRunStatus;
+  conclusion: CheckConclusion | null;
+  detailsUrl: string | null;
+  outputTitle: string | null;
+  outputSummary: string | null;
+  creatorEmail: string;
+  createdAt: number;
+  updatedAt: number;
+  completedAt: number | null;
 }
