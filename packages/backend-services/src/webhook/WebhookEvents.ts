@@ -12,6 +12,7 @@ const WEBHOOK_EVENTS: readonly WebhookEventName[] = [
   'fork',
   'star',
   'watch',
+  'release',
   'ping',
 ];
 
@@ -60,6 +61,10 @@ function mapRepoEventToWebhookEvent(type: RepoEventType): WebhookEventName | nul
     }
     case 'fork_created': {
       return 'fork';
+    }
+    case 'release_created':
+    case 'release_published': {
+      return 'release';
     }
     default: {
       return null;

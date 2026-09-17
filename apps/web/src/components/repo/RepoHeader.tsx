@@ -5,12 +5,13 @@ import type { Repo } from '../../types';
 import { VisibilityBadge } from '../ui/Badge';
 import { cn } from '../../lib/utils';
 
-export type RepoTab = 'code' | 'pulls' | 'issues' | 'activity' | 'settings';
+export type RepoTab = 'code' | 'pulls' | 'issues' | 'releases' | 'activity' | 'settings';
 
 const TABS: Array<{ id: RepoTab; label: string }> = [
   { id: 'code', label: 'Code' },
   { id: 'pulls', label: 'Pulls' },
   { id: 'issues', label: 'Issues' },
+  { id: 'releases', label: 'Releases' },
   { id: 'activity', label: 'Activity' },
   { id: 'settings', label: 'Settings' },
 ];
@@ -20,6 +21,7 @@ export function RepoHeader({
   activeTab,
   issueCount,
   pullCount,
+  releaseCount,
   forkCount,
   showSettings,
   socialActions,
@@ -29,6 +31,7 @@ export function RepoHeader({
   activeTab: RepoTab;
   issueCount?: number;
   pullCount?: number;
+  releaseCount?: number;
   forkCount?: number;
   showSettings?: boolean;
   socialActions?: ReactNode;
@@ -92,6 +95,9 @@ export function RepoHeader({
               )}
               {t.id === 'pulls' && pullCount !== undefined && (
                 <span className="ml-1.5 text-xs text-[var(--color-text-muted)]">{pullCount}</span>
+              )}
+              {t.id === 'releases' && releaseCount !== undefined && (
+                <span className="ml-1.5 text-xs text-[var(--color-text-muted)]">{releaseCount}</span>
               )}
             </button>
           ))}

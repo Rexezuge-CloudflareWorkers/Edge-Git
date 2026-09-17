@@ -7,6 +7,7 @@ import type {
   OrganizationMemberDAO,
   PullRequestDAO,
   PullThreadDAO,
+  ReleaseDAO,
   RepoCollaboratorDAO,
   RepositoryDAO,
   UserAccessTokenDAO,
@@ -36,6 +37,7 @@ import type { NotificationService } from '../social/NotificationService';
 import type { StarService } from '../social/StarService';
 import type { WatchService } from '../social/WatchService';
 import type { CollaborationService } from '../collab/CollaborationService';
+import type { ReleaseService } from '../release/ReleaseService';
 import type { SearchDAO } from '@edge-git/backend-data/dao';
 
 // Central token registry for the per-request composition root
@@ -77,6 +79,7 @@ const Tokens = {
   NotificationDAO: Symbol('NotificationDAO') as Token<() => Promise<import('@edge-git/backend-data/dao').NotificationDAO>>,
   WebhookDAO: Symbol('WebhookDAO') as Token<() => Promise<WebhookDAO>>,
   WebhookDeliveryDAO: Symbol('WebhookDeliveryDAO') as Token<() => Promise<WebhookDeliveryDAO>>,
+  ReleaseDAO: Symbol('ReleaseDAO') as Token<() => Promise<ReleaseDAO>>,
   AccessAuthService: Symbol('AccessAuthService') as Token<AccessAuthService>,
   TokenService: Symbol('TokenService') as Token<TokenService>,
   BranchProtectionService: Symbol('BranchProtectionService') as Token<BranchProtectionService>,
@@ -96,6 +99,7 @@ const Tokens = {
   WebhookService: Symbol('WebhookService') as Token<WebhookService>,
   WebhookDeliveryService: Symbol('WebhookDeliveryService') as Token<WebhookDeliveryService>,
   CollaborationService: Symbol('CollaborationService') as Token<CollaborationService>,
+  ReleaseService: Symbol('ReleaseService') as Token<ReleaseService>,
 } satisfies Record<string, Token<unknown>>;
 
 export { Tokens };

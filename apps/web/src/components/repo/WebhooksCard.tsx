@@ -11,7 +11,7 @@ import { ConfirmDeleteModal } from '../modals/ConfirmDeleteModal';
 import { WebhookRow } from './WebhookRow';
 import type { Notice } from './WebhookRow';
 
-const FALLBACK_EVENTS: WebhookEventName[] = ['push', 'issues', 'issue_comment', 'pull_request', 'pull_request_review', 'fork', 'star', 'watch'];
+const FALLBACK_EVENTS: WebhookEventName[] = ['push', 'issues', 'issue_comment', 'pull_request', 'pull_request_review', 'fork', 'star', 'watch', 'release'];
 
 function replaceHook(hooks: RepoWebhook[], updated: RepoWebhook): RepoWebhook[] {
   return hooks.map((h) => (h.id === updated.id ? updated : h));

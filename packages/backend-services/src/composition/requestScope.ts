@@ -1,4 +1,4 @@
-import { BranchProtectionDAO, CollaborationDAO, IssueDAO, NamespaceDAO, OrganizationDAO, OrganizationMemberDAO, PullRequestDAO, PullThreadDAO, RepoCollaboratorDAO, RepositoryDAO, SearchDAO, UserAccessTokenDAO, UserDAO } from '@edge-git/backend-data/dao';
+import { BranchProtectionDAO, CollaborationDAO, IssueDAO, NamespaceDAO, OrganizationDAO, OrganizationMemberDAO, PullRequestDAO, PullThreadDAO, ReleaseDAO, RepoCollaboratorDAO, RepositoryDAO, SearchDAO, UserAccessTokenDAO, UserDAO } from '@edge-git/backend-data/dao';
 import { EventDAO, NotificationDAO, StarDAO, WatchDAO, WebhookDAO, WebhookDeliveryDAO } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { Container } from '@edge-git/backend-runtime/di';
@@ -25,6 +25,7 @@ import { WatchService } from '@edge-git/backend-services/social/WatchService';
 import { WebhookDeliveryService } from '@edge-git/backend-services/webhook/WebhookDeliveryService';
 import { WebhookService } from '@edge-git/backend-services/webhook/WebhookService';
 import { CollaborationService } from '@edge-git/backend-services/collab';
+import { ReleaseService } from '@edge-git/backend-services/release';
 import { Tokens } from './tokens';
 
 // Minimal structural env for scope creation. Secrets are resolved lazily and
@@ -83,6 +84,7 @@ function createRequestScope(env: RequestScopeEnv): Container {
   const notificationDAO = memoize(() => Promise.resolve(new NotificationDAO(env.DB)));
   const webhookDAO = memoize(() => Promise.resolve(new WebhookDAO(env.DB)));
   const webhookDeliveryDAO = memoize(() => Promise.resolve(new WebhookDeliveryDAO(env.DB)));
+  const releaseDAO = memoize(() => Promise.resolve(new ReleaseDAO(env.DB)));
   scope.bindValue(Tokens.UserDAO, userDAO);
   scope.bindValue(Tokens.RepositoryDAO, repositoryDAO);
   scope.bindValue(Tokens.UserAccessTokenDAO, tokenDAO);
@@ -102,6 +104,7 @@ function createRequestScope(env: RequestScopeEnv): Container {
   scope.bindValue(Tokens.NotificationDAO, notificationDAO);
   scope.bindValue(Tokens.WebhookDAO, webhookDAO);
   scope.bindValue(Tokens.WebhookDeliveryDAO, webhookDeliveryDAO);
+  scope.bindValue(Tokens.ReleaseDAO, releaseDAO);
 
   scope.bind(Tokens.AccessAuthService, () => new AccessAuthService(env as never));
   scope.bind(Tokens.TokenService, () => new TokenService(env as never, { tokenDAO }));
@@ -112,7 +115,7 @@ function createRequestScope(env: RequestScopeEnv): Container {
   );
   scope.bind(
     Tokens.RepoService,
-    () => new RepoService(env as never, { repositoryDAO, issueDAO, pullRequestDAO, pullThreadDAO, branchProtectionDAO, userDAO, organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO, starDAO, watchDAO, eventDAO, notificationDAO }),
+    () => new RepoService(env as never, { repositoryDAO, issueDAO, pullRequestDAO, pullThreadDAO, branchProtectionDAO, userDAO, organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO, starDAO, watchDAO, eventDAO, notificationDAO, releaseDAO }),
   );
   scope.bind(Tokens.UserService, () => new UserService(env as never, { userDAO, namespaceDAO, organizationDAO, repositoryDAO }));
   scope.bind(Tokens.IssueService, () => new IssueService(env as never, { issueDAO }));
@@ -141,6 +144,7 @@ function createRequestScope(env: RequestScopeEnv): Container {
   );
   scope.bind(Tokens.StarService, () => new StarService(env as never, { starDAO }));
   scope.bind(Tokens.CollaborationService, () => new CollaborationService(env as never, { collaborationDAO }));
+  scope.bind(Tokens.ReleaseService, () => new ReleaseService(env as never, { releaseDAO }));
   scope.bind(Tokens.WatchService, () => new WatchService(env as never, { watchDAO }));
   scope.bind(Tokens.ActivityService, () => new ActivityService(env as never, { eventDAO }));
   scope.bind(Tokens.WebhookService, () => new WebhookService(env as never, { webhookDAO }));

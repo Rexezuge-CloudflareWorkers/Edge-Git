@@ -283,6 +283,29 @@
     "resolved": "已解决",
     "open": "开放"
   },
+  "releases": {
+    "newRelease": "新建发布",
+    "releases": "发布",
+    "noReleases": "暂无发布。",
+    "createRelease": "创建草稿发布",
+    "tagPlaceholder": "标签（例如 v1.0.0）",
+    "pickTag": "选择已有标签",
+    "namePlaceholder": "标题（可选）",
+    "bodyPlaceholder": "发布说明（可选）",
+    "draft": "草稿",
+    "prerelease": "预发布",
+    "publish": "发布",
+    "published": "发布已公开。",
+    "publishedBy": "{{email}} 发布于 {{date}}",
+    "created": "发布已创建。",
+    "deleted": "发布已删除。",
+    "deleteConfirm": "删除此发布吗？附件将一并删除。",
+    "uploadAsset": "上传附件",
+    "assetUploaded": "附件已上传。",
+    "assetDeleted": "附件已删除。",
+    "failedToCreate": "创建发布失败。",
+    "actionFailed": "发布操作失败。"
+  },
   "commits": {
     "history": "提交历史",
     "backToHistory": "返回历史",
@@ -427,6 +450,7 @@
     "failedToLoadCommit": "加载提交失败。",
     "failedToLoadCompare": "加载对比失败。",
     "failedToLoadCommits": "加载提交历史失败。",
+    "failedToLoadReleases": "加载发布失败。",
     "failedToLoadPull": "加载合并请求失败。",
     "failedToLoadPulls": "加载合并请求列表失败。",
     "failedToCreatePull": "创建合并请求失败。",
@@ -478,7 +502,9 @@
       "pr_merged": "合并了拉取请求",
       "pr_reviewed": "评审了拉取请求",
       "pr_commented": "评论了拉取请求",
-      "fork_created": "复刻了该仓库"
+      "fork_created": "复刻了该仓库",
+      "release_created": "创建了发布",
+      "release_published": "公开了发布"
     }
   },
   "notifications": {

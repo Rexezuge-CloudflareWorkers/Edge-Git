@@ -21,6 +21,8 @@ import { registerSearchRoutes } from './routes/SearchRoutes';
 import { registerUserNotificationRoutes } from './routes/NotificationRoutes';
 import { registerSocialRoutes, registerUserSocialRoutes } from './routes/SocialRoutes';
 import { registerWebhookRoutes } from './routes/WebhookRoutes';
+import { registerReleaseAssetPublicRoutes, registerReleaseAssetUserRoutes } from './routes/ReleaseAssetRoutes';
+import { registerReleasePublicRoutes, registerReleaseUserRoutes } from './routes/ReleaseRoutes';
 import { registerCollabPublicRoutes, registerCollabUserRoutes } from './routes/CollabRoutes';
 
 type AppRouter = HonoOpenAPIRouterType<{
@@ -64,6 +66,8 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
   registerUserProfileRoutes(app);
   registerSearchRoutes(app);
   registerSocialRoutes(app);
+  registerReleasePublicRoutes(app);
+  registerReleaseAssetPublicRoutes(app);
   registerCollabPublicRoutes(app);
 
     // Protected UI/API surface
@@ -89,6 +93,8 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
   registerUserSocialRoutes(app);
   registerUserNotificationRoutes(app);
   registerCollabUserRoutes(app);
+  registerReleaseUserRoutes(app);
+  registerReleaseAssetUserRoutes(app);
   registerWebhookRoutes(app);
 
     // SPA catch-all — public shell for user home (/), profile home

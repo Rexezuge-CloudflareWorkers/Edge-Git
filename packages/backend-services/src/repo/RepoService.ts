@@ -8,6 +8,7 @@ import {
   OrganizationMemberDAO,
   PullRequestDAO,
   PullThreadDAO,
+  ReleaseDAO,
   RepoCollaboratorDAO,
   RepositoryDAO,
   StarDAO,
@@ -45,6 +46,7 @@ interface RepoServiceDeps {
   watchDAO?: () => Promise<WatchDAO>;
   eventDAO?: () => Promise<EventDAO>;
   notificationDAO?: () => Promise<NotificationDAO>;
+  releaseDAO?: () => Promise<ReleaseDAO>;
 }
 
 class RepoService {
@@ -69,6 +71,7 @@ class RepoService {
       watchDAO: () => Promise.resolve(new WatchDAO(env.DB)),
       eventDAO: () => Promise.resolve(new EventDAO(env.DB)),
       notificationDAO: () => Promise.resolve(new NotificationDAO(env.DB)),
+      releaseDAO: () => Promise.resolve(new ReleaseDAO(env.DB)),
       ...deps,
     };
   }
@@ -378,6 +381,12 @@ class RepoService {
       await notificationDao.deleteByRepo(repo.id);
     } catch {
       // ignore — legacy DBs without notifications table
+    }
+    try {
+      const releaseDao = await this.deps.releaseDAO();
+      await releaseDao.deleteByRepo(repo.id);
+    } catch {
+      // ignore — legacy DBs without releases tables
     }
     const repositoryDAO = await this.deps.repositoryDAO();
     await repositoryDAO.deleteById(repo.id);

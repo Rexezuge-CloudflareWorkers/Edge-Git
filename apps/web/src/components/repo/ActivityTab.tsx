@@ -22,11 +22,22 @@ const EVENT_LABELS: Record<string, string> = {
   pr_reviewed: 'Reviewed A Pull Request',
   pr_commented: 'Commented On A Pull Request',
   fork_created: 'Forked This Repository',
+  release_created: 'Created A Release',
+  release_published: 'Published A Release',
 };
 
 function eventTarget(event: RepoEvent): string | null {
   if (event.subject_type === 'issue' && event.subject_number !== null) return `Issue #${event.subject_number}`;
   if (event.subject_type === 'pull' && event.subject_number !== null) return `Pull #${event.subject_number}`;
+  if (event.subject_type === 'release') {
+    try {
+      const payload = JSON.parse(event.payload ?? '{}') as { tag?: string };
+      if (typeof payload.tag === 'string' && payload.tag) return payload.tag;
+    } catch {
+      // ignore
+    }
+    return 'Release';
+  }
   if (event.type === 'push' && event.subject_oid) return event.subject_oid.slice(0, 7);
   return null;
 }

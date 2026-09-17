@@ -35,3 +35,5 @@ export { WebhookDAO } from './WebhookDAO';
 export type { RepoWebhookRow } from './WebhookDAO';
 export { WebhookDeliveryDAO } from './WebhookDeliveryDAO';
 export type { WebhookDeliveryRow } from './WebhookDeliveryDAO';
+export { ReleaseDAO } from './ReleaseDAO';
+export type { ReleaseRow, ReleaseAssetRow } from './ReleaseDAO';

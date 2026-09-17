@@ -7,6 +7,7 @@ import { ActivityTab } from '../components/repo/ActivityTab';
 import { CodeTab } from '../components/repo/CodeTab';
 import { IssuesTab } from '../components/repo/IssuesTab';
 import { PullsTab } from '../components/repo/PullsTab';
+import { ReleasesTab } from '../components/repo/ReleasesTab';
 import { RepoSettingsTab } from '../components/repo/RepoSettingsTab';
 import { SocialButtons } from '../components/repo/SocialButtons';
 import { Card } from '../components/ui/Card';
@@ -28,6 +29,7 @@ export function RepoView({
   const [tab, setTab] = useState<RepoTab>('code');
   const [issueCount, setIssueCount] = useState<number | undefined>(undefined);
   const [pullCount, setPullCount] = useState<number | undefined>(undefined);
+  const [releaseCount, setReleaseCount] = useState<number | undefined>(undefined);
 
   // `true` only for signed-in viewers: `null` (resolving) and `false`
   // share the public path so null->false never refetches. A public 404
@@ -132,6 +134,7 @@ export function RepoView({
         activeTab={visibleTab}
         issueCount={issueCount}
         pullCount={pullCount}
+        releaseCount={releaseCount}
         forkCount={repoData.forksCount}
         showSettings={canManage}
         socialActions={<SocialButtons owner={owner} repo={repo} authorized={authorized} showNotice={showNotice} />}
@@ -156,6 +159,9 @@ export function RepoView({
         )}
         {visibleTab === 'issues' && (
           <IssuesTab owner={owner} repo={repo} canWrite={authorized ?? false} showNotice={showNotice} onCountChange={setIssueCount} authorized={authorized} />
+        )}
+        {visibleTab === 'releases' && (
+          <ReleasesTab owner={owner} repo={repo} canWrite={authorized ?? false} showNotice={showNotice} onCountChange={setReleaseCount} authorized={authorized} />
         )}
         {visibleTab === 'activity' && <ActivityTab owner={owner} repo={repo} showNotice={showNotice} />}
         {visibleTab === 'settings' && (
