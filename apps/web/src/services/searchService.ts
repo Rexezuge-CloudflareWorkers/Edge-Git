@@ -1,7 +1,7 @@
-import type { Issue, PullRequest, Repo } from '../types';
+import type { Discussion, Issue, PullRequest, Repo, Snippet } from '../types';
 import { apiGet } from '../lib/api';
 
-export type SearchType = 'repos' | 'issues' | 'pulls' | 'code';
+export type SearchType = 'repos' | 'issues' | 'pulls' | 'code' | 'discussions' | 'snippets';
 
 export interface CodeHit {
   repo_id: string;
@@ -46,4 +46,20 @@ export async function searchPulls(query: string, limit = 20, scope?: { owner?: s
     repo: scope?.repo,
   });
   return data.pulls ?? [];
+}
+
+export async function searchDiscussions(query: string, limit = 20, scope?: { owner?: string; repo?: string }): Promise<Discussion[]> {
+  const data = await apiGet<{ discussions?: Discussion[] }>('/search', {
+    q: query,
+    type: 'discussions',
+    limit: String(limit),
+    owner: scope?.owner,
+    repo: scope?.repo,
+  });
+  return data.discussions ?? [];
+}
+
+export async function searchSnippets(query: string, limit = 20): Promise<Snippet[]> {
+  const data = await apiGet<{ snippets?: Snippet[] }>('/search', { q: query, type: 'snippets', limit: String(limit) });
+  return data.snippets ?? [];
 }

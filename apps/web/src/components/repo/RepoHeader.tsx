@@ -5,12 +5,15 @@ import type { Repo } from '../../types';
 import { VisibilityBadge } from '../ui/Badge';
 import { cn } from '../../lib/utils';
 
-export type RepoTab = 'code' | 'pulls' | 'issues' | 'releases' | 'activity' | 'settings';
+export type RepoTab = 'code' | 'pulls' | 'issues' | 'projects' | 'discussions' | 'wiki' | 'releases' | 'activity' | 'settings';
 
 const TABS: Array<{ id: RepoTab; label: string }> = [
   { id: 'code', label: 'Code' },
   { id: 'pulls', label: 'Pulls' },
   { id: 'issues', label: 'Issues' },
+  { id: 'projects', label: 'Projects' },
+  { id: 'discussions', label: 'Discussions' },
+  { id: 'wiki', label: 'Wiki' },
   { id: 'releases', label: 'Releases' },
   { id: 'activity', label: 'Activity' },
   { id: 'settings', label: 'Settings' },

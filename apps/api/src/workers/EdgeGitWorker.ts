@@ -22,6 +22,10 @@ import { registerSocialRoutes, registerUserSocialRoutes } from './routes/SocialR
 import { registerWebhookRoutes } from './routes/WebhookRoutes';
 import { registerReleaseAssetPublicRoutes, registerReleaseAssetUserRoutes } from './routes/ReleaseAssetRoutes';
 import { registerReleasePublicRoutes, registerReleaseUserRoutes } from './routes/ReleaseRoutes';
+import { registerProjectPublicRoutes, registerProjectUserRoutes } from './routes/ProjectRoutes';
+import { registerDiscussionPublicRoutes, registerDiscussionUserRoutes } from './routes/DiscussionRoutes';
+import { registerWikiPublicRoutes, registerWikiUserRoutes } from './routes/WikiRoutes';
+import { registerSnippetPublicRoutes, registerSnippetUserRoutes } from './routes/SnippetRoutes';
 import { registerCollabPublicRoutes, registerCollabUserRoutes } from './routes/CollabRoutes';
 
 type AppRouter = HonoOpenAPIRouterType<{
@@ -64,6 +68,10 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
   registerSocialRoutes(app);
   registerReleasePublicRoutes(app);
   registerReleaseAssetPublicRoutes(app);
+  registerProjectPublicRoutes(app);
+  registerDiscussionPublicRoutes(app);
+  registerWikiPublicRoutes(app);
+  registerSnippetPublicRoutes(app);
   registerCollabPublicRoutes(app);
 
     // Protected UI/API surface
@@ -89,6 +97,10 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
   registerUserSocialRoutes(app);
   registerUserNotificationRoutes(app);
   registerCollabUserRoutes(app);
+  registerProjectUserRoutes(app);
+  registerDiscussionUserRoutes(app);
+  registerWikiUserRoutes(app);
+  registerSnippetUserRoutes(app);
   registerReleaseUserRoutes(app);
   registerReleaseAssetUserRoutes(app);
   registerWebhookRoutes(app);
@@ -99,7 +111,7 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     // Git Smart HTTP paths never reach here: they match exact routes above.
     app.get('*', (c) => {
       const path: string = new URL(c.req.url).pathname;
-      if (path === '/' || path === '/settings' || path === '/new' || path === '/search' || path === '/notifications' || path.startsWith('/user/')) {
+      if (path === '/' || path === '/settings' || path === '/new' || path === '/search' || path === '/notifications' || path === '/snippets' || path.startsWith('/user/') || path.startsWith('/snippets/')) {
         return c.html(SPA_HTML);
       }
       if (/^\/[^/]+\/?$/.test(path)) {

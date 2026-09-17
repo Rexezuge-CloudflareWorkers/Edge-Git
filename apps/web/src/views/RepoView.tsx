@@ -5,9 +5,12 @@ import { loadRepoAuthed, loadRepoPublic } from '../services/repoService';
 import { RepoHeader, type RepoTab } from '../components/repo/RepoHeader';
 import { ActivityTab } from '../components/repo/ActivityTab';
 import { CodeTab } from '../components/repo/CodeTab';
+import { DiscussionsTab } from '../components/repo/DiscussionsTab';
 import { IssuesTab } from '../components/repo/IssuesTab';
+import { ProjectsTab } from '../components/repo/ProjectsTab';
 import { PullsTab } from '../components/repo/PullsTab';
 import { ReleasesTab } from '../components/repo/ReleasesTab';
+import { WikiTab } from '../components/repo/WikiTab';
 import { RepoSettingsTab } from '../components/repo/RepoSettingsTab';
 import { SocialButtons } from '../components/repo/SocialButtons';
 import { Card } from '../components/ui/Card';
@@ -159,6 +162,15 @@ export function RepoView({
         )}
         {visibleTab === 'issues' && (
           <IssuesTab owner={owner} repo={repo} canWrite={authorized ?? false} showNotice={showNotice} onCountChange={setIssueCount} authorized={authorized} />
+        )}
+        {visibleTab === 'projects' && (
+          <ProjectsTab owner={owner} repo={repo} canWrite={authorized ?? false} showNotice={showNotice} authorized={authorized} />
+        )}
+        {visibleTab === 'discussions' && (
+          <DiscussionsTab owner={owner} repo={repo} canWrite={authorized ?? false} showNotice={showNotice} authorized={authorized} />
+        )}
+        {visibleTab === 'wiki' && (
+          <WikiTab owner={owner} repo={repo} canWrite={repoData.viewerRole === 'admin' || repoData.viewerRole === 'write'} showNotice={showNotice} authorized={authorized} />
         )}
         {visibleTab === 'releases' && (
           <ReleasesTab owner={owner} repo={repo} canWrite={authorized ?? false} showNotice={showNotice} onCountChange={setReleaseCount} authorized={authorized} />

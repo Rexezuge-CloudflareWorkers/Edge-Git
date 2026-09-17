@@ -15,6 +15,7 @@ import { CommitsView } from '../../views/CommitsView';
 import { IssueDetailView } from '../../views/IssueDetailView';
 import { PullDetailView } from '../../views/PullDetailView';
 import { SettingsView } from '../../views/SettingsView';
+import { SnippetsView } from '../../views/SnippetsView';
 import { NotificationsView } from '../../views/NotificationsView';
 
 interface SpaViewRouterProps {
@@ -39,6 +40,7 @@ function SpaViewRouter({ user, setUser, authorized, showNotice, defaultOwner }: 
       <Routes>
         <Route path="/:owner/:repo/issues/:number" element={<IssueDetailView authorized={authorized} showNotice={showNotice} />} />
         <Route path="/search" element={<SearchView showNotice={showNotice} />} />
+        <Route path="/snippets" element={<SnippetsView showNotice={showNotice} authorized={authorized} />} />
         <Route path="/:owner/:repo/pulls/:number" element={<PullDetailView authorized={authorized} showNotice={showNotice} />} />
         <Route path="/:owner/:repo/commit/:oid" element={<CommitView authorized={authorized} showNotice={showNotice} />} />
         <Route path="/:owner/:repo/compare" element={<CompareView authorized={authorized} showNotice={showNotice} />} />
@@ -81,6 +83,7 @@ function SpaViewRouter({ user, setUser, authorized, showNotice, defaultOwner }: 
       />
       <Route path="/:owner/:repo/issues/:number" element={<IssueDetailView authorized={authorized} showNotice={showNotice} />} />
       <Route path="/search" element={<SearchView showNotice={showNotice} />} />
+      <Route path="/snippets" element={<SnippetsView showNotice={showNotice} authorized={authorized} />} />
       <Route path="/:owner/:repo/pulls/:number" element={<PullDetailView authorized={authorized} showNotice={showNotice} />} />
       <Route path="/:owner/:repo/commit/:oid" element={<CommitView authorized={authorized} showNotice={showNotice} />} />
       <Route path="/:owner/:repo/compare" element={<CompareView authorized={authorized} showNotice={showNotice} />} />

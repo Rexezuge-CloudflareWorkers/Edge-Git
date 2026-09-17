@@ -5,20 +5,29 @@ import {
   DEFAULT_GIT_CACHE_TTL_SECONDS,
   DEFAULT_MAX_ASSETS_PER_RELEASE,
   DEFAULT_MAX_ASSET_BYTES,
+  DEFAULT_MAX_CARDS_PER_COLUMN,
+  DEFAULT_MAX_COLUMNS_PER_PROJECT,
+  DEFAULT_MAX_DISCUSSIONS_PER_REPO,
   DEFAULT_MAX_FETCH_BODY_BYTES,
   DEFAULT_MAX_FILE_BYTES,
   DEFAULT_MAX_FETCH_HAVES,
   DEFAULT_MAX_FETCH_WANTS,
+  DEFAULT_MAX_FILES_PER_SNIPPET,
   DEFAULT_MAX_HOOKS_PER_REPO,
   DEFAULT_MAX_MERGE_DIFF_FILES,
   DEFAULT_MAX_PACK_BYTES,
   DEFAULT_MAX_PACK_OBJECTS,
+  DEFAULT_MAX_PROJECTS_PER_REPO,
   DEFAULT_MAX_PUSH_COMMANDS,
   DEFAULT_MAX_RELEASES_PER_REPO,
   DEFAULT_MAX_REPOS_PER_USER,
   DEFAULT_MAX_RULES_PER_REPO,
+  DEFAULT_MAX_SNIPPET_BYTES,
+  DEFAULT_MAX_SNIPPETS_PER_USER,
   DEFAULT_MAX_TOKENS_PER_USER,
   DEFAULT_MAX_TOKEN_EXPIRY_DAYS,
+  DEFAULT_MAX_WIKI_BODY_BYTES,
+  DEFAULT_MAX_WIKI_PAGES_PER_REPO,
   DEFAULT_SITE_URL,
   DEFAULT_WEBHOOK_DELIVERY_RETENTION_DAYS,
   DEFAULT_WEBHOOK_MAX_ATTEMPTS,
@@ -84,6 +93,25 @@ class ConfigurationManager {
     getMaxAssetsPerRelease: (env: unknown): number =>
       EnvParser.positiveInt(env, 'MAX_ASSETS_PER_RELEASE', DEFAULT_MAX_ASSETS_PER_RELEASE),
     getMaxAssetBytes: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_ASSET_BYTES', DEFAULT_MAX_ASSET_BYTES),
+  };
+
+  public static readonly collabSurfaces = {
+    getMaxProjectsPerRepo: (env: unknown): number =>
+      EnvParser.positiveInt(env, 'MAX_PROJECTS_PER_REPO', DEFAULT_MAX_PROJECTS_PER_REPO),
+    getMaxColumnsPerProject: (env: unknown): number =>
+      EnvParser.positiveInt(env, 'MAX_COLUMNS_PER_PROJECT', DEFAULT_MAX_COLUMNS_PER_PROJECT),
+    getMaxCardsPerColumn: (env: unknown): number =>
+      EnvParser.positiveInt(env, 'MAX_CARDS_PER_COLUMN', DEFAULT_MAX_CARDS_PER_COLUMN),
+    getMaxDiscussionsPerRepo: (env: unknown): number =>
+      EnvParser.positiveInt(env, 'MAX_DISCUSSIONS_PER_REPO', DEFAULT_MAX_DISCUSSIONS_PER_REPO),
+    getMaxWikiPagesPerRepo: (env: unknown): number =>
+      EnvParser.positiveInt(env, 'MAX_WIKI_PAGES_PER_REPO', DEFAULT_MAX_WIKI_PAGES_PER_REPO),
+    getMaxWikiBodyBytes: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_WIKI_BODY_BYTES', DEFAULT_MAX_WIKI_BODY_BYTES),
+    getMaxSnippetsPerUser: (env: unknown): number =>
+      EnvParser.positiveInt(env, 'MAX_SNIPPETS_PER_USER', DEFAULT_MAX_SNIPPETS_PER_USER),
+    getMaxFilesPerSnippet: (env: unknown): number =>
+      EnvParser.positiveInt(env, 'MAX_FILES_PER_SNIPPET', DEFAULT_MAX_FILES_PER_SNIPPET),
+    getMaxSnippetBytes: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_SNIPPET_BYTES', DEFAULT_MAX_SNIPPET_BYTES),
   };
 
   public static getDebugMode(env: unknown): boolean {

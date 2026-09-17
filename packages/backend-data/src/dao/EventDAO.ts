@@ -15,7 +15,17 @@ export type RepoEventType =
   | 'pr_commented'
   | 'fork_created'
   | 'release_created'
-  | 'release_published';
+  | 'release_published'
+  | 'project_created'
+  | 'project_closed'
+  | 'project_reopened'
+  | 'discussion_opened'
+  | 'discussion_answered'
+  | 'discussion_locked'
+  | 'discussion_commented'
+  | 'wiki_created'
+  | 'wiki_updated'
+  | 'snippet_created';
 
 export interface RepoEventRow {
   id: string;

@@ -3,6 +3,8 @@ import type { D1Queryable } from '../utils/D1Types';
 import type { IssueRow } from './IssueDAO';
 import type { PullRequestRow } from './PullRequestDAO';
 import type { RepositoryRow } from './RepositoryDAO';
+import type { DiscussionRow } from './DiscussionDAO';
+import type { SnippetRow } from './SnippetDAO';
 
 interface SearchOptions {
   limit?: number;
@@ -223,6 +225,71 @@ class SearchDAO extends BaseDAO {
       await this.withRetry(() => this.database.prepare('DELETE FROM code_index WHERE repo_id = ?').bind(repoId).run(), 'delete code index by repo');
     } catch {
       // ignore — table may not exist on old DBs
+    }
+  }
+
+  public async searchDiscussions(query: string, opts: SearchOptions = {}): Promise<DiscussionRow[]> {
+    const limit = clampLimit(opts.limit);
+    const tokens = query.trim().split(/\s+/).filter(Boolean).slice(0, 10);
+    if (tokens.length === 0) return [];
+    const ftsQuery = tokens.map((t) => `"${t.replaceAll('"', '""')}"*`).join(' AND ');
+    try {
+      const base = opts.repoId
+        ? `SELECT d.* FROM discussion_fts f JOIN discussions d ON d.id = f.discussion_id WHERE discussion_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
+        : `SELECT d.* FROM discussion_fts f JOIN discussions d ON d.id = f.discussion_id WHERE discussion_fts MATCH ? ORDER BY rank LIMIT ?`;
+      const result = await (opts.repoId
+        ? this.database.prepare(base).bind(ftsQuery, opts.repoId, limit)
+        : this.database.prepare(base).bind(ftsQuery, limit)
+      ).all<DiscussionRow>();
+      return result.results ?? [];
+    } catch {
+      const likes = tokens.map(() => `(lower(title) LIKE ? ESCAPE '!' OR lower(COALESCE(body, '')) LIKE ? ESCAPE '!')`).join(' AND ');
+      const params: unknown[] = [];
+      for (const t of tokens) {
+        const pattern = `%${escapeLike(t.toLowerCase())}%`;
+        params.push(pattern, pattern);
+      }
+      try {
+        if (opts.repoId) {
+          const result = await this.database
+            .prepare(`SELECT * FROM discussions WHERE repository_id = ? AND ${likes} ORDER BY number DESC LIMIT ?`)
+            .bind(opts.repoId, ...params, limit)
+            .all<DiscussionRow>();
+          return result.results ?? [];
+        }
+        params.push(limit);
+        const result = await this.database.prepare(`SELECT * FROM discussions WHERE ${likes} ORDER BY updated_at DESC LIMIT ?`).bind(...params).all<DiscussionRow>();
+        return result.results ?? [];
+      } catch {
+        return [];
+      }
+    }
+  }
+
+  public async searchSnippets(query: string, opts: { limit?: number } = {}): Promise<SnippetRow[]> {
+    const limit = clampLimit(opts.limit);
+    const tokens = query.trim().split(/\s+/).filter(Boolean).slice(0, 10);
+    if (tokens.length === 0) return [];
+    const ftsQuery = tokens.map((t) => `"${t.replaceAll('"', '""')}"*`).join(' AND ');
+    try {
+      const result = await this.database
+        .prepare(`SELECT s.* FROM snippet_fts f JOIN snippets s ON s.id = f.snippet_id WHERE snippet_fts MATCH ? AND s.visibility = 'public' ORDER BY rank LIMIT ?`)
+        .bind(ftsQuery, limit)
+        .all<SnippetRow>();
+      return result.results ?? [];
+    } catch {
+      const likes = tokens.map(() => `lower(title) LIKE ? ESCAPE '!'`).join(' AND ');
+      const params: unknown[] = tokens.map((t) => `%${escapeLike(t.toLowerCase())}%`);
+      try {
+        params.push(limit);
+        const result = await this.database
+          .prepare(`SELECT * FROM snippets WHERE visibility = 'public' AND ${likes} ORDER BY updated_at DESC LIMIT ?`)
+          .bind(...params)
+          .all<SnippetRow>();
+        return result.results ?? [];
+      } catch {
+        return [];
+      }
     }
   }
 }
