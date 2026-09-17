@@ -8,6 +8,9 @@ import { scanText } from '@edge-git/backend-services/security';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { TimestampUtil } from '@edge-git/shared/utils';
 import { createLogger } from '@edge-git/backend-runtime/logger';
+import { decodeBlobToText, loadCheckDefinition, loadCheckScript } from './CheckDefinition';
+import type { CustomCheckDefinition, LoadedDefinition } from './CheckDefinition';
+import { runCustomCheckScript } from './CustomJsSandbox';
 
 const logger = createLogger('CheckRunner');
 
@@ -28,37 +31,20 @@ interface RepoStubShape {
   getCommitDiff(commitOid: string): Promise<{ files?: unknown[] } | null>;
 }
 
-interface IndexedBlob {
-  contentBase64?: string;
-  isBinary?: boolean;
-}
-
 const MAX_SCAN_FILES = 50;
 const MAX_SCAN_BYTES = 20_000;
 const MAX_ATTEMPTS = 3;
 const CODEOWNERS_CANDIDATES = ['CODEOWNERS', '.github/CODEOWNERS', 'docs/CODEOWNERS'];
 
-function decodeBlobToText(blob: IndexedBlob | null): string | null {
-  if (!blob?.contentBase64 || blob.isBinary) return null;
-  try {
-    const binary = atob(blob.contentBase64);
-    if (binary.length > MAX_SCAN_BYTES) return null;
-    const bytes = Uint8Array.from(binary, (c) => c.codePointAt(0) ?? 0);
-    if (bytes.includes(0)) return null;
-    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-  } catch {
-    return null;
-  }
-}
-
 // CI check executor: one DO per repo (`CHECK_RUNNER.getByName(fullName)`).
 // 30s CPU per invocation (vs 10ms in the Worker) fits deterministic built-in
-// steps over the RepoWorker read-model. Arbitrary builds stay external via
-// the PATCH check-run API (custom-js follow-up). Single-flight per repo comes
-// free: only one alarm() runs at a time per object. D1 holds conclusions
-// (source of truth for the merge gate); DO storage holds only the ephemeral
-// pending queue. Never throws across RPC boundaries — failures mark runs
-// completed with a visible conclusion instead of hanging them pending.
+// steps plus sandboxed repo-defined custom-js steps over the RepoWorker
+// read-model. Arbitrary builds stay external via the PATCH check-run API.
+// Single-flight per repo comes free: only one alarm() runs at a time per
+// object. D1 holds conclusions (source of truth for the merge gate); DO
+// storage holds only the ephemeral pending queue. Never throws across RPC
+// boundaries — failures mark runs completed with a visible conclusion
+// instead of hanging them pending.
 class CheckRunnerWorker extends DurableObject<Env> {
   public override async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
@@ -106,9 +92,16 @@ class CheckRunnerWorker extends DurableObject<Env> {
     const dao = new CheckRunDAO(this.env.DB);
     const fullName = await this.resolveFullName(item.repositoryId);
     const repoStub = this.env.REPO.getByName(fullName ?? item.repositoryId) as unknown as RepoStubShape;
+    // Definitions load once per batch; absent means every custom context in
+    // this item stays queued for external runners.
+    let definition: LoadedDefinition | null = null;
     for (const context of item.contexts) {
       const base = context.split(':', 1)[0] ?? context;
-      if (!isBuiltInCheckContext(base)) continue;
+      if (!isBuiltInCheckContext(base)) {
+        if (definition === null) definition = await loadCheckDefinition(repoStub, item.headSha).catch(() => ({ state: 'absent' as const }));
+        await this.processCustomContext(dao, repoStub, item, context, definition);
+        continue;
+      }
       let run = await dao.getByRepoShaContext(item.repositoryId, item.headSha, context).catch(() => null);
       if (!run) {
         // Auto-create the queued row for required built-ins so pushes do not
@@ -125,6 +118,133 @@ class CheckRunnerWorker extends DurableObject<Env> {
       if (!run || run.status === 'completed') continue;
       await this.executeBuiltIn(dao, repoStub, item, run.id, context);
     }
+  }
+
+  // Custom contexts resolve against `.edgegit/checks.json` at the head SHA.
+  // No file (or no entry, or custom-js disabled) leaves the run queued for
+  // external runners; a broken file or script marks action_required visibly
+  // instead of hanging the merge gate on pending.
+  private async processCustomContext(
+    dao: CheckRunDAO,
+    repoStub: RepoStubShape,
+    item: PendingItem,
+    context: string,
+    definition: LoadedDefinition,
+  ): Promise<void> {
+    if (definition.state === 'absent') return;
+    if (definition.state === 'error') {
+      await this.completeCustom(dao, item, context, null, { conclusion: 'action_required', title: 'Invalid Check Definition', summary: definition.message });
+      return;
+    }
+    const entry = definition.checks.find((c) => c.context.toLowerCase() === context.toLowerCase()) ?? null;
+    if (!entry) return;
+    if (!ConfigurationManager.checks.isCustomJsEnabled(this.env)) return;
+    await this.executeCustom(dao, repoStub, item, context, entry);
+  }
+
+  private async completeCustom(
+    dao: CheckRunDAO,
+    item: PendingItem,
+    context: string,
+    runId: string | null,
+    step: { conclusion: 'success' | 'failure' | 'neutral' | 'skipped' | 'timed_out' | 'action_required'; title: string; summary: string },
+  ): Promise<void> {
+    let id = runId;
+    if (!id) {
+      const existing = await dao.getByRepoShaContext(item.repositoryId, item.headSha, context).catch(() => null);
+      if (existing && existing.status === 'completed') return;
+      if (existing) {
+        id = existing.id;
+      } else {
+        try {
+          const { UUIDUtil } = await import('@edge-git/shared/utils');
+          const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
+          await dao.create({ id: UUIDUtil.getRandomUUID(), repositoryId: item.repositoryId, headSha: item.headSha, context, creatorEmail: item.actorEmail, now });
+          const created = await dao.getByRepoShaContext(item.repositoryId, item.headSha, context).catch(() => null);
+          if (!created) return;
+          id = created.id;
+        } catch {
+          return;
+        }
+      }
+    }
+    const done = TimestampUtil.getCurrentUnixTimestampInSeconds();
+    await dao
+      .updateStatus(id, item.repositoryId, {
+        status: 'completed',
+        conclusion: step.conclusion,
+        outputTitle: step.title,
+        outputSummary: step.summary,
+        now: done,
+        completedAt: done,
+      })
+      .catch(() => undefined);
+    await this.emitCheckCompleted(item, id, context, step.conclusion, step.title).catch(() => undefined);
+  }
+
+  private async executeCustom(
+    dao: CheckRunDAO,
+    repoStub: RepoStubShape,
+    item: PendingItem,
+    context: string,
+    entry: CustomCheckDefinition,
+  ): Promise<void> {
+    const existing = await dao.getByRepoShaContext(item.repositoryId, item.headSha, context).catch(() => null);
+    if (existing && existing.status === 'completed') return;
+    const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
+    if (existing) {
+      await dao.updateStatus(existing.id, item.repositoryId, { status: 'in_progress', conclusion: null, now, completedAt: null }).catch(() => undefined);
+    }
+    try {
+      const maxScriptBytes = ConfigurationManager.checks.getCustomJsMaxScriptBytes(this.env);
+      const script = await loadCheckScript(repoStub, item.headSha, entry.scriptPath, maxScriptBytes);
+      if (script === null) {
+        await this.completeCustom(dao, item, context, existing?.id ?? null, {
+          conclusion: 'action_required',
+          title: 'Check Script Unavailable',
+          summary: `${entry.scriptPath} is missing, binary, or larger than ${maxScriptBytes} bytes.`,
+        });
+        return;
+      }
+      const files = await this.preloadTextFiles(repoStub, item.headSha);
+      const cpuMs = ConfigurationManager.checks.getCustomJsMaxCpuMs(this.env);
+      const maxFetches = ConfigurationManager.checks.getCustomJsMaxFetches(this.env);
+      const fetchTimeoutMs = ConfigurationManager.webhooks.getTimeoutMs(this.env);
+      const outcome = await runCustomCheckScript({
+        script,
+        files,
+        env: entry.env,
+        allowHosts: entry.allowHosts,
+        limits: {
+          cpuMs,
+          memoryMb: ConfigurationManager.checks.getCustomJsMemoryMb(this.env),
+          maxFetches,
+          fetchTimeoutMs,
+          maxResponseBytes: ConfigurationManager.webhooks.getMaxPayloadBytes(this.env),
+          wallMs: cpuMs + maxFetches * fetchTimeoutMs + 5000,
+          maxLogBytes: 4096,
+        },
+      });
+      await this.completeCustom(dao, item, context, existing?.id ?? null, outcome);
+    } catch (error) {
+      await this.completeCustom(dao, item, context, existing?.id ?? null, {
+        conclusion: 'action_required',
+        title: 'Check Error',
+        summary: error instanceof Error ? error.message.slice(0, 500) : 'Check execution failed.',
+      });
+    }
+  }
+
+  private async preloadTextFiles(repoStub: RepoStubShape, headSha: string): Promise<Record<string, string>> {
+    const files: Record<string, string> = {};
+    const listed = await repoStub.listAllFiles({ ref: headSha, maxFiles: 500 }).catch(() => []);
+    for (const file of listed.slice(0, MAX_SCAN_FILES)) {
+      if (Object.keys(files).length >= MAX_SCAN_FILES) break;
+      const blob = await repoStub.getBlob({ ref: headSha, filepath: file.path }).catch(() => null);
+      const text = decodeBlobToText(blob, MAX_SCAN_BYTES);
+      if (text !== null) files[file.path] = text;
+    }
+    return files;
   }
 
   private async executeBuiltIn(
@@ -179,7 +299,7 @@ class CheckRunnerWorker extends DurableObject<Env> {
         const findings = new Map<string, string>();
         for (const file of files.slice(0, MAX_SCAN_FILES)) {
           const blob = await repoStub.getBlob({ ref: headSha, filepath: file.path }).catch(() => null);
-          const text = decodeBlobToText(blob);
+          const text = decodeBlobToText(blob, MAX_SCAN_BYTES);
           if (text === null) continue;
           for (const finding of scanText(text)) findings.set(finding.ruleId, finding.hint);
           if (findings.size >= 10) break;
@@ -195,7 +315,7 @@ class CheckRunnerWorker extends DurableObject<Env> {
       case 'codeowners-exists': {
         for (const candidate of CODEOWNERS_CANDIDATES) {
           const blob = await repoStub.getBlob({ ref: headSha, filepath: candidate }).catch(() => null);
-          const text = decodeBlobToText(blob);
+          const text = decodeBlobToText(blob, MAX_SCAN_BYTES);
           if (text === null) continue;
           return runCodeownersStep({ content: text, ruleCount: parseCodeowners(text).length });
         }

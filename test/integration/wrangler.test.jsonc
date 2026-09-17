@@ -6,11 +6,13 @@
   "durable_objects": {
     "bindings": [
       { "name": "REPO", "class_name": "RepoWorker" },
-      { "name": "CRON_TASKS", "class_name": "CronTasksWorker" }
+      { "name": "CRON_TASKS", "class_name": "CronTasksWorker" },
+      { "name": "CHECK_RUNNER", "class_name": "CheckRunnerWorker" }
     ]
   },
   "migrations": [
-    { "tag": "v1000000000", "new_sqlite_classes": ["RepoWorker", "CronTasksWorker"] }
+    { "tag": "v1000000000", "new_sqlite_classes": ["RepoWorker", "CronTasksWorker"] },
+    { "tag": "v1000000001", "new_sqlite_classes": ["CheckRunnerWorker"] }
   ],
   "d1_databases": [
     { "binding": "DB", "database_name": "edge-git-test-db", "database_id": "00000000-0000-0000-0000-000000000000" }

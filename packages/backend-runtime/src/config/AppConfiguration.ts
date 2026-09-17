@@ -2,6 +2,11 @@ import { EnvParser } from './EnvParser';
 import {
   DEFAULT_AUDIT_LOG_RETENTION_DAYS,
   DEFAULT_BACKGROUND_TASK_RUN_RETENTION_DAYS,
+  DEFAULT_CHECK_CUSTOMJS_ENABLED,
+  DEFAULT_CHECK_CUSTOMJS_MAX_CPU_MS,
+  DEFAULT_CHECK_CUSTOMJS_MAX_FETCHES,
+  DEFAULT_CHECK_CUSTOMJS_MAX_SCRIPT_BYTES,
+  DEFAULT_CHECK_CUSTOMJS_MEMORY_MB,
   DEFAULT_CHECK_RETENTION_DAYS,
   DEFAULT_CHECK_TIMEOUT_SECONDS,
   DEFAULT_DEBUG_MODE,
@@ -251,6 +256,26 @@ class AppConfiguration {
 
   public getCheckRetentionDays(): number {
     return EnvParser.positiveInt(this.env, 'CHECK_RETENTION_DAYS', DEFAULT_CHECK_RETENTION_DAYS);
+  }
+
+  public isCheckCustomJsEnabled(): boolean {
+    return EnvParser.boolean(this.env, 'CHECK_CUSTOMJS_ENABLED', DEFAULT_CHECK_CUSTOMJS_ENABLED);
+  }
+
+  public getCheckCustomJsMaxCpuMs(): number {
+    return EnvParser.positiveInt(this.env, 'CHECK_CUSTOMJS_MAX_CPU_MS', DEFAULT_CHECK_CUSTOMJS_MAX_CPU_MS);
+  }
+
+  public getCheckCustomJsMaxScriptBytes(): number {
+    return EnvParser.positiveInt(this.env, 'CHECK_CUSTOMJS_MAX_SCRIPT_BYTES', DEFAULT_CHECK_CUSTOMJS_MAX_SCRIPT_BYTES);
+  }
+
+  public getCheckCustomJsMaxFetches(): number {
+    return EnvParser.positiveInt(this.env, 'CHECK_CUSTOMJS_MAX_FETCHES', DEFAULT_CHECK_CUSTOMJS_MAX_FETCHES);
+  }
+
+  public getCheckCustomJsMemoryMb(): number {
+    return EnvParser.positiveInt(this.env, 'CHECK_CUSTOMJS_MEMORY_MB', DEFAULT_CHECK_CUSTOMJS_MEMORY_MB);
   }
 
   public isDemoMode(): boolean {

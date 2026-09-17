@@ -13,6 +13,9 @@ src/generated-src/*
 src/generated/
 apps/api/src/generated/
 
+# Synced QuickJS wasm binary for the QUICKJS_WASM binding (postinstall)
+apps/background/wasm/
+
 # Logs
 
 logs
