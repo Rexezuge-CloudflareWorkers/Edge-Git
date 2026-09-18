@@ -3,10 +3,7 @@
     "dashboard": "Dashboard",
     "new": "New",
     "settings": "Settings",
-    "snippets": "Snippets",
-    "selectLanguage": "Select Language",
-    "unknownLanguage": "Unknown",
-    "language": "Language"
+    "snippets": "Snippets"
   },
   "common": {
     "cancel": "Cancel",
@@ -341,6 +338,11 @@
   "settings": {
     "userSettings": "User Settings",
     "profile": "Profile",
+    "preferences": "Preferences",
+    "language": "Language",
+    "languageDescription": "Choose Your Preferred Display Language.",
+    "selectLanguage": "Select Language",
+    "unknownLanguage": "Unknown",
     "email": "Email",
     "general": "General",
     "username": "Username",

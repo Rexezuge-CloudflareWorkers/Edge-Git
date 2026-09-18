@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { UserRound } from 'lucide-react';
 import type { CurrentUser } from '../types';
+import { LanguageSettingsCard } from '../components/settings/LanguageSettingsCard';
 import { ProfileSettingsCard } from '../components/settings/ProfileSettingsCard';
 import { TokensTab } from '../components/settings/TokensTab';
 import { ContextBar } from '../components/layout/ContextBar';
@@ -11,10 +12,16 @@ export function SettingsView({
   user,
   setUser,
   showNotice,
+  language,
+  onLanguageChange,
+  languageDisabled,
 }: {
   user: CurrentUser;
   setUser: (user: CurrentUser) => void;
   showNotice: (type: 'success' | 'error', text: string) => void;
+  language: string;
+  onLanguageChange: (lng: string) => void;
+  languageDisabled?: boolean;
 }) {
   const { t } = useTranslation();
   return (
@@ -30,6 +37,8 @@ export function SettingsView({
         />
 
         <ProfileSettingsCard user={user} setUser={setUser} showNotice={showNotice} />
+
+        <LanguageSettingsCard language={language} onLanguageChange={onLanguageChange} disabled={languageDisabled} />
 
         <TokensTab showNotice={showNotice} />
       </AppPage>

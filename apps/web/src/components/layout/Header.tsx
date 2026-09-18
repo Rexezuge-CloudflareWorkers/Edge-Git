@@ -3,23 +3,10 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Bell, GitBranch, Plus } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { LanguageSelector } from '../shared/LanguageSelector';
 import { getUnreadCount } from '../../services/notificationService';
 import { useRealtimeSubscription } from '../../realtime/useRealtime';
 
-export function Header({
-  userEmail,
-  username,
-  language,
-  onLanguageChange,
-  languageDisabled,
-}: {
-  userEmail: string | null;
-  username?: string | null;
-  language?: string;
-  onLanguageChange?: (lng: string) => void;
-  languageDisabled?: boolean;
-}) {
+export function Header({ userEmail, username }: { userEmail: string | null; username?: string | null }) {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
@@ -135,9 +122,6 @@ export function Header({
         </div>
 
         <div className="flex items-center gap-3">
-          {onLanguageChange && (
-            <LanguageSelector value={language} onChange={onLanguageChange} disabled={languageDisabled} />
-          )}
           {userEmail && (
             <button
               type="button"
