@@ -2,7 +2,7 @@ import type { Hono } from 'hono';
 import { requireVisibleRepo, resolvePublicViewer, toRepoJson, withPublicRepo } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
-import { emitWebhookEvent } from './SocialEmit';
+import { emitWebhookEvent, publishLiveUpdate } from './SocialEmit';
 
 type SocialApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -71,6 +71,13 @@ function registerUserSocialRoutes(app: SocialApp): void {
       event: 'star',
       action: 'starred',
     });
+    await publishLiveUpdate(c.env, {
+      fullName: `${owner}/${repoName}`,
+      channel: 'activity',
+      type: 'repo.starred',
+      actorEmail: email,
+      title: `Starred ${owner}/${repoName}`,
+    });
     return c.json({ starred: true, ...(await getCounts(c.env, row.id)) });
   });
 
@@ -106,6 +113,13 @@ function registerUserSocialRoutes(app: SocialApp): void {
       actorEmail: email,
       event: 'watch',
       action: 'watching',
+    });
+    await publishLiveUpdate(c.env, {
+      fullName: `${owner}/${repoName}`,
+      channel: 'activity',
+      type: 'repo.watching',
+      actorEmail: email,
+      title: `Started Watching ${owner}/${repoName}`,
     });
     return c.json({ watching: true, ...(await getCounts(c.env, row.id)) });
   });

@@ -83,8 +83,9 @@ class NotificationService {
 
   // Fan out one event to watchers + participants + @mentions, minus the
   // actor, keeping only recipients that still hold read+ on the repo.
-  // Private repos therefore never leak via notifications.
-  public async fanOut(input: FanOutInput): Promise<{ notified: number }> {
+  // Private repos therefore never leak via notifications. Returns the
+  // recipient emails so callers can also ping live-update subscribers.
+  public async fanOut(input: FanOutInput): Promise<{ notified: number; recipients: string[] }> {
     const actor = input.actorEmail.toLowerCase();
     const candidates = new Set<string>();
     if (input.repositoryId) {
@@ -108,7 +109,7 @@ class NotificationService {
       candidates.add(email);
     }
     candidates.delete(actor);
-    if (candidates.size === 0) return { notified: 0 };
+    if (candidates.size === 0) return { notified: 0, recipients: [] };
 
     let repo: RepositoryRow | null = null;
     if (input.repositoryId) {
@@ -123,6 +124,7 @@ class NotificationService {
     const dao = await this.deps.notificationDAO();
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const recipients = [...candidates].slice(0, MAX_FANOUT_RECIPIENTS);
+    const delivered: string[] = [];
     let notified = 0;
     for (const recipient of recipients) {
       if (repo) {
@@ -149,8 +151,9 @@ class NotificationService {
         })
         .catch(() => undefined);
       notified += 1;
+      delivered.push(recipient);
     }
-    return { notified };
+    return { notified, recipients: delivered };
   }
 
   public async listByUser(userEmail: string, limit = 50, cursor?: string, unreadOnly = false): Promise<{ notifications: NotificationRow[]; nextCursor: string | null }> {

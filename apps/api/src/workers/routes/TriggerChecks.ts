@@ -1,5 +1,6 @@
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { getCheckRunnerStub } from '../checkStub';
+import { publishCheckUpdate } from './SocialEmit';
 
 // Shared trigger: match the branch protection rule for `branch`, report a
 // queued run per required context on `headSha` (idempotent — re-pushes
@@ -44,6 +45,16 @@ async function triggerRequiredChecks(
         .catch(() => undefined);
     } catch {
       // DO unavailable — cron sweeper still expires rows.
+    }
+    if (triggered.length > 0) {
+      await publishCheckUpdate(env, {
+        fullName: input.fullName,
+        headSha: input.headSha,
+        context: triggered.join(','),
+        status: 'queued',
+        actorEmail: input.actorEmail,
+        title: `Queued ${triggered.length} Required Check${triggered.length === 1 ? '' : 's'}`,
+      }).catch(() => undefined);
     }
     return { triggered };
   } catch {

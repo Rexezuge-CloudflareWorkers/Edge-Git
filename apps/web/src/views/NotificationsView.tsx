@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Bell } from 'lucide-react';
 import type { NotificationItem } from '../types';
 import { listNotifications, markAllNotificationsRead, markNotificationRead } from '../services/notificationService';
+import { useRealtimeSubscription } from '../realtime/useRealtime';
 import { formatTimestamp } from '../lib/format';
 import { Button } from '../components/ui/Button';
 import { Card, CardHeader, CardTitle } from '../components/ui/Card';
@@ -82,6 +83,17 @@ export function NotificationsView({ showNotice }: { showNotice: (type: 'success'
     setLoading(true);
     setReloadKey((k) => k + 1);
   };
+
+  // Live inbox: new notifications reload page one (fallback: Refresh button).
+  useRealtimeSubscription({
+    enabled: true,
+    ticket: { kind: 'inbox' },
+    onEvent: () => {
+      setLoading(true);
+      setCursor(null);
+      setReloadKey((k) => k + 1);
+    },
+  });
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8 space-y-4">

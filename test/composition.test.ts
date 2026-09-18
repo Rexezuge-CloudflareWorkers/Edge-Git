@@ -97,6 +97,7 @@ const EXPECTED_TOKENS = [
   'WebhookService',
   'WebhookDeliveryService',
   'ReleaseService',
+  'RealtimeService',
   'TeamService',
   'AuditService',
 ] as const;

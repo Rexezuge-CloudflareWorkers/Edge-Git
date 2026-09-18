@@ -5,6 +5,7 @@ import { Activity } from 'lucide-react';
 import type { RepoEvent } from '../../types';
 import { listActivity } from '../../services/socialService';
 import { formatTimestamp } from '../../lib/format';
+import { useRealtimeSubscription } from '../../realtime/useRealtime';
 import { Card } from '../ui/Card';
 import { LoadMoreButton } from '../shared/LoadMoreButton';
 import { RefreshButton } from '../shared/RefreshButton';
@@ -63,7 +64,7 @@ function eventDetail(event: RepoEvent): string | null {
   return null;
 }
 
-export function ActivityTab({ owner, repo, showNotice }: { owner: string; repo: string; showNotice: (type: 'success' | 'error', text: string) => void }) {
+export function ActivityTab({ owner, repo, showNotice, authorized }: { owner: string; repo: string; showNotice: (type: 'success' | 'error', text: string) => void; authorized?: boolean | null }) {
   const { t } = useTranslation();
   const [events, setEvents] = useState<RepoEvent[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -109,6 +110,18 @@ export function ActivityTab({ owner, repo, showNotice }: { owner: string; repo: 
     setLoading(true);
     setReloadKey((k) => k + 1);
   };
+
+  // Live activity: any repo event bumps the feed back to page one.
+  // Signed-in viewers only; everyone else keeps manual refresh.
+  useRealtimeSubscription({
+    enabled: authorized === true,
+    ticket: { kind: 'repo', owner, repo, channels: ['activity'] },
+    onEvent: () => {
+      setLoading(true);
+      setCursor(null);
+      setReloadKey((k) => k + 1);
+    },
+  });
 
   return (
     <Card>

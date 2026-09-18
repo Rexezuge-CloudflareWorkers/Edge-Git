@@ -12,6 +12,8 @@ import {
   updatePullStatus,
 } from '../../services/pullService';
 import { isBlockedByReviews } from '../../lib/threads';
+import { PresenceDots } from '../../realtime/PresenceDots';
+import { usePullLive } from '../../realtime/usePullLive';
 import { PullChecks } from './PullChecks';
 import { PullComments } from './PullComments';
 import { PullReviews } from './PullReviews';
@@ -127,6 +129,18 @@ export function PullDetail({
     };
   }, [owner, repo, number, useAuthed]);
 
+  // Live comments / reviews / threads (threads reload via `liveKey`).
+  const { liveStatus, viewers, liveKey } = usePullLive({
+    owner,
+    repo,
+    number,
+    useAuthed,
+    ready: status === 'ready',
+    setPull,
+    setComments,
+    setReviews,
+  });
+
   if (status === 'loading') {
     return (
       <div className="min-h-64 flex items-center justify-center">
@@ -211,6 +225,7 @@ export function PullDetail({
           {(pull as { is_draft?: number }).is_draft === 1 && <Badge variant="warning">{t('pulls.draft', 'Draft')}</Badge>}
           <span className="text-xs text-[var(--color-text-muted)]">#{pull.number}</span>
           <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">{pull.title}</h1>
+          <PresenceDots status={liveStatus} viewers={viewers} />
         </div>
         {metaLabels.length > 0 && (
           <div className="mt-2 flex gap-1 flex-wrap">
@@ -282,7 +297,7 @@ export function PullDetail({
         {blockedByReview && (
           <p className="mt-2 text-sm text-[var(--color-error-text)]">{t('pulls.blockedByReview', 'Blocked: Unresolved Change Requests.')}</p>
         )}
-        <PullChecks owner={owner} repo={repo} headOid={pull.head_oid} />
+        <PullChecks owner={owner} repo={repo} headOid={pull.head_oid} authorized={authorized} />
         {(conflicts.length > 0 || conflictReason) && (
           <div className="mt-2 text-sm text-[var(--color-error-text)]">
             <p>{t('pulls.mergeConflicts', 'Merge Conflicts. Resolve Them On Your Branch.')}</p>
@@ -362,7 +377,7 @@ export function PullDetail({
       </Card>
 
       <Card>
-        <PullThreads owner={owner} repo={repo} number={number} canWrite={canWrite} showNotice={showNotice} authorized={authorized} />
+        <PullThreads owner={owner} repo={repo} number={number} canWrite={canWrite} showNotice={showNotice} authorized={authorized} refreshKey={liveKey} />
       </Card>
 
       <Card>

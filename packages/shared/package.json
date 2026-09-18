@@ -11,6 +11,8 @@
     "./i18n": "./src/i18n/index.ts",
     "./model": "./src/model/index.ts",
     "./model/*": "./src/model/*.ts",
+    "./realtime": "./src/realtime/index.ts",
+    "./realtime/*": "./src/realtime/*.ts",
     "./utils": "./src/utils/index.ts",
     "./utils/*": "./src/utils/*.ts"
   },

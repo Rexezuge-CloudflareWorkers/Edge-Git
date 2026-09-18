@@ -31,6 +31,7 @@ import { CollaborationService } from '@edge-git/backend-services/collab';
 import { DiscussionService } from '@edge-git/backend-services/discussion';
 import { ProjectService } from '@edge-git/backend-services/project';
 import { ReleaseService } from '@edge-git/backend-services/release';
+import { RealtimeService } from '@edge-git/backend-services/realtime';
 import { SnippetService } from '@edge-git/backend-services/snippet';
 import { ImportService } from '@edge-git/backend-services/transfer/ImportService';
 import { MirrorService } from '@edge-git/backend-services/transfer/MirrorService';
@@ -190,6 +191,15 @@ function createRequestScope(env: RequestScopeEnv): Container {
   scope.bind(Tokens.StarService, () => new StarService(env as never, { starDAO }));
   scope.bind(Tokens.CollaborationService, () => new CollaborationService(env as never, { collaborationDAO }));
   scope.bind(Tokens.ReleaseService, () => new ReleaseService(env as never, { releaseDAO }));
+  scope.bind(
+    Tokens.RealtimeService,
+    () =>
+      new RealtimeService(env as never, {
+        repositoryDAO,
+        permissionService: () =>
+          Promise.resolve(new PermissionService(env as never, { organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO, teamMemberDAO, teamGrantDAO, teamDAO })),
+      }),
+  );
   scope.bind(Tokens.ProjectService, () => new ProjectService(env as never, { projectDAO }));
   scope.bind(Tokens.DiscussionService, () => new DiscussionService(env as never, { discussionDAO }));
   scope.bind(Tokens.WikiService, () => new WikiService(env as never, { wikiDAO }));

@@ -48,6 +48,8 @@
     "./wiki/*": "./src/wiki/*.ts",
     "./release": "./src/release/index.ts",
     "./release/*": "./src/release/*.ts",
+    "./realtime": "./src/realtime/index.ts",
+    "./realtime/*": "./src/realtime/*.ts",
     "./transfer": "./src/transfer/index.ts",
     "./transfer/*": "./src/transfer/*.ts",
     "./deploykey": "./src/deploykey/index.ts",

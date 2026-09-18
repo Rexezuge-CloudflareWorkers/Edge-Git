@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { Comment, Issue } from '../../types';
 import { addComment, getIssue, listComments, updateIssueStatus } from '../../services/issueService';
 import { fetchUpgraded, useUpgradeFetchState } from '../../lib/upgradeFetch';
+import { PresenceDots } from '../../realtime/PresenceDots';
+import { issueChannel } from '../../realtime/protocol';
+import { useRealtimeSubscription } from '../../realtime/useRealtime';
 import { formatTimestamp } from '../../lib/format';
 import { Markdown } from '../shared/Markdown';
 import { Button } from '../ui/Button';
@@ -37,6 +40,36 @@ export function IssueDetail({
   const [toggling, setToggling] = useState(false);
 
   const useAuthed = authorized === true;
+  const authOpt = useMemo(() => (useAuthed ? { isAuthed: true as const } : { isAuthed: false as const }), [useAuthed]);
+  const lastTypingSent = useRef(0);
+
+  const refreshComments = useCallback(async () => {
+    try {
+      setComments(await listComments(owner, repo, number, authOpt));
+    } catch {
+      // live refresh is best-effort; manual refresh still works
+    }
+  }, [owner, repo, number, authOpt]);
+
+  const refreshIssue = useCallback(async () => {
+    try {
+      setIssue(await getIssue(owner, repo, number, authOpt));
+    } catch {
+      // best-effort
+    }
+  }, [owner, repo, number, authOpt]);
+
+  const { status: liveStatus, viewers, typing, sendTyping } = useRealtimeSubscription({
+    enabled: useAuthed && status === 'ready',
+    ticket: { kind: 'repo', owner, repo, channels: [issueChannel(number), 'presence'] },
+    onEvent: (event) => {
+      if (!event.type.startsWith('issue_')) return;
+      void refreshComments();
+      if (['issue_closed', 'issue_reopened', 'issue_updated'].includes(event.type)) {
+        void refreshIssue();
+      }
+    },
+  });
   // Single-flight reads across the auth upgrade (see upgradeFetch). Keyed
   // only on success, so a public 404 (private repo) still retries authed.
   // Post-mutation refreshes below bypass the helper and call services
@@ -46,7 +79,6 @@ export function IssueDetail({
 
   useEffect(() => {
     const key = `${owner}/${repo}/${number}`;
-    const authOpt = useAuthed ? { isAuthed: true as const } : { isAuthed: false as const };
     let cancelled = false;
     const run = async () => {
       let issueRes;
@@ -79,7 +111,7 @@ export function IssueDetail({
     return () => {
       cancelled = true;
     };
-  }, [owner, repo, number, showNotice, t, useAuthed]);
+  }, [owner, repo, number, showNotice, t, useAuthed, authOpt]);
 
   if (status === 'loading') {
     return (
@@ -130,6 +162,16 @@ export function IssueDetail({
     }
   };
 
+  const handleDraftChange = (value: string) => {
+    setDraft(value);
+    // Throttled typing ping; visibility expires via timeout.
+    const now = Date.now();
+    if (liveStatus === 'live' && now - lastTypingSent.current > 4000) {
+      lastTypingSent.current = now;
+      sendTyping(issueChannel(number));
+    }
+  };
+
   return (
     <div className="space-y-4">
       <Link to={`/${owner}/${repo}`} className="text-sm text-[var(--color-accent)] hover:underline">
@@ -141,6 +183,7 @@ export function IssueDetail({
           <IssueStatusBadge status={issue.status} />
           <span className="text-xs text-[var(--color-text-muted)]">#{issue.number}</span>
           <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">{issue.title}</h1>
+          <PresenceDots status={liveStatus} viewers={viewers} />
         </div>
         <p className="mt-1 text-xs text-[var(--color-text-muted)]">
           {t('issues.openedBy', 'Opened By {{email}} · {{date}}', {
@@ -190,9 +233,14 @@ export function IssueDetail({
             <Textarea
               placeholder={t('issues.commentPlaceholder', 'Write A Comment…')}
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => handleDraftChange(e.target.value)}
               rows={3}
             />
+            {typing.length > 0 && (
+              <p className="text-xs text-[var(--color-text-muted)]">
+                {t('realtime.typing', '{{names}} Typing…', { names: typing.slice(0, 3).join(', ') })}
+              </p>
+            )}
             <p className="text-xs text-[var(--color-text-muted)]">{t('issues.markdownHint', 'Markdown Supported.')}</p>
             <Button type="submit" variant="primary" size="sm" loading={saving} disabled={draft.trim() === ''}>
               {t('issues.addComment', 'Add Comment')}

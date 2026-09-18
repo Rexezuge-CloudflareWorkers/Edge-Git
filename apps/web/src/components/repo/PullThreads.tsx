@@ -17,6 +17,7 @@ export function PullThreads({
   canWrite,
   showNotice,
   authorized,
+  refreshKey,
 }: {
   owner: string;
   repo: string;
@@ -24,6 +25,7 @@ export function PullThreads({
   canWrite: boolean;
   showNotice: (type: 'success' | 'error', text: string) => void;
   authorized?: boolean | null;
+  refreshKey?: number;
 }) {
   const { t } = useTranslation();
   const [threads, setThreads] = useState<PullReviewThread[]>([]);
@@ -56,7 +58,7 @@ export function PullThreads({
     return () => {
       cancelled = true;
     };
-  }, [owner, repo, number, authorized]);
+  }, [owner, repo, number, authorized, refreshKey]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();

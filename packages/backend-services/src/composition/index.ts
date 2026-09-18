@@ -21,3 +21,4 @@ export { NotificationService } from '../social/NotificationService';
 export { WebhookService } from '../webhook/WebhookService';
 export { WebhookDeliveryService } from '../webhook/WebhookDeliveryService';
 export { CollaborationService } from '../collab/CollaborationService';
+export { RealtimeService } from '../realtime/RealtimeService';

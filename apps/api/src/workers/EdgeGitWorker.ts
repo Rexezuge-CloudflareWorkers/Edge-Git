@@ -14,6 +14,7 @@ import { registerFileWriteRoutes } from './routes/FileWriteRoutes';
 import { registerTokenRoutes } from './routes/TokenRoutes';
 import { registerIssueRoutes, registerUserIssueRoutes } from './routes/IssueRoutes';
 import { registerPullRoutes, registerUserPullMergeRoutes, registerUserPullRoutes, registerPullThreadRoutes, registerUserPullThreadRoutes } from './routes/PullRoutes';
+import { registerRealtimePublicRoutes, registerRealtimeUserRoutes } from './routes/RealtimeRoutes';
 import { registerUserProfileRoutes, registerUserSettingsRoutes } from './routes/UserRoutes';
 import { registerOrgRoutes } from './routes/OrgRoutes';
 import { registerTeamRoutes } from './routes/TeamRoutes';
@@ -69,6 +70,7 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     app.use('/:owner/:repo/git-receive-pack', MiddlewareHandlers.activityAudit());
 
     registerGitRoutes(app);
+    registerRealtimePublicRoutes(app);
     registerRepoRoutes(app);
     registerForkRoutes(app);
     registerIssueRoutes(app);
@@ -113,6 +115,7 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
   registerUserPullThreadRoutes(app);
   registerUserSocialRoutes(app);
   registerUserNotificationRoutes(app);
+  registerRealtimeUserRoutes(app);
   registerCollabUserRoutes(app);
   registerProjectUserRoutes(app);
   registerDiscussionUserRoutes(app);
