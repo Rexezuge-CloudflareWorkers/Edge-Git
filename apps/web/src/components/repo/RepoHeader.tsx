@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom';
-import type { ReactNode } from 'react';
 import { BookMarked, GitFork } from 'lucide-react';
 import type { Repo } from '../../types';
 import { VisibilityBadge } from '../ui/Badge';
@@ -28,7 +27,6 @@ export function RepoHeader({
   releaseCount,
   forkCount,
   showSettings,
-  socialActions,
   onTabChange,
 }: {
   repo: Repo;
@@ -38,7 +36,6 @@ export function RepoHeader({
   releaseCount?: number;
   forkCount?: number;
   showSettings?: boolean;
-  socialActions?: ReactNode;
   onTabChange: (tab: RepoTab) => void;
 }) {
   const tabs = showSettings ? TABS : TABS.filter((t) => t.id !== 'settings');
@@ -76,7 +73,6 @@ export function RepoHeader({
             )}
           </>
         }
-        actions={socialActions}
       />
       <div className="max-w-7xl mx-auto px-6 py-3">
         <SegmentedTabs
