@@ -1,9 +1,10 @@
 import type { Hono } from 'hono';
 import { getRepoStub, ensureRepo } from '../repoStub';
-import { requireVisibleRepo, toRepoJson, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { requireVisibleRepo, toRepoJson, toServiceStatus, withPublicRepo, withVisibleRepo, getScope } from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
-import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { Tokens } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
+import { EmailAddress } from '@edge-git/shared/utils';
 import type { RequestContext } from '@/middleware';
 
 type RepoApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -13,7 +14,7 @@ type RepoApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress:
 function registerRepoRoutes(app: RepoApp): void {
   app.get('/repos/:owner/:repo', async (c) => {
     return withPublicRepo(c as never, async (row) => {
-      const forksCount = await createRequestScope(c.env).get(Tokens.ForkService).countForks(row.id).catch(() => 0);
+      const forksCount = await getScope(c as never).get(Tokens.ForkService).countForks(row.id).catch(() => 0);
       return c.json({ ...(toRepoJson(row) as Record<string, unknown>), forksCount });
     });
   });
@@ -101,7 +102,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
   app.get('/user/me', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     try {
-      const profile = await createRequestScope(c.env).get(Tokens.UserService).getProfileByEmail(email);
+      const profile = await getScope(c as never).get(Tokens.UserService).getProfileByEmail(email);
       return c.json({ email: profile.email, username: profile.username });
     } catch {
       return c.json({ email });
@@ -110,7 +111,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
 
   app.get('/user/repos', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const scope = createRequestScope(c.env);
+    const scope = getScope(c as never);
     const rows = await scope.get(Tokens.RepoService).listVisibleForUser(email, 100);
     const permission = scope.get(Tokens.PermissionService);
     const repos = [];
@@ -129,14 +130,14 @@ function registerUserRepoRoutes(app: RepoApp): void {
       description?: string | null;
       isPrivate?: boolean;
     };
-    const scope = createRequestScope(c.env);
+    const scope = getScope(c as never);
     let owner = (body.owner ?? '').trim();
     if (!owner) {
       try {
         const profile = await scope.get(Tokens.UserService).getProfileByEmail(email);
-        owner = (profile.username ?? email.split('@', 1)[0]).trim();
+        owner = (profile.username ?? EmailAddress.normalize(email).split('@', 1)[0]).trim();
       } catch {
-        owner = email.split('@', 1)[0].trim();
+        owner = EmailAddress.normalize(email).split('@', 1)[0]?.trim() ?? '';
       }
     }
     const name = (body.name ?? '').trim();
@@ -163,8 +164,8 @@ function registerUserRepoRoutes(app: RepoApp): void {
 
   app.get('/user/repos/:owner/:repo', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const scope = createRequestScope(c.env);
-    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
+    const scope = getScope(c as never);
+    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email, scope);
     if (!row) return c.json({ error: 'Not found' }, 404);
     const role = await scope.get(Tokens.PermissionService).getRole(email, row).catch(() => null);
     const forksCount = await scope.get(Tokens.ForkService).countForks(row.id).catch(() => 0);
@@ -183,7 +184,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
       return c.json({ error: 'Nothing to update' }, 400);
     }
     try {
-      const updated = await createRequestScope(c.env).get(Tokens.RepoService).updateRepo(owner, repoName, email, patch);
+      const updated = await getScope(c as never).get(Tokens.RepoService).updateRepo(owner, repoName, email, patch);
       return c.json({ ...(toRepoJson(updated) as Record<string, unknown>), viewerCanManage: true });
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'Failed to update repo' }, toServiceStatus(error));
@@ -195,7 +196,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     try {
-      const { id } = await createRequestScope(c.env).get(Tokens.RepoService).deleteRepo(owner, repoName, email);
+      const { id } = await getScope(c as never).get(Tokens.RepoService).deleteRepo(owner, repoName, email);
       // Purge git objects from the Durable Object (best-effort; D1 is source of truth).
       const fullName = `${owner}/${repoName}`;
       try {
@@ -204,7 +205,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
         console.error('Failed to purge repo DO', fullName, error);
       }
       try {
-        await createRequestScope(c.env).get(Tokens.SearchService).clearRepo(id);
+        await getScope(c as never).get(Tokens.SearchService).clearRepo(id);
       } catch (error) {
         console.error('Failed to purge code index', fullName, error);
       }
@@ -250,30 +251,28 @@ function parseOverviewArgs(params: URLSearchParams): {
   };
 }
 
-async function withVisibleRepo(c: RequestContext, owner: string, repoName: string, fn: (fullName: string) => Promise<Response>): Promise<Response> {
-  const row = await requireVisibleRepo(c.env, owner, repoName, c.get('AuthenticatedUserEmailAddress'));
-  if (!row) return c.json({ error: 'Not found' }, 404);
-  return fn(`${owner}/${repoName}`);
+async function withVisibleRepoLocal(c: RequestContext, owner: string, repoName: string, fn: (fullName: string) => Promise<Response>): Promise<Response> {
+  return withVisibleRepo(c, owner, repoName, async (_row, fullName) => fn(fullName));
 }
 
 function registerUserRepoReadModelRoutes(app: RepoApp): void {
   app.get('/user/repos/:owner/:repo/branches', async (c) => {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    return withVisibleRepo(c as never, owner, repoName, async (fullName) => c.json(await getRepoStub(c.env, fullName).getBranches()));
+    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) => c.json(await getRepoStub(c.env, fullName).getBranches()));
   });
 
   app.get('/user/repos/:owner/:repo/tags', async (c) => {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    return withVisibleRepo(c as never, owner, repoName, async (fullName) => c.json(await getRepoStub(c.env, fullName).getTags()));
+    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) => c.json(await getRepoStub(c.env, fullName).getTags()));
   });
 
   app.get('/user/repos/:owner/:repo/tree', async (c) => {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const url = new URL(c.req.url);
-    return withVisibleRepo(
+    return withVisibleRepoLocal(
       c as never,
       owner,
       repoName,
@@ -293,7 +292,7 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const url = new URL(c.req.url);
     const filepath = url.searchParams.get('path') ?? '';
-    return withVisibleRepo(
+    return withVisibleRepoLocal(
       c as never,
       owner,
       repoName,
@@ -306,7 +305,7 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const url = new URL(c.req.url);
     const depth = url.searchParams.get('depth');
-    return withVisibleRepo(
+    return withVisibleRepoLocal(
       c as never,
       owner,
       repoName,
@@ -320,7 +319,7 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
     if (!/^[0-9a-f]{40}$/i.test(oid)) return c.json({ error: 'Invalid commit oid' }, 400);
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    return withVisibleRepo(c as never, owner, repoName, async (fullName) => {
+    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) => {
       const diff = (await getRepoStub(c.env, fullName).getCommitDiff(oid)) as { commit: unknown } | null;
       if (!diff || !diff.commit) return c.json({ error: 'Not found' }, 404);
       return c.json(diff);
@@ -334,7 +333,7 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
     const baseRef = url.searchParams.get('base') ?? '';
     const headRef = url.searchParams.get('head') ?? '';
     if (!baseRef || !headRef) return c.json({ error: 'base and head query params are required' }, 400);
-    return withVisibleRepo(c as never, owner, repoName, async (fullName) => {
+    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) => {
       const diff = await getRepoStub(c.env, fullName).getCompare({ baseRef, headRef });
       if (!diff) return c.json({ error: 'Not found' }, 404);
       return c.json(diff);
@@ -346,7 +345,7 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const url = new URL(c.req.url);
     const args = parseOverviewArgs(url.searchParams);
-    return withVisibleRepo(c as never, owner, repoName, async (fullName) => c.json(await getRepoStub(c.env, fullName).getOverview(args)));
+    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) => c.json(await getRepoStub(c.env, fullName).getOverview(args)));
   });
 }
 

@@ -1,4 +1,7 @@
 export { IsoGitFs } from './IsoGitFs';
+export { GitCache } from './GitCache';
+export { createDofsFs, setDofsDeviceSize, DEFAULT_CHUNK_SIZE } from './DofsFsAdapter';
+export type { DofsFs, DofsFsOptions } from './DofsFsAdapter';
 export { ErrorNormalizer, ErrorWithCode, normalizePath } from './ErrorNormalizer';
 export { GitService, PackLimitError } from './GitService';
 export { RefService } from './RefService';
@@ -12,4 +15,5 @@ export { isValidBranchName } from './MergeService';
 export { computeHunks, diffText, DIFF_CONTEXT_LINES, MAX_DIFF_LINES_PER_FILE } from './DiffHunks';
 export type { DiffHunk, DiffLine, DiffLineKind } from './DiffHunks';
 export type { RefUpdateResult } from '@edge-git/git-protocol';
-export { Fs as DofsFs } from 'dofs';
+// NOTE: `dofs` stays an implementation detail of git-service. Use
+// `createDofsFs`/`DofsFs` from `./DofsFsAdapter` instead of importing `dofs` directly.

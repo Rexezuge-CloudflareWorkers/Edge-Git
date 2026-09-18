@@ -1,7 +1,7 @@
 import { NotificationDAO, RepositoryDAO, UserDAO, WatchDAO } from '@edge-git/backend-data/dao';
 import type { NotificationRow, RepositoryRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
+import { EmailAddress, TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 import { PermissionService } from '../permission/PermissionService';
 
 interface NotificationServiceEnv {
@@ -72,8 +72,8 @@ class NotificationService {
     const candidates = usernames.slice(0, 50);
     for (const username of candidates) {
       try {
-        const user = await userDAO.getByUsernameCi(username.toLowerCase());
-        if (user) emails.push(user.email.toLowerCase());
+        const user = await userDAO.getByUsernameCi(EmailAddress.normalize(username));
+        if (user) emails.push(EmailAddress.normalize(user.email));
       } catch {
         // ignore — missing users table or unknown username
       }
@@ -86,14 +86,14 @@ class NotificationService {
   // Private repos therefore never leak via notifications. Returns the
   // recipient emails so callers can also ping live-update subscribers.
   public async fanOut(input: FanOutInput): Promise<{ notified: number; recipients: string[] }> {
-    const actor = input.actorEmail.toLowerCase();
+    const actor = EmailAddress.normalize(input.actorEmail);
     const candidates = new Set<string>();
     if (input.repositoryId) {
       try {
         const watchDAO = await this.deps.watchDAO();
         const watchers = await watchDAO.listWatchers(input.repositoryId, MAX_FANOUT_RECIPIENTS);
         for (const watcher of watchers) {
-          candidates.add(watcher.toLowerCase());
+          candidates.add(EmailAddress.normalize(watcher));
         }
       } catch {
         // ignore — legacy DBs without repo_watches

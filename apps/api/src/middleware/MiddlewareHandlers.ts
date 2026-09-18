@@ -5,13 +5,21 @@ import { coversScope } from '@edge-git/backend-services/auth';
 import { AuditService } from '@edge-git/backend-services/audit';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { getBasicCredentials, getBearerToken } from '@edge-git/git-protocol';
+import { getRequestScope } from '@edge-git/backend-runtime/di';
 import { UnauthorizedError, ForbiddenError } from '@edge-git/backend-errors';
 import { flushDueWebhookDeliveries } from '@/workers/routes/SocialEmit';
 type RequestContext = Context<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
+function getScope(c: RequestContext): ReturnType<typeof createRequestScope> {
+  try {
+    return getRequestScope(c as never) as ReturnType<typeof createRequestScope>;
+  } catch {
+    return createRequestScope(c.env as never);
+  }
+}
+
 async function authenticateUserIdentity(c: RequestContext): Promise<string> {
-  const env = c.env;
-  const scope = createRequestScope(env);
+  const scope = getScope(c);
   const email = await scope.get(Tokens.AccessAuthService).getAuthenticatedUserEmail(
     c.req.raw,
     c.executionCtx as unknown as AccessIdentityContext,
@@ -46,15 +54,15 @@ function unauthorizedGit(): Response {
   });
 }
 
-async function resolvePatToEmail(env: Env, pat: string): Promise<AuthenticatedToken> {
-  return createRequestScope(env).get(Tokens.TokenService).authenticateWithPAT(pat);
+async function resolvePatToEmail(c: RequestContext, pat: string): Promise<AuthenticatedToken> {
+  return getScope(c).get(Tokens.TokenService).authenticateWithPAT(pat);
 }
 
 // Deploy keys are per-repo git-only credentials. A valid key scoped to this
 // repo authenticates without a user identity (userEmail stays null, so push
 // activity attribution is skipped but the git operation proceeds).
-async function resolveDeployKey(env: Env, key: string, repoId: string, service: 'git-upload-pack' | 'git-receive-pack'): Promise<'admin' | 'write' | 'read' | null> {
-  const scope = createRequestScope(env);
+async function resolveDeployKey(c: RequestContext, key: string, repoId: string, service: 'git-upload-pack' | 'git-receive-pack'): Promise<'admin' | 'write' | 'read' | null> {
+  const scope = getScope(c);
   const found = await scope.get(Tokens.DeployKeyService).authenticateWithKey(key);
   if (!found || found.repositoryId !== repoId) return null;
   if (service === 'git-receive-pack' && found.permission !== 'write') return null;
@@ -67,8 +75,7 @@ async function gitAuthForRepo(
   repoName: string,
   service: 'git-upload-pack' | 'git-receive-pack',
 ): Promise<GitAuthResult | Response> {
-  const env = c.env;
-  const scope = createRequestScope(env);
+  const scope = getScope(c);
   const repo = await scope.get(Tokens.RepoService).getByOwnerAndName(owner, repoName);
   if (!repo) {
     // Return 401 (not 404) to avoid repo existence oracle for private repos.
@@ -98,14 +105,14 @@ async function gitAuthForRepo(
 
   let identity: AuthenticatedToken | null = null;
   try {
-    identity = await resolvePatToEmail(env, pat);
+    identity = await resolvePatToEmail(c, pat);
   } catch {
     identity = null;
   }
   if (!identity) {
     // Fall back to per-repo deploy keys (same 401 either way — the key
     // itself is the secret, so no existence oracle is created).
-    const keyRole = await resolveDeployKey(env, pat, repo.id, service);
+    const keyRole = await resolveDeployKey(c, pat, repo.id, service);
     if (!keyRole) return unauthorizedGit();
     return { userEmail: null, repo, role: keyRole, scopes: ['deploy-key'] };
   }

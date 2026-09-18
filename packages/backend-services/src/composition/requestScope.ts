@@ -1,7 +1,8 @@
 import { BranchProtectionDAO, CollaborationDAO, DiscussionDAO, IssueDAO, NamespaceDAO, OrganizationDAO, OrganizationMemberDAO, ProjectDAO, PullRequestDAO, PullThreadDAO, ReleaseDAO, RepoCollaboratorDAO, RepositoryDAO, SearchDAO, SnippetDAO, UserAccessTokenDAO, UserDAO, WikiDAO } from '@edge-git/backend-data/dao';
 import { AuditLogDAO, CheckRunDAO, DeployKeyDAO, EventDAO, ImportDAO, MirrorDAO, NotificationDAO, SecuritySettingsDAO, StarDAO, TeamDAO, TeamMemberDAO, TeamRepoGrantDAO, TokenRepoGrantDAO, WatchDAO, WebhookDAO, WebhookDeliveryDAO } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { Container } from '@edge-git/backend-runtime/di';
+import { Container, memoizeAsync } from '@edge-git/backend-runtime/di';
+import type { Token } from '@edge-git/backend-runtime/di';
 import { AppConfiguration } from '@edge-git/backend-runtime/config';
 // NOTE: service imports use the package entry points (`@edge-git/...`)
 // rather than relative file paths so route unit tests mocking those modules
@@ -57,10 +58,12 @@ interface RequestKeys {
   masterKey: string;
 }
 
-function memoize<T>(fn: () => Promise<T>): () => Promise<T> {
-  let pending: Promise<T> | undefined;
-  return () => (pending ??= fn());
-}
+// Table-driven DAO wiring (Otter pattern). Each entry is a lazy factory
+// thunk so `createRequestScope` never touches a DAO constructor eagerly —
+// unit tests with partial `vi.mock('@edge-git/backend-data/dao')` modules
+// keep working; only the DAOs a test actually resolves are constructed.
+// Factories stay memoized via `memoizeAsync` — D1 objects are cheap, but
+// Secrets Store round-trips (via `Tokens.Keys`) are not.
 
 // Composition root: builds a per-request child scope wiring DAOs → services.
 // Replaces the former scattered `new X(env)` / `new XDAO(env.DB)`
@@ -70,81 +73,91 @@ function createRequestScope(env: RequestScopeEnv): Container {
   scope.bindValue(Tokens.Env, env);
   scope.bindValue(Tokens.Db, env.DB);
 
-  const masterKey = memoize(() => {
+  const masterKey = memoizeAsync(() => {
     if (!env.AES_ENCRYPTION_KEY_SECRET) throw new Error('AES_ENCRYPTION_KEY_SECRET is not configured for this scope.');
     return env.AES_ENCRYPTION_KEY_SECRET.get();
   });
-  const keys = memoize(async (): Promise<RequestKeys> => ({ masterKey: await masterKey() }));
+  const keys = memoizeAsync(async (): Promise<RequestKeys> => ({ masterKey: await masterKey() }));
   scope.bindValue(Tokens.Keys, keys);
 
-  const userDAO = memoize(() => Promise.resolve(new UserDAO(env.DB)));
-  const repositoryDAO = memoize(() => Promise.resolve(new RepositoryDAO(env.DB)));
-  const tokenDAO = memoize(() => Promise.resolve(new UserAccessTokenDAO(env.DB)));
-  const issueDAO = memoize(() => Promise.resolve(new IssueDAO(env.DB)));
-  const pullRequestDAO = memoize(() => Promise.resolve(new PullRequestDAO(env.DB)));
-  const pullThreadDAO = memoize(() => Promise.resolve(new PullThreadDAO(env.DB)));
-  const namespaceDAO = memoize(() => Promise.resolve(new NamespaceDAO(env.DB)));
-  const organizationDAO = memoize(() => Promise.resolve(new OrganizationDAO(env.DB)));
-  const organizationMemberDAO = memoize(() => Promise.resolve(new OrganizationMemberDAO(env.DB)));
-  const repoCollaboratorDAO = memoize(() => Promise.resolve(new RepoCollaboratorDAO(env.DB)));
-  const branchProtectionDAO = memoize(() => Promise.resolve(new BranchProtectionDAO(env.DB)));
-  const checkRunDAO = memoize(() => Promise.resolve(new CheckRunDAO(env.DB)));
-  const collaborationDAO = memoize(() => Promise.resolve(new CollaborationDAO(env.DB)));
-  const searchDAO = memoize(() => Promise.resolve(new SearchDAO(env.DB)));
-  const starDAO = memoize(() => Promise.resolve(new StarDAO(env.DB)));
-  const watchDAO = memoize(() => Promise.resolve(new WatchDAO(env.DB)));
-  const eventDAO = memoize(() => Promise.resolve(new EventDAO(env.DB)));
-  const notificationDAO = memoize(() => Promise.resolve(new NotificationDAO(env.DB)));
-  const webhookDAO = memoize(() => Promise.resolve(new WebhookDAO(env.DB)));
-  const webhookDeliveryDAO = memoize(() => Promise.resolve(new WebhookDeliveryDAO(env.DB)));
-  const releaseDAO = memoize(() => Promise.resolve(new ReleaseDAO(env.DB)));
-  const projectDAO = memoize(() => Promise.resolve(new ProjectDAO(env.DB)));
-  const discussionDAO = memoize(() => Promise.resolve(new DiscussionDAO(env.DB)));
-  const wikiDAO = memoize(() => Promise.resolve(new WikiDAO(env.DB)));
-  const snippetDAO = memoize(() => Promise.resolve(new SnippetDAO(env.DB)));
-  const teamDAO = memoize(() => Promise.resolve(new TeamDAO(env.DB)));
-  const teamMemberDAO = memoize(() => Promise.resolve(new TeamMemberDAO(env.DB)));
-  const teamGrantDAO = memoize(() => Promise.resolve(new TeamRepoGrantDAO(env.DB)));
-  const auditLogDAO = memoize(() => Promise.resolve(new AuditLogDAO(env.DB)));
-  const importDAO = memoize(() => Promise.resolve(new ImportDAO(env.DB)));
-  const mirrorDAO = memoize(() => Promise.resolve(new MirrorDAO(env.DB)));
-  const deployKeyDAO = memoize(() => Promise.resolve(new DeployKeyDAO(env.DB)));
-  const tokenGrantDAO = memoize(() => Promise.resolve(new TokenRepoGrantDAO(env.DB)));
-  const securitySettingsDAO = memoize(() => Promise.resolve(new SecuritySettingsDAO(env.DB)));
-  scope.bindValue(Tokens.UserDAO, userDAO);
-  scope.bindValue(Tokens.RepositoryDAO, repositoryDAO);
-  scope.bindValue(Tokens.UserAccessTokenDAO, tokenDAO);
-  scope.bindValue(Tokens.IssueDAO, issueDAO);
-  scope.bindValue(Tokens.PullRequestDAO, pullRequestDAO);
-  scope.bindValue(Tokens.PullThreadDAO, pullThreadDAO);
-  scope.bindValue(Tokens.NamespaceDAO, namespaceDAO);
-  scope.bindValue(Tokens.OrganizationDAO, organizationDAO);
-  scope.bindValue(Tokens.OrganizationMemberDAO, organizationMemberDAO);
-  scope.bindValue(Tokens.RepoCollaboratorDAO, repoCollaboratorDAO);
-  scope.bindValue(Tokens.BranchProtectionDAO, branchProtectionDAO);
-  scope.bindValue(Tokens.CheckRunDAO, checkRunDAO);
-  scope.bindValue(Tokens.CollaborationDAO, collaborationDAO);
-  scope.bindValue(Tokens.SearchDAO, searchDAO);
-  scope.bindValue(Tokens.StarDAO, starDAO);
-  scope.bindValue(Tokens.WatchDAO, watchDAO);
-  scope.bindValue(Tokens.EventDAO, eventDAO);
-  scope.bindValue(Tokens.NotificationDAO, notificationDAO);
-  scope.bindValue(Tokens.WebhookDAO, webhookDAO);
-  scope.bindValue(Tokens.WebhookDeliveryDAO, webhookDeliveryDAO);
-  scope.bindValue(Tokens.ReleaseDAO, releaseDAO);
-  scope.bindValue(Tokens.ProjectDAO, projectDAO);
-  scope.bindValue(Tokens.DiscussionDAO, discussionDAO);
-  scope.bindValue(Tokens.WikiDAO, wikiDAO);
-  scope.bindValue(Tokens.SnippetDAO, snippetDAO);
-  scope.bindValue(Tokens.TeamDAO, teamDAO);
-  scope.bindValue(Tokens.TeamMemberDAO, teamMemberDAO);
-  scope.bindValue(Tokens.TeamRepoGrantDAO, teamGrantDAO);
-  scope.bindValue(Tokens.AuditLogDAO, auditLogDAO);
-  scope.bindValue(Tokens.ImportDAO, importDAO);
-  scope.bindValue(Tokens.MirrorDAO, mirrorDAO);
-  scope.bindValue(Tokens.DeployKeyDAO, deployKeyDAO);
-  scope.bindValue(Tokens.TokenRepoGrantDAO, tokenGrantDAO);
-  scope.bindValue(Tokens.SecuritySettingsDAO, securitySettingsDAO);
+  const daoDefs: Array<[string, () => Promise<unknown>]> = [
+    ['UserDAO', () => Promise.resolve(new UserDAO(env.DB))],
+    ['RepositoryDAO', () => Promise.resolve(new RepositoryDAO(env.DB))],
+    ['UserAccessTokenDAO', () => Promise.resolve(new UserAccessTokenDAO(env.DB))],
+    ['IssueDAO', () => Promise.resolve(new IssueDAO(env.DB))],
+    ['PullRequestDAO', () => Promise.resolve(new PullRequestDAO(env.DB))],
+    ['PullThreadDAO', () => Promise.resolve(new PullThreadDAO(env.DB))],
+    ['NamespaceDAO', () => Promise.resolve(new NamespaceDAO(env.DB))],
+    ['OrganizationDAO', () => Promise.resolve(new OrganizationDAO(env.DB))],
+    ['OrganizationMemberDAO', () => Promise.resolve(new OrganizationMemberDAO(env.DB))],
+    ['RepoCollaboratorDAO', () => Promise.resolve(new RepoCollaboratorDAO(env.DB))],
+    ['BranchProtectionDAO', () => Promise.resolve(new BranchProtectionDAO(env.DB))],
+    ['CheckRunDAO', () => Promise.resolve(new CheckRunDAO(env.DB))],
+    ['CollaborationDAO', () => Promise.resolve(new CollaborationDAO(env.DB))],
+    ['SearchDAO', () => Promise.resolve(new SearchDAO(env.DB))],
+    ['StarDAO', () => Promise.resolve(new StarDAO(env.DB))],
+    ['WatchDAO', () => Promise.resolve(new WatchDAO(env.DB))],
+    ['EventDAO', () => Promise.resolve(new EventDAO(env.DB))],
+    ['NotificationDAO', () => Promise.resolve(new NotificationDAO(env.DB))],
+    ['WebhookDAO', () => Promise.resolve(new WebhookDAO(env.DB))],
+    ['WebhookDeliveryDAO', () => Promise.resolve(new WebhookDeliveryDAO(env.DB))],
+    ['ReleaseDAO', () => Promise.resolve(new ReleaseDAO(env.DB))],
+    ['ProjectDAO', () => Promise.resolve(new ProjectDAO(env.DB))],
+    ['DiscussionDAO', () => Promise.resolve(new DiscussionDAO(env.DB))],
+    ['WikiDAO', () => Promise.resolve(new WikiDAO(env.DB))],
+    ['SnippetDAO', () => Promise.resolve(new SnippetDAO(env.DB))],
+    ['TeamDAO', () => Promise.resolve(new TeamDAO(env.DB))],
+    ['TeamMemberDAO', () => Promise.resolve(new TeamMemberDAO(env.DB))],
+    ['TeamRepoGrantDAO', () => Promise.resolve(new TeamRepoGrantDAO(env.DB))],
+    ['AuditLogDAO', () => Promise.resolve(new AuditLogDAO(env.DB))],
+    ['ImportDAO', () => Promise.resolve(new ImportDAO(env.DB))],
+    ['MirrorDAO', () => Promise.resolve(new MirrorDAO(env.DB))],
+    ['DeployKeyDAO', () => Promise.resolve(new DeployKeyDAO(env.DB))],
+    ['TokenRepoGrantDAO', () => Promise.resolve(new TokenRepoGrantDAO(env.DB))],
+    ['SecuritySettingsDAO', () => Promise.resolve(new SecuritySettingsDAO(env.DB))],
+  ];
+  const daoFactories = {} as Record<string, () => Promise<unknown>>;
+  for (const [tokenName, create] of daoDefs) {
+    const factory = memoizeAsync(create);
+    daoFactories[tokenName] = factory;
+    scope.bindValue((Tokens as Record<string, Token<unknown>>)[tokenName], factory);
+  }
+  const getDao = <T>(name: string): (() => Promise<T>) => daoFactories[name] as () => Promise<T>;
+
+  const repositoryDAO = getDao<RepositoryDAO>('RepositoryDAO');
+  const issueDAO = getDao<IssueDAO>('IssueDAO');
+  const pullRequestDAO = getDao<PullRequestDAO>('PullRequestDAO');
+  const pullThreadDAO = getDao<PullThreadDAO>('PullThreadDAO');
+  const branchProtectionDAO = getDao<BranchProtectionDAO>('BranchProtectionDAO');
+  const userDAO = getDao<UserDAO>('UserDAO');
+  const organizationDAO = getDao<OrganizationDAO>('OrganizationDAO');
+  const organizationMemberDAO = getDao<OrganizationMemberDAO>('OrganizationMemberDAO');
+  const repoCollaboratorDAO = getDao<RepoCollaboratorDAO>('RepoCollaboratorDAO');
+  const namespaceDAO = getDao<NamespaceDAO>('NamespaceDAO');
+  const starDAO = getDao<StarDAO>('StarDAO');
+  const watchDAO = getDao<WatchDAO>('WatchDAO');
+  const eventDAO = getDao<EventDAO>('EventDAO');
+  const notificationDAO = getDao<NotificationDAO>('NotificationDAO');
+  const webhookDAO = getDao<WebhookDAO>('WebhookDAO');
+  const webhookDeliveryDAO = getDao<WebhookDeliveryDAO>('WebhookDeliveryDAO');
+  const releaseDAO = getDao<ReleaseDAO>('ReleaseDAO');
+  const projectDAO = getDao<ProjectDAO>('ProjectDAO');
+  const discussionDAO = getDao<DiscussionDAO>('DiscussionDAO');
+  const wikiDAO = getDao<WikiDAO>('WikiDAO');
+  const snippetDAO = getDao<SnippetDAO>('SnippetDAO');
+  const teamDAO = getDao<TeamDAO>('TeamDAO');
+  const teamMemberDAO = getDao<TeamMemberDAO>('TeamMemberDAO');
+  const teamGrantDAO = getDao<TeamRepoGrantDAO>('TeamRepoGrantDAO');
+  const auditLogDAO = getDao<AuditLogDAO>('AuditLogDAO');
+  const importDAO = getDao<ImportDAO>('ImportDAO');
+  const mirrorDAO = getDao<MirrorDAO>('MirrorDAO');
+  const deployKeyDAO = getDao<DeployKeyDAO>('DeployKeyDAO');
+  const tokenDAO = getDao<UserAccessTokenDAO>('UserAccessTokenDAO');
+  const checkRunDAO = getDao<CheckRunDAO>('CheckRunDAO');
+  const collaborationDAO = getDao<CollaborationDAO>('CollaborationDAO');
+  const searchDAO = getDao<SearchDAO>('SearchDAO');
+  const tokenGrantDAO = getDao<TokenRepoGrantDAO>('TokenRepoGrantDAO');
+  const securitySettingsDAO = getDao<SecuritySettingsDAO>('SecuritySettingsDAO');
 
   scope.bind(Tokens.AccessAuthService, () => new AccessAuthService(env as never));
   scope.bind(Tokens.TokenService, () => new TokenService(env as never, { tokenDAO, repositoryDAO, tokenGrantDAO }));
@@ -152,11 +165,11 @@ function createRequestScope(env: RequestScopeEnv): Container {
   scope.bind(Tokens.BranchProtectionService, () => new BranchProtectionService(env as never, { branchProtectionDAO }));
   scope.bind(
     Tokens.ForkService,
-    () => new ForkService(env as never, { repositoryDAO, userDAO, organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO }),
+    (container) => new ForkService(env as never, { repositoryDAO, userDAO, organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO, permissionService: () => Promise.resolve(container.get(Tokens.PermissionService)) }),
   );
   scope.bind(
     Tokens.RepoService,
-    () => new RepoService(env as never, { repositoryDAO, issueDAO, pullRequestDAO, pullThreadDAO, branchProtectionDAO, userDAO, organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO, starDAO, watchDAO, eventDAO, notificationDAO, releaseDAO, projectDAO, discussionDAO, wikiDAO, importDAO, mirrorDAO, deployKeyDAO, tokenGrantDAO, securitySettingsDAO }),
+    (container) => new RepoService(env as never, { repositoryDAO, issueDAO, pullRequestDAO, pullThreadDAO, branchProtectionDAO, userDAO, organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO, starDAO, watchDAO, eventDAO, notificationDAO, releaseDAO, projectDAO, discussionDAO, wikiDAO, importDAO, mirrorDAO, deployKeyDAO, tokenGrantDAO, securitySettingsDAO, permissionService: () => Promise.resolve(container.get(Tokens.PermissionService)), config: AppConfiguration.fromEnv(env) }),
   );
   scope.bind(Tokens.UserService, () => new UserService(env as never, { userDAO, namespaceDAO, organizationDAO, repositoryDAO }));
   scope.bind(Tokens.IssueService, () => new IssueService(env as never, { issueDAO }));
@@ -171,21 +184,21 @@ function createRequestScope(env: RequestScopeEnv): Container {
     () => new TeamService(env as never, { teamDAO, teamMemberDAO, teamGrantDAO, organizationDAO, organizationMemberDAO, userDAO, repositoryDAO }),
   );
   scope.bind(Tokens.AuditService, () => new AuditService(env as never, { auditLogDAO, organizationDAO, organizationMemberDAO }));
+  // Single PermissionService binding (Otter pattern). Dependent services
+  // resolve it lazily via the container instead of `new PermissionService`
+  // per factory (previously 4 duplicated inline factories).
   scope.bind(
     Tokens.PermissionService,
     () => new PermissionService(env as never, { organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO, teamMemberDAO, teamGrantDAO, teamDAO }),
   );
   scope.bind(
     Tokens.SearchService,
-    () =>
+    (container) =>
       new SearchService(env as never, {
         searchDAO,
         repositoryDAO,
         issueDAO,
-        permissionService: () =>
-          Promise.resolve(
-            new PermissionService(env as never, { organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO, teamMemberDAO, teamGrantDAO, teamDAO }),
-          ),
+        permissionService: () => Promise.resolve(container.get(Tokens.PermissionService)),
       }),
   );
   scope.bind(Tokens.StarService, () => new StarService(env as never, { starDAO }));
@@ -193,11 +206,10 @@ function createRequestScope(env: RequestScopeEnv): Container {
   scope.bind(Tokens.ReleaseService, () => new ReleaseService(env as never, { releaseDAO }));
   scope.bind(
     Tokens.RealtimeService,
-    () =>
+    (container) =>
       new RealtimeService(env as never, {
         repositoryDAO,
-        permissionService: () =>
-          Promise.resolve(new PermissionService(env as never, { organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO, teamMemberDAO, teamGrantDAO, teamDAO })),
+        permissionService: () => Promise.resolve(container.get(Tokens.PermissionService)),
       }),
   );
   scope.bind(Tokens.ProjectService, () => new ProjectService(env as never, { projectDAO }));
@@ -214,14 +226,13 @@ function createRequestScope(env: RequestScopeEnv): Container {
   scope.bind(Tokens.WebhookDeliveryService, () => new WebhookDeliveryService(env as never, { webhookDAO, deliveryDAO: webhookDeliveryDAO }));
   scope.bind(
     Tokens.NotificationService,
-    () =>
+    (container) =>
       new NotificationService(env as never, {
         notificationDAO,
         watchDAO,
         userDAO,
         repositoryDAO,
-        permissionService: () =>
-          Promise.resolve(new PermissionService(env as never, { organizationDAO, organizationMemberDAO, repoCollaboratorDAO, namespaceDAO, teamMemberDAO, teamGrantDAO, teamDAO })),
+        permissionService: () => Promise.resolve(container.get(Tokens.PermissionService)),
       }),
   );
   // Lazy bind so unit tests mocking `@edge-git/backend-runtime/config` with

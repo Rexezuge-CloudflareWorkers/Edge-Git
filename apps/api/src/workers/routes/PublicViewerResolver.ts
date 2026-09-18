@@ -1,8 +1,9 @@
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import type { AccessIdentityContext } from '@edge-git/backend-services/auth';
-import { RepoService } from '@edge-git/backend-services/repo';
 import { ServiceError } from '@edge-git/backend-errors';
+import { getRequestScope } from '@edge-git/backend-runtime/di';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { getBasicCredentials, getBearerToken } from '@edge-git/git-protocol';
 import type { RequestContext } from '@/middleware';
 
@@ -22,11 +23,22 @@ function toRepoJson(r: RepositoryRow, viewerRole?: string | null): unknown {
   return viewerRole ? { ...base, viewerRole } : base;
 }
 
-async function requireVisibleRepo(env: Env, owner: string, repoName: string, viewerEmail: string | null): Promise<RepositoryRow | null> {
-  const scope = createRequestScope(env);
-  const row = await scope.get(Tokens.RepoService).getByOwnerAndName(owner, repoName);
+// Single-scope resolution (Otter pattern). Prefers the per-request container
+// installed by `scopeMiddleware`; falls back to a fresh scope for call sites
+// outside middleware ordering (tests, git auth helpers).
+function getScope(c: { get(key: string): unknown; env: Env }): ReturnType<typeof createRequestScope> {
+  try {
+    return getRequestScope(c as never);
+  } catch {
+    return createRequestScope(c.env);
+  }
+}
+
+async function requireVisibleRepo(env: Env, owner: string, repoName: string, viewerEmail: string | null, scope?: ReturnType<typeof createRequestScope>): Promise<RepositoryRow | null> {
+  const active = scope ?? createRequestScope(env);
+  const row = await active.get(Tokens.RepoService).getByOwnerAndName(owner, repoName);
   if (!row) return null;
-  const role = await scope.get(Tokens.PermissionService).getRole(viewerEmail, row);
+  const role = await active.get(Tokens.PermissionService).getRole(viewerEmail, row);
   if (!role) return null;
   return row;
 }
@@ -37,11 +49,12 @@ async function requireRoleForRepo(
   repoName: string,
   viewerEmail: string | null,
   minimum: 'read' | 'write' | 'admin',
+  scope?: ReturnType<typeof createRequestScope>,
 ): Promise<{ row: RepositoryRow; role: 'read' | 'write' | 'admin' } | null> {
-  const scope = createRequestScope(env);
-  const row = await scope.get(Tokens.RepoService).getByOwnerAndName(owner, repoName);
+  const active = scope ?? createRequestScope(env);
+  const row = await active.get(Tokens.RepoService).getByOwnerAndName(owner, repoName);
   if (!row) return null;
-  const role = await scope.get(Tokens.PermissionService).getRole(viewerEmail, row);
+  const role = await active.get(Tokens.PermissionService).getRole(viewerEmail, row);
   if (!role) return null;
   const rank = role === 'admin' ? 3 : role === 'write' ? 2 : 1;
   const need = minimum === 'admin' ? 3 : minimum === 'write' ? 2 : 1;
@@ -56,7 +69,7 @@ async function requireRoleForRepo(
  * Never throws — anonymous is a valid outcome here.
  */
 async function resolvePublicViewer(c: RequestContext): Promise<string | null> {
-  const scope = createRequestScope(c.env);
+  const scope = getScope(c as never);
   try {
     const email = await scope.get(Tokens.AccessAuthService).getAuthenticatedUserEmail(
       c.req.raw,
@@ -83,11 +96,30 @@ async function withPublicRepo(c: RequestContext, fn: (row: RepositoryRow, fullNa
   const owner = c.req.param('owner');
   const repoParam = c.req.param('repo');
   if (!owner || !repoParam) return c.json({ error: 'Not found' }, 404);
-  const repoName = RepoService.normalizeRepo(repoParam);
+  const repoName = RepoFullName.normalizeRepo(repoParam);
   const viewerEmail = await resolvePublicViewer(c);
-  const row = await requireVisibleRepo(c.env, owner, repoName, viewerEmail);
+  const row = await requireVisibleRepo(c.env, owner, repoName, viewerEmail, getScope(c as never));
   if (!row) return c.json({ error: 'Not found' }, 404);
   return fn(row, `${owner}/${repoName}`);
+}
+
+/**
+ * Authed read-model guard — the `/user/*` counterpart of `withPublicRepo`.
+ * Previously duplicated in `RepoRoutes.withVisibleRepo`; unified here so
+ * public and authed read paths share visibility semantics (private hides
+ * existence → 404).
+ */
+async function withVisibleRepo(
+  c: RequestContext,
+  owner: string,
+  repoName: string,
+  fn: (row: RepositoryRow, fullName: string) => Promise<Response>,
+): Promise<Response> {
+  const email = (c as { get(key: string): string }).get('AuthenticatedUserEmailAddress') ?? null;
+  const normalized = RepoFullName.normalizeRepo(repoName);
+  const row = await requireVisibleRepo(c.env, owner, normalized, email, getScope(c as never));
+  if (!row) return c.json({ error: 'Not found' }, 404);
+  return fn(row, `${owner}/${normalized}`);
 }
 
 function toServiceStatus(error: unknown): 400 | 403 | 404 | 500 {
@@ -100,4 +132,4 @@ function toServiceStatus(error: unknown): 400 | 403 | 404 | 500 {
   return 500;
 }
 
-export { toRepoJson, requireVisibleRepo, requireRoleForRepo, resolvePublicViewer, withPublicRepo, toServiceStatus };
+export { toRepoJson, requireVisibleRepo, requireRoleForRepo, resolvePublicViewer, withPublicRepo, withVisibleRepo, toServiceStatus, getScope };

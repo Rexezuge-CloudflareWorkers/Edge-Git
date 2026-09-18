@@ -2,7 +2,7 @@ import { RepositoryDAO } from '@edge-git/backend-data/dao';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { ForbiddenError, NotFoundError } from '@edge-git/backend-errors';
-import { CryptoUtil } from '@edge-git/shared/utils';
+import { CryptoUtil, EmailAddress } from '@edge-git/shared/utils';
 import { INBOX_SHARD, inboxTagForHash, isInboxHash, normalizeChannels, repoShardFor } from '@edge-git/shared/realtime';
 import { PermissionService } from '../permission/PermissionService';
 
@@ -37,7 +37,7 @@ class RealtimeService {
   }
 
   public static inboxHashForEmail(email: string): Promise<string> {
-    return CryptoUtil.sha256Hex(email.toLowerCase()).then((hex) => hex.slice(0, 16));
+    return CryptoUtil.sha256Hex(EmailAddress.normalize(email)).then((hex) => hex.slice(0, 16));
   }
 
   // Recipient emails → per-user inbox tags for the global shard. Bounded and

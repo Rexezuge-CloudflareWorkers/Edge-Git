@@ -1,4 +1,5 @@
 import { BaseDAO } from './BaseDAO';
+import { CollaborationQueries } from './CollaborationQueries';
 import type { D1Queryable } from '../utils/D1Types';
 
 export interface LabelRow {
@@ -43,7 +44,7 @@ class CollaborationDAO extends BaseDAO {
     await this.withRetry(
       () =>
         this.database
-          .prepare('INSERT INTO labels (id, repository_id, name, color, description, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+          .prepare(CollaborationQueries.insertLabel())
           .bind(input.id, input.repositoryId, input.name, input.color, input.description, input.now)
           .run(),
       'create label',
@@ -52,7 +53,7 @@ class CollaborationDAO extends BaseDAO {
 
   public async listLabels(repositoryId: string): Promise<LabelRow[]> {
     const result = await this.database
-      .prepare('SELECT * FROM labels WHERE repository_id = ? ORDER BY name ASC')
+      .prepare(CollaborationQueries.listLabels())
       .bind(repositoryId)
       .all<LabelRow>();
     return result.results ?? [];
@@ -101,7 +102,7 @@ class CollaborationDAO extends BaseDAO {
 
   public async listMilestones(repositoryId: string): Promise<MilestoneRow[]> {
     const result = await this.database
-      .prepare('SELECT * FROM milestones WHERE repository_id = ? ORDER BY created_at DESC')
+      .prepare(CollaborationQueries.listMilestones())
       .bind(repositoryId)
       .all<MilestoneRow>();
     return result.results ?? [];

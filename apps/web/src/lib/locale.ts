@@ -1,18 +1,12 @@
-import { LANGUAGE_STORAGE_KEY, SUPPORTED_LANGUAGES, normalizeLanguage } from '../i18n';
+import { LANGUAGE_STORAGE_KEY, SUPPORTED_LANGUAGES, canonicalizeLanguageTag, normalizeLanguage } from '../i18n';
 
 /**
  * Canonicalize a BCP 47-ish language tag (`en_us` → `en-US`,
  * `ZH-cn` → `zh-CN`) so locale matching is case- and separator-insensitive.
+ * Delegates to the single `i18n` canonicalizer (no duplicated logic).
  */
 export function canonicalizeLocaleTag(tag: string): string {
-  // eslint-disable-next-line unicorn/prefer-string-replace-all -- tsconfig lib is ES2020 (no replaceAll types)
-  const normalized = tag.trim().replace(/_/g, '-');
-  const parts = normalized.split('-').filter(Boolean);
-  if (parts.length === 0) return 'en';
-  const language = (parts[0] ?? 'en').toLowerCase();
-  if (parts.length === 1) return language;
-  const rest = parts.slice(1).map((part: string) => (part.length === 2 ? part.toUpperCase() : part.toLowerCase()));
-  return [language, ...rest].join('-');
+  return canonicalizeLanguageTag(tag);
 }
 
 /**

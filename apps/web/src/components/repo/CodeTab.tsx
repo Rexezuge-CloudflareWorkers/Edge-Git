@@ -6,6 +6,7 @@ import type { GitCommit, OverviewResponse, Repo, TagInfo, TreeEntry } from '../.
 import { decodeBlobContent, loadBlob, loadOverview, loadTree } from '../../services/repoService';
 import { formatTimestamp } from '../../lib/format';
 import { formatDateLocale } from '../../lib/locale';
+import { resolveSelectedRef, mergeEnrichedEntries } from './useCodeTabOverview';
 import { Card } from '../ui/Card';
 import { Select } from '../ui/Input';
 import { Button } from '../ui/Button';
@@ -24,33 +25,6 @@ import { TagPicker, TagsCard } from './TagsCard';
 const README_NAMES = new Set(['README.md', 'README.markdown', 'README.mdown', 'README.txt', 'README']);
 // Upper bound for in-browser editing; larger files stay git-only.
 const MAX_EDIT_CHARS = 262_144;
-
-// Resolve the selected ref against freshly loaded branches/tags, falling back
-// to the default branch when the selection no longer exists (e.g. a deleted
-// branch). Known tag refs are kept. Extracted to module scope so the CodeTab
-// effect stays within the complexity lint budget.
-function resolveSelectedRef(ref: string, branches: string[], currentBranch: string | null, tagRefs: Set<string>): string {
-  const isKnownRef = (ref.startsWith('refs/tags/') && tagRefs.has(ref)) || (ref !== '' && branches.includes(ref));
-  return isKnownRef ? ref : (currentBranch ?? branches[0] ?? 'HEAD');
-}
-
-// Merge lazily enriched last-commit info into the fast tree by path+oid.
-// Extracted to module scope so the CodeTab effect stays within the
-// max-nesting lint budget.
-function mergeEnrichedEntries(prev: TreeEntry[], enriched: TreeEntry[]): TreeEntry[] {
-  if (prev.length !== enriched.length) return enriched;
-  const byKey = new Map(enriched.map((e) => [`${e.oid}:${e.path}`, e.lastCommit ?? null]));
-  let changed = false;
-  const next = prev.map((e) => {
-    const lc = byKey.get(`${e.oid}:${e.path}`);
-    if (lc && !e.lastCommit) {
-      changed = true;
-      return { ...e, lastCommit: lc };
-    }
-    return e;
-  });
-  return changed ? next : prev;
-}
 
 export function CodeTab({
   owner,

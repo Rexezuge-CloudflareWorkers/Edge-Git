@@ -92,9 +92,6 @@ importers:
       '@edge-git/git-protocol':
         specifier: workspace:*
         version: link:../../packages/git-protocol
-      '@edge-git/git-service':
-        specifier: workspace:*
-        version: link:../../packages/git-service
       '@edge-git/shared':
         specifier: workspace:*
         version: link:../../packages/shared

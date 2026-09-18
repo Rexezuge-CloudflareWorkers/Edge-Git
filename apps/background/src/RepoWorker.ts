@@ -1,12 +1,14 @@
 import { DurableObject } from 'cloudflare:workers';
-import { DofsFs, GitService, IsoGitFs, PackLimitError } from '@edge-git/git-service';
+import { createDofsFs, GitService, IsoGitFs, PackLimitError } from '@edge-git/git-service';
+import type { DofsFs } from '@edge-git/git-service';
 import type { ProtectedRefRule } from '@edge-git/git-protocol';
-import { ConfigurationManager } from '@edge-git/backend-runtime/config';
+import { AppConfiguration } from '@edge-git/backend-runtime/config';
 import { FetchHandler } from './FetchHandler';
-import type { FetchLimits } from './FetchHandler';
 import { PushHandler } from './PushHandler';
 import { ReadModelService } from './ReadModelService';
 import { ReleaseAssetStore } from './ReleaseAssetStore';
+import { RepoLifecycle } from './RepoLifecycle';
+import { RepoReadRpc } from './RepoReadRpc';
 
 // NOTE: intentionally still extends the real `DurableObject` rather than
 // `AbstractDurableObjectWorker` (see return notes): the abstract base does
@@ -14,8 +16,13 @@ import { ReleaseAssetStore } from './ReleaseAssetStore';
 // without it), so subclassing it would strip workerd DO semantics (storage
 // isolation, getByName routing, RPC entrypoints). Its ctx type
 // (`DurableObjectStateLike` with `storage?: unknown`) is also incompatible
-// with `new DofsFs(ctx, ...)` and the `ctx.storage.get/put/deleteAll` calls
+// with `createDofsFs(ctx, ...)` and the `ctx.storage.get/put/deleteAll` calls
 // below. Same applies to CronTasksWorker.
+//
+// Facade (Otter pattern): routing + composition only. Lifecycle lives in
+// `RepoLifecycle`, read-model RPC fan-out in `RepoReadRpc`, pack handling in
+// `FetchHandler`/`PushHandler`. Previously 491 LOC; now under the 300 LOC
+// soft god-file guard.
 class RepoWorker extends DurableObject<Env> {
   private readonly dofs: DofsFs;
   private readonly isoGitFs: ReturnType<IsoGitFs['getPromiseFsClient']>;
@@ -24,22 +31,46 @@ class RepoWorker extends DurableObject<Env> {
   private readonly pushHandler: PushHandler;
   private readonly readModel: ReadModelService;
   private readonly releaseAssets: ReleaseAssetStore;
+  private readonly lifecycle: RepoLifecycle;
+  private readonly reads: RepoReadRpc;
+  private readonly config: AppConfiguration;
 
   private fullNameValue: string | undefined;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
 
-    this.dofs = new DofsFs(ctx, env, { chunkSize: 512 * 1024 });
+    this.dofs = createDofsFs(ctx, env);
 
     this.isoGitFs = new IsoGitFs(this.dofs).getPromiseFsClient();
     this.git = new GitService(this.isoGitFs, '/repo');
+    this.config = AppConfiguration.fromEnv(env);
     this.fetchHandler = new FetchHandler({ git: this.git, env, getFullName: () => this.fullNameValue });
     this.pushHandler = new PushHandler({ isoGitFs: this.isoGitFs, git: this.git, getFullName: () => this.fullNameValue });
     this.readModel = new ReadModelService(this.git);
     this.releaseAssets = new ReleaseAssetStore(this.isoGitFs, env);
+    this.lifecycle = new RepoLifecycle(
+      ctx,
+      env,
+      this.dofs,
+      this.isoGitFs,
+      this.git,
+      this.config,
+      () => this.fullNameValue,
+      () => this.loadFullNameIfNeeded(),
+    );
+    this.reads = new RepoReadRpc(
+      this.git,
+      this.readModel,
+      () => this.prepare(),
+      () => this.config.getMaxMergeDiffFiles(),
+      () => this.config.getMaxFileBytes(),
+      this.isoGitFs,
+      this.releaseAssets,
+      () => this.lifecycle.getLimits(),
+    );
 
-    // NOTE: Do NOT call blockConcurrencyWhile here. `new Fs()` already
+    // NOTE: Do NOT call blockConcurrencyWhile here. `createDofsFs()` already
     // schedules its own blockConcurrencyWhile(ensureSchema). Nesting a second
     // block that runs isomorphic-git init deadlocks (30s timeout → DO reset →
     // HTTP 500 on every POST git-upload-pack / receive-pack advertise).
@@ -57,11 +88,7 @@ class RepoWorker extends DurableObject<Env> {
   }
 
   private ensureDeviceSize(): void {
-    try {
-      this.dofs.setDeviceSize(5 * 1024 * 1024 * 1024);
-    } catch {
-      // ENOSPC / already set — safe to ignore, write path surfaces real errors
-    }
+    this.lifecycle.ensureDeviceSize();
   }
 
   public get fullName(): string {
@@ -111,21 +138,15 @@ class RepoWorker extends DurableObject<Env> {
   }
 
   public async initRepo(): Promise<void> {
-    await this.git.initRepo();
+    await this.lifecycle.initRepo();
   }
 
   public async deleteRepo(): Promise<void> {
-    await this.ctx.storage.deleteAll();
+    await this.lifecycle.deleteRepo();
   }
 
   public async ensureRepoInitialized(): Promise<void> {
-    try {
-      await this.isoGitFs.promises.stat('/repo/HEAD');
-      return;
-    } catch {
-      // missing HEAD → init below
-    }
-    await this.initRepo();
+    await this.lifecycle.ensureRepoInitialized();
   }
 
   public async listRefs(): Promise<{ refs: Array<{ ref: string; oid: string }>; symbolicHead: string | null }> {
@@ -134,21 +155,11 @@ class RepoWorker extends DurableObject<Env> {
   }
 
   private async prepare(): Promise<void> {
-    await this.loadFullNameIfNeeded();
-    this.ensureDeviceSize();
-    await this.ensureRepoInitialized();
-    this.git.ensureFreshCache(ConfigurationManager.repo.getCacheTtlSeconds(this.env));
+    await this.lifecycle.prepare();
   }
 
-  private getLimits(): FetchLimits & { maxCommands: number } {
-    return {
-      maxWants: ConfigurationManager.repo.getMaxFetchWants(this.env),
-      maxHaves: ConfigurationManager.repo.getMaxFetchHaves(this.env),
-      maxCommands: ConfigurationManager.repo.getMaxPushCommands(this.env),
-      maxObjects: ConfigurationManager.repo.getMaxPackObjects(this.env),
-      maxPackBytes: ConfigurationManager.repo.getMaxPackBytes(this.env),
-      maxFetchBodyBytes: ConfigurationManager.repo.getMaxFetchBodyBytes(this.env),
-    };
+  private getLimits(): ReturnType<RepoLifecycle['getLimits']> {
+    return this.lifecycle.getLimits();
   }
 
   public async receivePack(data: Uint8Array, protections: ProtectedRefRule[] = []): Promise<Response> {
@@ -160,43 +171,25 @@ class RepoWorker extends DurableObject<Env> {
   }
 
   public async getLatestCommit(branch = 'HEAD'): Promise<unknown> {
-    await this.prepare();
-    return this.readModel.getLatestCommit(branch);
+    return this.reads.getLatestCommit(branch);
   }
 
   public async getCommits(args: { ref?: string; depth?: number; filepath?: string }): Promise<unknown> {
-    await this.prepare();
-    return this.readModel.getCommits(args);
+    return this.reads.getCommits(args);
   }
 
   public async getBranches(): Promise<{ branches: string[]; currentBranch: string | null }> {
-    await this.prepare();
-    return this.readModel.getBranches();
+    return this.reads.getBranches();
   }
 
   public async createBranch(args: { name: string; fromRef?: string }): Promise<unknown> {
-    await this.prepare();
-    const startOid = await this.git.resolveRef(args.fromRef || 'HEAD');
-    if (!startOid) {
-      return { ok: false, error: 'unknown start point', status: 404 };
-    }
-    const result = await this.git.createBranch(args.name, startOid);
-    if (result.ok) this.git.clearCache();
-    return result;
+    return this.reads.createBranch(args);
   }
 
   public async deleteBranchRef(branch: string): Promise<unknown> {
-    await this.prepare();
-    const result = await this.git.deleteBranchRef(branch);
-    if (result.ok) this.git.clearCache();
-    return result;
+    return this.reads.deleteBranchRef(branch);
   }
 
-  /**
-   * Commit a single file create/update/delete on a branch (web editor).
-   * `content: null` deletes. Returns a discriminated union — never throws
-   * except for oversized packs — so it survives DO RPC boundaries.
-   */
   public async commitFile(args: {
     branch: string;
     path: string;
@@ -206,196 +199,79 @@ class RepoWorker extends DurableObject<Env> {
     authorName: string;
     authorEmail: string;
   }): Promise<unknown> {
-    await this.prepare();
-    const result = await this.git.commitFile({
-      branch: args.branch,
-      path: args.path,
-      content: args.content,
-      message: args.message,
-      expectedOid: args.expectedOid,
-      author: { name: args.authorName, email: args.authorEmail },
-      maxFileBytes: ConfigurationManager.repo.getMaxFileBytes(this.env),
-    });
-    if (result.ok) this.git.clearCache();
-    return result;
+    return this.reads.commitFile(args);
   }
 
   public async setDefaultBranch(branch: string): Promise<unknown> {
-    await this.prepare();
-    const result = await this.git.setDefaultBranch(branch);
-    if (result.ok) this.git.clearCache();
-    return result;
+    return this.reads.setDefaultBranch(branch);
   }
 
-  public async getTags(): Promise<
-    Array<{ name: string; ref: string; oid: string; peeledOid: string | null; type: 'lightweight' | 'annotated' }>
-  > {
-    await this.prepare();
-    return this.readModel.getTags();
+  public async getTags(): Promise<Array<{ name: string; ref: string; oid: string; peeledOid: string | null; type: 'lightweight' | 'annotated' }>> {
+    return this.reads.getTags();
   }
 
   public async getTree(args: { ref?: string; path?: string; withLastCommit?: boolean }): Promise<unknown> {
-    await this.prepare();
-    return this.readModel.getTree(args);
+    return this.reads.getTree(args);
   }
 
   public async getBlob(args: { ref?: string; filepath: string }): Promise<unknown> {
-    await this.prepare();
-    return this.readModel.getBlob(args);
+    return this.reads.getBlob(args);
   }
 
-  public async getOverview(args: {
-    ref?: string;
-    path?: string;
-    depth?: number;
-    includeTags?: boolean;
-    includeReadme?: boolean;
-  }): Promise<unknown> {
-    await this.prepare();
-    return this.readModel.getOverview(args);
+  public async getOverview(args: { ref?: string; path?: string; depth?: number; includeTags?: boolean; includeReadme?: boolean }): Promise<unknown> {
+    return this.reads.getOverview(args);
   }
 
   public async listAllFiles(args: { ref?: string; maxFiles?: number }): Promise<Array<{ path: string; oid: string }>> {
-    await this.prepare();
-    return this.readModel.listAllFiles(args);
+    return this.reads.listAllFiles(args);
   }
 
   public async getCommit(commitOid: string): Promise<unknown> {
-    await this.prepare();
-    return this.readModel.getCommit(commitOid);
+    return this.reads.getCommit(commitOid);
   }
 
   public async getCommitDiff(commitOid: string): Promise<unknown> {
-    await this.prepare();
-    return this.readModel.getCommitDiff(commitOid, ConfigurationManager.repo.getMaxMergeDiffFiles(this.env));
+    return this.reads.getCommitDiff(commitOid);
   }
 
   public async getCompare(args: { baseRef: string; headRef: string }): Promise<unknown> {
-    await this.prepare();
-    return this.readModel.getCompare(args.baseRef, args.headRef, ConfigurationManager.repo.getMaxMergeDiffFiles(this.env));
+    return this.reads.getCompare(args);
   }
 
   public async getMergePreview(args: { baseRef: string; headRef: string }): Promise<unknown> {
-    await this.prepare();
-    return this.readModel.getMergePreview(args.baseRef, args.headRef);
+    return this.reads.getMergePreview(args);
   }
 
   public async getMergePreviewByOids(args: { baseOid: string; headOid: string }): Promise<unknown> {
-    await this.prepare();
-    return this.readModel.getMergePreviewByOids(args.baseOid, args.headOid);
+    return this.reads.getMergePreviewByOids(args);
   }
 
   public async resolveRef(ref: string): Promise<string | null> {
-    await this.prepare();
-    return this.git.resolveRef(ref);
+    return this.reads.resolveRef(ref);
   }
 
   public async hasObject(oid: string): Promise<boolean> {
-    await this.prepare();
-    return this.git.hasObject(oid);
+    return this.reads.hasObject(oid);
   }
 
-  /**
-   * Ancestry check for mirror fast-forward validation (local oldOid must
-   * be an ancestor of the mirrored newOid). Runs after the mirrored
-   * objects are indexed so history covers the new commits.
-   */
   public async isAncestor(ancestor: string, oid: string): Promise<boolean> {
-    await this.prepare();
-    if (!/^[0-9a-f]{40}$/.test(ancestor) || !/^[0-9a-f]{40}$/.test(oid)) return false;
-    try {
-      return await this.git.isAncestor(ancestor, oid);
-    } catch {
-      return false;
-    }
+    return this.reads.isAncestor(ancestor, oid);
   }
 
-  /**
-   * Update existing refs to new oids (mirror fast-forward). Callers must
-   * have validated ancestry first; results report per-ref ok flags and
-   * never throw for ref-level failures.
-   */
   public async updateRefs(updates: Array<{ ref: string; oldOid: string; newOid: string }>): Promise<unknown> {
-    await this.prepare();
-    const pending = (updates ?? []).filter(
-      (u) => typeof u.ref === 'string' && (u.ref.startsWith('refs/heads/') || u.ref.startsWith('refs/tags/')) && /^[0-9a-f]{40}$/.test(u.oldOid) && /^[0-9a-f]{40}$/.test(u.newOid),
-    );
-    if (pending.length === 0) return { updated: [] };
-    const results = await this.git.applyRefUpdates(
-      pending.map((u) => ({ oldOid: u.oldOid, newOid: u.newOid, ref: u.ref })),
-      false,
-    );
-    this.git.clearCache();
-    const updated: string[] = [];
-    for (const [i, result] of results.entries()) {
-      if (result.ok) updated.push(pending[i].ref);
-    }
-    return { updated };
+    return this.reads.updateRefs(updates);
   }
 
-  /**
-   * Export a packfile for the given wants (fork copy, cross-fork PR
-   * materialization). Bounded by the repo pack limits; over-limit exports
-   * throw `PackLimitError` so callers fail closed.
-   */
   public async exportPack(wants: string[]): Promise<{ oids: string[]; pack: Uint8Array | null }> {
-    await this.prepare();
-    if (wants.length === 0) return { oids: [], pack: null };
-    const limits = this.getLimits();
-    const { oids } = await this.git.collectObjectsForPack(wants, [], { maxObjects: limits.maxObjects });
-    if (oids.length === 0) return { oids, pack: null };
-    const pack = (await this.git.packObjects(oids)) as Uint8Array | undefined;
-    if (!pack || pack.byteLength === 0) return { oids, pack: null };
-    if (pack.byteLength > limits.maxPackBytes) {
-      throw new PackLimitError(`pack too large: ${pack.byteLength} > ${limits.maxPackBytes} bytes`);
-    }
-    return { oids, pack };
+    return this.reads.exportPack(wants);
   }
 
-  /**
-   * Index an exported packfile into this repo. When `refs` are provided
-   * (fork copy), missing refs are created; otherwise (cross-fork PR
-   * materialization) only objects are imported and no refs are touched.
-   */
   public async importPack(pack: Uint8Array, refs?: Array<{ ref: string; oid: string }>): Promise<{ importedRefs: string[] }> {
-    await this.prepare();
-    if (!pack || pack.byteLength === 0) return { importedRefs: [] };
-    const limits = this.getLimits();
-    if (pack.byteLength > limits.maxPackBytes) {
-      throw new PackLimitError(`pack too large: ${pack.byteLength} > ${limits.maxPackBytes} bytes`);
-    }
-    const suffix = `${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
-    const packFilePath = `/repo/objects/pack/fork-${suffix}.pack`;
-    let wrotePack = false;
-    try {
-      await this.isoGitFs.promises.writeFile(packFilePath, pack);
-      wrotePack = true;
-      await this.git.indexPack(packFilePath.replace('/repo/', ''));
-    } catch (error) {
-      if (wrotePack) {
-        await this.isoGitFs.promises.unlink(packFilePath).catch(() => undefined);
-      }
-      throw error;
-    }
-    this.git.clearCache();
-    const importedRefs: string[] = [];
-    const pending = (refs ?? []).filter((r) => typeof r.ref === 'string' && /^[0-9a-f]{40}$/.test(r.oid));
-    if (pending.length > 0) {
-      const results = await this.git.applyRefUpdates(
-        pending.map((r) => ({ oldOid: '0'.repeat(40), newOid: r.oid, ref: r.ref })),
-        false,
-      );
-      for (const [i, result] of results.entries()) {
-        if (result.ok) importedRefs.push(pending[i].ref);
-      }
-      this.git.clearCache();
-    }
-    return { importedRefs };
+    return this.reads.importPack(pack, refs);
   }
 
   public async getPullDiff(args: { baseOid: string | null; headOid: string }): Promise<unknown> {
-    await this.prepare();
-    return this.readModel.getPullDiff(args.baseOid, args.headOid, ConfigurationManager.repo.getMaxMergeDiffFiles(this.env));
+    return this.reads.getPullDiff(args);
   }
 
   public async mergePull(args: {
@@ -408,84 +284,32 @@ class RepoWorker extends DurableObject<Env> {
     deleteHead?: boolean;
     strategy?: 'merge' | 'squash' | 'rebase';
   }): Promise<unknown> {
-    await this.prepare();
-    const strategy = args.strategy ?? 'merge';
-    const author = { name: args.authorName, email: args.authorEmail };
-    const outcome =
-      strategy === 'squash'
-        ? await this.git.squashMerge({ baseBranch: args.baseBranch, headOid: args.headOid, author, message: args.message })
-        : strategy === 'rebase'
-          ? await this.git.rebaseMerge({ baseBranch: args.baseBranch, headOid: args.headOid, author })
-          : await this.git.mergeBranches({
-              baseBranch: args.baseBranch,
-              headOid: args.headOid,
-              author,
-              message: args.message,
-            });
-    if (outcome.type !== 'conflict') {
-      this.git.clearCache();
-    }
-    let deletedHead = false;
-    if (args.deleteHead && outcome.type !== 'conflict' && args.headBranch && args.headBranch !== args.baseBranch) {
-      try {
-        await this.git.deleteBranch(args.headBranch);
-        deletedHead = true;
-        this.git.clearCache();
-      } catch {
-        // Best-effort: head may already be gone or checked out. Merge still counts.
-        deletedHead = false;
-      }
-    }
-    return { ...outcome, deletedHead };
+    return this.reads.mergePull(args);
   }
 
-  /**
-   * Delete a branch in this repo (cross-fork PR `deleteHead` targets the
-   * head repo DO). Best-effort: missing/invalid branches report
-   * `deleted: false` instead of throwing.
-   */
   public async deleteBranch(branch: string): Promise<{ deleted: boolean }> {
-    await this.prepare();
-    try {
-      await this.git.deleteBranch(branch);
-      this.git.clearCache();
-      return { deleted: true };
-    } catch {
-      return { deleted: false };
-    }
+    return this.reads.deleteBranch(branch);
   }
 
   public async getBlame(args: { ref?: string; filepath: string }): Promise<unknown> {
-    await this.prepare();
-    if (!args.filepath || args.filepath.length > 500) return null;
-    return this.readModel.getBlame(args.ref ?? 'HEAD', args.filepath);
+    return this.reads.getBlame(args);
   }
 
-  /**
-   * Store a release asset's bytes in the DO filesystem (outside `/repo` so
-   * git history is untouched). Bounded by `MAX_ASSET_BYTES`; returns a
-   * discriminated union — never throws except for oversized payloads — so
-   * it survives DO RPC boundaries.
-   */
   public async storeReleaseAsset(args: { releaseId: string; assetId: string; bytes: Uint8Array }): Promise<unknown> {
-    await this.prepare();
-    return this.releaseAssets.store(args);
+    return this.reads.storeReleaseAsset(args);
   }
 
   public async getReleaseAsset(args: { releaseId: string; assetId: string }): Promise<Uint8Array | null> {
-    await this.prepare();
-    return this.releaseAssets.load(args);
+    return this.reads.getReleaseAsset(args);
   }
 
   public async deleteReleaseAsset(args: { releaseId: string; assetId: string }): Promise<{ deleted: boolean }> {
-    await this.prepare();
-    return this.releaseAssets.remove(args);
+    return this.reads.deleteReleaseAsset(args);
   }
 
   public async deleteReleaseAssets(args: { releaseId: string }): Promise<{ deleted: number }> {
-    await this.prepare();
-    return this.releaseAssets.removeAll(args);
+    return this.reads.deleteReleaseAssets(args);
   }
 }
 
-export { RepoWorker };
+export { RepoWorker, PackLimitError };
