@@ -171,6 +171,16 @@ class WebhookDAO extends BaseDAO {
       'delete webhooks by repo',
     );
   }
+
+  // Refresh denormalized `full_name` after an owner/org rename. Keyed by
+  // stable `repository_id` so hook rows follow the new `owner/name`.
+  public async updateFullNameByRepo(repositoryId: string, fullName: string): Promise<void> {
+    await this.withRetry(
+      () =>
+        this.database.prepare('UPDATE repo_webhooks SET full_name = ? WHERE repository_id = ?').bind(fullName, repositoryId).run(),
+      'rename webhook full name',
+    ).catch(() => undefined);
+  }
 }
 
 export { WebhookDAO };

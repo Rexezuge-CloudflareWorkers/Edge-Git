@@ -1,9 +1,20 @@
-import { NamespaceDAO, OrganizationDAO, RepositoryDAO, UserDAO } from '@edge-git/backend-data/dao';
+import {
+  EventDAO,
+  IssueDAO,
+  NamespaceDAO,
+  NotificationDAO,
+  OrganizationDAO,
+  PullRequestDAO,
+  RepositoryDAO,
+  UserDAO,
+  WebhookDAO,
+} from '@edge-git/backend-data/dao';
 import type { UserRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
 import { isReservedNamespaceName } from '@edge-git/shared/constants';
 import { TimestampUtil } from '@edge-git/shared/utils';
+import { cascadeOwnerRepos } from '../repo/repoRenameCascade';
 
 interface UserServiceEnv {
   DB: D1Queryable;
@@ -14,6 +25,11 @@ interface UserServiceDeps {
   namespaceDAO?: () => Promise<NamespaceDAO>;
   organizationDAO?: () => Promise<OrganizationDAO>;
   repositoryDAO?: () => Promise<RepositoryDAO>;
+  issueDAO?: () => Promise<IssueDAO>;
+  pullRequestDAO?: () => Promise<PullRequestDAO>;
+  eventDAO?: () => Promise<EventDAO>;
+  notificationDAO?: () => Promise<NotificationDAO>;
+  webhookDAO?: () => Promise<WebhookDAO>;
 }
 
 const USERNAME_RE = /^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$/i;
@@ -51,6 +67,11 @@ class UserService {
       namespaceDAO: () => Promise.resolve(new NamespaceDAO(env.DB)),
       organizationDAO: () => Promise.resolve(new OrganizationDAO(env.DB)),
       repositoryDAO: () => Promise.resolve(new RepositoryDAO(env.DB)),
+      issueDAO: () => Promise.resolve(new IssueDAO(env.DB)),
+      pullRequestDAO: () => Promise.resolve(new PullRequestDAO(env.DB)),
+      eventDAO: () => Promise.resolve(new EventDAO(env.DB)),
+      notificationDAO: () => Promise.resolve(new NotificationDAO(env.DB)),
+      webhookDAO: () => Promise.resolve(new WebhookDAO(env.DB)),
       ...deps,
     };
   }
@@ -209,11 +230,21 @@ class UserService {
     } catch {
       // ignore — users.username is source of truth on legacy DBs
     }
-    // Simple rename: cascade owner on user-owned repos, free the old name immediately.
+    // Simple rename: cascade owner on user-owned repos (plus denormalized
+    // `full_name` sidecars), free the old name immediately.
     if (oldCi) {
       try {
-        const repoDao = await this.deps.repositoryDAO();
-        await repoDao.renameOwner(oldCi, handle);
+        await cascadeOwnerRepos(
+          {
+            repositoryDAO: this.deps.repositoryDAO,
+            issueDAO: this.deps.issueDAO,
+            pullRequestDAO: this.deps.pullRequestDAO,
+            eventDAO: this.deps.eventDAO,
+            notificationDAO: this.deps.notificationDAO,
+            webhookDAO: this.deps.webhookDAO,
+          },
+          { oldOwnerCi: oldCi, newOwner: handle, now },
+        );
       } catch {
         // ignore
       }

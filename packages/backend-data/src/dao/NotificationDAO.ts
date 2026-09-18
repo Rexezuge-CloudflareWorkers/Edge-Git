@@ -121,6 +121,15 @@ class NotificationDAO extends BaseDAO {
       'delete notifications by repo',
     );
   }
+
+  // Refresh denormalized `full_name` after an owner/org rename. Keyed by
+  // stable `repository_id` so inbox rows follow the new `owner/name`.
+  public async updateFullNameByRepo(repositoryId: string, fullName: string): Promise<void> {
+    await this.withRetry(
+      () => this.database.prepare('UPDATE notifications SET full_name = ? WHERE repository_id = ?').bind(fullName, repositoryId).run(),
+      'rename notification full name',
+    ).catch(() => undefined);
+  }
 }
 
 export { NotificationDAO };

@@ -247,28 +247,57 @@ function registerUserSettingsRoutes(app: UserApp): void {
         .get(Tokens.UserService)
         .getProfileByEmail(email)
         .catch(() => null);
-      const renamed = await scope.get(Tokens.UserService).renameUsername(email, body.username);
-      // Best-effort DO move for every owned repo: new stub initialized, old stub purged.
-      // D1 is source of truth; git objects copy via fresh init (empty) when DO has no copy RPC.
-      if (before?.username && before.username.toLowerCase() !== renamed.username.toLowerCase()) {
-        try {
-          const repos = await scope.get(Tokens.RepoService).listByOwnerEmail(email, 500);
-          const { getRepoStub, ensureRepo } = await import('../repoStub');
-          const owned = repos.filter((r) => (r.owner_ci ?? r.owner).toLowerCase() === before.username?.toLowerCase());
-          for (const repo of owned) {
-            const oldFull = `${before.username}/${repo.name}`;
-            const newFull = `${renamed.username}/${repo.name}`;
-            try {
-              await ensureRepo(c.env, newFull);
-              await getRepoStub(c.env, oldFull)
-                .deleteRepo()
-                .catch(() => undefined);
-            } catch {
-              // ignore per-repo failures
-            }
+      // Snapshot owned repos BEFORE the D1 rename — afterwards `owner_ci`
+      // already reads new, so a post-rename filter by the old name matches
+      // nothing and the DO move silently never runs.
+      const snapshot: Array<{ id: string; name: string }> = [];
+      if (before?.username) {
+        const seen = new Set<string>();
+        const remember = (rows: Array<{ id: string; name: string }>): void => {
+          for (const row of rows) {
+            if (!row.id || !row.name || seen.has(row.id)) continue;
+            seen.add(row.id);
+            snapshot.push({ id: row.id, name: row.name });
           }
+        };
+        try {
+          remember(await scope.get(Tokens.RepoService).listByOwnerEmail(email, 1000));
         } catch {
-          // ignore — rename already committed in D1
+          // ignore — DAO snapshot below still applies
+        }
+        try {
+          remember(await scope.get(Tokens.RepositoryDAO)().then((dao) => dao.listByOwner(before.username as string, 1000)));
+        } catch {
+          // ignore — owner_email snapshot above still applies
+        }
+      }
+      const renamed = await scope.get(Tokens.UserService).renameUsername(email, body.username);
+      // Fail-closed DO move: git objects + release assets are copied old→new
+      // and the old isolate is purged only after the copy verifies. On copy
+      // failure the new isolate is purged, D1 is rolled back to the old
+      // handle, and the request surfaces 413 (pack limit) / 500.
+      if (before?.username && before.username.toLowerCase() !== renamed.username.toLowerCase()) {
+        const moves = snapshot.map((repo) => ({
+          id: repo.id,
+          name: repo.name,
+          oldFull: `${before.username as string}/${repo.name}`,
+          newFull: `${renamed.username}/${repo.name}`,
+        }));
+        if (moves.length > 0) {
+          const { moveRepoDosForRename } = await import('./RepoMove');
+          const { isPackLimitError } = await import('./CrossFork');
+          try {
+            await moveRepoDosForRename(c.env, email, moves);
+          } catch (moveError) {
+            await scope
+              .get(Tokens.UserService)
+              .renameUsername(email, before.username)
+              .catch(() => undefined);
+            if (isPackLimitError(moveError)) {
+              return c.json({ error: moveError instanceof Error ? moveError.message : 'Repository too large to move' }, 413);
+            }
+            return c.json({ error: 'Failed to move repository data' }, 500);
+          }
         }
       }
       const profile = await scope.get(Tokens.UserService).getProfileByEmail(email);
