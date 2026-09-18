@@ -8,13 +8,7 @@ import { Badge } from '../ui/Badge';
 import { Input, Select } from '../ui/Input';
 import { RefreshButton } from '../shared/RefreshButton';
 
-export function OrgMembersManager({
-  org,
-  showNotice,
-}: {
-  org: string;
-  showNotice: (type: 'success' | 'error', text: string) => void;
-}) {
+export function OrgMembersManager({ org, showNotice }: { org: string; showNotice: (type: 'success' | 'error', text: string) => void }) {
   const { t } = useTranslation();
   const [members, setMembers] = useState<OrgMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,7 +24,8 @@ export function OrgMembersManager({
         const rows = await listOrgMembers(org);
         if (!cancelled) setMembers(rows);
       } catch (error) {
-        if (!cancelled) showNotice('error', error instanceof Error ? error.message : t('orgs.failedToLoadMembers', 'Failed To Load Members.'));
+        if (!cancelled)
+          showNotice('error', error instanceof Error ? error.message : t('orgs.failedToLoadMembers', 'Failed To Load Members.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -114,7 +109,9 @@ export function OrgMembersManager({
               <p className="text-xs text-[var(--color-text-muted)] truncate">{m.email}</p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <Badge variant={m.role === 'owner' ? 'info' : 'neutral'}>{m.role === 'owner' ? t('orgs.owner', 'Owner') : t('orgs.member', 'Member')}</Badge>
+              <Badge variant={m.role === 'owner' ? 'info' : 'neutral'}>
+                {m.role === 'owner' ? t('orgs.owner', 'Owner') : t('orgs.member', 'Member')}
+              </Badge>
               <Select
                 value={m.role}
                 onChange={(e) => void changeRole(m.username ?? m.email, e.target.value as 'owner' | 'member')}

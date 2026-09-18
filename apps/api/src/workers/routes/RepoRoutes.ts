@@ -14,7 +14,10 @@ type RepoApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress:
 function registerRepoRoutes(app: RepoApp): void {
   app.get('/repos/:owner/:repo', async (c) => {
     return withPublicRepo(c as never, async (row) => {
-      const forksCount = await getScope(c as never).get(Tokens.ForkService).countForks(row.id).catch(() => 0);
+      const forksCount = await getScope(c as never)
+        .get(Tokens.ForkService)
+        .countForks(row.id)
+        .catch(() => 0);
       return c.json({ ...(toRepoJson(row) as Record<string, unknown>), forksCount });
     });
   });
@@ -102,7 +105,9 @@ function registerUserRepoRoutes(app: RepoApp): void {
   app.get('/user/me', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     try {
-      const profile = await getScope(c as never).get(Tokens.UserService).getProfileByEmail(email);
+      const profile = await getScope(c as never)
+        .get(Tokens.UserService)
+        .getProfileByEmail(email);
       return c.json({ email: profile.email, username: profile.username });
     } catch {
       return c.json({ email });
@@ -151,13 +156,26 @@ function registerUserRepoRoutes(app: RepoApp): void {
       const canonicalOwner = created?.owner ?? owner;
       await ensureRepo(c.env, `${canonicalOwner}/${normalized}`);
       const fullName = `${canonicalOwner}/${normalized}`;
-      await scope.get(Tokens.WatchService).ensureWatching(id, email).catch(() => undefined);
-      await recordAndNotify(c.env, { repositoryId: id, fullName, actorEmail: email, type: 'repo_created', title: `Created repository ${fullName}` });
+      await scope
+        .get(Tokens.WatchService)
+        .ensureWatching(id, email)
+        .catch(() => undefined);
+      await recordAndNotify(c.env, {
+        repositoryId: id,
+        fullName,
+        actorEmail: email,
+        type: 'repo_created',
+        title: `Created repository ${fullName}`,
+      });
       return c.json({ id, owner: canonicalOwner, name: normalized, fullName }, 201);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create repo';
       const status =
-        message.includes('already exists') || message.includes('Invalid') || message.includes('Maximum') || message.includes('reserved') ? 400 : message.includes('members') || message.includes('owner') ? 403 : 500;
+        message.includes('already exists') || message.includes('Invalid') || message.includes('Maximum') || message.includes('reserved')
+          ? 400
+          : message.includes('members') || message.includes('owner')
+            ? 403
+            : 500;
       return c.json({ error: message }, status as 400);
     }
   });
@@ -167,9 +185,20 @@ function registerUserRepoRoutes(app: RepoApp): void {
     const scope = getScope(c as never);
     const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email, scope);
     if (!row) return c.json({ error: 'Not found' }, 404);
-    const role = await scope.get(Tokens.PermissionService).getRole(email, row).catch(() => null);
-    const forksCount = await scope.get(Tokens.ForkService).countForks(row.id).catch(() => 0);
-    return c.json({ ...(toRepoJson(row, role) as Record<string, unknown>), viewerCanManage: role === 'admin', viewerRole: role, forksCount });
+    const role = await scope
+      .get(Tokens.PermissionService)
+      .getRole(email, row)
+      .catch(() => null);
+    const forksCount = await scope
+      .get(Tokens.ForkService)
+      .countForks(row.id)
+      .catch(() => 0);
+    return c.json({
+      ...(toRepoJson(row, role) as Record<string, unknown>),
+      viewerCanManage: role === 'admin',
+      viewerRole: role,
+      forksCount,
+    });
   });
 
   app.patch('/user/repos/:owner/:repo', async (c) => {
@@ -184,7 +213,9 @@ function registerUserRepoRoutes(app: RepoApp): void {
       return c.json({ error: 'Nothing to update' }, 400);
     }
     try {
-      const updated = await getScope(c as never).get(Tokens.RepoService).updateRepo(owner, repoName, email, patch);
+      const updated = await getScope(c as never)
+        .get(Tokens.RepoService)
+        .updateRepo(owner, repoName, email, patch);
       return c.json({ ...(toRepoJson(updated) as Record<string, unknown>), viewerCanManage: true });
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'Failed to update repo' }, toServiceStatus(error));
@@ -196,7 +227,9 @@ function registerUserRepoRoutes(app: RepoApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     try {
-      const { id } = await getScope(c as never).get(Tokens.RepoService).deleteRepo(owner, repoName, email);
+      const { id } = await getScope(c as never)
+        .get(Tokens.RepoService)
+        .deleteRepo(owner, repoName, email);
       // Purge git objects from the Durable Object (best-effort; D1 is source of truth).
       const fullName = `${owner}/${repoName}`;
       try {
@@ -205,7 +238,9 @@ function registerUserRepoRoutes(app: RepoApp): void {
         console.error('Failed to purge repo DO', fullName, error);
       }
       try {
-        await getScope(c as never).get(Tokens.SearchService).clearRepo(id);
+        await getScope(c as never)
+          .get(Tokens.SearchService)
+          .clearRepo(id);
       } catch (error) {
         console.error('Failed to purge code index', fullName, error);
       }
@@ -251,7 +286,12 @@ function parseOverviewArgs(params: URLSearchParams): {
   };
 }
 
-async function withVisibleRepoLocal(c: RequestContext, owner: string, repoName: string, fn: (fullName: string) => Promise<Response>): Promise<Response> {
+async function withVisibleRepoLocal(
+  c: RequestContext,
+  owner: string,
+  repoName: string,
+  fn: (fullName: string) => Promise<Response>,
+): Promise<Response> {
   return withVisibleRepo(c, owner, repoName, async (_row, fullName) => fn(fullName));
 }
 
@@ -272,18 +312,14 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const url = new URL(c.req.url);
-    return withVisibleRepoLocal(
-      c as never,
-      owner,
-      repoName,
-      async (fullName) =>
-        c.json(
-          await getRepoStub(c.env, fullName).getTree({
-            ref: url.searchParams.get('ref') ?? undefined,
-            path: url.searchParams.get('path') ?? undefined,
-            withLastCommit: parseWithLastCommit(url.searchParams.get('withLastCommit')),
-          }),
-        ),
+    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) =>
+      c.json(
+        await getRepoStub(c.env, fullName).getTree({
+          ref: url.searchParams.get('ref') ?? undefined,
+          path: url.searchParams.get('path') ?? undefined,
+          withLastCommit: parseWithLastCommit(url.searchParams.get('withLastCommit')),
+        }),
+      ),
     );
   });
 
@@ -292,11 +328,8 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const url = new URL(c.req.url);
     const filepath = url.searchParams.get('path') ?? '';
-    return withVisibleRepoLocal(
-      c as never,
-      owner,
-      repoName,
-      async (fullName) => c.json(await getRepoStub(c.env, fullName).getBlob({ ref: url.searchParams.get('ref') ?? undefined, filepath })),
+    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) =>
+      c.json(await getRepoStub(c.env, fullName).getBlob({ ref: url.searchParams.get('ref') ?? undefined, filepath })),
     );
   });
 
@@ -305,12 +338,13 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const url = new URL(c.req.url);
     const depth = url.searchParams.get('depth');
-    return withVisibleRepoLocal(
-      c as never,
-      owner,
-      repoName,
-      async (fullName) =>
-        c.json(await getRepoStub(c.env, fullName).getCommits({ ref: url.searchParams.get('ref') ?? undefined, depth: depth ? Number(depth) : undefined })),
+    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) =>
+      c.json(
+        await getRepoStub(c.env, fullName).getCommits({
+          ref: url.searchParams.get('ref') ?? undefined,
+          depth: depth ? Number(depth) : undefined,
+        }),
+      ),
     );
   });
 
@@ -345,7 +379,9 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const url = new URL(c.req.url);
     const args = parseOverviewArgs(url.searchParams);
-    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) => c.json(await getRepoStub(c.env, fullName).getOverview(args)));
+    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) =>
+      c.json(await getRepoStub(c.env, fullName).getOverview(args)),
+    );
   });
 }
 

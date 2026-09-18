@@ -33,7 +33,9 @@ function createDaoFakeDb(): D1Queryable & {
           );
         }
         if (q.includes('FROM users WHERE email = ?') || q.includes('FROM users WHERE lower(email)')) {
-          return Promise.resolve((state.users.find((u) => String(u.email).toLowerCase() === String(params[0]).toLowerCase()) ?? null) as T | null);
+          return Promise.resolve(
+            (state.users.find((u) => String(u.email).toLowerCase() === String(params[0]).toLowerCase()) ?? null) as T | null,
+          );
         }
         if (q.includes('FROM issues WHERE repository_id = ? AND number = ?')) {
           return Promise.resolve((state.issues.find((i) => i.repository_id === params[0] && i.number === params[1]) ?? null) as T | null);
@@ -46,7 +48,9 @@ function createDaoFakeDb(): D1Queryable & {
       },
       all<T>(): Promise<{ results: T[] }> {
         if (q.includes('FROM repositories WHERE owner_email = ?') || q.includes('FROM repositories WHERE lower(owner_email)')) {
-          return Promise.resolve({ results: state.repos.filter((r) => String(r.owner_email).toLowerCase() === String(params[0]).toLowerCase()) as T[] });
+          return Promise.resolve({
+            results: state.repos.filter((r) => String(r.owner_email).toLowerCase() === String(params[0]).toLowerCase()) as T[],
+          });
         }
         if (q.includes('FROM repositories WHERE owner = ?')) {
           return Promise.resolve({ results: state.repos.filter((r) => r.owner === params[0]) as T[] });
@@ -148,8 +152,10 @@ function createDaoFakeDb(): D1Queryable & {
     };
   }
 
-  return { ...state, prepare: (query: string) => ({ bind: (...params: unknown[]) => statement(query, params) }) } as unknown as D1Queryable &
-    typeof state;
+  return {
+    ...state,
+    prepare: (query: string) => ({ bind: (...params: unknown[]) => statement(query, params) }),
+  } as unknown as D1Queryable & typeof state;
 }
 
 describe('RepositoryDAO', () => {
@@ -189,7 +195,16 @@ describe('IssueDAO', () => {
     const db = createDaoFakeDb();
     const dao = new IssueDAO(db);
     expect(await dao.nextNumber('r1')).toBe(1);
-    await dao.create({ id: 'i1', repositoryId: 'r1', fullName: 'a/d', number: 1, title: 'Bug', body: null, creatorEmail: 'a@x.co', now: 100 });
+    await dao.create({
+      id: 'i1',
+      repositoryId: 'r1',
+      fullName: 'a/d',
+      number: 1,
+      title: 'Bug',
+      body: null,
+      creatorEmail: 'a@x.co',
+      now: 100,
+    });
     expect(await dao.nextNumber('r1')).toBe(2);
     await expect(dao.getByNumber('r1', 1)).resolves.toMatchObject({ title: 'Bug' });
     await expect(dao.listByRepo('r1')).resolves.toHaveLength(1);

@@ -4,7 +4,11 @@ import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { PermissionService } from '@edge-git/backend-services/permission';
 import { SearchService } from '@edge-git/backend-services/search';
 
-function createPullSearchFakeDb(opts: { pulls?: Array<Record<string, unknown>>; repos?: Array<Record<string, unknown>>; ftsAvailable?: boolean }) {
+function createPullSearchFakeDb(opts: {
+  pulls?: Array<Record<string, unknown>>;
+  repos?: Array<Record<string, unknown>>;
+  ftsAvailable?: boolean;
+}) {
   const pulls = opts.pulls ?? [];
   const repos = opts.repos ?? [];
   const ftsAvailable = opts.ftsAvailable ?? false;
@@ -22,7 +26,12 @@ function createPullSearchFakeDb(opts: { pulls?: Array<Record<string, unknown>>; 
         if (q.includes('MATCH')) {
           if (!ftsAvailable) throw new Error('no such table: pull_fts');
           const fts = String(params[0]).toLowerCase();
-          const tokens = fts.replaceAll('"', '').replaceAll('*', '').split(/\s*(?:and|or)\s*/).map((t) => t.trim()).filter(Boolean);
+          const tokens = fts
+            .replaceAll('"', '')
+            .replaceAll('*', '')
+            .split(/\s*(?:and|or)\s*/)
+            .map((t) => t.trim())
+            .filter(Boolean);
           const hits = pulls.filter((p) => {
             const hay = `${p.title} ${p.body ?? ''}`.toLowerCase();
             return tokens.every((t) => hay.includes(t));
@@ -64,7 +73,7 @@ describe('SearchDAO.searchPulls', () => {
   it('falls back to LIKE without FTS5 and scopes by repo', async () => {
     const dao = new SearchDAO(createPullSearchFakeDb({ pulls: PULLS }));
     expect((await dao.searchPulls('threaded', {})).map((p) => p.number)).toEqual([1]);
-    expect((await dao.searchPulls('threaded', { repoId: 'other' }))).toEqual([]);
+    expect(await dao.searchPulls('threaded', { repoId: 'other' })).toEqual([]);
     expect(await dao.searchPulls('   ', {})).toEqual([]);
   });
 

@@ -92,7 +92,12 @@ export function CommitView({
 
   return (
     <div>
-      <RepoHeader repo={repoData} activeTab="code" showSettings={false} onTabChange={(id: RepoTab) => navigate(`/${owner}/${repo}${id === 'code' ? '' : `?tab=${id}`}`)} />
+      <RepoHeader
+        repo={repoData}
+        activeTab="code"
+        showSettings={false}
+        onTabChange={(id: RepoTab) => navigate(`/${owner}/${repo}${id === 'code' ? '' : `?tab=${id}`}`)}
+      />
       <AppPage>
         <Link className="text-sm text-[var(--color-accent)] hover:underline" to={`/${owner}/${repo}/commits`}>
           {t('commits.backToHistory', 'Back To History')}

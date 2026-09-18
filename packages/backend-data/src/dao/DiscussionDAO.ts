@@ -84,7 +84,9 @@ class DiscussionDAO extends BaseDAO {
     await this.withRetry(
       () =>
         this.database
-          .prepare('INSERT INTO discussion_categories (id, repository_id, slug, title, description, kind, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+          .prepare(
+            'INSERT INTO discussion_categories (id, repository_id, slug, title, description, kind, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          )
           .bind(input.id, input.repositoryId, input.slug, input.title, input.description, input.kind, input.now)
           .run(),
       'create discussion category',
@@ -192,7 +194,11 @@ class DiscussionDAO extends BaseDAO {
     );
   }
 
-  public async updateDiscussion(id: string, patch: { title?: string; body?: string | null; categoryId?: string | null }, now: number): Promise<void> {
+  public async updateDiscussion(
+    id: string,
+    patch: { title?: string; body?: string | null; categoryId?: string | null },
+    now: number,
+  ): Promise<void> {
     const sets: string[] = [];
     const values: Array<string | null> = [];
     if (patch.title !== undefined) {
@@ -210,13 +216,21 @@ class DiscussionDAO extends BaseDAO {
     if (sets.length === 0) return;
     sets.push('updated_at = ?');
     await this.withRetry(
-      () => this.database.prepare(`UPDATE discussions SET ${sets.join(', ')} WHERE id = ?`).bind(...values, now, id).run(),
+      () =>
+        this.database
+          .prepare(`UPDATE discussions SET ${sets.join(', ')} WHERE id = ?`)
+          .bind(...values, now, id)
+          .run(),
       'update discussion',
     );
   }
 
   public async deleteDiscussion(id: string): Promise<void> {
-    await this.database.prepare('DELETE FROM discussion_comments WHERE discussion_id = ?').bind(id).run().catch(() => undefined);
+    await this.database
+      .prepare('DELETE FROM discussion_comments WHERE discussion_id = ?')
+      .bind(id)
+      .run()
+      .catch(() => undefined);
     await this.withRetry(() => this.database.prepare('DELETE FROM discussions WHERE id = ?').bind(id).run(), 'delete discussion');
   }
 
@@ -224,7 +238,9 @@ class DiscussionDAO extends BaseDAO {
     await this.withRetry(
       () =>
         this.database
-          .prepare('INSERT INTO discussion_comments (id, discussion_id, author_email, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
+          .prepare(
+            'INSERT INTO discussion_comments (id, discussion_id, author_email, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+          )
           .bind(input.id, input.discussionId, input.authorEmail, input.body, input.now, input.now)
           .run(),
       'create discussion comment',
@@ -250,7 +266,11 @@ class DiscussionDAO extends BaseDAO {
 
   public async updateComment(id: string, discussionId: string, body: string, now: number): Promise<void> {
     await this.withRetry(
-      () => this.database.prepare('UPDATE discussion_comments SET body = ?, updated_at = ? WHERE id = ? AND discussion_id = ?').bind(body, now, id, discussionId).run(),
+      () =>
+        this.database
+          .prepare('UPDATE discussion_comments SET body = ?, updated_at = ? WHERE id = ? AND discussion_id = ?')
+          .bind(body, now, id, discussionId)
+          .run(),
       'update discussion comment',
     );
   }
@@ -267,7 +287,11 @@ class DiscussionDAO extends BaseDAO {
     for (const row of rows) {
       await this.deleteDiscussion(row.id).catch(() => undefined);
     }
-    await this.database.prepare('DELETE FROM discussion_categories WHERE repository_id = ?').bind(repositoryId).run().catch(() => undefined);
+    await this.database
+      .prepare('DELETE FROM discussion_categories WHERE repository_id = ?')
+      .bind(repositoryId)
+      .run()
+      .catch(() => undefined);
   }
 }
 

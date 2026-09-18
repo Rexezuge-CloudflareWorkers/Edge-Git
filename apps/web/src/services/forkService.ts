@@ -42,7 +42,11 @@ async function tryAuthedFirst<T>(authedPath: string, publicPath: string, isAuthe
   }
 }
 
-export async function listForks(owner: string, repo: string, opts?: { isAuthed?: boolean | null }): Promise<{ forks: Repo[]; count: number }> {
+export async function listForks(
+  owner: string,
+  repo: string,
+  opts?: { isAuthed?: boolean | null },
+): Promise<{ forks: Repo[]; count: number }> {
   const data = await tryAuthedFirst<{ forks?: Repo[]; count?: number }>(authedForks(owner, repo), publicForks(owner, repo), opts?.isAuthed);
   return { forks: data.forks ?? [], count: data.count ?? data.forks?.length ?? 0 };
 }

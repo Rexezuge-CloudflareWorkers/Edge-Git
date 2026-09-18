@@ -39,9 +39,7 @@ describe('social lifecycle on real D1', () => {
   it('stars and unstars idempotently with public counts', async () => {
     const before = await body<{ count: number; viewerStarred: boolean }>(await api(`/repos/${OWNER}/${REPO}/stars`));
     expect(before.count).toBe(0);
-    const starred = await body<{ starred: boolean; starsCount: number }>(
-      await api(`/user/repos/${OWNER}/${REPO}/star`, { method: 'PUT' }),
-    );
+    const starred = await body<{ starred: boolean; starsCount: number }>(await api(`/user/repos/${OWNER}/${REPO}/star`, { method: 'PUT' }));
     expect(starred).toMatchObject({ starred: true, starsCount: 1 });
     // Second star is a no-op (INSERT OR IGNORE).
     await api(`/user/repos/${OWNER}/${REPO}/star`, { method: 'PUT' });
@@ -49,7 +47,9 @@ describe('social lifecycle on real D1', () => {
     expect(pub.count).toBe(1);
     const mine = await body<{ repos: Array<{ name: string }> }>(await api('/user/stars'));
     expect(mine.repos.map((r) => r.name)).toContain(REPO);
-    const unstarred = await body<{ starred: boolean; starsCount: number }>(await api(`/user/repos/${OWNER}/${REPO}/star`, { method: 'DELETE' }));
+    const unstarred = await body<{ starred: boolean; starsCount: number }>(
+      await api(`/user/repos/${OWNER}/${REPO}/star`, { method: 'DELETE' }),
+    );
     expect(unstarred).toMatchObject({ starred: false, starsCount: 0 });
   });
 
@@ -63,21 +63,34 @@ describe('social lifecycle on real D1', () => {
 
   it('fans out issue notifications to watchers but not the actor', async () => {
     const db = (env as unknown as TestEnv).DB;
-    const repo = (await db.prepare('SELECT id FROM repositories WHERE owner = ? AND name = ?').bind(OWNER, REPO).first<{ id: string }>()) as { id: string };
+    const repo = (await db
+      .prepare('SELECT id FROM repositories WHERE owner = ? AND name = ?')
+      .bind(OWNER, REPO)
+      .first<{ id: string }>()) as { id: string };
     const now = Math.floor(Date.now() / 1000);
     await db.prepare('INSERT OR IGNORE INTO users (email, created_at) VALUES (?, ?)').bind(FRIEND, now).run();
-    await db.prepare('INSERT OR IGNORE INTO repo_watches (repo_id, user_email, created_at) VALUES (?, ?, ?)').bind(repo.id, FRIEND, now).run();
+    await db
+      .prepare('INSERT OR IGNORE INTO repo_watches (repo_id, user_email, created_at) VALUES (?, ?, ?)')
+      .bind(repo.id, FRIEND, now)
+      .run();
     const created = await body<{ number: number }>(
-      await api(`/user/repos/${OWNER}/${REPO}/issues`, json({ method: 'POST', body: JSON.stringify({ title: 'Hello @nobody-here', body: 'cc' }) })),
+      await api(
+        `/user/repos/${OWNER}/${REPO}/issues`,
+        json({ method: 'POST', body: JSON.stringify({ title: 'Hello @nobody-here', body: 'cc' }) }),
+      ),
     );
-    const activity = await body<{ events: Array<{ type: string; subject_number: number | null }> }>(await api(`/repos/${OWNER}/${REPO}/activity`));
+    const activity = await body<{ events: Array<{ type: string; subject_number: number | null }> }>(
+      await api(`/repos/${OWNER}/${REPO}/activity`),
+    );
     const opened = activity.events.find((e) => e.type === 'issue_opened');
     expect(opened?.subject_number).toBe(created.number);
     // Actor (test user) is excluded from their own fan-out.
     const inbox = await body<{ unreadCount: number }>(await api('/user/notifications'));
     expect(inbox.unreadCount).toBe(0);
     // The D1-backed watcher got exactly one unread notification.
-    const rows = (await db.prepare('SELECT * FROM notifications WHERE user_email = ?').bind(FRIEND).all()).results as Array<{ is_read: number }>;
+    const rows = (await db.prepare('SELECT * FROM notifications WHERE user_email = ?').bind(FRIEND).all()).results as Array<{
+      is_read: number;
+    }>;
     expect(rows).toHaveLength(1);
     expect(rows[0].is_read).toBe(0);
   });
@@ -87,7 +100,9 @@ describe('social lifecycle on real D1', () => {
     const now = Math.floor(Date.now() / 1000);
     const id = crypto.randomUUID();
     await db
-      .prepare("INSERT OR IGNORE INTO notifications (id, user_email, repository_id, full_name, actor_email, type, title, is_read, created_at) VALUES (?, ?, NULL, ?, ?, 'issue_opened', 'Seeded', 0, ?)")
+      .prepare(
+        "INSERT OR IGNORE INTO notifications (id, user_email, repository_id, full_name, actor_email, type, title, is_read, created_at) VALUES (?, ?, NULL, ?, ?, 'issue_opened', 'Seeded', 0, ?)",
+      )
       .bind(id, USER, `${OWNER}/${REPO}`, FRIEND, now)
       .run();
     const list = await body<{ notifications: Array<{ id: string }>; unreadCount: number }>(await api('/user/notifications?unreadOnly=1'));

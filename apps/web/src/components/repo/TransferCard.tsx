@@ -2,7 +2,17 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Download, RefreshCw } from 'lucide-react';
 import type { RepoImportJob, RepoMirror } from '../../types';
-import { cancelImport, deleteMirror, exportRepo, getImport, getMirror, putMirror, setMirrorEnabled, startImport, syncMirror } from '../../services/transferService';
+import {
+  cancelImport,
+  deleteMirror,
+  exportRepo,
+  getImport,
+  getMirror,
+  putMirror,
+  setMirrorEnabled,
+  startImport,
+  syncMirror,
+} from '../../services/transferService';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Input, Label, Select } from '../ui/Input';
@@ -34,7 +44,15 @@ function base64ToBytes(base64: string): Uint8Array {
   return bytes;
 }
 
-export function TransferCard({ owner, repo, showNotice }: { owner: string; repo: string; showNotice: (type: 'success' | 'error', text: string) => void }) {
+export function TransferCard({
+  owner,
+  repo,
+  showNotice,
+}: {
+  owner: string;
+  repo: string;
+  showNotice: (type: 'success' | 'error', text: string) => void;
+}) {
   const { t } = useTranslation();
   const [sourceUrl, setSourceUrl] = useState('');
   const [job, setJob] = useState<RepoImportJob | null>(null);
@@ -194,10 +212,15 @@ export function TransferCard({ owner, repo, showNotice }: { owner: string; repo:
               {t('transfer.startImport', 'Start Import')}
             </Button>
           </div>
-          <p className="text-xs text-[var(--color-text-muted)]">{t('transfer.importHint', 'HTTPS Public Repos Only. Targets Empty Repositories. No Credentials Stored.')}</p>
+          <p className="text-xs text-[var(--color-text-muted)]">
+            {t('transfer.importHint', 'HTTPS Public Repos Only. Targets Empty Repositories. No Credentials Stored.')}
+          </p>
           {job && (
             <div className="text-sm text-[var(--color-text-secondary)]">
-              <ReadOnlyField label={t('transfer.importStatus', 'Latest Import Status')} value={`${job.status}${job.error ? ` — ${job.error}` : ''}${job.status === 'done' ? ` (${job.importedRefs} refs)` : ''}`} />
+              <ReadOnlyField
+                label={t('transfer.importStatus', 'Latest Import Status')}
+                value={`${job.status}${job.error ? ` — ${job.error}` : ''}${job.status === 'done' ? ` (${job.importedRefs} refs)` : ''}`}
+              />
               {jobActive && (
                 <Button variant="danger" size="sm" onClick={() => void cancel()} className="mt-2">
                   {t('transfer.cancelImport', 'Cancel Import')}
@@ -213,7 +236,11 @@ export function TransferCard({ owner, repo, showNotice }: { owner: string; repo:
             <div className="flex-1 min-w-48">
               <Input placeholder="https://github.com/owner/repo" value={mirrorUrl} onChange={(e) => setMirrorUrl(e.target.value)} />
             </div>
-            <Select aria-label={t('transfer.interval', 'Interval')} value={intervalMinutes} onChange={(e) => setIntervalMinutes(Number(e.target.value))}>
+            <Select
+              aria-label={t('transfer.interval', 'Interval')}
+              value={intervalMinutes}
+              onChange={(e) => setIntervalMinutes(Number(e.target.value))}
+            >
               {MIRROR_INTERVALS.map((m) => (
                 <option key={m} value={m}>
                   {intervalLabel(m)}
@@ -227,8 +254,12 @@ export function TransferCard({ owner, repo, showNotice }: { owner: string; repo:
           {mirror && (
             <div className="flex items-center gap-2 flex-wrap text-sm text-[var(--color-text-secondary)]">
               <span>
-                {mirror.enabled ? t('transfer.mirrorOn', 'Mirror Enabled.') : t('transfer.mirrorOff', 'Mirror Disabled (Auto-Disabled After Repeated Failures).')}
-                {mirror.lastRunAt ? ` ${t('transfer.lastRun', 'Last Run:')} ${new Date(mirror.lastRunAt * 1000).toLocaleString()} (${mirror.lastStatus ?? '—'})` : ''}
+                {mirror.enabled
+                  ? t('transfer.mirrorOn', 'Mirror Enabled.')
+                  : t('transfer.mirrorOff', 'Mirror Disabled (Auto-Disabled After Repeated Failures).')}
+                {mirror.lastRunAt
+                  ? ` ${t('transfer.lastRun', 'Last Run:')} ${new Date(mirror.lastRunAt * 1000).toLocaleString()} (${mirror.lastStatus ?? '—'})`
+                  : ''}
                 {mirror.lastError ? ` — ${mirror.lastError}` : ''}
               </span>
               <Button size="sm" variant="secondary" onClick={() => void syncNow()}>
@@ -253,7 +284,9 @@ export function TransferCard({ owner, repo, showNotice }: { owner: string; repo:
               {t('transfer.downloadExport', 'Download Export')}
             </Button>
           </div>
-          <p className="text-xs text-[var(--color-text-muted)]">{t('transfer.exportHint', 'Bounded Size. Restore With git unpack-objects + update-ref.')}</p>
+          <p className="text-xs text-[var(--color-text-muted)]">
+            {t('transfer.exportHint', 'Bounded Size. Restore With git unpack-objects + update-ref.')}
+          </p>
         </div>
       </div>
     </Card>

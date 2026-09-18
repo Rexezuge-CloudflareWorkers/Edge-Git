@@ -29,22 +29,24 @@ function createApiFakeDb() {
           );
         }
         if (q.includes('FROM users WHERE email = ?') || q.includes('FROM users WHERE lower(email)')) {
-          return Promise.resolve((state.users.find((u) => String(u.email).toLowerCase() === String(params[0]).toLowerCase()) ?? null) as T | null);
+          return Promise.resolve(
+            (state.users.find((u) => String(u.email).toLowerCase() === String(params[0]).toLowerCase()) ?? null) as T | null,
+          );
         }
         if (q.includes('COALESCE(MAX(number)')) {
           const max = state.issues.filter((i) => i.repository_id === params[0]).reduce((m, i) => Math.max(m, i.number as number), 0);
           return Promise.resolve({ max_n: max } as unknown as T);
         }
         if (q.includes('FROM issues WHERE repository_id = ? AND number = ?')) {
-          return Promise.resolve(
-            (state.issues.find((i) => i.repository_id === params[0] && i.number === params[1]) ?? null) as T | null,
-          );
+          return Promise.resolve((state.issues.find((i) => i.repository_id === params[0] && i.number === params[1]) ?? null) as T | null);
         }
         return Promise.resolve(null);
       },
       all<T>(): Promise<{ results: T[] }> {
         if (q.includes('FROM repositories WHERE owner_email = ?') || q.includes('FROM repositories WHERE lower(owner_email)')) {
-          return Promise.resolve({ results: state.repos.filter((r) => String(r.owner_email).toLowerCase() === String(params[0]).toLowerCase()) as T[] });
+          return Promise.resolve({
+            results: state.repos.filter((r) => String(r.owner_email).toLowerCase() === String(params[0]).toLowerCase()) as T[],
+          });
         }
         if (q.includes('FROM issues WHERE repository_id = ?')) {
           return Promise.resolve({
@@ -193,9 +195,7 @@ function createStub() {
       return Promise.resolve({ ok: true, commitOid: 'c'.repeat(40), created, deleted: args.content === null });
     },
     getTags: () =>
-      Promise.resolve([
-        { name: 'v1.0.0', ref: 'refs/tags/v1.0.0', oid: 'b'.repeat(40), peeledOid: null, type: 'lightweight' as const },
-      ]),
+      Promise.resolve([{ name: 'v1.0.0', ref: 'refs/tags/v1.0.0', oid: 'b'.repeat(40), peeledOid: null, type: 'lightweight' as const }]),
     getTree: () => Promise.resolve([]),
     getBlob: () => Promise.resolve(null),
     getCommits: () => Promise.resolve([]),
@@ -246,11 +246,16 @@ describe('EdgeGitWorker HTTP surface', () => {
     const worker = new EdgeGitWorker() as unknown as { onRequest(r: Request, e: unknown, c: unknown): Promise<Response> };
     const db = createApiFakeDb();
     const env = createEnv(db);
-    const call = (path: string, init?: RequestInit): Promise<Response> => worker.onRequest(new Request(`https://git.example.com${path}`, init), env, ctx);
+    const call = (path: string, init?: RequestInit): Promise<Response> =>
+      worker.onRequest(new Request(`https://git.example.com${path}`, init), env, ctx);
 
     await expect(call('/user/me').then((r) => r.json())).resolves.toMatchObject({ email: 'alice@example.com' });
 
-    const created = await call('/user/repos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'demo' }) });
+    const created = await call('/user/repos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'demo' }),
+    });
     expect(created.status).toBe(201);
     await expect(call('/user/repos').then((r) => r.json())).resolves.toMatchObject({ repos: [{ name: 'demo' }] });
     expect((await call('/user/repos/alice/demo')).status).toBe(200);
@@ -307,16 +312,28 @@ describe('EdgeGitWorker HTTP surface', () => {
     const db = createApiFakeDb();
     const env = createEnv(db);
     await worker.onRequest(
-      new Request('https://git.example.com/user/repos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'pub' }) }),
+      new Request('https://git.example.com/user/repos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'pub' }),
+      }),
       env,
       ctx,
     );
     const refs = await worker.onRequest(new Request('https://git.example.com/alice/pub/info/refs?service=git-upload-pack'), env, ctx);
     expect(refs.status).toBe(200);
     expect((await worker.onRequest(new Request('https://git.example.com/alice/pub/info/refs?service=nope'), env, ctx)).status).toBe(400);
-    expect((await worker.onRequest(new Request('https://git.example.com/alice/pub/info/refs?service=git-receive-pack'), env, ctx)).status).toBe(401);
-    expect((await worker.onRequest(new Request('https://git.example.com/alice/missing/info/refs?service=git-upload-pack'), env, ctx)).status).toBe(401);
-    const pack = await worker.onRequest(new Request('https://git.example.com/alice/pub/git-upload-pack', { method: 'POST', body: new Uint8Array([1]) }), env, ctx);
+    expect(
+      (await worker.onRequest(new Request('https://git.example.com/alice/pub/info/refs?service=git-receive-pack'), env, ctx)).status,
+    ).toBe(401);
+    expect(
+      (await worker.onRequest(new Request('https://git.example.com/alice/missing/info/refs?service=git-upload-pack'), env, ctx)).status,
+    ).toBe(401);
+    const pack = await worker.onRequest(
+      new Request('https://git.example.com/alice/pub/git-upload-pack', { method: 'POST', body: new Uint8Array([1]) }),
+      env,
+      ctx,
+    );
     expect(pack.status).toBe(200);
   });
 
@@ -326,7 +343,8 @@ describe('EdgeGitWorker HTTP surface', () => {
     const env = createEnv(db);
     const bobEnv = { ...env, DEV_AUTH_EMAIL: 'bob@example.com' };
     const json = { 'Content-Type': 'application/json' };
-    const call = (path: string, init?: RequestInit): Promise<Response> => worker.onRequest(new Request(`https://git.example.com${path}`, init), env, ctx);
+    const call = (path: string, init?: RequestInit): Promise<Response> =>
+      worker.onRequest(new Request(`https://git.example.com${path}`, init), env, ctx);
     const callAsBob = (path: string, init?: RequestInit): Promise<Response> =>
       worker.onRequest(new Request(`https://git.example.com${path}`, init), bobEnv, ctx);
 
@@ -342,21 +360,24 @@ describe('EdgeGitWorker HTTP surface', () => {
 
     expect((await call('/user/repos/alice/mine', { method: 'PATCH', headers: json, body: JSON.stringify({}) })).status).toBe(400);
     expect(
-      (await call('/user/repos/alice/mine', { method: 'PATCH', headers: json, body: JSON.stringify({ description: 'x'.repeat(501) }) })).status,
+      (await call('/user/repos/alice/mine', { method: 'PATCH', headers: json, body: JSON.stringify({ description: 'x'.repeat(501) }) }))
+        .status,
     ).toBe(400);
-    expect((await call('/user/repos/alice/missing', { method: 'PATCH', headers: json, body: JSON.stringify({ description: 'y' }) })).status).toBe(
-      404,
-    );
+    expect(
+      (await call('/user/repos/alice/missing', { method: 'PATCH', headers: json, body: JSON.stringify({ description: 'y' }) })).status,
+    ).toBe(404);
 
-    expect((await callAsBob('/user/repos/alice/mine', { method: 'PATCH', headers: json, body: JSON.stringify({ description: 'hijack' }) })).status).toBe(
-      404,
-    );
+    expect(
+      (await callAsBob('/user/repos/alice/mine', { method: 'PATCH', headers: json, body: JSON.stringify({ description: 'hijack' }) }))
+        .status,
+    ).toBe(404);
     expect((await call('/user/repos', { method: 'POST', headers: json, body: JSON.stringify({ name: 'ours' }) })).status).toBe(201);
     await expect(callAsBob('/user/repos/alice/ours').then((r) => r.json())).resolves.toMatchObject({ viewerCanManage: false });
     // Public repo reveals existence: non-admin gets 403 on write.
-    expect((await callAsBob('/user/repos/alice/ours', { method: 'PATCH', headers: json, body: JSON.stringify({ description: 'hijack' }) })).status).toBe(
-      403,
-    );
+    expect(
+      (await callAsBob('/user/repos/alice/ours', { method: 'PATCH', headers: json, body: JSON.stringify({ description: 'hijack' }) }))
+        .status,
+    ).toBe(403);
     // Private repo hides existence from outsiders.
     expect((await callAsBob('/user/repos/alice/mine', { method: 'DELETE' })).status).toBe(404);
 
@@ -378,7 +399,8 @@ describe('EdgeGitWorker HTTP surface', () => {
     const bobEnv = { ...env, DEV_AUTH_EMAIL: 'bob@example.com' };
     const anonEnv = { ...env, DEV_AUTH_EMAIL: undefined };
     const json = { 'Content-Type': 'application/json' };
-    const call = (path: string, init?: RequestInit): Promise<Response> => worker.onRequest(new Request(`https://git.example.com${path}`, init), env, ctx);
+    const call = (path: string, init?: RequestInit): Promise<Response> =>
+      worker.onRequest(new Request(`https://git.example.com${path}`, init), env, ctx);
     const callAsBob = (path: string, init?: RequestInit): Promise<Response> =>
       worker.onRequest(new Request(`https://git.example.com${path}`, init), bobEnv, ctx);
     const callAnon = (path: string, init?: RequestInit): Promise<Response> =>
@@ -386,8 +408,13 @@ describe('EdgeGitWorker HTTP surface', () => {
 
     expect((await call('/user/repos', { method: 'POST', headers: json, body: JSON.stringify({ name: 'demo' }) })).status).toBe(201);
     expect(
-      (await call('/user/repos/alice/demo/issues', { method: 'POST', headers: json, body: JSON.stringify({ title: 'Bug', body: '**bold**' }) }))
-        .status,
+      (
+        await call('/user/repos/alice/demo/issues', {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ title: 'Bug', body: '**bold**' }),
+        })
+      ).status,
     ).toBe(201);
 
     await expect(call('/user/repos/alice/demo/issues/1').then((r) => r.json())).resolves.toMatchObject({ issue: { number: 1 } });
@@ -409,27 +436,39 @@ describe('EdgeGitWorker HTTP surface', () => {
       comments: [{ body: 'first' }],
     });
     expect(
-      (await call('/user/repos/alice/demo/issues/1/comments', { method: 'POST', headers: json, body: JSON.stringify({ body: '   ' }) })).status,
+      (await call('/user/repos/alice/demo/issues/1/comments', { method: 'POST', headers: json, body: JSON.stringify({ body: '   ' }) }))
+        .status,
     ).toBe(400);
-    expect((await call('/user/repos/alice/demo/issues/99/comments', { method: 'POST', headers: json, body: JSON.stringify({ body: 'x' }) })).status).toBe(
-      404,
-    );
+    expect(
+      (await call('/user/repos/alice/demo/issues/99/comments', { method: 'POST', headers: json, body: JSON.stringify({ body: 'x' }) }))
+        .status,
+    ).toBe(404);
 
-    const closed = await call('/user/repos/alice/demo/issues/1', { method: 'PATCH', headers: json, body: JSON.stringify({ status: 'closed' }) });
+    const closed = await call('/user/repos/alice/demo/issues/1', {
+      method: 'PATCH',
+      headers: json,
+      body: JSON.stringify({ status: 'closed' }),
+    });
     expect(closed.status).toBe(200);
     await expect(closed.json()).resolves.toMatchObject({ issue: { status: 'closed' } });
     await expect(callAnon('/repos/alice/demo/issues/1').then((r) => r.json())).resolves.toMatchObject({ issue: { status: 'closed' } });
-    const reopened = await call('/user/repos/alice/demo/issues/1', { method: 'PATCH', headers: json, body: JSON.stringify({ status: 'open' }) });
+    const reopened = await call('/user/repos/alice/demo/issues/1', {
+      method: 'PATCH',
+      headers: json,
+      body: JSON.stringify({ status: 'open' }),
+    });
     expect(reopened.status).toBe(200);
 
-    expect((await call('/user/repos/alice/demo/issues/1', { method: 'PATCH', headers: json, body: JSON.stringify({ status: 'bogus' }) })).status).toBe(
-      400,
-    );
-    expect((await call('/user/repos/alice/demo/issues/99', { method: 'PATCH', headers: json, body: JSON.stringify({ status: 'closed' }) })).status).toBe(
-      404,
-    );
     expect(
-      (await callAsBob('/user/repos/alice/demo/issues/1', { method: 'PATCH', headers: json, body: JSON.stringify({ status: 'closed' }) })).status,
+      (await call('/user/repos/alice/demo/issues/1', { method: 'PATCH', headers: json, body: JSON.stringify({ status: 'bogus' }) })).status,
+    ).toBe(400);
+    expect(
+      (await call('/user/repos/alice/demo/issues/99', { method: 'PATCH', headers: json, body: JSON.stringify({ status: 'closed' }) }))
+        .status,
+    ).toBe(404);
+    expect(
+      (await callAsBob('/user/repos/alice/demo/issues/1', { method: 'PATCH', headers: json, body: JSON.stringify({ status: 'closed' }) }))
+        .status,
     ).toBe(403);
   });
 
@@ -459,7 +498,13 @@ describe('EdgeGitWorker HTTP surface', () => {
       (await authed('/user/repos', { method: 'POST', headers: json, body: JSON.stringify({ name: 'sec', isPrivate: true }) })).status,
     ).toBe(201);
 
-    for (const path of ['/repos/alice/pub', '/repos/alice/pub/branches', '/repos/alice/pub/tree', '/repos/alice/pub/commits', '/repos/alice/pub/issues']) {
+    for (const path of [
+      '/repos/alice/pub',
+      '/repos/alice/pub/branches',
+      '/repos/alice/pub/tree',
+      '/repos/alice/pub/commits',
+      '/repos/alice/pub/issues',
+    ]) {
       expect(await anon(path).then((r) => r.status)).toBe(200);
     }
     await expect(anon('/repos/alice/pub/overview').then((r) => r.json())).resolves.toMatchObject({
@@ -492,7 +537,11 @@ describe('EdgeGitWorker HTTP surface', () => {
     const authedEnv = createEnv(db);
     const anonEnv = { ...authedEnv, DEV_AUTH_EMAIL: undefined };
     await worker.onRequest(
-      new Request('https://git.example.com/user/repos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'pub' }) }),
+      new Request('https://git.example.com/user/repos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'pub' }),
+      }),
       authedEnv,
       ctx,
     );
@@ -511,7 +560,11 @@ describe('EdgeGitWorker HTTP surface', () => {
     const authedEnv = createEnv(db);
     const anonEnv = { ...authedEnv, DEV_AUTH_EMAIL: undefined };
     await worker.onRequest(
-      new Request('https://git.example.com/user/repos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'pub' }) }),
+      new Request('https://git.example.com/user/repos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'pub' }),
+      }),
       authedEnv,
       ctx,
     );
@@ -529,7 +582,11 @@ describe('EdgeGitWorker HTTP surface', () => {
     const authedEnv = createEnv(db);
     const anonEnv = { ...authedEnv, DEV_AUTH_EMAIL: undefined };
     await worker.onRequest(
-      new Request('https://git.example.com/user/repos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'pub' }) }),
+      new Request('https://git.example.com/user/repos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'pub' }),
+      }),
       authedEnv,
       ctx,
     );
@@ -546,13 +603,18 @@ describe('EdgeGitWorker HTTP surface', () => {
     const env = createEnv(db);
     const bobEnv = { ...env, DEV_AUTH_EMAIL: 'bob@example.com' };
     const json = { 'Content-Type': 'application/json' };
-    const call = (path: string, init?: RequestInit): Promise<Response> => worker.onRequest(new Request(`https://git.example.com${path}`, init), env, ctx);
+    const call = (path: string, init?: RequestInit): Promise<Response> =>
+      worker.onRequest(new Request(`https://git.example.com${path}`, init), env, ctx);
     const callAsBob = (path: string, init?: RequestInit): Promise<Response> =>
       worker.onRequest(new Request(`https://git.example.com${path}`, init), bobEnv, ctx);
 
     expect((await call('/user/repos', { method: 'POST', headers: json, body: JSON.stringify({ name: 'demo' }) })).status).toBe(201);
 
-    const created = await call('/user/repos/alice/demo/branches', { method: 'POST', headers: json, body: JSON.stringify({ name: 'feature' }) });
+    const created = await call('/user/repos/alice/demo/branches', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ name: 'feature' }),
+    });
     expect(created.status).toBe(201);
     await expect(created.json()).resolves.toMatchObject({ ok: true, ref: 'refs/heads/feature' });
 
@@ -560,21 +622,33 @@ describe('EdgeGitWorker HTTP surface', () => {
     expect(
       (await call('/user/repos/alice/demo/branches', { method: 'POST', headers: json, body: JSON.stringify({ name: 'taken' }) })).status,
     ).toBe(409);
-    expect((await callAsBob('/user/repos/alice/demo/branches', { method: 'POST', headers: json, body: JSON.stringify({ name: 'x' }) })).status).toBe(
-      403,
-    );
+    expect(
+      (await callAsBob('/user/repos/alice/demo/branches', { method: 'POST', headers: json, body: JSON.stringify({ name: 'x' }) })).status,
+    ).toBe(403);
 
     expect((await call('/user/repos/alice/demo/branches?branch=feature', { method: 'DELETE' })).status).toBe(200);
     expect((await call('/user/repos/alice/demo/branches?branch=main', { method: 'DELETE' })).status).toBe(409);
     expect((await call('/user/repos/alice/demo/branches', { method: 'DELETE' })).status).toBe(400);
 
-    const moved = await call('/user/repos/alice/demo/branches/default', { method: 'PATCH', headers: json, body: JSON.stringify({ branch: 'feature' }) });
+    const moved = await call('/user/repos/alice/demo/branches/default', {
+      method: 'PATCH',
+      headers: json,
+      body: JSON.stringify({ branch: 'feature' }),
+    });
     expect(moved.status).toBe(200);
     await expect(moved.json()).resolves.toMatchObject({ ok: true, defaultBranch: 'feature' });
     expect(
-      (await callAsBob('/user/repos/alice/demo/branches/default', { method: 'PATCH', headers: json, body: JSON.stringify({ branch: 'feature' }) })).status,
+      (
+        await callAsBob('/user/repos/alice/demo/branches/default', {
+          method: 'PATCH',
+          headers: json,
+          body: JSON.stringify({ branch: 'feature' }),
+        })
+      ).status,
     ).toBe(403);
-    expect((await call('/user/repos/alice/demo/branches/default', { method: 'PATCH', headers: json, body: JSON.stringify({}) })).status).toBe(400);
+    expect(
+      (await call('/user/repos/alice/demo/branches/default', { method: 'PATCH', headers: json, body: JSON.stringify({}) })).status,
+    ).toBe(400);
   });
 
   it('edits files with write guards and concurrency checks', async () => {
@@ -583,7 +657,8 @@ describe('EdgeGitWorker HTTP surface', () => {
     const env = createEnv(db);
     const bobEnv = { ...env, DEV_AUTH_EMAIL: 'bob@example.com' };
     const json = { 'Content-Type': 'application/json' };
-    const call = (path: string, init?: RequestInit): Promise<Response> => worker.onRequest(new Request(`https://git.example.com${path}`, init), env, ctx);
+    const call = (path: string, init?: RequestInit): Promise<Response> =>
+      worker.onRequest(new Request(`https://git.example.com${path}`, init), env, ctx);
     const callAsBob = (path: string, init?: RequestInit): Promise<Response> =>
       worker.onRequest(new Request(`https://git.example.com${path}`, init), bobEnv, ctx);
     const toB64 = (text: string): string => btoa(String.fromCodePoint(...new TextEncoder().encode(text)));
@@ -607,8 +682,13 @@ describe('EdgeGitWorker HTTP surface', () => {
 
     expect((await call('/user/repos/alice/demo/contents', { method: 'POST', headers: json, body: JSON.stringify({}) })).status).toBe(400);
     expect(
-      (await call('/user/repos/alice/demo/contents', { method: 'POST', headers: json, body: JSON.stringify({ branch: 'main', path: 'x.txt', contentBase64: '!!!' }) }))
-        .status,
+      (
+        await call('/user/repos/alice/demo/contents', {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ branch: 'main', path: 'x.txt', contentBase64: '!!!' }),
+        })
+      ).status,
     ).toBe(400);
     expect(
       (
@@ -638,8 +718,13 @@ describe('EdgeGitWorker HTTP surface', () => {
       ).status,
     ).toBe(404);
     expect(
-      (await callAsBob('/user/repos/alice/demo/contents', { method: 'POST', headers: json, body: JSON.stringify({ branch: 'main', path: 'x.txt', contentBase64: toB64('x') }) }))
-        .status,
+      (
+        await callAsBob('/user/repos/alice/demo/contents', {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ branch: 'main', path: 'x.txt', contentBase64: toB64('x') }),
+        })
+      ).status,
     ).toBe(403);
 
     expect((await call('/user/repos/alice/demo/contents?branch=main&path=old.txt', { method: 'DELETE' })).status).toBe(200);
@@ -655,7 +740,15 @@ describe('scheduled tasks', () => {
     const env = { DB: db } as unknown as Env;
     const svc = new (await import('@edge-git/backend-services/auth')).TokenService({ DB: db });
     await svc.createToken('a@x.co', 't1');
-    db.tokens.push({ token_id: 'old', user_email: 'a@x.co', token_hash: 'h', name: 'old', expires_at: 1, last_used_at: null, created_at: 1 });
+    db.tokens.push({
+      token_id: 'old',
+      user_email: 'a@x.co',
+      token_hash: 'h',
+      name: 'old',
+      expires_at: 1,
+      last_used_at: null,
+      created_at: 1,
+    });
     await runScheduledTasks(env, '*/10 * * * *', Date.now());
     expect(db.tokens.some((t) => t.token_id === 'old')).toBe(false);
   });

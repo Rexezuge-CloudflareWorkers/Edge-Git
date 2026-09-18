@@ -50,7 +50,13 @@ function registerUserPullThreadRoutes(app: PullApp): void {
     if (!row) return c.json({ error: 'Not found' }, 404);
     const number = parsePullNumber(c.req.param('number'));
     if (number === null) return c.json({ error: 'Not found' }, 404);
-    const body = (await c.req.json().catch(() => ({}))) as { path?: string; line?: number | null; side?: string | null; commitOid?: string | null; body?: string };
+    const body = (await c.req.json().catch(() => ({}))) as {
+      path?: string;
+      line?: number | null;
+      side?: string | null;
+      commitOid?: string | null;
+      body?: string;
+    };
     try {
       const scope = createRequestScope(c.env);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
@@ -177,7 +183,10 @@ function registerUserPullThreadRoutes(app: PullApp): void {
         reason: body.reason ?? null,
       });
       try {
-        await scope.get(Tokens.CollaborationService).syncReviewerStatus(review.pull_request_id, review.author_email, 'pending').catch(() => undefined);
+        await scope
+          .get(Tokens.CollaborationService)
+          .syncReviewerStatus(review.pull_request_id, review.author_email, 'pending')
+          .catch(() => undefined);
       } catch {
         // best-effort reviewer status reset
       }

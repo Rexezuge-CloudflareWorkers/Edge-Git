@@ -476,7 +476,13 @@ export function CodeTab({
                   </Link>
                 </p>
                 <div className="mt-2">
-                  <ForkSyncButton owner={owner} repo={repo} upstreamFull={repoMeta.forkedFrom} branch={defaultBranch ?? 'main'} showNotice={showNotice} />
+                  <ForkSyncButton
+                    owner={owner}
+                    repo={repo}
+                    upstreamFull={repoMeta.forkedFrom}
+                    branch={defaultBranch ?? 'main'}
+                    showNotice={showNotice}
+                  />
                 </div>
               </>
             )}

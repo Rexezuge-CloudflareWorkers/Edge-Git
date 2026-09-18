@@ -55,7 +55,11 @@ class ActivityService {
     return { id };
   }
 
-  public async listByRepo(repositoryId: string, limit = 50, cursor?: string): Promise<{ events: RepoEventRow[]; nextCursor: string | null }> {
+  public async listByRepo(
+    repositoryId: string,
+    limit = 50,
+    cursor?: string,
+  ): Promise<{ events: RepoEventRow[]; nextCursor: string | null }> {
     const dao = await this.deps.eventDAO();
     return dao.listByRepo(repositoryId, Math.min(Math.max(limit, 1), 100), cursor);
   }

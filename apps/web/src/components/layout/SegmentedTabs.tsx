@@ -23,7 +23,11 @@ export function SegmentedTabs({
   ariaLabel?: string;
 }) {
   return (
-    <div aria-label={ariaLabel} role="tablist" className="flex items-center gap-1 rounded-lg bg-[var(--color-surface-2)] p-1 w-fit max-w-full overflow-x-auto">
+    <div
+      aria-label={ariaLabel}
+      role="tablist"
+      className="flex items-center gap-1 rounded-lg bg-[var(--color-surface-2)] p-1 w-fit max-w-full overflow-x-auto"
+    >
       {tabs.map((t) => (
         <button
           key={t.id}

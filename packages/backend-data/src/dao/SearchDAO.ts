@@ -52,15 +52,17 @@ class SearchDAO extends BaseDAO {
     const ftsQuery = tokens.map((t) => `"${t.replaceAll('"', '""')}"*`).join(' AND ');
     try {
       const result = await this.database
-        .prepare(
-          `SELECT r.* FROM repo_fts f JOIN repositories r ON r.id = f.repo_id WHERE repo_fts MATCH ? ORDER BY rank LIMIT ?`,
-        )
+        .prepare(`SELECT r.* FROM repo_fts f JOIN repositories r ON r.id = f.repo_id WHERE repo_fts MATCH ? ORDER BY rank LIMIT ?`)
         .bind(ftsQuery, limit)
         .all<RepositoryRow>();
       return result.results ?? [];
     } catch {
       // FTS5 unavailable — LIKE fallback over name/description/full name.
-      const likes = tokens.map(() => `(lower(owner) LIKE ? ESCAPE '!' OR lower(name) LIKE ? ESCAPE '!' OR lower(COALESCE(description, '')) LIKE ? ESCAPE '!')`).join(' AND ');
+      const likes = tokens
+        .map(
+          () => `(lower(owner) LIKE ? ESCAPE '!' OR lower(name) LIKE ? ESCAPE '!' OR lower(COALESCE(description, '')) LIKE ? ESCAPE '!')`,
+        )
+        .join(' AND ');
       const params: unknown[] = [];
       for (const t of tokens) {
         const pattern = `%${escapeLike(t.toLowerCase())}%`;
@@ -88,9 +90,8 @@ class SearchDAO extends BaseDAO {
       const base = opts.repoId
         ? `SELECT i.* FROM issue_fts f JOIN issues i ON i.id = f.issue_id WHERE issue_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
         : `SELECT i.* FROM issue_fts f JOIN issues i ON i.id = f.issue_id WHERE issue_fts MATCH ? ORDER BY rank LIMIT ?`;
-      const result = await (opts.repoId
-        ? this.database.prepare(base).bind(ftsQuery, opts.repoId, limit)
-        : this.database.prepare(base).bind(ftsQuery, limit)
+      const result = await (
+        opts.repoId ? this.database.prepare(base).bind(ftsQuery, opts.repoId, limit) : this.database.prepare(base).bind(ftsQuery, limit)
       ).all<IssueRow>();
       return result.results ?? [];
     } catch {
@@ -110,7 +111,10 @@ class SearchDAO extends BaseDAO {
           return result.results ?? [];
         }
         params.push(limit);
-        const result = await this.database.prepare(`SELECT * FROM issues WHERE ${likes} ORDER BY updated_at DESC LIMIT ?`).bind(...params).all<IssueRow>();
+        const result = await this.database
+          .prepare(`SELECT * FROM issues WHERE ${likes} ORDER BY updated_at DESC LIMIT ?`)
+          .bind(...params)
+          .all<IssueRow>();
         return result.results ?? [];
       } catch {
         return [];
@@ -127,9 +131,8 @@ class SearchDAO extends BaseDAO {
       const base = opts.repoId
         ? `SELECT p.* FROM pull_fts f JOIN pull_requests p ON p.id = f.pull_id WHERE pull_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
         : `SELECT p.* FROM pull_fts f JOIN pull_requests p ON p.id = f.pull_id WHERE pull_fts MATCH ? ORDER BY rank LIMIT ?`;
-      const result = await (opts.repoId
-        ? this.database.prepare(base).bind(ftsQuery, opts.repoId, limit)
-        : this.database.prepare(base).bind(ftsQuery, limit)
+      const result = await (
+        opts.repoId ? this.database.prepare(base).bind(ftsQuery, opts.repoId, limit) : this.database.prepare(base).bind(ftsQuery, limit)
       ).all<PullRequestRow>();
       return result.results ?? [];
     } catch {
@@ -148,7 +151,10 @@ class SearchDAO extends BaseDAO {
           return result.results ?? [];
         }
         params.push(limit);
-        const result = await this.database.prepare(`SELECT * FROM pull_requests WHERE ${likes} ORDER BY updated_at DESC LIMIT ?`).bind(...params).all<PullRequestRow>();
+        const result = await this.database
+          .prepare(`SELECT * FROM pull_requests WHERE ${likes} ORDER BY updated_at DESC LIMIT ?`)
+          .bind(...params)
+          .all<PullRequestRow>();
         return result.results ?? [];
       } catch {
         return [];
@@ -165,9 +171,8 @@ class SearchDAO extends BaseDAO {
       const base = opts.repoId
         ? `SELECT c.* FROM code_fts f JOIN code_index c ON c.repo_id = f.repo_id AND c.path = f.path WHERE code_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
         : `SELECT c.* FROM code_fts f JOIN code_index c ON c.repo_id = f.repo_id AND c.path = f.path WHERE code_fts MATCH ? ORDER BY rank LIMIT ?`;
-      const result = await (opts.repoId
-        ? this.database.prepare(base).bind(ftsQuery, opts.repoId, limit)
-        : this.database.prepare(base).bind(ftsQuery, limit)
+      const result = await (
+        opts.repoId ? this.database.prepare(base).bind(ftsQuery, opts.repoId, limit) : this.database.prepare(base).bind(ftsQuery, limit)
       ).all<CodeHit>();
       return result.results ?? [];
     } catch {
@@ -186,7 +191,10 @@ class SearchDAO extends BaseDAO {
           return result.results ?? [];
         }
         params.push(limit);
-        const result = await this.database.prepare(`SELECT * FROM code_index WHERE ${likes} ORDER BY updated_at DESC LIMIT ?`).bind(...params).all<CodeHit>();
+        const result = await this.database
+          .prepare(`SELECT * FROM code_index WHERE ${likes} ORDER BY updated_at DESC LIMIT ?`)
+          .bind(...params)
+          .all<CodeHit>();
         return result.results ?? [];
       } catch {
         return [];
@@ -214,7 +222,10 @@ class SearchDAO extends BaseDAO {
 
   public async deleteCodeFile(repoId: string, path: string): Promise<void> {
     try {
-      await this.withRetry(() => this.database.prepare('DELETE FROM code_index WHERE repo_id = ? AND path = ?').bind(repoId, path).run(), 'delete code index file');
+      await this.withRetry(
+        () => this.database.prepare('DELETE FROM code_index WHERE repo_id = ? AND path = ?').bind(repoId, path).run(),
+        'delete code index file',
+      );
     } catch {
       // ignore — table may not exist on old DBs
     }
@@ -222,7 +233,10 @@ class SearchDAO extends BaseDAO {
 
   public async deleteCodeByRepo(repoId: string): Promise<void> {
     try {
-      await this.withRetry(() => this.database.prepare('DELETE FROM code_index WHERE repo_id = ?').bind(repoId).run(), 'delete code index by repo');
+      await this.withRetry(
+        () => this.database.prepare('DELETE FROM code_index WHERE repo_id = ?').bind(repoId).run(),
+        'delete code index by repo',
+      );
     } catch {
       // ignore — table may not exist on old DBs
     }
@@ -237,9 +251,8 @@ class SearchDAO extends BaseDAO {
       const base = opts.repoId
         ? `SELECT d.* FROM discussion_fts f JOIN discussions d ON d.id = f.discussion_id WHERE discussion_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
         : `SELECT d.* FROM discussion_fts f JOIN discussions d ON d.id = f.discussion_id WHERE discussion_fts MATCH ? ORDER BY rank LIMIT ?`;
-      const result = await (opts.repoId
-        ? this.database.prepare(base).bind(ftsQuery, opts.repoId, limit)
-        : this.database.prepare(base).bind(ftsQuery, limit)
+      const result = await (
+        opts.repoId ? this.database.prepare(base).bind(ftsQuery, opts.repoId, limit) : this.database.prepare(base).bind(ftsQuery, limit)
       ).all<DiscussionRow>();
       return result.results ?? [];
     } catch {
@@ -258,7 +271,10 @@ class SearchDAO extends BaseDAO {
           return result.results ?? [];
         }
         params.push(limit);
-        const result = await this.database.prepare(`SELECT * FROM discussions WHERE ${likes} ORDER BY updated_at DESC LIMIT ?`).bind(...params).all<DiscussionRow>();
+        const result = await this.database
+          .prepare(`SELECT * FROM discussions WHERE ${likes} ORDER BY updated_at DESC LIMIT ?`)
+          .bind(...params)
+          .all<DiscussionRow>();
         return result.results ?? [];
       } catch {
         return [];
@@ -273,7 +289,9 @@ class SearchDAO extends BaseDAO {
     const ftsQuery = tokens.map((t) => `"${t.replaceAll('"', '""')}"*`).join(' AND ');
     try {
       const result = await this.database
-        .prepare(`SELECT s.* FROM snippet_fts f JOIN snippets s ON s.id = f.snippet_id WHERE snippet_fts MATCH ? AND s.visibility = 'public' ORDER BY rank LIMIT ?`)
+        .prepare(
+          `SELECT s.* FROM snippet_fts f JOIN snippets s ON s.id = f.snippet_id WHERE snippet_fts MATCH ? AND s.visibility = 'public' ORDER BY rank LIMIT ?`,
+        )
         .bind(ftsQuery, limit)
         .all<SnippetRow>();
       return result.results ?? [];

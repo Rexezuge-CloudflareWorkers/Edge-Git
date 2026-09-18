@@ -27,10 +27,9 @@ function resolveScope(c: RequestContext): ReturnType<typeof createRequestScope> 
 
 async function authenticateUserIdentity(c: RequestContext): Promise<string> {
   const scope = getScope(c);
-  const email = await scope.get(Tokens.AccessAuthService).getAuthenticatedUserEmail(
-    c.req.raw,
-    c.executionCtx as unknown as AccessIdentityContext,
-  );
+  const email = await scope
+    .get(Tokens.AccessAuthService)
+    .getAuthenticatedUserEmail(c.req.raw, c.executionCtx as unknown as AccessIdentityContext);
   await scope.get(Tokens.UserService).upsertUser(email);
   return email;
 }
@@ -68,7 +67,12 @@ async function resolvePatToEmail(c: RequestContext, pat: string): Promise<Authen
 // Deploy keys are per-repo git-only credentials. A valid key scoped to this
 // repo authenticates without a user identity (userEmail stays null, so push
 // activity attribution is skipped but the git operation proceeds).
-async function resolveDeployKey(c: RequestContext, key: string, repoId: string, service: 'git-upload-pack' | 'git-receive-pack'): Promise<'admin' | 'write' | 'read' | null> {
+async function resolveDeployKey(
+  c: RequestContext,
+  key: string,
+  repoId: string,
+  service: 'git-upload-pack' | 'git-receive-pack',
+): Promise<'admin' | 'write' | 'read' | null> {
   const scope = getScope(c);
   const found = await scope.get(Tokens.DeployKeyService).authenticateWithKey(key);
   if (!found || found.repositoryId !== repoId) return null;
@@ -190,7 +194,7 @@ async function activityAuditHandler(c: RequestContext, next: Next): Promise<Resp
     try {
       let email = 'unknown';
       try {
-        email = (c.get('AuthenticatedUserEmailAddress')) ?? 'unknown';
+        email = c.get('AuthenticatedUserEmailAddress') ?? 'unknown';
       } catch {
         email = 'unknown';
       }

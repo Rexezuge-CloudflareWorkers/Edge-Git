@@ -13,7 +13,14 @@ export async function listRules(owner: string, repo: string): Promise<BranchProt
 export async function createRule(
   owner: string,
   repo: string,
-  input: { pattern: string; requirePr?: boolean; requiredApprovals?: number; blockForcePush?: boolean; blockDeletion?: boolean; requireStatusChecks?: string[] },
+  input: {
+    pattern: string;
+    requirePr?: boolean;
+    requiredApprovals?: number;
+    blockForcePush?: boolean;
+    blockDeletion?: boolean;
+    requireStatusChecks?: string[];
+  },
 ): Promise<{ rule: BranchProtectionRule }> {
   return apiPost<{ rule: BranchProtectionRule }>(`${authedBase(owner, repo)}/rules`, input);
 }

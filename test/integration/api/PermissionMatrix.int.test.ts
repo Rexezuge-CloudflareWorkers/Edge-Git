@@ -25,7 +25,10 @@ describe('permission matrix on real D1 (git trust boundary)', () => {
     const testEnv = env as unknown as TestEnv;
     await setupIntegrationTest(testEnv, USER);
     await ensureUser(testEnv.DB, SECOND, 'second');
-    for (const [name, isPrivate] of [[PUB, false], [PRIV, true]] as const) {
+    for (const [name, isPrivate] of [
+      [PUB, false],
+      [PRIV, true],
+    ] as const) {
       const res = await api('/user/repos', json({ method: 'POST', body: JSON.stringify({ name, isPrivate }) }));
       expect([200, 201].includes(res.status)).toBe(true);
     }
@@ -52,7 +55,9 @@ describe('permission matrix on real D1 (git trust boundary)', () => {
 
   it('elevates the collaborator read → write via git gates', async () => {
     const testEnv = env as unknown as TestEnv;
-    const repoRow = (await testEnv.DB.prepare(`SELECT id FROM repositories WHERE owner_ci = ? AND name_ci = ?`).bind(OWNER, PRIV).first()) as unknown as {
+    const repoRow = (await testEnv.DB.prepare(`SELECT id FROM repositories WHERE owner_ci = ? AND name_ci = ?`)
+      .bind(OWNER, PRIV)
+      .first()) as unknown as {
       id: string;
     };
     await addCollaborator(testEnv.DB, repoRow.id, SECOND, 'read', USER);

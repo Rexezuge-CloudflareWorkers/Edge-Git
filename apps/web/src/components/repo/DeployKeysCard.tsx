@@ -11,7 +11,15 @@ import { RefreshButton } from '../shared/RefreshButton';
 import { ReadOnlyField } from '../shared/ReadOnlyField';
 import { ConfirmDeleteModal } from '../modals/ConfirmDeleteModal';
 
-export function DeployKeysCard({ owner, repo, showNotice }: { owner: string; repo: string; showNotice: (type: 'success' | 'error', text: string) => void }) {
+export function DeployKeysCard({
+  owner,
+  repo,
+  showNotice,
+}: {
+  owner: string;
+  repo: string;
+  showNotice: (type: 'success' | 'error', text: string) => void;
+}) {
   const { t } = useTranslation();
   const [keys, setKeys] = useState<DeployKey[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,21 +98,37 @@ export function DeployKeysCard({ owner, repo, showNotice }: { owner: string; rep
         <form onSubmit={submit} className="space-y-3">
           <div className="flex gap-2 flex-wrap">
             <div className="flex-1 min-w-40">
-              <Input placeholder={t('deployKeys.namePlaceholder', 'Key Name (e.g. ci-runner)')} value={name} onChange={(e) => setName(e.target.value)} required />
+              <Input
+                placeholder={t('deployKeys.namePlaceholder', 'Key Name (e.g. ci-runner)')}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
             </div>
-            <Select aria-label={t('deployKeys.permission', 'Permission')} value={permission} onChange={(e) => setPermission(e.target.value as DeployKeyPermission)}>
+            <Select
+              aria-label={t('deployKeys.permission', 'Permission')}
+              value={permission}
+              onChange={(e) => setPermission(e.target.value as DeployKeyPermission)}
+            >
               <option value="read">read</option>
               <option value="write">write</option>
             </Select>
             <div className="w-32">
-              <Input placeholder={t('deployKeys.expiryPlaceholder', 'Expiry (days)')} value={expiresInDays} onChange={(e) => setExpiresInDays(e.target.value)} inputMode="numeric" />
+              <Input
+                placeholder={t('deployKeys.expiryPlaceholder', 'Expiry (days)')}
+                value={expiresInDays}
+                onChange={(e) => setExpiresInDays(e.target.value)}
+                inputMode="numeric"
+              />
             </div>
             <Button type="submit" variant="primary" size="sm" loading={saving}>
               <KeyRound className="h-3.5 w-3.5" />
               {t('deployKeys.addKey', 'Add Key')}
             </Button>
           </div>
-          <p className="text-xs text-[var(--color-text-muted)]">{t('deployKeys.hint', 'Git Only. Scoped To This Repository. Use As The HTTPS Password.')}</p>
+          <p className="text-xs text-[var(--color-text-muted)]">
+            {t('deployKeys.hint', 'Git Only. Scoped To This Repository. Use As The HTTPS Password.')}
+          </p>
         </form>
         {lastCreated && (
           <div className="mt-4">
@@ -121,7 +145,9 @@ export function DeployKeysCard({ owner, repo, showNotice }: { owner: string; rep
                 </p>
                 <p className="text-xs text-[var(--color-text-muted)]">{formatExpiryTimestamp(key.expiresAt)}</p>
                 <p className="mt-1">
-                  <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-[var(--color-surface)] text-[var(--color-text-secondary)]">{key.permission}</span>
+                  <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-[var(--color-surface)] text-[var(--color-text-secondary)]">
+                    {key.permission}
+                  </span>
                 </p>
               </div>
               <Button variant="danger" size="sm" onClick={() => setRevoking(key)}>
@@ -130,7 +156,9 @@ export function DeployKeysCard({ owner, repo, showNotice }: { owner: string; rep
             </li>
           ))}
         </ul>
-        {keys.length === 0 && !loading && <p className="text-sm text-[var(--color-text-muted)] mt-4">{t('deployKeys.noKeys', 'No Deploy Keys Yet.')}</p>}
+        {keys.length === 0 && !loading && (
+          <p className="text-sm text-[var(--color-text-muted)] mt-4">{t('deployKeys.noKeys', 'No Deploy Keys Yet.')}</p>
+        )}
       </Card>
 
       {revoking && (

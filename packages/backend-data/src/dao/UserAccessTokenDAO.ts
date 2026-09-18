@@ -23,7 +23,9 @@ function parseScopes(raw: string | null | undefined): TokenScope[] {
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    const valid = parsed.filter((s): s is TokenScope => typeof s === 'string' && (['repo:read', 'repo:write', 'admin'] as const).includes(s as TokenScope));
+    const valid = parsed.filter(
+      (s): s is TokenScope => typeof s === 'string' && (['repo:read', 'repo:write', 'admin'] as const).includes(s as TokenScope),
+    );
     return valid.length > 0 ? valid : [];
   } catch {
     return [];
@@ -129,7 +131,11 @@ class UserAccessTokenDAO extends BaseDAO {
 
   public async delete(tokenId: string, userEmail: string): Promise<void> {
     await this.withRetry(
-      () => this.database.prepare('DELETE FROM user_access_tokens WHERE token_id = ? AND lower(user_email) = lower(?)').bind(tokenId, userEmail).run(),
+      () =>
+        this.database
+          .prepare('DELETE FROM user_access_tokens WHERE token_id = ? AND lower(user_email) = lower(?)')
+          .bind(tokenId, userEmail)
+          .run(),
       'delete access token',
     );
   }
@@ -138,7 +144,9 @@ class UserAccessTokenDAO extends BaseDAO {
     const result = await this.withRetry(
       () =>
         this.database
-          .prepare('UPDATE user_access_tokens SET token_hash = ?, token_prefix = ?, expires_at = ?, last_used_at = NULL WHERE token_id = ? AND lower(user_email) = lower(?)')
+          .prepare(
+            'UPDATE user_access_tokens SET token_hash = ?, token_prefix = ?, expires_at = ?, last_used_at = NULL WHERE token_id = ? AND lower(user_email) = lower(?)',
+          )
           .bind(newHash, newPrefix, newExpiresAt, tokenId, userEmail)
           .run(),
       'rotate access token',

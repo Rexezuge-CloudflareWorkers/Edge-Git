@@ -54,13 +54,22 @@ export function ForkButton({
       </Button>
       {open && (
         <ModalShell onClose={() => setOpen(false)} widthClass="w-full max-w-md mx-4" ariaLabel={t('forks.fork', 'Fork')}>
-          <ModalHeader title={t('forks.forkRepository', 'Fork {{fullName}}', { fullName: `${owner}/${repo}` })} onClose={() => setOpen(false)} />
+          <ModalHeader
+            title={t('forks.forkRepository', 'Fork {{fullName}}', { fullName: `${owner}/${repo}` })}
+            onClose={() => setOpen(false)}
+          />
           <ModalBody>
             <form onSubmit={submit} className="space-y-3">
               <div>
                 <Label className="mb-1.5">{t('repos.owner', 'Owner')}</Label>
-                <Input value={forkOwner} onChange={(e) => setForkOwner(e.target.value)} placeholder={t('repos.ownerPlaceholder', 'owner (default: you)')} />
-                <p className="mt-1 text-xs text-[var(--color-text-muted)]">{t('forks.ownerHint', 'Your Username Or An Organization You Belong To.')}</p>
+                <Input
+                  value={forkOwner}
+                  onChange={(e) => setForkOwner(e.target.value)}
+                  placeholder={t('repos.ownerPlaceholder', 'owner (default: you)')}
+                />
+                <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                  {t('forks.ownerHint', 'Your Username Or An Organization You Belong To.')}
+                </p>
               </div>
               <div>
                 <Label className="mb-1.5">{t('repos.repositoryName', 'Repository Name')}</Label>

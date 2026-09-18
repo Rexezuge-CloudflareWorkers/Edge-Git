@@ -14,7 +14,10 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const target = resolve(root, 'apps/background/wasm/quickjs-async.wasm');
 
 const requireFromBackground = createRequire(resolve(root, 'apps/background/package.json'));
-const source = resolve(dirname(requireFromBackground.resolve('@jitl/quickjs-wasmfile-release-asyncify/package.json')), 'dist/emscripten-module.wasm');
+const source = resolve(
+  dirname(requireFromBackground.resolve('@jitl/quickjs-wasmfile-release-asyncify/package.json')),
+  'dist/emscripten-module.wasm',
+);
 
 mkdirSync(dirname(target), { recursive: true });
 const sourceSize = statSync(source).size;

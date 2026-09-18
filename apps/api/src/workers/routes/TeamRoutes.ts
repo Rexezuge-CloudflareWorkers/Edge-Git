@@ -5,7 +5,14 @@ import { toServiceStatus } from './PublicViewerResolver';
 
 type TeamApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
-function teamJson(t: { id: string; slug: string; name: string; description: string | null; created_at: number; updated_at: number }): unknown {
+function teamJson(t: {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  created_at: number;
+  updated_at: number;
+}): unknown {
   return { id: t.id, slug: t.slug, name: t.name, description: t.description, createdAt: t.created_at, updatedAt: t.updated_at };
 }
 
@@ -28,7 +35,9 @@ function registerTeamRoutes(app: TeamApp): void {
     const body = (await c.req.json().catch(() => ({}))) as { slug?: string; name?: string; description?: string | null };
     if (!body.slug) return c.json({ error: 'slug is required' }, 400);
     try {
-      const team = await createRequestScope(c.env).get(Tokens.TeamService).createTeam(c.req.param('org'), email, body as { slug: string });
+      const team = await createRequestScope(c.env)
+        .get(Tokens.TeamService)
+        .createTeam(c.req.param('org'), email, body as { slug: string });
       return c.json(teamJson(team), 201);
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'Failed' }, toServiceStatus(error));
@@ -148,7 +157,9 @@ function registerTeamRoutes(app: TeamApp): void {
     if (role !== 'admin' && role !== 'write' && role !== 'read') return c.json({ error: 'Invalid role' }, 400);
     try {
       const scope = createRequestScope(c.env);
-      const repo = await scope.get(Tokens.RepoService).getByOwnerAndName(c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')));
+      const repo = await scope
+        .get(Tokens.RepoService)
+        .getByOwnerAndName(c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')));
       if (!repo) return c.json({ error: 'Repository not found' }, 404);
       await scope.get(Tokens.TeamService).grantRepo(c.req.param('org'), c.req.param('team'), email, repo.id, role);
       return c.json({ ok: true });
@@ -161,7 +172,9 @@ function registerTeamRoutes(app: TeamApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     try {
       const scope = createRequestScope(c.env);
-      const repo = await scope.get(Tokens.RepoService).getByOwnerAndName(c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')));
+      const repo = await scope
+        .get(Tokens.RepoService)
+        .getByOwnerAndName(c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')));
       if (!repo) return c.json({ error: 'Repository not found' }, 404);
       await scope.get(Tokens.TeamService).revokeGrant(c.req.param('org'), c.req.param('team'), email, repo.id);
       return c.json({ ok: true });

@@ -25,7 +25,9 @@ class TeamMemberDAO extends BaseDAO {
         .run()
         .catch(() => undefined);
       return this.database
-        .prepare('INSERT INTO team_members (team_id, user_email, role, joined_at) VALUES (?, ?, ?, ?) ON CONFLICT(team_id, user_email) DO UPDATE SET role = excluded.role')
+        .prepare(
+          'INSERT INTO team_members (team_id, user_email, role, joined_at) VALUES (?, ?, ?, ?) ON CONFLICT(team_id, user_email) DO UPDATE SET role = excluded.role',
+        )
         .bind(teamId, normalized, role, now)
         .run();
     }, 'upsert team member');
@@ -56,13 +58,17 @@ class TeamMemberDAO extends BaseDAO {
 
   public async remove(teamId: string, userEmail: string): Promise<void> {
     await this.withRetry(
-      () => this.database.prepare('DELETE FROM team_members WHERE team_id = ? AND lower(user_email) = lower(?)').bind(teamId, userEmail).run(),
+      () =>
+        this.database.prepare('DELETE FROM team_members WHERE team_id = ? AND lower(user_email) = lower(?)').bind(teamId, userEmail).run(),
       'remove team member',
     );
   }
 
   public async deleteByTeam(teamId: string): Promise<void> {
-    await this.withRetry(() => this.database.prepare('DELETE FROM team_members WHERE team_id = ?').bind(teamId).run(), 'delete members by team');
+    await this.withRetry(
+      () => this.database.prepare('DELETE FROM team_members WHERE team_id = ?').bind(teamId).run(),
+      'delete members by team',
+    );
   }
 
   public async countAdmins(teamId: string): Promise<number> {

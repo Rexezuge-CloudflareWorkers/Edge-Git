@@ -59,7 +59,12 @@ export async function loadTags(owner: string, repo: string, opts?: { isAuthed?: 
   return tryAuthedFirst(`${authedBase(owner, repo)}/tags`, `${publicBase(owner, repo)}/tags`, opts?.isAuthed);
 }
 
-export async function createBranch(owner: string, repo: string, name: string, from?: string): Promise<{ branch?: string; ref?: string; oid?: string }> {
+export async function createBranch(
+  owner: string,
+  repo: string,
+  name: string,
+  from?: string,
+): Promise<{ branch?: string; ref?: string; oid?: string }> {
   return apiPost(`${authedBase(owner, repo)}/branches`, { name, from });
 }
 
@@ -114,7 +119,11 @@ export async function loadTree(
   path?: string,
   opts?: { isAuthed?: boolean | null; withLastCommit?: boolean },
 ): Promise<TreeEntry[]> {
-  const query = toQuery({ ref, path, withLastCommit: opts?.withLastCommit === false ? '0' : opts?.withLastCommit === true ? '1' : undefined });
+  const query = toQuery({
+    ref,
+    path,
+    withLastCommit: opts?.withLastCommit === false ? '0' : opts?.withLastCommit === true ? '1' : undefined,
+  });
   return tryAuthedFirst(`${authedBase(owner, repo)}/tree${query}`, `${publicBase(owner, repo)}/tree${query}`, opts?.isAuthed);
 }
 
@@ -166,7 +175,12 @@ export async function loadOverview(
   return tryAuthedFirst(`${authedBase(owner, repo)}/overview${query}`, `${publicBase(owner, repo)}/overview${query}`, opts?.isAuthed);
 }
 
-export async function loadCommit(owner: string, repo: string, oid: string, opts?: { isAuthed?: boolean | null }): Promise<CommitDiffResult> {
+export async function loadCommit(
+  owner: string,
+  repo: string,
+  oid: string,
+  opts?: { isAuthed?: boolean | null },
+): Promise<CommitDiffResult> {
   return tryAuthedFirst(
     `${authedBase(owner, repo)}/commits/${encodeURIComponent(oid)}`,
     `${publicBase(owner, repo)}/commits/${encodeURIComponent(oid)}`,

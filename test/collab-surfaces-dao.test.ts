@@ -176,7 +176,9 @@ function createFakeDb(): D1Queryable {
           columns.forEach((col, i) => {
             row[col] = parseLiteral(tokens[i]);
           });
-          const conflicts = (UNIQUES[name] ?? []).some((key) => table(name).some((existing) => key.every((col) => existing[col] === row[col])));
+          const conflicts = (UNIQUES[name] ?? []).some((key) =>
+            table(name).some((existing) => key.every((col) => existing[col] === row[col])),
+          );
           if (conflicts) {
             if (orIgnore) return Promise.resolve({ success: true, meta: { changes: 0 } });
             throw new Error('UNIQUE constraint failed');
@@ -251,7 +253,15 @@ describe('collab surfaces DAO: projects end to end', () => {
   it('runs the full board lifecycle', async () => {
     const db = createFakeDb();
     const dao = new ProjectDAO(db);
-    await dao.createProject({ id: 'p1', repositoryId: 'r1', number: 1, title: 'Roadmap', description: null, creatorEmail: 'a@x.com', now: 1 });
+    await dao.createProject({
+      id: 'p1',
+      repositoryId: 'r1',
+      number: 1,
+      title: 'Roadmap',
+      description: null,
+      creatorEmail: 'a@x.com',
+      now: 1,
+    });
     expect(await dao.nextNumber('r1')).toBe(2);
     expect(await dao.countByRepo('r1')).toBe(1);
     expect((await dao.getByNumber('r1', 1))?.title).toBe('Roadmap');
@@ -263,8 +273,32 @@ describe('collab surfaces DAO: projects end to end', () => {
     await dao.renameColumn('c1', 'p1', 'Backlog');
     expect((await dao.getColumn('c1', 'p1'))?.title).toBe('Backlog');
 
-    await dao.createCard({ id: 'k1', projectId: 'p1', columnId: 'c1', kind: 'note', noteTitle: 'Ship', noteBody: 'v1', issueId: null, pullRequestId: null, position: 0, creatorEmail: 'a@x.com', now: 1 });
-    await dao.createCard({ id: 'k2', projectId: 'p1', columnId: 'c1', kind: 'issue', noteTitle: null, noteBody: null, issueId: 'i1', pullRequestId: null, position: 1, creatorEmail: 'a@x.com', now: 1 });
+    await dao.createCard({
+      id: 'k1',
+      projectId: 'p1',
+      columnId: 'c1',
+      kind: 'note',
+      noteTitle: 'Ship',
+      noteBody: 'v1',
+      issueId: null,
+      pullRequestId: null,
+      position: 0,
+      creatorEmail: 'a@x.com',
+      now: 1,
+    });
+    await dao.createCard({
+      id: 'k2',
+      projectId: 'p1',
+      columnId: 'c1',
+      kind: 'issue',
+      noteTitle: null,
+      noteBody: null,
+      issueId: 'i1',
+      pullRequestId: null,
+      position: 1,
+      creatorEmail: 'a@x.com',
+      now: 1,
+    });
     expect(await dao.countCardsInColumn('c1')).toBe(2);
     expect((await dao.listCards('p1')).map((c) => c.id)).toEqual(['k1', 'k2']);
     expect((await dao.getCard('k1', 'p1'))?.note_title).toBe('Ship');
@@ -273,9 +307,9 @@ describe('collab surfaces DAO: projects end to end', () => {
     expect((await dao.getCard('k1', 'p1'))?.column_id).toBe('c2');
     await dao.setCardArchived('k2', 'p1', true, 4);
     expect((await dao.listCards('p1')).map((c) => c.id)).toEqual(['k1']);
-    expect((await dao.listCards('p1', true))).toHaveLength(2);
+    expect(await dao.listCards('p1', true)).toHaveLength(2);
     await dao.deleteCard('k2', 'p1');
-    expect((await dao.listCards('p1', true))).toHaveLength(1);
+    expect(await dao.listCards('p1', true)).toHaveLength(1);
 
     await dao.updateProject('p1', 'r1', { title: 'Roadmap v2', description: 'Desc' }, 5);
     expect((await dao.getByNumber('r1', 1))?.title).toBe('Roadmap v2');
@@ -296,16 +330,42 @@ describe('collab surfaces DAO: discussions end to end', () => {
     const dao = new DiscussionDAO(db);
     const seeded = await dao.ensureDefaultCategories('r1', 1);
     expect(seeded.map((c) => c.slug).sort()).toEqual(['announcements', 'general', 'ideas', 'qa']);
-    expect((await dao.ensureDefaultCategories('r1', 1))).toHaveLength(4);
+    expect(await dao.ensureDefaultCategories('r1', 1)).toHaveLength(4);
     expect((await dao.getCategoryBySlug('r1', 'general'))?.kind).toBe('general');
     const general = (await dao.getCategoryBySlug('r1', 'general'))!;
     expect((await dao.getCategoryById(general.id, 'r1'))?.slug).toBe('general');
-    await dao.createCategory({ id: 'custom', repositoryId: 'r1', slug: 'custom', title: 'Custom', description: null, kind: 'general', now: 1 });
+    await dao.createCategory({
+      id: 'custom',
+      repositoryId: 'r1',
+      slug: 'custom',
+      title: 'Custom',
+      description: null,
+      kind: 'general',
+      now: 1,
+    });
     expect(await dao.listCategories('r1')).toHaveLength(5);
 
     expect(await dao.nextNumber('r1')).toBe(1);
-    await dao.createDiscussion({ id: 'd1', repositoryId: 'r1', categoryId: general.id, number: 1, title: 'Hello', body: 'World', authorEmail: 'a@x.com', now: 1 });
-    await dao.createDiscussion({ id: 'd2', repositoryId: 'r1', categoryId: null, number: 2, title: 'Second', body: null, authorEmail: 'b@x.com', now: 2 });
+    await dao.createDiscussion({
+      id: 'd1',
+      repositoryId: 'r1',
+      categoryId: general.id,
+      number: 1,
+      title: 'Hello',
+      body: 'World',
+      authorEmail: 'a@x.com',
+      now: 1,
+    });
+    await dao.createDiscussion({
+      id: 'd2',
+      repositoryId: 'r1',
+      categoryId: null,
+      number: 2,
+      title: 'Second',
+      body: null,
+      authorEmail: 'b@x.com',
+      now: 2,
+    });
     expect(await dao.countByRepo('r1')).toBe(2);
     expect((await dao.listByRepo('r1')).map((d) => d.number)).toEqual([2, 1]);
     expect((await dao.listByRepo('r1', general.id)).map((d) => d.id)).toEqual(['d1']);
@@ -340,10 +400,10 @@ describe('collab surfaces DAO: wiki end to end', () => {
 
     const updated = await dao.updatePage('w1', 'r1', { body: 'v2 docs', expectedRevision: 1 }, 'b@x.com', 2);
     expect(updated.revision).toBe(2);
-    await expect(dao.updatePage('w1', 'r1', { body: 'stale' , expectedRevision: 1 }, 'c@x.com', 3)).rejects.toThrow('revision conflict');
+    await expect(dao.updatePage('w1', 'r1', { body: 'stale', expectedRevision: 1 }, 'c@x.com', 3)).rejects.toThrow('revision conflict');
     await expect(dao.updatePage('missing', 'r1', { body: 'x' }, 'a@x.com', 3)).rejects.toThrow('not found');
     expect((await dao.listRevisions('w1')).map((r) => r.revision)).toEqual([2, 1]);
-    expect((await dao.searchByRepo('r1', 'docs', 10))).toHaveLength(1);
+    expect(await dao.searchByRepo('r1', 'docs', 10)).toHaveLength(1);
     expect(await dao.searchByRepo('r1', 'nothing-here', 10)).toHaveLength(0);
 
     await dao.deletePage('w1', 'r1');
@@ -369,7 +429,14 @@ describe('collab surfaces DAO: snippets end to end', () => {
 
     await dao.updateSnippet('s1', { title: 'Hello!' }, 3);
     expect((await dao.getById('s1'))?.title).toBe('Hello!');
-    await dao.replaceFiles('s1', [{ filename: 'a.txt', body: '1' }, { filename: 'b.txt', body: '2' }], 4);
+    await dao.replaceFiles(
+      's1',
+      [
+        { filename: 'a.txt', body: '1' },
+        { filename: 'b.txt', body: '2' },
+      ],
+      4,
+    );
     expect((await dao.listFiles('s1')).map((f) => f.filename)).toEqual(['a.txt', 'b.txt']);
     expect((await dao.searchPublic('hello', 10)).map((s) => s.id)).toEqual(['s1']);
     expect(await dao.searchPublic('zzz-no-match', 10)).toHaveLength(0);
@@ -405,7 +472,9 @@ describe('collab surfaces services on real DAOs', () => {
     const updated = await svc.updateProject('r1', number, { title: 'P2', description: null });
     expect(updated.title).toBe('P2');
     await expect(svc.getProject('r1', 999)).rejects.toThrow('not found');
-    await expect(svc.createCard('r1', number, { columnId: board.columns[0].id, kind: 'pull' }, 'a@x.com')).rejects.toThrow('pullRequestId is required');
+    await expect(svc.createCard('r1', number, { columnId: board.columns[0].id, kind: 'pull' }, 'a@x.com')).rejects.toThrow(
+      'pullRequestId is required',
+    );
     const issueCard = await svc.createCard('r1', number, { columnId: board.columns[0].id, kind: 'issue', issueId: 'i1' }, 'a@x.com');
     expect(issueCard.kind).toBe('issue');
     const pullCard = await svc.createCard('r1', number, { columnId: board.columns[0].id, kind: 'pull', pullRequestId: 'p9' }, 'a@x.com');
@@ -454,7 +523,7 @@ describe('collab surfaces services on real DAOs', () => {
     const updated = await svc.updatePage('r1', 'home', { title: 'Home!', body: '# Hi!' }, 'b@x.com');
     expect(updated.revision).toBe(2);
     expect(await svc.listRevisions('r1', 'home')).toHaveLength(2);
-    expect((await svc.searchPages('r1', 'hi'))).toHaveLength(1);
+    expect(await svc.searchPages('r1', 'hi')).toHaveLength(1);
     await svc.deletePage('r1', 'home');
     expect(await svc.listPages('r1')).toHaveLength(0);
     expect(WikiService.normalizeSlug('  Hello World  ')).toBe('hello-world');
@@ -466,10 +535,13 @@ describe('collab surfaces services on real DAOs', () => {
     const created = await svc.createSnippet('a@x.com', { title: 'T', visibility: 'secret', files: [{ filename: 'a.txt', body: '1' }] });
     expect(created.files).toHaveLength(1);
     expect((await svc.getSnippet(created.snippet.id, 'a@x.com')).snippet.title).toBe('T');
-    expect((await svc.listByOwner('a@x.com', 'a@x.com'))).toHaveLength(1);
+    expect(await svc.listByOwner('a@x.com', 'a@x.com')).toHaveLength(1);
     expect(await svc.listByOwner('a@x.com', 'stranger@x.com')).toHaveLength(0);
     expect(await svc.listPublic()).toHaveLength(0);
-    const updated = await svc.updateSnippet(created.snippet.id, 'a@x.com', { visibility: 'public', files: [{ filename: 'b.txt', body: '2' }] });
+    const updated = await svc.updateSnippet(created.snippet.id, 'a@x.com', {
+      visibility: 'public',
+      files: [{ filename: 'b.txt', body: '2' }],
+    });
     expect(updated.snippet.visibility).toBe('public');
     expect(await svc.listPublic()).toHaveLength(1);
     await expect(svc.updateSnippet(created.snippet.id, 'stranger@x.com', { title: 'Hax' })).rejects.toThrow('Only the snippet owner');
@@ -483,7 +555,16 @@ describe('collab surfaces services on real DAOs', () => {
     const search = new SearchDAO(db);
     const discussions = new DiscussionDAO(db);
     await discussions.ensureDefaultCategories('r1', 1);
-    await discussions.createDiscussion({ id: 'd1', repositoryId: 'r1', categoryId: null, number: 1, title: 'Searchable Hello', body: 'world body', authorEmail: 'a@x.com', now: 1 });
+    await discussions.createDiscussion({
+      id: 'd1',
+      repositoryId: 'r1',
+      categoryId: null,
+      number: 1,
+      title: 'Searchable Hello',
+      body: 'world body',
+      authorEmail: 'a@x.com',
+      now: 1,
+    });
     const snippets = new SnippetDAO(db);
     await snippets.createSnippet({ id: 's1', ownerEmail: 'a@x.com', title: 'Searchable Snippet', visibility: 'public', now: 1 });
     expect((await search.searchDiscussions('hello', { repoId: 'r1' })).map((d) => d.id)).toEqual(['d1']);

@@ -177,11 +177,17 @@ class AuditLogDAO extends BaseDAO {
   }
 
   public async deleteByOrg(orgId: string): Promise<void> {
-    await this.withRetry(() => this.database.prepare('DELETE FROM audit_logs WHERE org_id = ?').bind(orgId).run(), 'delete audit logs by org');
+    await this.withRetry(
+      () => this.database.prepare('DELETE FROM audit_logs WHERE org_id = ?').bind(orgId).run(),
+      'delete audit logs by org',
+    );
   }
 
   public async deleteByRepo(repoId: string): Promise<void> {
-    await this.withRetry(() => this.database.prepare('DELETE FROM audit_logs WHERE repo_id = ?').bind(repoId).run(), 'delete audit logs by repo');
+    await this.withRetry(
+      () => this.database.prepare('DELETE FROM audit_logs WHERE repo_id = ?').bind(repoId).run(),
+      'delete audit logs by repo',
+    );
   }
 
   public async pruneOlderThan(cutoff: number, limit: number): Promise<number> {

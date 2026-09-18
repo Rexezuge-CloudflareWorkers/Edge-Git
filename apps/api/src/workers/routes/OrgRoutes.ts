@@ -16,7 +16,8 @@ function registerOrgRoutes(app: OrgApp): void {
       return c.json({ id: org.id, username: org.username }, 201);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create organization';
-      const status = message.includes('taken') || message.includes('Invalid') || message.includes('reserved') ? 400 : toServiceStatus(error);
+      const status =
+        message.includes('taken') || message.includes('Invalid') || message.includes('reserved') ? 400 : toServiceStatus(error);
       return c.json({ error: message }, status);
     }
   });
@@ -34,7 +35,10 @@ function registerOrgRoutes(app: OrgApp): void {
       const scope = createRequestScope(c.env);
       const org = await scope.get(Tokens.OrganizationService).requireMember(orgName, email);
       const members = await scope.get(Tokens.OrganizationService).listMembers(org.username, email);
-      const viewerRole = await scope.get(Tokens.OrganizationService).getMemberRole(org.id, email).catch(() => null);
+      const viewerRole = await scope
+        .get(Tokens.OrganizationService)
+        .getMemberRole(org.id, email)
+        .catch(() => null);
       return c.json({ id: org.id, username: org.username, members, viewerRole });
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
@@ -60,7 +64,9 @@ function registerOrgRoutes(app: OrgApp): void {
             for (const repo of owned) {
               try {
                 await ensureRepo(c.env, `${org.username}/${repo.name}`);
-                await getRepoStub(c.env, `${before}/${repo.name}`).deleteRepo().catch(() => undefined);
+                await getRepoStub(c.env, `${before}/${repo.name}`)
+                  .deleteRepo()
+                  .catch(() => undefined);
               } catch {
                 // ignore per-repo
               }
@@ -73,7 +79,8 @@ function registerOrgRoutes(app: OrgApp): void {
       return c.json({ id: org.id, username: org.username });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to update organization';
-      const status = message.includes('taken') || message.includes('Invalid') || message.includes('reserved') ? 400 : toServiceStatus(error);
+      const status =
+        message.includes('taken') || message.includes('Invalid') || message.includes('reserved') ? 400 : toServiceStatus(error);
       return c.json({ error: message }, status);
     }
   });
@@ -106,9 +113,7 @@ function registerOrgRoutes(app: OrgApp): void {
     const role = body.role ?? 'member';
     if (role !== 'owner' && role !== 'member') return c.json({ error: 'Invalid role' }, 400);
     try {
-      await createRequestScope(c.env)
-        .get(Tokens.OrganizationService)
-        .addMember(c.req.param('org'), email, target, role);
+      await createRequestScope(c.env).get(Tokens.OrganizationService).addMember(c.req.param('org'), email, target, role);
       return c.json({ ok: true }, 201);
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'Failed' }, toServiceStatus(error));

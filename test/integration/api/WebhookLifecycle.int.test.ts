@@ -30,7 +30,13 @@ describe('webhook lifecycle on real D1', () => {
 
   it('creates hooks with a one-time secret and masked lists', async () => {
     const created = await body<{ hook: { id: string; urlMasked: string; hasSecret: boolean; events: string[] }; secret: string }>(
-      await api(`/user/repos/${OWNER}/${REPO}/hooks`, json({ method: 'POST', body: JSON.stringify({ url: 'https://hooks.example.com/edge-git-deliveries', events: ['issues', 'push'] }) })),
+      await api(
+        `/user/repos/${OWNER}/${REPO}/hooks`,
+        json({
+          method: 'POST',
+          body: JSON.stringify({ url: 'https://hooks.example.com/edge-git-deliveries', events: ['issues', 'push'] }),
+        }),
+      ),
     );
     expect(created.secret.length).toBeGreaterThanOrEqual(16);
     expect(created.hook.hasSecret).toBe(true);
@@ -50,10 +56,16 @@ describe('webhook lifecycle on real D1', () => {
   it('rejects invalid hook input', async () => {
     expect((await api(`/user/repos/${OWNER}/${REPO}/hooks`, json({ method: 'POST', body: JSON.stringify({}) }))).status).toBe(400);
     expect(
-      (await api(`/user/repos/${OWNER}/${REPO}/hooks`, json({ method: 'POST', body: JSON.stringify({ url: 'http://127.0.0.1/x' }) }))).status,
+      (await api(`/user/repos/${OWNER}/${REPO}/hooks`, json({ method: 'POST', body: JSON.stringify({ url: 'http://127.0.0.1/x' }) })))
+        .status,
     ).toBe(400);
     expect(
-      (await api(`/user/repos/${OWNER}/${REPO}/hooks`, json({ method: 'POST', body: JSON.stringify({ url: 'https://hooks.example.com/y', events: ['bogus'] }) }))).status,
+      (
+        await api(
+          `/user/repos/${OWNER}/${REPO}/hooks`,
+          json({ method: 'POST', body: JSON.stringify({ url: 'https://hooks.example.com/y', events: ['bogus'] }) }),
+        )
+      ).status,
     ).toBe(400);
     expect((await api(`/user/repos/${OWNER}/missing/hooks`)).status).toBe(404);
   });
@@ -64,7 +76,11 @@ describe('webhook lifecycle on real D1', () => {
     );
     expect(created.number).toBeGreaterThan(0);
     const db = (env as unknown as TestEnv).DB;
-    const rows = (await db.prepare("SELECT * FROM webhook_deliveries WHERE event = 'issues'").all()).results as Array<{ event: string; status: string; payload: string }>;
+    const rows = (await db.prepare("SELECT * FROM webhook_deliveries WHERE event = 'issues'").all()).results as Array<{
+      event: string;
+      status: string;
+      payload: string;
+    }>;
     expect(rows.length).toBeGreaterThanOrEqual(1);
     expect(['pending', 'success', 'failed']).toContain(rows[0].status);
     expect(rows[0].payload).toContain('webhook');
@@ -96,7 +112,10 @@ describe('webhook lifecycle on real D1', () => {
     expect(rotated.secret.length).toBeGreaterThanOrEqual(16);
 
     const repatched = await body<{ hook: { events: string[]; isActive: boolean } }>(
-      await api(`/user/repos/${OWNER}/${REPO}/hooks/${hookId}`, json({ method: 'PATCH', body: JSON.stringify({ events: ['star'], isActive: false }) })),
+      await api(
+        `/user/repos/${OWNER}/${REPO}/hooks/${hookId}`,
+        json({ method: 'PATCH', body: JSON.stringify({ events: ['star'], isActive: false }) }),
+      ),
     );
     expect(repatched.hook).toMatchObject({ events: ['star'], isActive: false });
     expect(before.hook.secretSuffix).not.toBe(rotated.hook.secretSuffix);

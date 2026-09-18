@@ -25,7 +25,12 @@ function sameRepoName(a: string, b: string): boolean {
   return a.toLowerCase() === b.toLowerCase();
 }
 
-function mergeHeadRepoOptions(currentFull: string, parent: string | null | undefined, forks: Repo[], prev: string): { options: string[]; selected: string } {
+function mergeHeadRepoOptions(
+  currentFull: string,
+  parent: string | null | undefined,
+  forks: Repo[],
+  prev: string,
+): { options: string[]; selected: string } {
   const options = [currentFull];
   if (parent && options.every((o) => !sameRepoName(o, parent))) {
     options.push(parent);
@@ -91,7 +96,11 @@ export function PullsTab({
     const run = async () => {
       try {
         const [list, b, forks] = await Promise.all([
-          listPulls(owner, repo, { ...authOpt, label: labelFilter.trim() || undefined, q: searchQuery.trim().length >= 2 ? searchQuery.trim() : undefined }),
+          listPulls(owner, repo, {
+            ...authOpt,
+            label: labelFilter.trim() || undefined,
+            q: searchQuery.trim().length >= 2 ? searchQuery.trim() : undefined,
+          }),
           loadBranches(owner, repo, authOpt).catch(() => ({ branches: [], currentBranch: null })),
           listForks(owner, repo, authOpt).catch(() => ({ forks: [], count: 0 })),
         ]);
@@ -103,7 +112,8 @@ export function PullsTab({
         setHeadRepos(merged.options);
         setHeadRepo(merged.selected);
       } catch (error) {
-        if (!cancelled) showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadPulls', 'Failed To Load Pull Requests.'));
+        if (!cancelled)
+          showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadPulls', 'Failed To Load Pull Requests.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -201,7 +211,13 @@ export function PullsTab({
               </label>
               <label className="flex-1 min-w-36 text-sm">
                 <span className="text-[var(--color-text-muted)]">{t('pulls.headRepo', 'Head Repository')}</span>
-                <Select value={headRepo} onChange={(e) => { setHeadRepo(e.target.value); setHead(''); }}>
+                <Select
+                  value={headRepo}
+                  onChange={(e) => {
+                    setHeadRepo(e.target.value);
+                    setHead('');
+                  }}
+                >
                   {headRepos.map((r) => (
                     <option key={r} value={r}>
                       {r}
@@ -213,15 +229,22 @@ export function PullsTab({
                 <span className="text-[var(--color-text-muted)]">{t('pulls.head', 'Head')}</span>
                 <Select value={head} onChange={(e) => setHead(e.target.value)}>
                   <option value="">{t('pulls.selectHead', 'Select Head')}</option>
-                  {headBranches.filter((b) => isCrossRepo || b !== base).map((b) => (
-                    <option key={b} value={b}>
-                      {b}
-                    </option>
-                  ))}
+                  {headBranches
+                    .filter((b) => isCrossRepo || b !== base)
+                    .map((b) => (
+                      <option key={b} value={b}>
+                        {b}
+                      </option>
+                    ))}
                 </Select>
               </label>
             </div>
-            <Textarea placeholder={t('pulls.descriptionPlaceholder', 'Description (Optional)')} value={body} onChange={(e) => setBody(e.target.value)} rows={3} />
+            <Textarea
+              placeholder={t('pulls.descriptionPlaceholder', 'Description (Optional)')}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={3}
+            />
             <label className="flex items-center gap-2 text-sm text-[var(--color-text-muted)]">
               <input type="checkbox" checked={isDraft} onChange={(e) => setIsDraft(e.target.checked)} />
               {t('pulls.draft', 'Draft Pull Request')}
@@ -239,8 +262,16 @@ export function PullsTab({
           <RefreshButton onRefresh={refresh} loading={loading} />
         </CardHeader>
         <div className="mb-3 flex gap-2">
-          <Input placeholder={t('pulls.filterByLabel', 'Filter By Label…')} value={labelFilter} onChange={(e) => setLabelFilter(e.target.value)} />
-          <Input placeholder={t('pulls.searchPulls', 'Search Pull Requests…')} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+          <Input
+            placeholder={t('pulls.filterByLabel', 'Filter By Label…')}
+            value={labelFilter}
+            onChange={(e) => setLabelFilter(e.target.value)}
+          />
+          <Input
+            placeholder={t('pulls.searchPulls', 'Search Pull Requests…')}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
         {!loading && pulls.length === 0 ? (
           <div className="text-center text-[var(--color-text-muted)] py-10 text-sm">

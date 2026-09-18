@@ -59,13 +59,20 @@ class RepoCollaboratorDAO extends BaseDAO {
 
   public async remove(repoId: string, userEmail: string): Promise<void> {
     await this.withRetry(
-      () => this.database.prepare('DELETE FROM repo_collaborators WHERE repo_id = ? AND lower(user_email) = lower(?)').bind(repoId, userEmail).run(),
+      () =>
+        this.database
+          .prepare('DELETE FROM repo_collaborators WHERE repo_id = ? AND lower(user_email) = lower(?)')
+          .bind(repoId, userEmail)
+          .run(),
       'remove repo collaborator',
     );
   }
 
   public async deleteByRepo(repoId: string): Promise<void> {
-    await this.withRetry(() => this.database.prepare('DELETE FROM repo_collaborators WHERE repo_id = ?').bind(repoId).run(), 'delete collaborators by repo');
+    await this.withRetry(
+      () => this.database.prepare('DELETE FROM repo_collaborators WHERE repo_id = ?').bind(repoId).run(),
+      'delete collaborators by repo',
+    );
   }
 }
 

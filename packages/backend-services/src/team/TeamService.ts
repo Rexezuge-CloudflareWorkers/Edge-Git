@@ -97,7 +97,11 @@ class TeamService {
   /**
   Team managers: org owners plus team admins.
   */
-  public async requireTeamManager(orgUsername: string, teamSlug: string, userEmail: string): Promise<{ org: OrganizationRow; team: TeamRow }> {
+  public async requireTeamManager(
+    orgUsername: string,
+    teamSlug: string,
+    userEmail: string,
+  ): Promise<{ org: OrganizationRow; team: TeamRow }> {
     const { org, team } = await this.requireTeam(orgUsername, teamSlug);
     const orgRole = await this.orgRole(org.id, userEmail);
     if (orgRole === 'owner') return { org, team };
@@ -116,7 +120,11 @@ class TeamService {
     return EmailAddress.normalize(user.email);
   }
 
-  public async createTeam(orgUsername: string, actorEmail: string, input: { slug: string; name?: string; description?: string | null }): Promise<TeamRow> {
+  public async createTeam(
+    orgUsername: string,
+    actorEmail: string,
+    input: { slug: string; name?: string; description?: string | null },
+  ): Promise<TeamRow> {
     const org = await this.requireOrg(orgUsername);
     await this.requireOrgOwner(org, actorEmail);
     const slug = input.slug.trim();
@@ -178,21 +186,36 @@ class TeamService {
     return dao.listByOrg(org.id);
   }
 
-  public async addMember(orgUsername: string, teamSlug: string, actorEmail: string, targetUsernameOrEmail: string, role: TeamMemberRole = 'member'): Promise<void> {
+  public async addMember(
+    orgUsername: string,
+    teamSlug: string,
+    actorEmail: string,
+    targetUsernameOrEmail: string,
+    role: TeamMemberRole = 'member',
+  ): Promise<void> {
     if (role !== 'admin' && role !== 'member') throw new BadRequestError('Invalid role');
     const { team } = await this.requireTeamManager(orgUsername, teamSlug, actorEmail);
     const targetEmail = await this.resolveEmail(targetUsernameOrEmail);
     const memberDAO = await this.deps.teamMemberDAO();
     const existing = await memberDAO.get(team.id, targetEmail).catch(() => null);
     if (!existing) {
-      const count = await memberDAO.listByTeam(team.id, 10_000).then((rows) => rows.length).catch(() => 0);
+      const count = await memberDAO
+        .listByTeam(team.id, 10_000)
+        .then((rows) => rows.length)
+        .catch(() => 0);
       const max = this.deps.config.getMaxTeamMembers();
       if (count >= max) throw new BadRequestError(`Maximum of ${max} team members reached`);
     }
     await memberDAO.upsert(team.id, targetEmail, role, TimestampUtil.getCurrentUnixTimestampInSeconds());
   }
 
-  public async setMemberRole(orgUsername: string, teamSlug: string, actorEmail: string, targetUsernameOrEmail: string, role: TeamMemberRole): Promise<void> {
+  public async setMemberRole(
+    orgUsername: string,
+    teamSlug: string,
+    actorEmail: string,
+    targetUsernameOrEmail: string,
+    role: TeamMemberRole,
+  ): Promise<void> {
     if (role !== 'admin' && role !== 'member') throw new BadRequestError('Invalid role');
     const { team } = await this.requireTeamManager(orgUsername, teamSlug, actorEmail);
     const targetEmail = await this.resolveEmail(targetUsernameOrEmail);
@@ -219,7 +242,11 @@ class TeamService {
     await memberDAO.remove(team.id, targetEmail);
   }
 
-  public async listMembers(orgUsername: string, teamSlug: string, requesterEmail: string): Promise<Array<{ email: string; username: string | null; role: TeamMemberRole }>> {
+  public async listMembers(
+    orgUsername: string,
+    teamSlug: string,
+    requesterEmail: string,
+  ): Promise<Array<{ email: string; username: string | null; role: TeamMemberRole }>> {
     const { org, team } = await this.requireTeam(orgUsername, teamSlug);
     await this.requireOrgMember(org, requesterEmail);
     const memberDAO = await this.deps.teamMemberDAO();
@@ -246,13 +273,7 @@ class TeamService {
     return rows.map((r) => r.user_email.toLowerCase());
   }
 
-  public async grantRepo(
-    orgUsername: string,
-    teamSlug: string,
-    actorEmail: string,
-    repoId: string,
-    role: RepoRole,
-  ): Promise<void> {
+  public async grantRepo(orgUsername: string, teamSlug: string, actorEmail: string, repoId: string, role: RepoRole): Promise<void> {
     if (role !== 'admin' && role !== 'write' && role !== 'read') throw new BadRequestError('Invalid role');
     const { org, team } = await this.requireTeam(orgUsername, teamSlug);
     await this.requireOrgOwner(org, actorEmail);
@@ -276,7 +297,11 @@ class TeamService {
     await grantDAO.remove(team.id, repoId);
   }
 
-  public async listGrants(orgUsername: string, teamSlug: string, requesterEmail: string): Promise<Array<{ repoId: string; role: RepoRole }>> {
+  public async listGrants(
+    orgUsername: string,
+    teamSlug: string,
+    requesterEmail: string,
+  ): Promise<Array<{ repoId: string; role: RepoRole }>> {
     const { org, team } = await this.requireTeam(orgUsername, teamSlug);
     await this.requireOrgMember(org, requesterEmail);
     const grantDAO = await this.deps.teamGrantDAO();

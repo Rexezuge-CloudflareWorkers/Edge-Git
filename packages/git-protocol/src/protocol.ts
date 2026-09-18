@@ -4,12 +4,7 @@ export { parseReceivePackRequest, buildReportStatus, validateReceivePackCounts, 
 export type { Command, ReceiveCountLimits } from './ReceiveParser';
 export { parseCommand, parseFetchRequest, validateFetchRequestCounts, validateFetchRequestOids, validateFilterSpec } from './FetchParser';
 export type { FetchRequest, FetchCountLimits } from './FetchParser';
-export {
-  buildFetchErrorResponse,
-  shouldSendPackfileForFetch,
-  buildLsRefsResponse,
-  buildFetchResponse,
-} from './FetchResponseBuilder';
+export { buildFetchErrorResponse, shouldSendPackfileForFetch, buildLsRefsResponse, buildFetchResponse } from './FetchResponseBuilder';
 export type { FetchResponseOptions } from './FetchResponseBuilder';
 export { getBasicCredentials, getBearerToken } from './AuthHeaders';
 export { ZERO_OID, isZeroOid, branchNameFromRef, checkStaticPushProtection } from './ProtectionPolicy';

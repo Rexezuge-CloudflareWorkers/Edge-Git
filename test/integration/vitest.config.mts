@@ -15,8 +15,10 @@ const backendServicesSrcPath = fileURLToPath(new URL('../../packages/backend-ser
 const gitServiceSrcPath = fileURLToPath(new URL('../../packages/git-service/src', import.meta.url));
 
 const migrationsDir = resolve(fileURLToPath(new URL('../../migrations', import.meta.url)));
-const migrationFiles = readdirSync(migrationsDir).filter(f => f.endsWith('.sql')).sort();
-const migrationSql = migrationFiles.map(f => readFileSync(resolve(migrationsDir, f), 'utf-8')).join('\n\n');
+const migrationFiles = readdirSync(migrationsDir)
+  .filter((f) => f.endsWith('.sql'))
+  .sort();
+const migrationSql = migrationFiles.map((f) => readFileSync(resolve(migrationsDir, f), 'utf-8')).join('\n\n');
 
 export default defineConfig({
   define: {
@@ -36,18 +38,8 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
       reportsDirectory: './coverage-integration',
-      include: [
-        'apps/api/src/**/*.ts',
-        'apps/background/src/**/*.ts',
-        'packages/**/src/**/*.ts',
-      ],
-      exclude: [
-        '**/*.test.ts',
-        '**/*.int.test.ts',
-        '**/*.d.ts',
-        '**/index.ts',
-        '**/types.d.ts',
-      ],
+      include: ['apps/api/src/**/*.ts', 'apps/background/src/**/*.ts', 'packages/**/src/**/*.ts'],
+      exclude: ['**/*.test.ts', '**/*.int.test.ts', '**/*.d.ts', '**/index.ts', '**/types.d.ts'],
       // NOTE: V8 coverage instrumentation is not functional with @cloudflare/vitest-pool-workers
       // because the Cloudflare Workers sandbox does not expose node:inspector/promises.
       // Run `pnpm run test:integration` (without --coverage) for integration testing.
@@ -60,11 +52,7 @@ export default defineConfig({
     }),
   },
   ssr: {
-    noExternal: [
-      'hono',
-      'chanfana',
-      '@edge-git',
-    ],
+    noExternal: ['hono', 'chanfana', '@edge-git'],
   },
   resolve: {
     alias: [

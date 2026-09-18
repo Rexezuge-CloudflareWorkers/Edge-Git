@@ -11,7 +11,17 @@ import { ConfirmDeleteModal } from '../modals/ConfirmDeleteModal';
 import { WebhookRow } from './WebhookRow';
 import type { Notice } from './WebhookRow';
 
-const FALLBACK_EVENTS: WebhookEventName[] = ['push', 'issues', 'issue_comment', 'pull_request', 'pull_request_review', 'fork', 'star', 'watch', 'release'];
+const FALLBACK_EVENTS: WebhookEventName[] = [
+  'push',
+  'issues',
+  'issue_comment',
+  'pull_request',
+  'pull_request_review',
+  'fork',
+  'star',
+  'watch',
+  'release',
+];
 
 function replaceHook(hooks: RepoWebhook[], updated: RepoWebhook): RepoWebhook[] {
   return hooks.map((h) => (h.id === updated.id ? updated : h));
@@ -42,7 +52,8 @@ export function WebhooksCard({ owner, repo, showNotice }: { owner: string; repo:
           setAvailableEvents(events.filter((e) => e !== 'ping'));
         }
       } catch (error) {
-        if (!cancelled) showNotice('error', error instanceof Error ? error.message : t('webhooks.failedToLoad', 'Failed To Load Webhooks.'));
+        if (!cancelled)
+          showNotice('error', error instanceof Error ? error.message : t('webhooks.failedToLoad', 'Failed To Load Webhooks.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -114,11 +125,15 @@ export function WebhooksCard({ owner, repo, showNotice }: { owner: string; repo:
         </CardTitle>
         <RefreshButton onRefresh={refresh} loading={loading} />
       </CardHeader>
-      <p className="text-sm text-[var(--color-text-secondary)]">{t('webhooks.description', 'POST Signed JSON Payloads To External URLs On Repository Events. Deliveries Retry With Backoff.')}</p>
+      <p className="text-sm text-[var(--color-text-secondary)]">
+        {t('webhooks.description', 'POST Signed JSON Payloads To External URLs On Repository Events. Deliveries Retry With Backoff.')}
+      </p>
 
       {revealedSecret && (
         <div className="mt-3 rounded-md border border-[var(--color-warning-text)]/40 bg-[var(--color-warning-bg)] p-3">
-          <p className="text-sm font-medium text-[var(--color-text-primary)]">{t('webhooks.copySecretOnce', 'Copy This Secret Now — It Will Not Be Shown Again.')}</p>
+          <p className="text-sm font-medium text-[var(--color-text-primary)]">
+            {t('webhooks.copySecretOnce', 'Copy This Secret Now — It Will Not Be Shown Again.')}
+          </p>
           <p className="mt-1 font-mono text-sm break-all text-[var(--color-text-primary)]">{revealedSecret.secret}</p>
           <div className="mt-2">
             <Button size="sm" variant="secondary" onClick={() => setRevealedSecret(null)}>
@@ -182,9 +197,14 @@ export function WebhooksCard({ owner, repo, showNotice }: { owner: string; repo:
           />
         ))}
       </ul>
-      {hooks.length === 0 && !loading && <p className="text-sm text-[var(--color-text-muted)] mt-4">{t('webhooks.noHooks', 'No Webhooks Yet.')}</p>}
+      {hooks.length === 0 && !loading && (
+        <p className="text-sm text-[var(--color-text-muted)] mt-4">{t('webhooks.noHooks', 'No Webhooks Yet.')}</p>
+      )}
       <p className="mt-3 text-xs text-[var(--color-text-muted)]">
-        {t('webhooks.signingNote', 'Each Webhook Has Its Own Signing Secret (X-EdgeGit-Signature-256). Hooks Auto-Disable After Repeated Failures.')}
+        {t(
+          'webhooks.signingNote',
+          'Each Webhook Has Its Own Signing Secret (X-EdgeGit-Signature-256). Hooks Auto-Disable After Repeated Failures.',
+        )}
       </p>
 
       {removing && (

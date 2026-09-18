@@ -39,7 +39,12 @@ function registerUserForkRoutes(app: ForkApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    const body = (await c.req.json().catch(() => ({}))) as { owner?: string; name?: string; description?: string | null; isPrivate?: boolean };
+    const body = (await c.req.json().catch(() => ({}))) as {
+      owner?: string;
+      name?: string;
+      description?: string | null;
+      isPrivate?: boolean;
+    };
     const scope = createRequestScope(c.env);
     let fork: { id: string; owner: string; name: string; fullName: string; isPrivate: boolean };
     try {
@@ -51,7 +56,8 @@ function registerUserForkRoutes(app: ForkApp): void {
     try {
       await ensureRepo(c.env, fork.fullName);
       await copyRepoGit(c.env, sourceFullName, fork.fullName);
-    } catch (error) {      // Roll back the fork so a failed copy never leaves a half-made repo.
+    } catch (error) {
+      // Roll back the fork so a failed copy never leaves a half-made repo.
       await scope.get(Tokens.ForkService).rollbackFork(fork.id);
       try {
         await getRepoStub(c.env, fork.fullName).deleteRepo();
@@ -63,8 +69,14 @@ function registerUserForkRoutes(app: ForkApp): void {
       }
       return c.json({ error: 'Failed to copy repository data' }, 500);
     }
-    await scope.get(Tokens.WatchService).ensureWatching(fork.id, email).catch(() => undefined);
-    const sourceRow = await scope.get(Tokens.RepoService).getByOwnerAndName(owner, repoName).catch(() => null);
+    await scope
+      .get(Tokens.WatchService)
+      .ensureWatching(fork.id, email)
+      .catch(() => undefined);
+    const sourceRow = await scope
+      .get(Tokens.RepoService)
+      .getByOwnerAndName(owner, repoName)
+      .catch(() => null);
     if (sourceRow) {
       await recordAndNotify(c.env, {
         repositoryId: sourceRow.id,
@@ -75,7 +87,10 @@ function registerUserForkRoutes(app: ForkApp): void {
         payload: { fork: fork.fullName },
       });
     }
-    return c.json({ id: fork.id, owner: fork.owner, name: fork.name, fullName: fork.fullName, forkedFrom: sourceFullName, isPrivate: fork.isPrivate }, 201);
+    return c.json(
+      { id: fork.id, owner: fork.owner, name: fork.name, fullName: fork.fullName, forkedFrom: sourceFullName, isPrivate: fork.isPrivate },
+      201,
+    );
   });
 
   app.get('/user/repos/:owner/:repo/forks', async (c) => {

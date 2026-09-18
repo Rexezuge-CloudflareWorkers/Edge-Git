@@ -126,7 +126,12 @@ class OrganizationService {
     return user.email.toLowerCase();
   }
 
-  public async addMember(orgUsername: string, actorEmail: string, targetUsernameOrEmail: string, role: OrgMemberRole = 'member'): Promise<void> {
+  public async addMember(
+    orgUsername: string,
+    actorEmail: string,
+    targetUsernameOrEmail: string,
+    role: OrgMemberRole = 'member',
+  ): Promise<void> {
     const org = await this.requireOwner(orgUsername, actorEmail);
     if (role !== 'owner' && role !== 'member') throw new BadRequestError('Invalid role');
     const targetEmail = await this.resolveEmail(targetUsernameOrEmail);
@@ -161,7 +166,10 @@ class OrganizationService {
     await memberDAO.remove(org.id, targetEmail);
   }
 
-  public async listMembers(orgUsername: string, requesterEmail: string): Promise<Array<{ email: string; username: string | null; role: OrgMemberRole }>> {
+  public async listMembers(
+    orgUsername: string,
+    requesterEmail: string,
+  ): Promise<Array<{ email: string; username: string | null; role: OrgMemberRole }>> {
     const org = await this.requireMember(orgUsername, requesterEmail);
     const memberDAO = await this.deps.organizationMemberDAO();
     const userDAO = await this.deps.userDAO();

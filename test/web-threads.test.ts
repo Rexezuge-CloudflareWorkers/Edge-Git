@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { countApprovals, countOpenThreads, groupThreadsByPath, isBlockedByCodeowners, isBlockedByReviews, latestReviewsByAuthor, threadLabel } from '../apps/web/src/lib/threads';
+import {
+  countApprovals,
+  countOpenThreads,
+  groupThreadsByPath,
+  isBlockedByCodeowners,
+  isBlockedByReviews,
+  latestReviewsByAuthor,
+  threadLabel,
+} from '../apps/web/src/lib/threads';
 
 describe('web thread gate parity', () => {
   it('mirrors the API latest-wins gate and skips dismissed reviews', () => {
@@ -29,7 +37,9 @@ describe('web thread gate parity', () => {
     expect(isBlockedByCodeowners(reviews, 'alice@example.com', [])).toBe(false);
     expect(isBlockedByCodeowners(reviews, 'alice@example.com', ['carol@example.com'])).toBe(false);
     expect(isBlockedByCodeowners(reviews, 'alice@example.com', ['dave@example.com'])).toBe(true);
-    expect(isBlockedByCodeowners([{ author_email: 'alice@example.com', state: 'approved' }], 'alice@example.com', ['alice@example.com'])).toBe(true);
+    expect(
+      isBlockedByCodeowners([{ author_email: 'alice@example.com', state: 'approved' }], 'alice@example.com', ['alice@example.com']),
+    ).toBe(true);
   });
 });
 

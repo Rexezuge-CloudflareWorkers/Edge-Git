@@ -62,7 +62,9 @@ function createFakeDb(seed: { now?: number } = {}): D1Queryable & {
       },
       all<T>(): Promise<{ results: T[] }> {
         if (q.startsWith('SELECT * FROM repositories WHERE owner_email = ?') || q.includes('FROM repositories WHERE lower(owner_email)')) {
-          const rows = state.repos.filter((r) => String(r.owner_email).toLowerCase() === String(params[0]).toLowerCase()).slice(0, params[1] as number);
+          const rows = state.repos
+            .filter((r) => String(r.owner_email).toLowerCase() === String(params[0]).toLowerCase())
+            .slice(0, params[1] as number);
           return Promise.resolve({ results: rows as T[] });
         }
         if (q.startsWith('SELECT * FROM repositories WHERE owner = ?')) {
@@ -237,7 +239,13 @@ describe('IssueService', () => {
     const db = createFakeDb();
     const svc = new IssueService({ DB: db });
     const first = await svc.createIssue({ repositoryId: 'r1', fullName: 'alice/demo', title: 'First', creatorEmail: 'a@x.co' });
-    const second = await svc.createIssue({ repositoryId: 'r1', fullName: 'alice/demo', title: 'Second', body: 'b', creatorEmail: 'a@x.co' });
+    const second = await svc.createIssue({
+      repositoryId: 'r1',
+      fullName: 'alice/demo',
+      title: 'Second',
+      body: 'b',
+      creatorEmail: 'a@x.co',
+    });
     expect(first.number).toBe(1);
     expect(second.number).toBe(2);
     const listed = await svc.listByRepo('r1');
@@ -344,9 +352,9 @@ describe('D1 utils', () => {
   });
 
   it('throws DatabaseError for non-retryable failures', async () => {
-    await expect(executeD1WithRetry(() => Promise.resolve({ success: false, error: 'UNIQUE constraint failed' }), 'dup')).rejects.toBeInstanceOf(
-      DatabaseError,
-    );
+    await expect(
+      executeD1WithRetry(() => Promise.resolve({ success: false, error: 'UNIQUE constraint failed' }), 'dup'),
+    ).rejects.toBeInstanceOf(DatabaseError);
     expect(isD1ErrorRetryable('database is locked')).toBe(true);
     expect(isD1ErrorRetryable('UNIQUE constraint failed')).toBe(false);
     expect(isD1ErrorRetryable('')).toBe(false);

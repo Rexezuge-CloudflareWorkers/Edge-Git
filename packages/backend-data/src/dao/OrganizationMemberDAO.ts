@@ -58,13 +58,20 @@ class OrganizationMemberDAO extends BaseDAO {
 
   public async remove(orgId: string, userEmail: string): Promise<void> {
     await this.withRetry(
-      () => this.database.prepare('DELETE FROM organization_members WHERE org_id = ? AND lower(user_email) = lower(?)').bind(orgId, userEmail).run(),
+      () =>
+        this.database
+          .prepare('DELETE FROM organization_members WHERE org_id = ? AND lower(user_email) = lower(?)')
+          .bind(orgId, userEmail)
+          .run(),
       'remove organization member',
     );
   }
 
   public async deleteByOrg(orgId: string): Promise<void> {
-    await this.withRetry(() => this.database.prepare('DELETE FROM organization_members WHERE org_id = ?').bind(orgId).run(), 'delete members by org');
+    await this.withRetry(
+      () => this.database.prepare('DELETE FROM organization_members WHERE org_id = ?').bind(orgId).run(),
+      'delete members by org',
+    );
   }
 
   public async countOwners(orgId: string): Promise<number> {

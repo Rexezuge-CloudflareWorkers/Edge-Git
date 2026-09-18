@@ -78,7 +78,11 @@ class ProjectService {
     };
   }
 
-  public async createProject(repositoryId: string, input: { title: unknown; description?: unknown }, creatorEmail: string): Promise<ProjectMetadata> {
+  public async createProject(
+    repositoryId: string,
+    input: { title: unknown; description?: unknown },
+    creatorEmail: string,
+  ): Promise<ProjectMetadata> {
     const title = normalizeTitle(input.title);
     const description =
       input.description === undefined || input.description === null
@@ -103,7 +107,9 @@ class ProjectService {
       { title: 'Done', position: 2 },
     ];
     for (const seed of seeds) {
-      await dao.createColumn({ id: UUIDUtil.getRandomUUID(), projectId: id, title: seed.title, position: seed.position, now }).catch(() => undefined);
+      await dao
+        .createColumn({ id: UUIDUtil.getRandomUUID(), projectId: id, title: seed.title, position: seed.position, now })
+        .catch(() => undefined);
     }
     const row = await dao.getById(id, repositoryId);
     if (!row) throw new NotFoundError('Project not found');
@@ -134,7 +140,11 @@ class ProjectService {
     return { project: toMetadata(row), columns: columns.map(toColumnMetadata), cards: cards.map(toCardMetadata) };
   }
 
-  public async updateProject(repositoryId: string, number: number, input: { title?: unknown; description?: unknown }): Promise<ProjectMetadata> {
+  public async updateProject(
+    repositoryId: string,
+    number: number,
+    input: { title?: unknown; description?: unknown },
+  ): Promise<ProjectMetadata> {
     const dao = await this.deps.projectDAO();
     const row = await dao.getByNumber(repositoryId, number);
     if (!row) throw new NotFoundError('Project not found');
@@ -177,7 +187,8 @@ class ProjectService {
     const existing = await dao.listColumns(project.id);
     const max = ConfigurationManager.collabSurfaces.getMaxColumnsPerProject(this.env);
     if (existing.length >= max) throw new BadRequestError(`Maximum ${max} columns per project`);
-    if (existing.some((c) => c.title.toLowerCase() === title.toLowerCase())) throw new BadRequestError('a column with this title already exists');
+    if (existing.some((c) => c.title.toLowerCase() === title.toLowerCase()))
+      throw new BadRequestError('a column with this title already exists');
     const position = existing.length === 0 ? 0 : Math.max(...existing.map((c) => c.position)) + 1;
     const id = UUIDUtil.getRandomUUID();
     try {
@@ -190,7 +201,12 @@ class ProjectService {
     return toColumnMetadata(row);
   }
 
-  public async renameColumn(repositoryId: string, projectNumber: number, columnId: string, input: { title: unknown }): Promise<ProjectColumnMetadata> {
+  public async renameColumn(
+    repositoryId: string,
+    projectNumber: number,
+    columnId: string,
+    input: { title: unknown },
+  ): Promise<ProjectColumnMetadata> {
     const title = normalizeTitle(input.title);
     const dao = await this.deps.projectDAO();
     const project = await dao.getByNumber(repositoryId, projectNumber);
@@ -247,7 +263,8 @@ class ProjectService {
       if (input.noteTitle === undefined) {
         noteTitle = 'Untitled';
       } else {
-        if (typeof input.noteTitle !== 'string' || !input.noteTitle.trim()) throw new BadRequestError('noteTitle must be a non-empty string');
+        if (typeof input.noteTitle !== 'string' || !input.noteTitle.trim())
+          throw new BadRequestError('noteTitle must be a non-empty string');
         noteTitle = input.noteTitle.trim().slice(0, MAX_NOTE_TITLE);
       }
       if (input.noteBody !== undefined) {
@@ -258,7 +275,8 @@ class ProjectService {
       if (typeof input.issueId !== 'string' || !input.issueId) throw new BadRequestError('issueId is required for issue cards');
       issueId = input.issueId;
     } else {
-      if (typeof input.pullRequestId !== 'string' || !input.pullRequestId) throw new BadRequestError('pullRequestId is required for pull cards');
+      if (typeof input.pullRequestId !== 'string' || !input.pullRequestId)
+        throw new BadRequestError('pullRequestId is required for pull cards');
       pullRequestId = input.pullRequestId;
     }
     const siblings = await dao.listCards(project.id, true).catch(() => []);
@@ -313,7 +331,12 @@ class ProjectService {
     return toCardMetadata(updated);
   }
 
-  public async setCardArchived(repositoryId: string, projectNumber: number, cardId: string, archived: unknown): Promise<ProjectCardMetadata> {
+  public async setCardArchived(
+    repositoryId: string,
+    projectNumber: number,
+    cardId: string,
+    archived: unknown,
+  ): Promise<ProjectCardMetadata> {
     if (typeof archived !== 'boolean') throw new BadRequestError('archived must be a boolean');
     const dao = await this.deps.projectDAO();
     const project = await dao.getByNumber(repositoryId, projectNumber);

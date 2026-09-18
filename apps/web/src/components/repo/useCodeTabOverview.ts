@@ -110,7 +110,12 @@ function useCodeTabOverview(
         setDefaultBranch(overview.currentBranch ?? overview.branches[0] ?? null);
         setTags(overview.tags);
         const tagRefs = new Set(overview.tags.map((tg) => tg.ref));
-        const resolvedRef = resolveSelectedRef(refState, overview.branches, overview.currentBranch ?? overview.branches[0] ?? null, tagRefs);
+        const resolvedRef = resolveSelectedRef(
+          refState,
+          overview.branches,
+          overview.currentBranch ?? overview.branches[0] ?? null,
+          tagRefs,
+        );
         if (refState !== '' && resolvedRef !== refState) {
           setRef(resolvedRef === 'HEAD' ? '' : resolvedRef);
           return;

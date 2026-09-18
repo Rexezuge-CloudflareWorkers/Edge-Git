@@ -99,7 +99,11 @@ describe('git data-plane on real D1+DO', () => {
     ).json()) as { token: string };
     const bigPush = await api(`/${OWNER}/${REPO}/git-receive-pack`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${minted.token}`, 'Content-Length': String(60 * 1024 * 1024), 'Content-Type': 'application/x-git-receive-pack-request' },
+      headers: {
+        Authorization: `Bearer ${minted.token}`,
+        'Content-Length': String(60 * 1024 * 1024),
+        'Content-Type': 'application/x-git-receive-pack-request',
+      },
       body: 'x',
     });
     expect(bigPush.status).toBe(413);

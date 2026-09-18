@@ -219,7 +219,12 @@ export class PackCollector {
     return { oids: Array.from(objectsToSend), shallow: Array.from(shallowBoundary) };
   }
 
-  private async enqueueRelatedObjectsWithDepth(type: string, oid: string, queue: Array<{ oid: string; depth: number }>, depth: number): Promise<void> {
+  private async enqueueRelatedObjectsWithDepth(
+    type: string,
+    oid: string,
+    queue: Array<{ oid: string; depth: number }>,
+    depth: number,
+  ): Promise<void> {
     switch (type) {
       case 'commit': {
         const commit = await git.readCommit({

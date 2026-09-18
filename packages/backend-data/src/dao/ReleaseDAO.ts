@@ -125,7 +125,11 @@ class ReleaseDAO extends BaseDAO {
     }
     if (sets.length === 0) return;
     await this.withRetry(
-      () => this.database.prepare(`UPDATE releases SET ${sets.join(', ')} WHERE id = ? AND repository_id = ?`).bind(...values, id, repositoryId).run(),
+      () =>
+        this.database
+          .prepare(`UPDATE releases SET ${sets.join(', ')} WHERE id = ? AND repository_id = ?`)
+          .bind(...values, id, repositoryId)
+          .run(),
       'update release',
     );
   }

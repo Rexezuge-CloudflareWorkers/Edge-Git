@@ -40,7 +40,10 @@ describe('PR depth part 2 on real D1', () => {
   });
 
   it('opens, lists, replies, and resolves threads (owner + public)', async () => {
-    const open = await api(`/user/repos/${OWNER}/${REPO}/pulls/1/threads`, json({ method: 'POST', body: { path: 'src/app.ts', line: 42, side: 'new', body: 'nit?' } }));
+    const open = await api(
+      `/user/repos/${OWNER}/${REPO}/pulls/1/threads`,
+      json({ method: 'POST', body: { path: 'src/app.ts', line: 42, side: 'new', body: 'nit?' } }),
+    );
     expect(open.status).toBe(201);
     const opened = (await open.json()) as { thread: { id: string; status: string; comments: Array<{ body: string }> } };
     expect(opened.thread.status).toBe('open');
@@ -58,14 +61,23 @@ describe('PR depth part 2 on real D1', () => {
     expect(pub.status).toBe(200);
     expect(((await pub.json()) as { threads: unknown[] }).threads).toHaveLength(1);
 
-    const reply = await api(`/user/repos/${OWNER}/${REPO}/pulls/1/threads/${threadId}/replies`, json({ method: 'POST', body: { body: 'ack' } }));
+    const reply = await api(
+      `/user/repos/${OWNER}/${REPO}/pulls/1/threads/${threadId}/replies`,
+      json({ method: 'POST', body: { body: 'ack' } }),
+    );
     expect(reply.status).toBe(201);
 
-    const resolve = await api(`/user/repos/${OWNER}/${REPO}/pulls/1/threads/${threadId}`, json({ method: 'PATCH', body: { resolved: true } }));
+    const resolve = await api(
+      `/user/repos/${OWNER}/${REPO}/pulls/1/threads/${threadId}`,
+      json({ method: 'PATCH', body: { resolved: true } }),
+    );
     expect(resolve.status).toBe(200);
     expect(await resolve.json()).toMatchObject({ thread: { status: 'resolved' } });
 
-    const badToggle = await api(`/user/repos/${OWNER}/${REPO}/pulls/1/threads/${threadId}`, json({ method: 'PATCH', body: { resolved: 'yes' } }));
+    const badToggle = await api(
+      `/user/repos/${OWNER}/${REPO}/pulls/1/threads/${threadId}`,
+      json({ method: 'PATCH', body: { resolved: 'yes' } }),
+    );
     expect(badToggle.status).toBe(400);
 
     const missing = await api(`/user/repos/${OWNER}/${REPO}/pulls/1/threads/nope/replies`, json({ method: 'POST', body: { body: 'x' } }));
@@ -75,25 +87,34 @@ describe('PR depth part 2 on real D1', () => {
   it('dismisses reviews and clears the merge gate', async () => {
     const testEnv = env as unknown as TestEnv;
     const now = Math.floor(Date.now() / 1000);
-    const pr = await testEnv.DB.prepare('SELECT id FROM pull_requests WHERE repository_id = ? AND number = 1').bind(repoId).first<{ id: string }>();
+    const pr = await testEnv.DB.prepare('SELECT id FROM pull_requests WHERE repository_id = ? AND number = 1')
+      .bind(repoId)
+      .first<{ id: string }>();
     await testEnv.DB.prepare(
       `INSERT INTO pull_request_reviews (id, pull_request_id, author_email, state, body, commit_oid, created_at) VALUES (?, ?, ?, 'changes_requested', 'fix this', NULL, ?)`,
     )
       .bind(crypto.randomUUID(), pr?.id ?? '', 'reviewer@example.com', now)
       .run();
 
-    const reviews = (await (await api(`/user/repos/${OWNER}/${REPO}/pulls/1/reviews`)).json()) as { reviews: Array<{ id: string; state: string }> };
+    const reviews = (await (await api(`/user/repos/${OWNER}/${REPO}/pulls/1/reviews`)).json()) as {
+      reviews: Array<{ id: string; state: string }>;
+    };
     const target = reviews.reviews.find((r) => r.state === 'changes_requested');
     expect(target).toBeDefined();
 
-    const dismiss = await api(`/user/repos/${OWNER}/${REPO}/pulls/1/reviews/${target?.id}/dismiss`, json({ method: 'POST', body: { reason: 'outdated' } }));
+    const dismiss = await api(
+      `/user/repos/${OWNER}/${REPO}/pulls/1/reviews/${target?.id}/dismiss`,
+      json({ method: 'POST', body: { reason: 'outdated' } }),
+    );
     expect(dismiss.status).toBe(200);
     expect(await dismiss.json()).toMatchObject({ review: { dismissed: 1 } });
 
     const again = await api(`/user/repos/${OWNER}/${REPO}/pulls/1/reviews/${target?.id}/dismiss`, json({ method: 'POST', body: {} }));
     expect(again.status).toBe(400);
 
-    const after = (await (await api(`/user/repos/${OWNER}/${REPO}/pulls/1/reviews`)).json()) as { reviews: Array<{ id: string; dismissed?: number }> };
+    const after = (await (await api(`/user/repos/${OWNER}/${REPO}/pulls/1/reviews`)).json()) as {
+      reviews: Array<{ id: string; dismissed?: number }>;
+    };
     expect(after.reviews.find((r) => r.id === target?.id)?.dismissed).toBe(1);
   });
 

@@ -53,15 +53,9 @@ export async function listReleases(owner: string, repo: string, opts?: { isAuthe
   return data.releases ?? [];
 }
 
-export async function getRelease(
-  owner: string,
-  repo: string,
-  tag: string,
-): Promise<{ release: Release; assets: ReleaseAsset[] }> {
+export async function getRelease(owner: string, repo: string, tag: string): Promise<{ release: Release; assets: ReleaseAsset[] }> {
   try {
-    return await apiGet<{ release: Release; assets: ReleaseAsset[] }>(
-      `${authedBase(owner, repo)}/releases/${encodeURIComponent(tag)}`,
-    );
+    return await apiGet<{ release: Release; assets: ReleaseAsset[] }>(`${authedBase(owner, repo)}/releases/${encodeURIComponent(tag)}`);
   } catch {
     return apiGet<{ release: Release; assets: ReleaseAsset[] }>(`${publicBase(owner, repo)}/releases/${encodeURIComponent(tag)}`);
   }
@@ -107,12 +101,7 @@ function encodeFileToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-export async function uploadReleaseAsset(
-  owner: string,
-  repo: string,
-  tag: string,
-  file: File,
-): Promise<{ asset: ReleaseAsset }> {
+export async function uploadReleaseAsset(owner: string, repo: string, tag: string, file: File): Promise<{ asset: ReleaseAsset }> {
   const bytes = new Uint8Array(await file.arrayBuffer());
   return apiPost<{ asset: ReleaseAsset }>(`${authedBase(owner, repo)}/releases/${encodeURIComponent(tag)}/assets`, {
     name: file.name,

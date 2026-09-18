@@ -18,7 +18,10 @@ interface WebhookDeliveryServiceEnv {
 interface WebhookDeliveryServiceDeps {
   webhookDAO?: () => Promise<WebhookDAO>;
   deliveryDAO?: () => Promise<WebhookDeliveryDAO>;
-  postJson?: (url: string, init: { headers: Record<string, string>; body: string; timeoutMs: number }) => Promise<{ httpStatus: number | null; error: string | null }>;
+  postJson?: (
+    url: string,
+    init: { headers: Record<string, string>; body: string; timeoutMs: number },
+  ) => Promise<{ httpStatus: number | null; error: string | null }>;
 }
 
 interface EnqueueEventInput {
@@ -167,7 +170,12 @@ class WebhookDeliveryService {
     }
   }
 
-  public async listDeliveries(hookId: string, repositoryId: string, limit = 20, cursor?: string): Promise<{ deliveries: WebhookDeliveryMetadata[]; nextCursor: string | null }> {
+  public async listDeliveries(
+    hookId: string,
+    repositoryId: string,
+    limit = 20,
+    cursor?: string,
+  ): Promise<{ deliveries: WebhookDeliveryMetadata[]; nextCursor: string | null }> {
     const webhookDAO = await this.deps.webhookDAO();
     const hook = await webhookDAO.getByIdAndRepo(hookId, repositoryId).catch(() => null);
     if (!hook) throw new NotFoundError('Webhook not found.');
@@ -249,25 +257,31 @@ class WebhookDeliveryService {
     if (!row) return false;
     const hook = await webhookDAO.getById(row.hook_id).catch(() => null);
     if (!hook || hook.is_active !== 1) {
-      await deliveryDAO.markSettled(deliveryId, { status: 'failed', nextRetryAt: now, httpStatus: null, error: 'Webhook is missing or disabled.', now }).catch(() => undefined);
+      await deliveryDAO
+        .markSettled(deliveryId, { status: 'failed', nextRetryAt: now, httpStatus: null, error: 'Webhook is missing or disabled.', now })
+        .catch(() => undefined);
       return false;
     }
     const issuedAt = String(now);
     const signature = await signDelivery(hook.secret, row.payload);
-    const outcome = await this.deps.postJson(hook.url, {
-      headers: {
-        'X-EdgeGit-Event': row.event,
-        'X-EdgeGit-Delivery': row.id,
-        'X-EdgeGit-Timestamp': issuedAt,
-        'X-EdgeGit-Signature-256': signature,
-      },
-      body: row.payload,
-      timeoutMs,
-    }).catch(() => ({ httpStatus: null as number | null, error: 'Delivery failed.' }));
+    const outcome = await this.deps
+      .postJson(hook.url, {
+        headers: {
+          'X-EdgeGit-Event': row.event,
+          'X-EdgeGit-Delivery': row.id,
+          'X-EdgeGit-Timestamp': issuedAt,
+          'X-EdgeGit-Signature-256': signature,
+        },
+        body: row.payload,
+        timeoutMs,
+      })
+      .catch(() => ({ httpStatus: null as number | null, error: 'Delivery failed.' }));
     const attempts = row.attempts + 1;
     const terminal = !isRetryableHttpStatus(outcome.httpStatus) || attempts >= maxAttempts;
     if (outcome.error === null) {
-      await deliveryDAO.markSettled(deliveryId, { status: 'success', nextRetryAt: now, httpStatus: outcome.httpStatus, error: null, now }).catch(() => undefined);
+      await deliveryDAO
+        .markSettled(deliveryId, { status: 'success', nextRetryAt: now, httpStatus: outcome.httpStatus, error: null, now })
+        .catch(() => undefined);
       await webhookDAO.recordDeliveryOutcome(hook.id, true, now, disableAfter).catch(() => undefined);
       return true;
     }

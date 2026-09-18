@@ -30,7 +30,10 @@ describe('branch protection lifecycle on real D1', () => {
   const rulesPath = `/user/repos/${OWNER}/${REPO}/rules`;
 
   it('creates, lists, rejects duplicates, and deletes rules', async () => {
-    const created = await api(rulesPath, json({ method: 'POST', body: JSON.stringify({ pattern: 'main', requirePr: true, requiredApprovals: 1 }) }));
+    const created = await api(
+      rulesPath,
+      json({ method: 'POST', body: JSON.stringify({ pattern: 'main', requirePr: true, requiredApprovals: 1 }) }),
+    );
     expect(created.status).toBe(201);
     const rule = (await created.json()) as { rule: { id: string; pattern: string; requirePr: boolean; requiredApprovals: number } };
     expect(rule.rule.pattern).toBe('main');
@@ -41,7 +44,9 @@ describe('branch protection lifecycle on real D1', () => {
 
     expect((await api(rulesPath, json({ method: 'POST', body: JSON.stringify({ pattern: 'main' }) }))).status).toBe(400);
     expect((await api(rulesPath, json({ method: 'POST', body: JSON.stringify({ pattern: 'has space' }) }))).status).toBe(400);
-    expect((await api(rulesPath, json({ method: 'POST', body: JSON.stringify({ pattern: 'other', requiredApprovals: 7 }) }))).status).toBe(400);
+    expect((await api(rulesPath, json({ method: 'POST', body: JSON.stringify({ pattern: 'other', requiredApprovals: 7 }) }))).status).toBe(
+      400,
+    );
 
     expect((await api(`${rulesPath}/${rule.rule.id}`, { method: 'DELETE' })).status).toBe(200);
     const after = (await (await api(rulesPath)).json()) as { rules: unknown[] };
@@ -73,7 +78,9 @@ describe('branch protection lifecycle on real D1', () => {
 
     // An outsider approval lifts the gate (merge then fails past the gate on
     // missing git branches — the seeded PR has no oids and the DO repo is empty).
-    await testEnv.DB.prepare(`INSERT INTO pull_request_reviews (id, pull_request_id, author_email, state, body, commit_oid, created_at) VALUES (?, ?, ?, 'approved', NULL, NULL, ?)`)
+    await testEnv.DB.prepare(
+      `INSERT INTO pull_request_reviews (id, pull_request_id, author_email, state, body, commit_oid, created_at) VALUES (?, ?, ?, 'approved', NULL, NULL, ?)`,
+    )
       .bind('rev-outsider-1', 'pr-protect-1', REVIEWER, now)
       .run();
     const pastGate = await api(mergePath, json({ method: 'POST', body: JSON.stringify({}) }));

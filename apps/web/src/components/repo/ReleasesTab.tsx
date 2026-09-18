@@ -248,7 +248,13 @@ export function ReleasesTab({
     if (!tagName.trim()) return;
     setSaving(true);
     try {
-      await createRelease(owner, repo, { tagName: tagName.trim(), name: name.trim() || undefined, body: body.trim() || undefined, isDraft: true, isPrerelease });
+      await createRelease(owner, repo, {
+        tagName: tagName.trim(),
+        name: name.trim() || undefined,
+        body: body.trim() || undefined,
+        isDraft: true,
+        isPrerelease,
+      });
       setTagName('');
       setName('');
       setBody('');
@@ -329,7 +335,16 @@ export function ReleasesTab({
         ) : (
           <ul className="divide-y divide-[var(--color-border)]">
             {releases.map((r) => (
-              <ReleaseRow key={r.id} owner={owner} repo={repo} release={r} canWrite={canWrite} authorized={authorized} showNotice={showNotice} onChanged={refresh} />
+              <ReleaseRow
+                key={r.id}
+                owner={owner}
+                repo={repo}
+                release={r}
+                canWrite={canWrite}
+                authorized={authorized}
+                showNotice={showNotice}
+                onChanged={refresh}
+              />
             ))}
           </ul>
         )}

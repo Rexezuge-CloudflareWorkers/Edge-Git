@@ -28,7 +28,9 @@ async function runMirrorSync(env: Env, repositoryId: string): Promise<void> {
   const maxFailures = scope.get(Tokens.MirrorService).maxFailures();
   const fail = async (message: string): Promise<void> => {
     logger.error(`Mirror sync for ${repositoryId} failed: ${message}`);
-    await mirrorDAO.recordRun(repositoryId, false, message, TimestampUtil.getCurrentUnixTimestampInSeconds(), maxFailures).catch(() => undefined);
+    await mirrorDAO
+      .recordRun(repositoryId, false, message, TimestampUtil.getCurrentUnixTimestampInSeconds(), maxFailures)
+      .catch(() => undefined);
   };
   try {
     const repoDAO = await scope.get(Tokens.RepositoryDAO)();

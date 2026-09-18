@@ -6,7 +6,12 @@ import { matchCodeowners, parseCodeowners } from '@edge-git/backend-services/col
 import { PullRequestService } from '@edge-git/backend-services/pull';
 
 function createCollabFakeDb(): D1Queryable & { labels: Array<Record<string, unknown>>; milestones: Array<Record<string, unknown>> } {
-  const state = { labels: [] as Array<Record<string, unknown>>, milestones: [] as Array<Record<string, unknown>>, issueLabels: [] as Array<{ issue_id: string; label_id: string }>, reviewers: [] as Array<Record<string, unknown>> };
+  const state = {
+    labels: [] as Array<Record<string, unknown>>,
+    milestones: [] as Array<Record<string, unknown>>,
+    issueLabels: [] as Array<{ issue_id: string; label_id: string }>,
+    reviewers: [] as Array<Record<string, unknown>>,
+  };
   function statement(query: string, params: unknown[]) {
     const q = query.replace(/\s+/g, ' ').trim();
     return {
@@ -62,7 +67,11 @@ function createCollabFakeDb(): D1Queryable & { labels: Array<Record<string, unkn
       },
     };
   }
-  return { prepare: (query: string) => ({ bind: (...params: unknown[]) => statement(query, params) }), labels: state.labels, milestones: state.milestones } as unknown as D1Queryable & {
+  return {
+    prepare: (query: string) => ({ bind: (...params: unknown[]) => statement(query, params) }),
+    labels: state.labels,
+    milestones: state.milestones,
+  } as unknown as D1Queryable & {
     labels: Array<Record<string, unknown>>;
     milestones: Array<Record<string, unknown>>;
   };
@@ -101,7 +110,10 @@ describe('CODEOWNERS parser', () => {
 
 describe('PullRequest draft gate', () => {
   it('blocks merge of draft pull requests', async () => {
-    const fake = { getByNumber: () => Promise.resolve({ id: 'pr-1', repository_id: 'r', number: 1, status: 'open', is_draft: 1 }), listReviews: () => Promise.resolve([]) };
+    const fake = {
+      getByNumber: () => Promise.resolve({ id: 'pr-1', repository_id: 'r', number: 1, status: 'open', is_draft: 1 }),
+      listReviews: () => Promise.resolve([]),
+    };
     const svc = new PullRequestService({ DB: {} as D1Queryable }, { pullRequestDAO: () => Promise.resolve(fake as never) });
     await expect(svc.markMerged({ repositoryId: 'r', number: 1, mergedBy: 'a@b.c' })).rejects.toThrow('draft');
   });

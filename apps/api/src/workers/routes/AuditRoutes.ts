@@ -5,9 +5,18 @@ import { toServiceStatus } from './PublicViewerResolver';
 
 type AuditApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
-function parseAuditQuery(url: string): { userEmail?: string; action?: string; repo?: string; startTime?: number; endTime?: number; limit?: number; cursor?: string } {
+function parseAuditQuery(url: string): {
+  userEmail?: string;
+  action?: string;
+  repo?: string;
+  startTime?: number;
+  endTime?: number;
+  limit?: number;
+  cursor?: string;
+} {
   const params = new URL(url).searchParams;
-  const out: { userEmail?: string; action?: string; repo?: string; startTime?: number; endTime?: number; limit?: number; cursor?: string } = {};
+  const out: { userEmail?: string; action?: string; repo?: string; startTime?: number; endTime?: number; limit?: number; cursor?: string } =
+    {};
   const userEmail = params.get('userEmail') ?? params.get('user_email');
   const action = params.get('action');
   const repo = params.get('repo');
@@ -25,7 +34,21 @@ function parseAuditQuery(url: string): { userEmail?: string; action?: string; re
   return out;
 }
 
-function logJson(rows: Array<{ log_id: string; timestamp: number; user_email: string; action: string; resource: string | null; method: string; path: string; status_code: number; detail: string | null; ip_address: string | null; user_agent: string | null }>): unknown {
+function logJson(
+  rows: Array<{
+    log_id: string;
+    timestamp: number;
+    user_email: string;
+    action: string;
+    resource: string | null;
+    method: string;
+    path: string;
+    status_code: number;
+    detail: string | null;
+    ip_address: string | null;
+    user_agent: string | null;
+  }>,
+): unknown {
   return rows.map((r) => ({
     id: r.log_id,
     timestamp: r.timestamp,
@@ -52,14 +75,20 @@ function registerAuditRoutes(app: AuditApp): void {
       const scope = createRequestScope(c.env);
       let repoId: string | undefined;
       if (query.repo) {
-        const name = query.repo.includes('/') ? query.repo.split('/').at(-1) ?? query.repo : query.repo;
+        const name = query.repo.includes('/') ? (query.repo.split('/').at(-1) ?? query.repo) : query.repo;
         const repo = await scope.get(Tokens.RepoService).getByOwnerAndName(c.req.param('org'), RepoService.normalizeRepo(name));
         if (!repo) return c.json({ error: 'Repository not found' }, 404);
         repoId = repo.id;
       }
       const { logs, nextCursor } = await scope
         .get(Tokens.AuditService)
-        .queryByOrg(c.req.param('org'), email, { userEmail: query.userEmail, action: query.action, repoId, startTime: query.startTime, endTime: query.endTime }, query.limit, query.cursor);
+        .queryByOrg(
+          c.req.param('org'),
+          email,
+          { userEmail: query.userEmail, action: query.action, repoId, startTime: query.startTime, endTime: query.endTime },
+          query.limit,
+          query.cursor,
+        );
       return c.json({ logs: logJson(logs), nextCursor });
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));

@@ -18,7 +18,11 @@ async function tryAuthedFirst<T>(authedPath: string, publicPath: string, isAuthe
   }
 }
 
-export async function listDiscussionCategories(owner: string, repo: string, opts?: { isAuthed?: boolean | null }): Promise<DiscussionCategory[]> {
+export async function listDiscussionCategories(
+  owner: string,
+  repo: string,
+  opts?: { isAuthed?: boolean | null },
+): Promise<DiscussionCategory[]> {
   const data = await tryAuthedFirst<{ categories?: DiscussionCategory[] }>(
     `${authedBase(owner, repo)}/discussions/categories`,
     `${publicBase(owner, repo)}/discussions/categories`,
@@ -27,9 +31,18 @@ export async function listDiscussionCategories(owner: string, repo: string, opts
   return data.categories ?? [];
 }
 
-export async function listDiscussions(owner: string, repo: string, category?: string, opts?: { isAuthed?: boolean | null }): Promise<Discussion[]> {
-  const authed = category ? `${authedBase(owner, repo)}/discussions?category=${encodeURIComponent(category)}` : `${authedBase(owner, repo)}/discussions`;
-  const pub = category ? `${publicBase(owner, repo)}/discussions?category=${encodeURIComponent(category)}` : `${publicBase(owner, repo)}/discussions`;
+export async function listDiscussions(
+  owner: string,
+  repo: string,
+  category?: string,
+  opts?: { isAuthed?: boolean | null },
+): Promise<Discussion[]> {
+  const authed = category
+    ? `${authedBase(owner, repo)}/discussions?category=${encodeURIComponent(category)}`
+    : `${authedBase(owner, repo)}/discussions`;
+  const pub = category
+    ? `${publicBase(owner, repo)}/discussions?category=${encodeURIComponent(category)}`
+    : `${publicBase(owner, repo)}/discussions`;
   const data = await tryAuthedFirst<{ discussions?: Discussion[] }>(authed, pub, opts?.isAuthed);
   return data.discussions ?? [];
 }
@@ -40,7 +53,11 @@ export async function loadDiscussion(
   number: number,
   opts?: { isAuthed?: boolean | null },
 ): Promise<{ discussion: Discussion; comments: DiscussionComment[] }> {
-  return tryAuthedFirst(`${authedBase(owner, repo)}/discussions/${number}`, `${publicBase(owner, repo)}/discussions/${number}`, opts?.isAuthed);
+  return tryAuthedFirst(
+    `${authedBase(owner, repo)}/discussions/${number}`,
+    `${publicBase(owner, repo)}/discussions/${number}`,
+    opts?.isAuthed,
+  );
 }
 
 export async function createDiscussion(
@@ -64,7 +81,12 @@ export async function deleteDiscussion(owner: string, repo: string, number: numb
   return apiDelete(`${authedBase(owner, repo)}/discussions/${number}`);
 }
 
-export async function addDiscussionComment(owner: string, repo: string, number: number, body: string): Promise<{ comment: DiscussionComment }> {
+export async function addDiscussionComment(
+  owner: string,
+  repo: string,
+  number: number,
+  body: string,
+): Promise<{ comment: DiscussionComment }> {
   return apiPost(`${authedBase(owner, repo)}/discussions/${number}/comments`, { body });
 }
 

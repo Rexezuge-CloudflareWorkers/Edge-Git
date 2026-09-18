@@ -10,9 +10,9 @@ describe('AccessAuthService', () => {
   it('falls back to platform identity when vars unset', async () => {
     const svc = new AccessAuthService({});
     const req = new Request('https://example.com/');
-    await expect(svc.getAuthenticatedUserEmail(req, { access: { getIdentity: async () => ({ email: 'user@example.com' }) } })).resolves.toBe(
-      'user@example.com',
-    );
+    await expect(
+      svc.getAuthenticatedUserEmail(req, { access: { getIdentity: async () => ({ email: 'user@example.com' }) } }),
+    ).resolves.toBe('user@example.com');
   });
 
   it('rejects missing JWT with no platform identity', async () => {

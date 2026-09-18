@@ -124,9 +124,13 @@ describe('release lifecycle on real D1', () => {
     const assetId = uploadedBody.asset.id;
 
     // duplicate names rejected
-    expect((await json('POST', `/user/repos/${OWNER}/${REPO}/releases/v0.1.0/assets`, { name: 'hello.txt', contentBase64: content })).status).toBe(400);
+    expect(
+      (await json('POST', `/user/repos/${OWNER}/${REPO}/releases/v0.1.0/assets`, { name: 'hello.txt', contentBase64: content })).status,
+    ).toBe(400);
     // invalid payloads rejected
-    expect((await json('POST', `/user/repos/${OWNER}/${REPO}/releases/v0.1.0/assets`, { name: 'x.bin', contentBase64: '!!!' })).status).toBe(400);
+    expect(
+      (await json('POST', `/user/repos/${OWNER}/${REPO}/releases/v0.1.0/assets`, { name: 'x.bin', contentBase64: '!!!' })).status,
+    ).toBe(400);
 
     const listed = await api(`/user/repos/${OWNER}/${REPO}/releases/v0.1.0/assets`);
     expect(listed.status).toBe(200);

@@ -39,22 +39,26 @@ describe('PAT lifecycle on real D1', () => {
     expect((await api(path)).status).toBe(401);
     expect((await api(path, { headers: { Authorization: 'Bearer bogus' } })).status).toBe(401);
 
-    const created = (await (await api('/user/tokens', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'pat-check' }),
-    })).json()) as { tokenId: string; token: string };
+    const created = (await (
+      await api('/user/tokens', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'pat-check' }),
+      })
+    ).json()) as { tokenId: string; token: string };
 
     const authed = await api(path, { headers: { Authorization: `Bearer ${created.token}` } });
     expect(authed.status).toBe(200);
   });
 
   it('revokes the token and the PAT stops working', async () => {
-    const created = (await (await api('/user/tokens', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'revoke-me' }),
-    })).json()) as { tokenId: string; token: string };
+    const created = (await (
+      await api('/user/tokens', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'revoke-me' }),
+      })
+    ).json()) as { tokenId: string; token: string };
 
     const path = `/${OWNER}/${REPO}/info/refs?service=git-upload-pack`;
     expect((await api(path, { headers: { Authorization: `Bearer ${created.token}` } })).status).toBe(200);

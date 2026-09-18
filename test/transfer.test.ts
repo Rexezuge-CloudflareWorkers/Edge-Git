@@ -20,7 +20,9 @@ function advertisementBytes(): Uint8Array {
   const lines = [
     PktLine.encode('# service=git-upload-pack\n'),
     PktLine.encodeFlush(),
-    PktLine.encode(`${OID_A} refs/heads/main\0multi_ack thin-pack side-band side-band-64k ofs-delta shallow deepen-since deepen-not deepen-not filter object-format=sha1\n`),
+    PktLine.encode(
+      `${OID_A} refs/heads/main\0multi_ack thin-pack side-band side-band-64k ofs-delta shallow deepen-since deepen-not deepen-not filter object-format=sha1\n`,
+    ),
     PktLine.encode(`${OID_B} refs/tags/v1.0.0^{}\n`),
     PktLine.encode(`${'c'.repeat(40)} refs/pull/1/head\n`),
     PktLine.encodeFlush(),
@@ -128,7 +130,8 @@ describe('SecuritySettingsService', () => {
   it('defaults to warn and round-trips mode changes', async () => {
     const rows = new Map<string, { secret_scan_mode: 'off' | 'warn' | 'block' }>();
     const fakeDAO = {
-      getByRepo: async (id: string) => (rows.has(id) ? { repository_id: id, secret_scan_mode: rows.get(id)?.secret_scan_mode, updated_by: null, updated_at: 0 } : null),
+      getByRepo: async (id: string) =>
+        rows.has(id) ? { repository_id: id, secret_scan_mode: rows.get(id)?.secret_scan_mode, updated_by: null, updated_at: 0 } : null,
       setScanMode: async (id: string, mode: 'off' | 'warn' | 'block') => {
         rows.set(id, { secret_scan_mode: mode });
       },
@@ -151,7 +154,18 @@ describe('DeployKeyService', () => {
         rows.push({ ...input, token_hash: input.tokenHash, repository_id: input.repositoryId });
       },
       listByRepo: async () =>
-        rows.map((r) => ({ id: r.id, repository_id: r.repositoryId, name: r.name, token_hash: r.tokenHash, token_prefix: r.tokenPrefix, permission: r.permission, expires_at: r.expiresAt, last_used_at: null, created_by: 'a@b.c', created_at: 0 })),
+        rows.map((r) => ({
+          id: r.id,
+          repository_id: r.repositoryId,
+          name: r.name,
+          token_hash: r.tokenHash,
+          token_prefix: r.tokenPrefix,
+          permission: r.permission,
+          expires_at: r.expiresAt,
+          last_used_at: null,
+          created_by: 'a@b.c',
+          created_at: 0,
+        })),
       getByIdAndRepo: async (id: string) => rows.find((r) => r.id === id) ?? null,
       deleteByIdAndRepo: async (id: string) => {
         const i = rows.findIndex((r) => r.id === id);
@@ -189,10 +203,22 @@ describe('ImportService jobs', () => {
     return {
       rows,
       create: async (input: Record<string, unknown>) => {
-        rows.push({ id: input.id, repository_id: input.repositoryId, source_url: input.sourceUrl, status: 'pending', error: null, refs_json: null, imported_refs: 0, created_by: input.createdBy, created_at: 0, updated_at: 0 });
+        rows.push({
+          id: input.id,
+          repository_id: input.repositoryId,
+          source_url: input.sourceUrl,
+          status: 'pending',
+          error: null,
+          refs_json: null,
+          imported_refs: 0,
+          created_by: input.createdBy,
+          created_at: 0,
+          updated_at: 0,
+        });
       },
       getById: async (id: string) => rows.find((r) => r.id === id) ?? null,
-      hasActiveForRepo: async (repo: string) => rows.some((r) => r.repository_id === repo && (r.status === 'pending' || r.status === 'running')),
+      hasActiveForRepo: async (repo: string) =>
+        rows.some((r) => r.repository_id === repo && (r.status === 'pending' || r.status === 'running')),
       markCancelled: async (id: string) => {
         const row = rows.find((r) => r.id === id);
         if (row) row.status = 'cancelled';
@@ -221,7 +247,19 @@ describe('MirrorService config', () => {
     let row: Record<string, unknown> | null = null;
     return {
       upsert: async (input: Record<string, unknown>) => {
-        row = { repository_id: input.repositoryId, source_url: input.sourceUrl, interval_minutes: input.intervalMinutes, enabled: 1, last_run_at: null, last_status: null, last_error: null, consecutive_failures: 0, created_by: input.createdBy, created_at: 0, updated_at: 0 };
+        row = {
+          repository_id: input.repositoryId,
+          source_url: input.sourceUrl,
+          interval_minutes: input.intervalMinutes,
+          enabled: 1,
+          last_run_at: null,
+          last_status: null,
+          last_error: null,
+          consecutive_failures: 0,
+          created_by: input.createdBy,
+          created_at: 0,
+          updated_at: 0,
+        };
       },
       getByRepo: async () => row,
       setEnabled: async (_id: string, enabled: boolean) => {
@@ -256,15 +294,53 @@ describe('TokenService repo grants and rotation', () => {
       getByTokenHash: async (hash: string, now: number) => {
         const t = tokens.find((row) => row.token_hash === hash && (row.expires_at as number) > now);
         if (!t) return undefined;
-        return { tokenId: t.token_id, userEmail: t.user_email, tokenHash: t.token_hash, name: t.name, expiresAt: t.expires_at, lastUsedAt: null, createdAt: t.created_at, scopes: JSON.parse(String(t.scopes ?? '["repo:read","repo:write","admin"]')), tokenPrefix: (t.token_prefix as string | null) ?? null };
+        return {
+          tokenId: t.token_id,
+          userEmail: t.user_email,
+          tokenHash: t.token_hash,
+          name: t.name,
+          expiresAt: t.expires_at,
+          lastUsedAt: null,
+          createdAt: t.created_at,
+          scopes: JSON.parse(String(t.scopes ?? '["repo:read","repo:write","admin"]')),
+          tokenPrefix: (t.token_prefix as string | null) ?? null,
+        };
       },
       getByUserEmail: async (email: string) =>
         tokens
           .filter((t) => String(t.user_email).toLowerCase() === email.toLowerCase())
-          .map((t) => ({ tokenId: t.token_id, userEmail: t.user_email, tokenHash: t.token_hash, name: t.name, expiresAt: t.expires_at, lastUsedAt: null, createdAt: t.created_at, scopes: JSON.parse(String(t.scopes ?? '["repo:read","repo:write","admin"]')), tokenPrefix: t.token_prefix ?? null })),
+          .map((t) => ({
+            tokenId: t.token_id,
+            userEmail: t.user_email,
+            tokenHash: t.token_hash,
+            name: t.name,
+            expiresAt: t.expires_at,
+            lastUsedAt: null,
+            createdAt: t.created_at,
+            scopes: JSON.parse(String(t.scopes ?? '["repo:read","repo:write","admin"]')),
+            tokenPrefix: t.token_prefix ?? null,
+          })),
       updateLastUsedByHash: async () => undefined,
-      create: async (tokenId: string, userEmail: string, tokenHash: string, name: string, expiresAt: number, now: number, scopes?: readonly string[], prefix?: string | null) => {
-        tokens.push({ token_id: tokenId, user_email: userEmail, token_hash: tokenHash, name, expires_at: expiresAt, created_at: now, scopes: JSON.stringify(scopes ?? []), token_prefix: prefix ?? null });
+      create: async (
+        tokenId: string,
+        userEmail: string,
+        tokenHash: string,
+        name: string,
+        expiresAt: number,
+        now: number,
+        scopes?: readonly string[],
+        prefix?: string | null,
+      ) => {
+        tokens.push({
+          token_id: tokenId,
+          user_email: userEmail,
+          token_hash: tokenHash,
+          name,
+          expires_at: expiresAt,
+          created_at: now,
+          scopes: JSON.stringify(scopes ?? []),
+          token_prefix: prefix ?? null,
+        });
       },
       delete: async (tokenId: string) => {
         const i = tokens.findIndex((t) => t.token_id === tokenId);
@@ -283,7 +359,8 @@ describe('TokenService repo grants and rotation', () => {
       getByOwnerAndName: async (owner: string, name: string) => {
         const clean = name.endsWith('.git') ? name.slice(0, -4) : name;
         for (const repo of repos.values()) {
-          if (repo.owner.toLowerCase() === owner.toLowerCase() && repo.name.toLowerCase() === clean.toLowerCase()) return { ...repo, owner_email: 'a@b.c', description: null, is_private: 0, created_at: 0, updated_at: 0 };
+          if (repo.owner.toLowerCase() === owner.toLowerCase() && repo.name.toLowerCase() === clean.toLowerCase())
+            return { ...repo, owner_email: 'a@b.c', description: null, is_private: 0, created_at: 0, updated_at: 0 };
         }
         return null;
       },
@@ -309,9 +386,19 @@ describe('TokenService repo grants and rotation', () => {
     const { tokenDAO, repositoryDAO, tokenGrantDAO, tokens } = fakes();
     const svc = new TokenService(
       { DB: {} as never },
-      { tokenDAO: async () => tokenDAO as never, repositoryDAO: async () => repositoryDAO as never, tokenGrantDAO: async () => tokenGrantDAO as never },
+      {
+        tokenDAO: async () => tokenDAO as never,
+        repositoryDAO: async () => repositoryDAO as never,
+        tokenGrantDAO: async () => tokenGrantDAO as never,
+      },
     );
-    const created = await svc.createToken('alice@example.com', 'scoped', 30, ['repo:read', 'repo:write', 'admin'], [{ owner: 'alice', name: 'demo', scope: 'repo:read' }]);
+    const created = await svc.createToken(
+      'alice@example.com',
+      'scoped',
+      30,
+      ['repo:read', 'repo:write', 'admin'],
+      [{ owner: 'alice', name: 'demo', scope: 'repo:read' }],
+    );
     expect(created.prefix).toBe(created.token.slice(0, 12));
     const authed = await svc.authenticateWithPAT(created.token);
     expect(authed.repoGrants).toEqual([{ repositoryId: 'r1', scope: 'repo:read' }]);
@@ -324,6 +411,8 @@ describe('TokenService repo grants and rotation', () => {
     const reauthed = await svc.authenticateWithPAT(rotated.token);
     expect(reauthed.repoGrants).toEqual([{ repositoryId: 'r1', scope: 'repo:read' }]);
     expect(tokens.length).toBe(1);
-    await expect(svc.createToken('alice@example.com', 'bad', 30, undefined, [{ owner: 'nobody', name: 'missing', scope: 'repo:read' }])).rejects.toThrow(/not found/);
+    await expect(
+      svc.createToken('alice@example.com', 'bad', 30, undefined, [{ owner: 'nobody', name: 'missing', scope: 'repo:read' }]),
+    ).rejects.toThrow(/not found/);
   });
 });

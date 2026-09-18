@@ -74,12 +74,39 @@ function createChecksFakeDb(seed: CheckRow[] = []): D1Queryable & { rows: CheckR
       },
       run(): Promise<{ success: boolean; meta?: { changes?: number } }> {
         if (q.startsWith('INSERT INTO check_runs')) {
-          const [id, repository_id, head_sha, context, status, conclusion, details_url, output_title, output_summary, creator_email, created_at, updated_at, completed_at] =
-            params as Array<string | number | null>;
+          const [
+            id,
+            repository_id,
+            head_sha,
+            context,
+            status,
+            conclusion,
+            details_url,
+            output_title,
+            output_summary,
+            creator_email,
+            created_at,
+            updated_at,
+            completed_at,
+          ] = params as Array<string | number | null>;
           if (state.rows.some((r) => r.repository_id === repository_id && r.head_sha === head_sha && r.context === context)) {
             return Promise.resolve({ success: false, error: 'UNIQUE constraint failed' });
           }
-          state.rows.push({ id, repository_id, head_sha, context, status, conclusion, details_url, output_title, output_summary, creator_email, created_at, updated_at, completed_at } as unknown as CheckRow);
+          state.rows.push({
+            id,
+            repository_id,
+            head_sha,
+            context,
+            status,
+            conclusion,
+            details_url,
+            output_title,
+            output_summary,
+            creator_email,
+            created_at,
+            updated_at,
+            completed_at,
+          } as unknown as CheckRow);
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE check_runs SET status = ?')) {
@@ -114,7 +141,10 @@ function createChecksFakeDb(seed: CheckRow[] = []): D1Queryable & { rows: CheckR
       },
     };
   }
-  return { prepare: (query: string) => ({ bind: (...params: unknown[]) => statement(query, params) }), rows: state.rows } as unknown as D1Queryable & {
+  return {
+    prepare: (query: string) => ({ bind: (...params: unknown[]) => statement(query, params) }),
+    rows: state.rows,
+  } as unknown as D1Queryable & {
     rows: CheckRow[];
   };
 }
@@ -234,11 +264,21 @@ describe('CheckService D1 flows', () => {
   it('reports, refreshes, and lists runs with combined state', async () => {
     const db = createChecksFakeDb();
     const svc = new CheckService({ DB: db, MAX_CHECKS_PER_SHA: '50' }, { checkRunDAO: () => Promise.resolve(new CheckRunDAO(db)) });
-    const created = await svc.reportStatus({ repositoryId: 'repo-1', headSha: SHA_A, context: 'secret-scan', creatorEmail: 'Alice@Example.com' });
+    const created = await svc.reportStatus({
+      repositoryId: 'repo-1',
+      headSha: SHA_A,
+      context: 'secret-scan',
+      creatorEmail: 'Alice@Example.com',
+    });
     expect(created.status).toBe('queued');
     expect(created.creatorEmail).toBe('alice@example.com');
     // Re-report while queued refreshes instead of throwing.
-    const refreshed = await svc.reportStatus({ repositoryId: 'repo-1', headSha: SHA_A, context: 'secret-scan', creatorEmail: 'alice@example.com' });
+    const refreshed = await svc.reportStatus({
+      repositoryId: 'repo-1',
+      headSha: SHA_A,
+      context: 'secret-scan',
+      creatorEmail: 'alice@example.com',
+    });
     expect(refreshed.id).toBe(created.id);
     const listed = await svc.listForSha('repo-1', SHA_A);
     expect(listed.runs).toHaveLength(1);
@@ -250,17 +290,27 @@ describe('CheckService D1 flows', () => {
     const svc = new CheckService({ DB: db }, { checkRunDAO: () => Promise.resolve(new CheckRunDAO(db)) });
     await expect(svc.updateRun({ repositoryId: 'repo-1', id: 'missing', status: 'completed', conclusion: 'success' })).rejects.toThrow();
     await expect(svc.updateRun({ repositoryId: 'repo-1', id: 'r1', status: 'completed' })).rejects.toThrow('conclusion is required');
-    const done = await svc.updateRun({ repositoryId: 'repo-1', id: 'r1', status: 'completed', conclusion: 'success', outputTitle: 'All Good' });
+    const done = await svc.updateRun({
+      repositoryId: 'repo-1',
+      id: 'r1',
+      status: 'completed',
+      conclusion: 'success',
+      outputTitle: 'All Good',
+    });
     expect(done.status).toBe('completed');
     expect(done.conclusion).toBe('success');
     expect(done.completedAt).not.toBeNull();
-    await expect(svc.reportStatus({ repositoryId: 'repo-1', headSha: SHA_A, context: 'secret-scan', creatorEmail: 'a@x.com' })).rejects.toThrow('already completed');
+    await expect(
+      svc.reportStatus({ repositoryId: 'repo-1', headSha: SHA_A, context: 'secret-scan', creatorEmail: 'a@x.com' }),
+    ).rejects.toThrow('already completed');
   });
 
   it('enforces the per-SHA cap', async () => {
     const db = createChecksFakeDb([row({ id: 'r1', context: 'a' })]);
     const svc = new CheckService({ DB: db, MAX_CHECKS_PER_SHA: '1' }, { checkRunDAO: () => Promise.resolve(new CheckRunDAO(db)) });
-    await expect(svc.reportStatus({ repositoryId: 'repo-1', headSha: SHA_A, context: 'b', creatorEmail: 'a@x.com' })).rejects.toThrow('Maximum 1');
+    await expect(svc.reportStatus({ repositoryId: 'repo-1', headSha: SHA_A, context: 'b', creatorEmail: 'a@x.com' })).rejects.toThrow(
+      'Maximum 1',
+    );
   });
 
   it('marks stale runs timed_out and prunes old rows', async () => {
@@ -278,7 +328,11 @@ describe('CheckService D1 flows', () => {
   });
 
   it('degrades listStale errors to zero marked', async () => {
-    const broken = { prepare: () => { throw new Error('down'); } } as unknown as D1Queryable;
+    const broken = {
+      prepare: () => {
+        throw new Error('down');
+      },
+    } as unknown as D1Queryable;
     const svc = new CheckService({ DB: broken }, { checkRunDAO: () => Promise.resolve(new CheckRunDAO(broken)) });
     await expect(svc.markStale(undefined, 10)).resolves.toBe(0);
   });

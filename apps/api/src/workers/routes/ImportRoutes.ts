@@ -86,7 +86,7 @@ function registerImportRoutes(app: TransferApp): void {
       const listed = (await stub.listRefs()) as { refs: Array<{ ref: string; oid: string }> };
       const heads = (listed.refs ?? []).filter((r) => r.ref.startsWith('refs/heads/') || r.ref.startsWith('refs/tags/'));
       if (heads.length === 0) return c.json({ error: 'Repository is empty' }, 404);
-      const exported = (await stub.exportPack(heads.map((r) => r.oid)));
+      const exported = await stub.exportPack(heads.map((r) => r.oid));
       if (!exported.pack || exported.pack.byteLength === 0) return c.json({ error: 'Nothing to export' }, 404);
       const maxBytes = ConfigurationManager.transfer.getMaxExportBytes(c.env);
       if (exported.pack.byteLength > maxBytes) {

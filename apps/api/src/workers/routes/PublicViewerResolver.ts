@@ -34,7 +34,13 @@ function getScope(c: { get(key: string): unknown; env: Env }): ReturnType<typeof
   }
 }
 
-async function requireVisibleRepo(env: Env, owner: string, repoName: string, viewerEmail: string | null, scope?: ReturnType<typeof createRequestScope>): Promise<RepositoryRow | null> {
+async function requireVisibleRepo(
+  env: Env,
+  owner: string,
+  repoName: string,
+  viewerEmail: string | null,
+  scope?: ReturnType<typeof createRequestScope>,
+): Promise<RepositoryRow | null> {
   const active = scope ?? createRequestScope(env);
   const row = await active.get(Tokens.RepoService).getByOwnerAndName(owner, repoName);
   if (!row) return null;
@@ -69,10 +75,9 @@ async function requireRoleForRepo(
 async function resolvePublicViewer(c: RequestContext): Promise<string | null> {
   const scope = getScope(c as never);
   try {
-    const email = await scope.get(Tokens.AccessAuthService).getAuthenticatedUserEmail(
-      c.req.raw,
-      c.executionCtx as unknown as AccessIdentityContext,
-    );
+    const email = await scope
+      .get(Tokens.AccessAuthService)
+      .getAuthenticatedUserEmail(c.req.raw, c.executionCtx as unknown as AccessIdentityContext);
     if (email) return email;
   } catch {
     // Anonymous — fall through to PAT.
@@ -126,4 +131,13 @@ function toServiceStatus(error: unknown): 400 | 403 | 404 | 500 {
   return toMappedStatus(error);
 }
 
-export { toRepoJson, requireVisibleRepo, requireRoleForRepo, resolvePublicViewer, withPublicRepo, withVisibleRepo, toServiceStatus, getScope };
+export {
+  toRepoJson,
+  requireVisibleRepo,
+  requireRoleForRepo,
+  resolvePublicViewer,
+  withPublicRepo,
+  withVisibleRepo,
+  toServiceStatus,
+  getScope,
+};

@@ -25,7 +25,13 @@ class NamespaceDAO extends BaseDAO {
     return row !== null;
   }
 
-  public async claim(input: { usernameCi: string; kind: NamespaceKind; userEmail?: string | null; orgId?: string | null; now: number }): Promise<void> {
+  public async claim(input: {
+    usernameCi: string;
+    kind: NamespaceKind;
+    userEmail?: string | null;
+    orgId?: string | null;
+    now: number;
+  }): Promise<void> {
     await this.withRetry(
       () =>
         this.database
@@ -54,7 +60,10 @@ class NamespaceDAO extends BaseDAO {
   }
 
   public async release(usernameCi: string): Promise<void> {
-    await this.withRetry(() => this.database.prepare('DELETE FROM namespaces WHERE username_ci = ?').bind(usernameCi).run(), 'release namespace');
+    await this.withRetry(
+      () => this.database.prepare('DELETE FROM namespaces WHERE username_ci = ?').bind(usernameCi).run(),
+      'release namespace',
+    );
   }
 }
 

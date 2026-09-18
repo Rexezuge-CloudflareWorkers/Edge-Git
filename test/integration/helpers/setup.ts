@@ -26,10 +26,7 @@ export async function ensureUser(db: D1Database, email: string, username?: strin
   const normalizedEmail = email.toLowerCase();
   const handle = (username ?? normalizedEmail.split('@', 1)[0]).trim() || 'user';
   const handleCi = handle.toLowerCase();
-  await db
-    .prepare(`INSERT OR IGNORE INTO users (email, created_at) VALUES (?, ?)`)
-    .bind(normalizedEmail, now)
-    .run();
+  await db.prepare(`INSERT OR IGNORE INTO users (email, created_at) VALUES (?, ?)`).bind(normalizedEmail, now).run();
   await db
     .prepare(`UPDATE users SET username = COALESCE(username, ?), updated_at = COALESCE(updated_at, ?) WHERE email = ?`)
     .bind(handle, now, normalizedEmail)
@@ -51,7 +48,15 @@ export async function setupIntegrationTest(env: TestEnv, userEmail?: string): Pr
 
 export async function seedRepo(
   db: D1Database,
-  input: { ownerEmail: string; owner: string; name: string; isPrivate?: boolean; description?: string | null; ownerType?: string; orgId?: string | null },
+  input: {
+    ownerEmail: string;
+    owner: string;
+    name: string;
+    isPrivate?: boolean;
+    description?: string | null;
+    ownerType?: string;
+    orgId?: string | null;
+  },
 ): Promise<string> {
   const id = crypto.randomUUID();
   const now = Math.floor(Date.now() / 1000);

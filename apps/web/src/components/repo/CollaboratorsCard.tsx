@@ -34,7 +34,8 @@ export function CollaboratorsCard({
         const list = await listCollaborators(owner, repo);
         if (!cancelled) setRows(list);
       } catch (error) {
-        if (!cancelled) showNotice('error', error instanceof Error ? error.message : t('collaborators.failedToLoad', 'Failed To Load Collaborators.'));
+        if (!cancelled)
+          showNotice('error', error instanceof Error ? error.message : t('collaborators.failedToLoad', 'Failed To Load Collaborators.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -120,7 +121,10 @@ export function CollaboratorsCard({
                       showNotice('success', t('collaborators.updated', 'Collaborator Saved.'));
                       refresh();
                     } catch (error) {
-                      showNotice('error', error instanceof Error ? error.message : t('collaborators.failedToSave', 'Failed To Save Collaborator.'));
+                      showNotice(
+                        'error',
+                        error instanceof Error ? error.message : t('collaborators.failedToSave', 'Failed To Save Collaborator.'),
+                      );
                     }
                   })();
                 }}

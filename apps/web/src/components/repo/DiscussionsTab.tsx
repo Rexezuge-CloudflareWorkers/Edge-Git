@@ -3,7 +3,16 @@ import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MessagesSquare } from 'lucide-react';
 import type { Discussion, DiscussionCategory, DiscussionComment } from '../../types';
-import { addDiscussionComment, createDiscussion, deleteDiscussion, deleteDiscussionComment, listDiscussionCategories, listDiscussions, loadDiscussion, updateDiscussion } from '../../services/discussionService';
+import {
+  addDiscussionComment,
+  createDiscussion,
+  deleteDiscussion,
+  deleteDiscussionComment,
+  listDiscussionCategories,
+  listDiscussions,
+  loadDiscussion,
+  updateDiscussion,
+} from '../../services/discussionService';
 import { formatTimestamp } from '../../lib/format';
 import { readIntParam, readParam, writeParams } from '../../lib/urlParams';
 import { Button } from '../ui/Button';
@@ -108,7 +117,11 @@ export function DiscussionsTab({
     e.preventDefault();
     setSaving(true);
     try {
-      const { discussion } = await createDiscussion(owner, repo, { title: title.trim(), body: body.trim() || null, categorySlug: category || undefined });
+      const { discussion } = await createDiscussion(owner, repo, {
+        title: title.trim(),
+        body: body.trim() || null,
+        categorySlug: category || undefined,
+      });
       setTitle('');
       setBody('');
       showNotice('success', t('discussions.discussionCreated', 'Discussion Created.'));
@@ -145,16 +158,32 @@ export function DiscussionsTab({
             <CardTitle>{t('discussions.newDiscussion', 'New Discussion')}</CardTitle>
           </CardHeader>
           <form onSubmit={submit} className="space-y-3">
-            <Input placeholder={t('discussions.titlePlaceholder', 'Title')} value={title} onChange={(e) => setTitle(e.target.value)} required />
+            <Input
+              placeholder={t('discussions.titlePlaceholder', 'Title')}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
             <div className="flex gap-2">
-              <select value={category} onChange={(e) => setCategory(e.target.value)} className="rounded-md border border-[var(--color-border)] bg-transparent px-2 py-1.5 text-sm">
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="rounded-md border border-[var(--color-border)] bg-transparent px-2 py-1.5 text-sm"
+              >
                 <option value="">{t('discussions.allCategories', 'All Categories')}</option>
                 {categories.map((c) => (
-                  <option key={c.id} value={c.slug}>{c.title}</option>
+                  <option key={c.id} value={c.slug}>
+                    {c.title}
+                  </option>
                 ))}
               </select>
             </div>
-            <Textarea placeholder={t('discussions.bodyPlaceholder', 'Write Something…')} value={body} onChange={(e) => setBody(e.target.value)} rows={3} />
+            <Textarea
+              placeholder={t('discussions.bodyPlaceholder', 'Write Something…')}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={3}
+            />
             <Button type="submit" variant="primary" size="sm" loading={saving}>
               {t('discussions.createDiscussion', 'Create Discussion')}
             </Button>
@@ -178,7 +207,11 @@ export function DiscussionsTab({
               <li key={d.id} className="py-3 first:pt-0 last:pb-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs rounded border border-[var(--color-border)] px-1.5 py-0.5">{d.status}</span>
-                  <button type="button" onClick={() => selectDiscussion(d.number)} className="font-medium text-[var(--color-accent)] hover:underline text-left">
+                  <button
+                    type="button"
+                    onClick={() => selectDiscussion(d.number)}
+                    className="font-medium text-[var(--color-accent)] hover:underline text-left"
+                  >
                     {d.title}
                   </button>
                   <span className="text-xs text-[var(--color-text-muted)]">#{d.number}</span>
@@ -195,25 +228,56 @@ export function DiscussionsTab({
       {detail && (
         <Card>
           <CardHeader>
-            <CardTitle>#{detail.discussion.number} {detail.discussion.title}</CardTitle>
+            <CardTitle>
+              #{detail.discussion.number} {detail.discussion.title}
+            </CardTitle>
             <div className="flex gap-2">
               {canWrite && detail.discussion.status === 'open' && (
                 <>
-                  <Button size="sm" onClick={() => updateDiscussion(owner, repo, detail.discussion.number, { status: 'answered' }).then(() => reloadDetail(detail.discussion.number).then(() => undefined))}>
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      updateDiscussion(owner, repo, detail.discussion.number, { status: 'answered' }).then(() =>
+                        reloadDetail(detail.discussion.number).then(() => undefined),
+                      )
+                    }
+                  >
                     {t('discussions.markAnswered', 'Mark Answered')}
                   </Button>
-                  <Button size="sm" onClick={() => updateDiscussion(owner, repo, detail.discussion.number, { status: 'locked' }).then(() => reloadDetail(detail.discussion.number).then(() => undefined))}>
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      updateDiscussion(owner, repo, detail.discussion.number, { status: 'locked' }).then(() =>
+                        reloadDetail(detail.discussion.number).then(() => undefined),
+                      )
+                    }
+                  >
                     {t('discussions.lock', 'Lock')}
                   </Button>
                 </>
               )}
               {canWrite && detail.discussion.status !== 'open' && (
-                <Button size="sm" onClick={() => updateDiscussion(owner, repo, detail.discussion.number, { status: 'open' }).then(() => reloadDetail(detail.discussion.number).then(() => undefined))}>
+                <Button
+                  size="sm"
+                  onClick={() =>
+                    updateDiscussion(owner, repo, detail.discussion.number, { status: 'open' }).then(() =>
+                      reloadDetail(detail.discussion.number).then(() => undefined),
+                    )
+                  }
+                >
                   {t('discussions.reopen', 'Reopen')}
                 </Button>
               )}
               {canWrite && (
-                <Button size="sm" onClick={() => deleteDiscussion(owner, repo, detail.discussion.number).then(() => { selectDiscussion(null); reload(); })}>
+                <Button
+                  size="sm"
+                  onClick={() =>
+                    deleteDiscussion(owner, repo, detail.discussion.number).then(() => {
+                      selectDiscussion(null);
+                      reload();
+                    })
+                  }
+                >
                   {t('common.delete', 'Delete')}
                 </Button>
               )}
@@ -223,7 +287,9 @@ export function DiscussionsTab({
           <div className="mt-4 space-y-3">
             {detail.comments.map((c) => (
               <div key={c.id} className="rounded border border-[var(--color-border)] p-2 text-sm">
-                <p className="text-xs text-[var(--color-text-muted)]">{c.authorEmail} · {formatTimestamp(c.createdAt)}</p>
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  {c.authorEmail} · {formatTimestamp(c.createdAt)}
+                </p>
                 <Markdown content={c.body} />
                 {canWrite && (
                   <Button size="sm" onClick={() => removeComment(detail.discussion.number, c.id)}>
@@ -235,8 +301,14 @@ export function DiscussionsTab({
           </div>
           {signedIn && detail.discussion.status !== 'locked' && (
             <form onSubmit={submitComment} className="mt-3 flex gap-2">
-              <Input placeholder={t('discussions.replyPlaceholder', 'Write A Reply…')} value={comment} onChange={(e) => setComment(e.target.value)} />
-              <Button type="submit" size="sm" variant="primary">{t('discussions.reply', 'Reply')}</Button>
+              <Input
+                placeholder={t('discussions.replyPlaceholder', 'Write A Reply…')}
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+              />
+              <Button type="submit" size="sm" variant="primary">
+                {t('discussions.reply', 'Reply')}
+              </Button>
             </form>
           )}
         </Card>

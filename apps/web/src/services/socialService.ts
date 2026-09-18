@@ -55,7 +55,12 @@ export async function listWatchedRepos(): Promise<Repo[]> {
   return data.repos ?? [];
 }
 
-export async function listActivity(owner: string, repo: string, cursor?: string, limit = 30): Promise<{ events: RepoEvent[]; nextCursor: string | null }> {
+export async function listActivity(
+  owner: string,
+  repo: string,
+  cursor?: string,
+  limit = 30,
+): Promise<{ events: RepoEvent[]; nextCursor: string | null }> {
   const params: Record<string, string> = { limit: String(limit) };
   if (cursor) params.cursor = cursor;
   const qs = new URLSearchParams(params).toString();

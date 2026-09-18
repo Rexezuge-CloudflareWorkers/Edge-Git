@@ -77,9 +77,7 @@ class RealtimeService {
     channels: unknown;
   }): Promise<AuthorizedRepoSubscription> {
     const repositoryDAO = await this.deps.repositoryDAO();
-    const row: RepositoryRow | null = await repositoryDAO
-      .getByOwnerAndName(input.owner, input.repo)
-      .catch(() => null);
+    const row: RepositoryRow | null = await repositoryDAO.getByOwnerAndName(input.owner, input.repo).catch(() => null);
     if (!row) throw new NotFoundError('Repository not found.');
     const permission = await this.deps.permissionService();
     const role = await permission.getRole(input.viewerEmail, row).catch(() => null);

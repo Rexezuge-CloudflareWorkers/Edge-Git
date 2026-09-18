@@ -133,11 +133,17 @@ export function WikiTab({
         setPage(created);
         setSlug(created.slug);
         showNotice('success', t('wiki.pageCreated', 'Wiki Page Created.'));
-      }      setEditing(false);
+      }
+      setEditing(false);
       reload();
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
-      showNotice('error', message.includes('409') || message.includes('revision conflict') ? t('wiki.conflict', 'Someone Else Updated This Page. Reload And Retry.') : message || t('errors.failedToSaveWiki', 'Failed To Save Wiki Page.'));
+      showNotice(
+        'error',
+        message.includes('409') || message.includes('revision conflict')
+          ? t('wiki.conflict', 'Someone Else Updated This Page. Reload And Retry.')
+          : message || t('errors.failedToSaveWiki', 'Failed To Save Wiki Page.'),
+      );
     } finally {
       setSaving(false);
     }
@@ -151,7 +157,11 @@ export function WikiTab({
           <div className="flex gap-2">
             <Input placeholder={t('wiki.searchPlaceholder', 'Search Pages…')} value={query} onChange={(e) => setQuery(e.target.value)} />
             <RefreshButton onRefresh={reload} loading={loading} />
-            {canWrite && <Button size="sm" variant="primary" onClick={startNew}>{t('wiki.newPage', 'New Page')}</Button>}
+            {canWrite && (
+              <Button size="sm" variant="primary" onClick={startNew}>
+                {t('wiki.newPage', 'New Page')}
+              </Button>
+            )}
           </div>
         </CardHeader>
         {!loading && pages.length === 0 ? (
@@ -163,10 +173,16 @@ export function WikiTab({
           <ul className="divide-y divide-[var(--color-border)]">
             {pages.map((p) => (
               <li key={p.id} className="py-2 flex items-center gap-2">
-                <button type="button" onClick={() => selectPage(p.slug)} className={`text-left hover:underline ${slug === p.slug ? 'font-medium text-[var(--color-accent)]' : 'text-[var(--color-accent)]'}`}>
+                <button
+                  type="button"
+                  onClick={() => selectPage(p.slug)}
+                  className={`text-left hover:underline ${slug === p.slug ? 'font-medium text-[var(--color-accent)]' : 'text-[var(--color-accent)]'}`}
+                >
                   {p.title}
                 </button>
-                <span className="text-xs text-[var(--color-text-muted)]">/{p.slug} · r{p.revision}</span>
+                <span className="text-xs text-[var(--color-text-muted)]">
+                  /{p.slug} · r{p.revision}
+                </span>
               </li>
             ))}
           </ul>
@@ -178,12 +194,31 @@ export function WikiTab({
           <CardHeader>
             <CardTitle>{page.title}</CardTitle>
             <div className="flex gap-2">
-              {canWrite && <Button size="sm" onClick={() => setEditing(true)}>{t('wiki.edit', 'Edit')}</Button>}
-              <Button size="sm" onClick={() => { setShowHistory((v) => !v); if (!showHistory) void loadWikiRevisions(owner, repo, page.slug).then(setRevisions); }}>
+              {canWrite && (
+                <Button size="sm" onClick={() => setEditing(true)}>
+                  {t('wiki.edit', 'Edit')}
+                </Button>
+              )}
+              <Button
+                size="sm"
+                onClick={() => {
+                  setShowHistory((v) => !v);
+                  if (!showHistory) void loadWikiRevisions(owner, repo, page.slug).then(setRevisions);
+                }}
+              >
                 {t('wiki.history', 'History')}
               </Button>
               {canWrite && (
-                <Button size="sm" onClick={() => deleteWikiPage(owner, repo, page.slug).then(() => { setPage(null); setSlug(null); reload(); })}>
+                <Button
+                  size="sm"
+                  onClick={() =>
+                    deleteWikiPage(owner, repo, page.slug).then(() => {
+                      setPage(null);
+                      setSlug(null);
+                      reload();
+                    })
+                  }
+                >
                   {t('common.delete', 'Delete')}
                 </Button>
               )}
@@ -193,7 +228,9 @@ export function WikiTab({
           {showHistory && (
             <ul className="mt-4 space-y-1 text-xs text-[var(--color-text-muted)]">
               {revisions.map((r) => (
-                <li key={r.id}>r{r.revision} · {r.authorEmail}</li>
+                <li key={r.id}>
+                  r{r.revision} · {r.authorEmail}
+                </li>
               ))}
             </ul>
           )}
@@ -206,12 +243,31 @@ export function WikiTab({
             <CardTitle>{page ? t('wiki.editPage', 'Edit Page') : t('wiki.newPage', 'New Page')}</CardTitle>
           </CardHeader>
           <form onSubmit={submit} className="space-y-3">
-            <Input placeholder={t('wiki.titlePlaceholder', 'Page Title')} value={title} onChange={(e) => setTitle(e.target.value)} required />
-            <Input placeholder={t('wiki.slugPlaceholder', 'page-slug')} value={slugInput} onChange={(e) => setSlugInput(e.target.value)} disabled={!!page} />
-            <Textarea placeholder={t('wiki.bodyPlaceholder', 'Markdown Content…')} value={body} onChange={(e) => setBody(e.target.value)} rows={10} />
+            <Input
+              placeholder={t('wiki.titlePlaceholder', 'Page Title')}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
+            <Input
+              placeholder={t('wiki.slugPlaceholder', 'page-slug')}
+              value={slugInput}
+              onChange={(e) => setSlugInput(e.target.value)}
+              disabled={!!page}
+            />
+            <Textarea
+              placeholder={t('wiki.bodyPlaceholder', 'Markdown Content…')}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={10}
+            />
             <div className="flex gap-2">
-              <Button type="submit" variant="primary" size="sm" loading={saving}>{t('common.saveChanges', 'Save Changes')}</Button>
-              <Button type="button" size="sm" onClick={() => setEditing(false)}>{t('common.cancel', 'Cancel')}</Button>
+              <Button type="submit" variant="primary" size="sm" loading={saving}>
+                {t('common.saveChanges', 'Save Changes')}
+              </Button>
+              <Button type="button" size="sm" onClick={() => setEditing(false)}>
+                {t('common.cancel', 'Cancel')}
+              </Button>
             </div>
           </form>
         </Card>

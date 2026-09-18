@@ -108,12 +108,21 @@ class ProjectDAO extends BaseDAO {
 
   public async setStatus(id: string, repositoryId: string, status: 'open' | 'closed', now: number): Promise<void> {
     await this.withRetry(
-      () => this.database.prepare('UPDATE projects SET status = ?, updated_at = ? WHERE id = ? AND repository_id = ?').bind(status, now, id, repositoryId).run(),
+      () =>
+        this.database
+          .prepare('UPDATE projects SET status = ?, updated_at = ? WHERE id = ? AND repository_id = ?')
+          .bind(status, now, id, repositoryId)
+          .run(),
       'update project status',
     );
   }
 
-  public async updateProject(id: string, repositoryId: string, patch: { title?: string; description?: string | null }, now: number): Promise<void> {
+  public async updateProject(
+    id: string,
+    repositoryId: string,
+    patch: { title?: string; description?: string | null },
+    now: number,
+  ): Promise<void> {
     const sets: string[] = [];
     const values: Array<string | null> = [];
     if (patch.title !== undefined) {
@@ -137,8 +146,16 @@ class ProjectDAO extends BaseDAO {
   }
 
   public async deleteProject(id: string, repositoryId: string): Promise<void> {
-    await this.database.prepare('DELETE FROM project_cards WHERE project_id = ?').bind(id).run().catch(() => undefined);
-    await this.database.prepare('DELETE FROM project_columns WHERE project_id = ?').bind(id).run().catch(() => undefined);
+    await this.database
+      .prepare('DELETE FROM project_cards WHERE project_id = ?')
+      .bind(id)
+      .run()
+      .catch(() => undefined);
+    await this.database
+      .prepare('DELETE FROM project_columns WHERE project_id = ?')
+      .bind(id)
+      .run()
+      .catch(() => undefined);
     await this.withRetry(
       () => this.database.prepare('DELETE FROM projects WHERE id = ? AND repository_id = ?').bind(id, repositoryId).run(),
       'delete project',
@@ -181,7 +198,11 @@ class ProjectDAO extends BaseDAO {
   }
 
   public async deleteColumn(id: string, projectId: string): Promise<void> {
-    await this.database.prepare('DELETE FROM project_cards WHERE column_id = ?').bind(id).run().catch(() => undefined);
+    await this.database
+      .prepare('DELETE FROM project_cards WHERE column_id = ?')
+      .bind(id)
+      .run()
+      .catch(() => undefined);
     await this.withRetry(
       () => this.database.prepare('DELETE FROM project_columns WHERE id = ? AND project_id = ?').bind(id, projectId).run(),
       'delete project column',

@@ -30,8 +30,7 @@ export interface CommitFileInput {
 }
 
 export type CommitFileResult =
-  | { ok: true; commitOid: string; created: boolean; deleted: boolean }
-  | { ok: false; error: string; status: 400 | 404 | 409 | 413 };
+  { ok: true; commitOid: string; created: boolean; deleted: boolean } | { ok: false; error: string; status: 400 | 404 | 409 | 413 };
 
 interface TreeEntry {
   mode: string;

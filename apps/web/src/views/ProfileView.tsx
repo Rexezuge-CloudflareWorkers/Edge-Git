@@ -45,7 +45,8 @@ export function ProfileView({ showNotice }: { showNotice: (type: 'success' | 'er
 
   useEffect(() => {
     let cancelled = false;
-    const run = async () => {      if (!cancelled) setStatus('loading');
+    const run = async () => {
+      if (!cancelled) setStatus('loading');
       try {
         const data = await loadProfile(username);
         if (cancelled) return;
@@ -127,136 +128,136 @@ export function ProfileView({ showNotice }: { showNotice: (type: 'success' | 'er
         }
       />
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-4">
-      <Card className="flex items-center gap-4">
-        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-[var(--color-surface-3)] shrink-0">
-          {isOrg ? (
-            <Building2 className="h-6 w-6 text-[var(--color-text-secondary)]" />
-          ) : (
-            <UserRound className="h-6 w-6 text-[var(--color-text-secondary)]" />
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-xl font-semibold text-[var(--color-text-primary)] truncate">{profile.username}</h1>
-            <Badge variant={isOrg ? 'info' : 'neutral'}>
-              {isOrg ? t('profile.organization', 'Organization') : t('profile.user', 'User')}
-            </Badge>
+        <Card className="flex items-center gap-4">
+          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-[var(--color-surface-3)] shrink-0">
+            {isOrg ? (
+              <Building2 className="h-6 w-6 text-[var(--color-text-secondary)]" />
+            ) : (
+              <UserRound className="h-6 w-6 text-[var(--color-text-secondary)]" />
+            )}
           </div>
-          <p className="text-xs text-[var(--color-text-muted)] mt-1">
-            {t('profile.repoCount', '{{count}} Repositories', { count: profile.repoCount ?? repos.length })}
-            {!isOrg && profile.orgCount != null
-              ? ` · ${t('profile.orgCount', '{{count}} Organizations', { count: profile.orgCount })}`
-              : ''}
-            {isOrg && profile.memberCount != null
-              ? ` · ${t('profile.memberCount', '{{count}} Members', { count: profile.memberCount })}`
-              : ''}
-          </p>
-        </div>
-      </Card>
-
-      <SegmentedTabs
-        ariaLabel="Profile sections"
-        tabs={tabs.map((key) => ({
-          id: key,
-          label:
-            key === 'repositories'
-              ? t('profile.repositories', 'Repositories')
-              : key === 'organizations'
-                ? t('profile.organizations', 'Organizations')
-                : key === 'people'
-                  ? t('profile.people', 'People')
-                  : t('profile.manage', 'Manage'),
-        }))}
-        value={visibleTab}
-        onChange={(id) => setTab(id as ProfileTab)}
-      />
-
-      {visibleTab === 'repositories' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('profile.repositories', 'Repositories')}</CardTitle>
-            <span className="text-sm text-[var(--color-text-muted)]">{repos.length}</span>
-          </CardHeader>
-          {repos.length === 0 ? (
-            <p className="text-sm text-[var(--color-text-muted)] py-6 text-center">{t('profile.noRepos', 'No Visible Repositories.')}</p>
-          ) : (
-            <ul className="divide-y divide-[var(--color-border)]">
-              {repos.map((r) => (
-                <li key={r.fullName} className="py-3 flex items-center justify-between gap-3 first:pt-0 last:pb-0">
-                  <div className="min-w-0">
-                    <Link to={`/${r.owner}/${r.name}`} className="font-medium text-[var(--color-accent)] hover:underline truncate">
-                      {r.fullName}
-                    </Link>
-                    {r.description && <p className="text-sm text-[var(--color-text-secondary)] truncate">{r.description}</p>}
-                  </div>
-                  <VisibilityBadge isPrivate={r.isPrivate} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      )}
-
-      {visibleTab === 'organizations' && !isOrg && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('profile.organizations', 'Organizations')}</CardTitle>
-            <span className="text-sm text-[var(--color-text-muted)]">{orgs.length}</span>
-          </CardHeader>
-          {orgs.length === 0 ? (
-            <p className="text-sm text-[var(--color-text-muted)] py-6 text-center">{t('profile.noOrgs', 'No Visible Organizations.')}</p>
-          ) : (
-            <ul className="divide-y divide-[var(--color-border)]">
-              {orgs.map((o) => (
-                <li key={o.username} className="py-3 flex items-center justify-between gap-3 first:pt-0 last:pb-0">
-                  <div className="min-w-0">
-                    <Link to={`/${o.username}`} className="font-medium text-[var(--color-accent)] hover:underline truncate">
-                      {o.username}
-                    </Link>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      )}
-
-      {visibleTab === 'people' && isOrg && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('profile.people', 'People')}</CardTitle>
-            {profile.memberCount != null && <span className="text-sm text-[var(--color-text-muted)]">{profile.memberCount}</span>}
-          </CardHeader>
-          {members === null ? (
-            <p className="text-sm text-[var(--color-text-muted)] py-6 text-center">
-              {t('profile.membersRestricted', 'Member List Is Visible To Organization Members Only.')}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl font-semibold text-[var(--color-text-primary)] truncate">{profile.username}</h1>
+              <Badge variant={isOrg ? 'info' : 'neutral'}>
+                {isOrg ? t('profile.organization', 'Organization') : t('profile.user', 'User')}
+              </Badge>
+            </div>
+            <p className="text-xs text-[var(--color-text-muted)] mt-1">
+              {t('profile.repoCount', '{{count}} Repositories', { count: profile.repoCount ?? repos.length })}
+              {!isOrg && profile.orgCount != null
+                ? ` · ${t('profile.orgCount', '{{count}} Organizations', { count: profile.orgCount })}`
+                : ''}
+              {isOrg && profile.memberCount != null
+                ? ` · ${t('profile.memberCount', '{{count}} Members', { count: profile.memberCount })}`
+                : ''}
             </p>
-          ) : members.length === 0 ? (
-            <p className="text-sm text-[var(--color-text-muted)] py-6 text-center">{t('profile.noMembers', 'No Members Found.')}</p>
-          ) : (
-            <ul className="divide-y divide-[var(--color-border)]">
-              {members.map((m) => (
-                <li key={m.email} className="py-3 flex items-center justify-between gap-3 first:pt-0 last:pb-0">
-                  <div className="min-w-0">
-                    <p className="font-medium text-[var(--color-text-primary)] truncate">{m.username ?? m.email}</p>
-                    <p className="text-xs text-[var(--color-text-muted)] truncate">{m.email}</p>
-                  </div>
-                  <Badge variant={m.role === 'owner' ? 'info' : 'neutral'}>{m.role}</Badge>
-                </li>
-              ))}
-            </ul>
-          )}
+          </div>
         </Card>
-      )}
 
-      {visibleTab === 'manage' && isOrg && canManageOrg && (
-        <div className="space-y-4">
-          <OrgMembersManager org={profile.username} showNotice={showNotice} />
-          <OrgTeamsManager org={profile.username} showNotice={showNotice} />
-          <OrgAuditLogCard org={profile.username} showNotice={showNotice} />
-          <OrgSettingsCard org={{ username: profile.username }} showNotice={showNotice} />
-        </div>
-      )}
+        <SegmentedTabs
+          ariaLabel="Profile sections"
+          tabs={tabs.map((key) => ({
+            id: key,
+            label:
+              key === 'repositories'
+                ? t('profile.repositories', 'Repositories')
+                : key === 'organizations'
+                  ? t('profile.organizations', 'Organizations')
+                  : key === 'people'
+                    ? t('profile.people', 'People')
+                    : t('profile.manage', 'Manage'),
+          }))}
+          value={visibleTab}
+          onChange={(id) => setTab(id as ProfileTab)}
+        />
+
+        {visibleTab === 'repositories' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('profile.repositories', 'Repositories')}</CardTitle>
+              <span className="text-sm text-[var(--color-text-muted)]">{repos.length}</span>
+            </CardHeader>
+            {repos.length === 0 ? (
+              <p className="text-sm text-[var(--color-text-muted)] py-6 text-center">{t('profile.noRepos', 'No Visible Repositories.')}</p>
+            ) : (
+              <ul className="divide-y divide-[var(--color-border)]">
+                {repos.map((r) => (
+                  <li key={r.fullName} className="py-3 flex items-center justify-between gap-3 first:pt-0 last:pb-0">
+                    <div className="min-w-0">
+                      <Link to={`/${r.owner}/${r.name}`} className="font-medium text-[var(--color-accent)] hover:underline truncate">
+                        {r.fullName}
+                      </Link>
+                      {r.description && <p className="text-sm text-[var(--color-text-secondary)] truncate">{r.description}</p>}
+                    </div>
+                    <VisibilityBadge isPrivate={r.isPrivate} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        )}
+
+        {visibleTab === 'organizations' && !isOrg && (
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('profile.organizations', 'Organizations')}</CardTitle>
+              <span className="text-sm text-[var(--color-text-muted)]">{orgs.length}</span>
+            </CardHeader>
+            {orgs.length === 0 ? (
+              <p className="text-sm text-[var(--color-text-muted)] py-6 text-center">{t('profile.noOrgs', 'No Visible Organizations.')}</p>
+            ) : (
+              <ul className="divide-y divide-[var(--color-border)]">
+                {orgs.map((o) => (
+                  <li key={o.username} className="py-3 flex items-center justify-between gap-3 first:pt-0 last:pb-0">
+                    <div className="min-w-0">
+                      <Link to={`/${o.username}`} className="font-medium text-[var(--color-accent)] hover:underline truncate">
+                        {o.username}
+                      </Link>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        )}
+
+        {visibleTab === 'people' && isOrg && (
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('profile.people', 'People')}</CardTitle>
+              {profile.memberCount != null && <span className="text-sm text-[var(--color-text-muted)]">{profile.memberCount}</span>}
+            </CardHeader>
+            {members === null ? (
+              <p className="text-sm text-[var(--color-text-muted)] py-6 text-center">
+                {t('profile.membersRestricted', 'Member List Is Visible To Organization Members Only.')}
+              </p>
+            ) : members.length === 0 ? (
+              <p className="text-sm text-[var(--color-text-muted)] py-6 text-center">{t('profile.noMembers', 'No Members Found.')}</p>
+            ) : (
+              <ul className="divide-y divide-[var(--color-border)]">
+                {members.map((m) => (
+                  <li key={m.email} className="py-3 flex items-center justify-between gap-3 first:pt-0 last:pb-0">
+                    <div className="min-w-0">
+                      <p className="font-medium text-[var(--color-text-primary)] truncate">{m.username ?? m.email}</p>
+                      <p className="text-xs text-[var(--color-text-muted)] truncate">{m.email}</p>
+                    </div>
+                    <Badge variant={m.role === 'owner' ? 'info' : 'neutral'}>{m.role}</Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        )}
+
+        {visibleTab === 'manage' && isOrg && canManageOrg && (
+          <div className="space-y-4">
+            <OrgMembersManager org={profile.username} showNotice={showNotice} />
+            <OrgTeamsManager org={profile.username} showNotice={showNotice} />
+            <OrgAuditLogCard org={profile.username} showNotice={showNotice} />
+            <OrgSettingsCard org={{ username: profile.username }} showNotice={showNotice} />
+          </div>
+        )}
       </div>
     </div>
   );

@@ -138,7 +138,20 @@ export interface Comment {
 }
 
 export type { TokenScope } from './transferTypes';
-export type { TokenRepoGrant, RotatedToken, RepoGrantInput, RepoImportStatus, RepoImportJob, RepoMirror, RepoExport, DeployKeyPermission, DeployKey, CreatedDeployKey, SecretScanMode, RepoSecuritySettings } from './transferTypes';
+export type {
+  TokenRepoGrant,
+  RotatedToken,
+  RepoGrantInput,
+  RepoImportStatus,
+  RepoImportJob,
+  RepoMirror,
+  RepoExport,
+  DeployKeyPermission,
+  DeployKey,
+  CreatedDeployKey,
+  SecretScanMode,
+  RepoSecuritySettings,
+} from './transferTypes';
 import type { TokenRepoGrant, TokenScope } from './transferTypes';
 
 export interface TokenMetadata {

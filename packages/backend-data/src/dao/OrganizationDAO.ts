@@ -31,15 +31,16 @@ class OrganizationDAO extends BaseDAO {
   }
 
   public async getByUsernameCi(usernameCi: string): Promise<OrganizationRow | null> {
-    return this.database
-      .prepare('SELECT * FROM organizations WHERE username_ci = ? LIMIT 1')
-      .bind(usernameCi)
-      .first<OrganizationRow>();
+    return this.database.prepare('SELECT * FROM organizations WHERE username_ci = ? LIMIT 1').bind(usernameCi).first<OrganizationRow>();
   }
 
   public async rename(id: string, username: string, now: number): Promise<void> {
     await this.withRetry(
-      () => this.database.prepare('UPDATE organizations SET username = ?, username_ci = ?, updated_at = ? WHERE id = ?').bind(username, username.toLowerCase(), now, id).run(),
+      () =>
+        this.database
+          .prepare('UPDATE organizations SET username = ?, username_ci = ?, updated_at = ? WHERE id = ?')
+          .bind(username, username.toLowerCase(), now, id)
+          .run(),
       'rename organization',
     );
   }

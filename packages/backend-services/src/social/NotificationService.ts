@@ -156,7 +156,12 @@ class NotificationService {
     return { notified, recipients: delivered };
   }
 
-  public async listByUser(userEmail: string, limit = 50, cursor?: string, unreadOnly = false): Promise<{ notifications: NotificationRow[]; nextCursor: string | null }> {
+  public async listByUser(
+    userEmail: string,
+    limit = 50,
+    cursor?: string,
+    unreadOnly = false,
+  ): Promise<{ notifications: NotificationRow[]; nextCursor: string | null }> {
     const dao = await this.deps.notificationDAO();
     return dao.listByUser(userEmail.toLowerCase(), Math.min(Math.max(limit, 1), 100), cursor, unreadOnly);
   }

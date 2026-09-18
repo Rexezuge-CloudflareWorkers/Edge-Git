@@ -15,9 +15,7 @@ export function PresenceDots({ status, viewers }: { status: RealtimeStatus; view
       title={viewers.join(', ')}
     >
       <span className={cn('h-1.5 w-1.5 rounded-full', others > 0 ? 'bg-green-500' : 'bg-[var(--color-accent)]')} />
-      {others > 0
-        ? t('realtime.viewingCount', '{{count}} Viewing', { count: viewers.length })
-        : t('realtime.live', 'Live')}
+      {others > 0 ? t('realtime.viewingCount', '{{count}} Viewing', { count: viewers.length }) : t('realtime.live', 'Live')}
     </span>
   );
 }

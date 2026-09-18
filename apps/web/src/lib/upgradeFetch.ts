@@ -34,11 +34,7 @@ export type UpgradeResult<T> = { status: 'skipped' } | { status: 'loaded'; data:
  * session) still retries authed after the upgrade. Callers check their own
  * `cancelled` flag afterwards.
  */
-export async function fetchUpgraded<T>(
-  st: UpgradeFetchState<T>,
-  key: string,
-  load: UpgradeLoad<T>,
-): Promise<UpgradeResult<T>> {
+export async function fetchUpgraded<T>(st: UpgradeFetchState<T>, key: string, load: UpgradeLoad<T>): Promise<UpgradeResult<T>> {
   if (st.key === key) return { status: 'skipped' };
   const shared = st.inflightKey === key ? st.inflight : null;
   if (shared) {

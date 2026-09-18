@@ -30,7 +30,13 @@ describe('realtime lifecycle on real D1 + DO', () => {
 
   it('issues repo tickets for read+ viewers with their channels', async () => {
     const ticket = await body<{ shard: string; ticket: string; expiresAt: number; channels: string[] }>(
-      await api('/user/realtime/ticket', json({ method: 'POST', body: JSON.stringify({ owner: OWNER, repo: REPO, channels: ['issue:1', 'activity', 'presence', 'bogus'] }) })),
+      await api(
+        '/user/realtime/ticket',
+        json({
+          method: 'POST',
+          body: JSON.stringify({ owner: OWNER, repo: REPO, channels: ['issue:1', 'activity', 'presence', 'bogus'] }),
+        }),
+      ),
     );
     expect(ticket.shard).toBe(`repo:${OWNER}/${REPO}`);
     expect(typeof ticket.ticket).toBe('string');
@@ -39,12 +45,22 @@ describe('realtime lifecycle on real D1 + DO', () => {
   });
 
   it('rejects tickets for unknown repos and empty channels', async () => {
-    expect((await api('/user/realtime/ticket', json({ method: 'POST', body: JSON.stringify({ owner: OWNER, repo: 'nope', channels: ['activity'] }) }))).status).toBe(
-      404,
-    );
-    expect((await api('/user/realtime/ticket', json({ method: 'POST', body: JSON.stringify({ owner: OWNER, repo: REPO, channels: ['bogus'] }) }))).status).toBe(
-      403,
-    );
+    expect(
+      (
+        await api(
+          '/user/realtime/ticket',
+          json({ method: 'POST', body: JSON.stringify({ owner: OWNER, repo: 'nope', channels: ['activity'] }) }),
+        )
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await api(
+          '/user/realtime/ticket',
+          json({ method: 'POST', body: JSON.stringify({ owner: OWNER, repo: REPO, channels: ['bogus'] }) }),
+        )
+      ).status,
+    ).toBe(403);
     expect((await api('/user/realtime/ticket', json({ method: 'POST', body: JSON.stringify({ owner: OWNER }) }))).status).toBe(400);
   });
 
@@ -82,7 +98,10 @@ describe('realtime lifecycle on real D1 + DO', () => {
 
   it('keeps mutations working with live publish active', async () => {
     const created = await body<{ number: number }>(
-      await api(`/user/repos/${OWNER}/${REPO}/issues`, json({ method: 'POST', body: JSON.stringify({ title: 'Live Issue', body: 'hello' }) })),
+      await api(
+        `/user/repos/${OWNER}/${REPO}/issues`,
+        json({ method: 'POST', body: JSON.stringify({ title: 'Live Issue', body: 'hello' }) }),
+      ),
     );
     expect(created.number).toBeGreaterThan(0);
     const commented = await api(

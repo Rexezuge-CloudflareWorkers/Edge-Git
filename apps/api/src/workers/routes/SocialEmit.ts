@@ -41,17 +41,20 @@ async function recordAndNotify(env: Env, input: SocialEmitInput): Promise<void> 
   }
   try {
     const mentionUsernames = NotificationService.parseMentions(input.mentionText ?? input.title);
-    const fanout = await scope.get(Tokens.NotificationService).fanOut({
-      repositoryId: input.repositoryId,
-      fullName: input.fullName,
-      actorEmail: input.actorEmail,
-      type: input.type,
-      title: input.title,
-      subjectType: input.subjectType ?? null,
-      subjectNumber: input.subjectNumber ?? null,
-      participantEmails: input.participantEmails ?? [],
-      mentionUsernames,
-    }).catch(() => ({ notified: 0, recipients: [] as string[] }));
+    const fanout = await scope
+      .get(Tokens.NotificationService)
+      .fanOut({
+        repositoryId: input.repositoryId,
+        fullName: input.fullName,
+        actorEmail: input.actorEmail,
+        type: input.type,
+        title: input.title,
+        subjectType: input.subjectType ?? null,
+        subjectNumber: input.subjectNumber ?? null,
+        participantEmails: input.participantEmails ?? [],
+        mentionUsernames,
+      })
+      .catch(() => ({ notified: 0, recipients: [] as string[] }));
     await publishLiveUpdate(env, {
       fullName: input.fullName,
       channel: channelForRepoEvent(input.type, input.subjectType ?? null, input.subjectNumber ?? null),
@@ -107,21 +110,19 @@ interface WebhookEmitInput {
 // Best-effort: never throws.
 async function emitWebhookEvent(env: Env, input: WebhookEmitInput): Promise<void> {
   try {
-    await createRequestScope(env)
-      .get(Tokens.WebhookDeliveryService)
-      .enqueueForEvent({
-        repositoryId: input.repositoryId,
-        fullName: input.fullName,
-        event: input.event,
-        actorEmail: input.actorEmail,
-        eventId: input.eventId,
-        subjectType: input.subjectType,
-        subjectNumber: input.subjectNumber,
-        subjectOid: input.subjectOid,
-        title: input.title,
-        action: input.action,
-        extra: input.extra,
-      });
+    await createRequestScope(env).get(Tokens.WebhookDeliveryService).enqueueForEvent({
+      repositoryId: input.repositoryId,
+      fullName: input.fullName,
+      event: input.event,
+      actorEmail: input.actorEmail,
+      eventId: input.eventId,
+      subjectType: input.subjectType,
+      subjectNumber: input.subjectNumber,
+      subjectOid: input.subjectOid,
+      title: input.title,
+      action: input.action,
+      extra: input.extra,
+    });
   } catch (error) {
     console.error('Failed to enqueue webhook deliveries', input.event, input.fullName, error);
   }

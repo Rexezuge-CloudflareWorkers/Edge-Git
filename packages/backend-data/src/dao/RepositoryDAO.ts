@@ -182,7 +182,11 @@ class RepositoryDAO extends BaseDAO {
     const newCi = newOwner.toLowerCase();
     try {
       await this.withRetry(
-        () => this.database.prepare('UPDATE repositories SET owner = ?, owner_ci = ? WHERE lower(owner) = ?').bind(newOwner, newCi, oldOwnerCi).run(),
+        () =>
+          this.database
+            .prepare('UPDATE repositories SET owner = ?, owner_ci = ? WHERE lower(owner) = ?')
+            .bind(newOwner, newCi, oldOwnerCi)
+            .run(),
         'rename repo owner',
       );
     } catch {
@@ -231,7 +235,11 @@ class RepositoryDAO extends BaseDAO {
     }
     values.push(id);
     await this.withRetry(
-      () => this.database.prepare(`UPDATE repositories SET ${sets.join(', ')} WHERE id = ?`).bind(...values).run(),
+      () =>
+        this.database
+          .prepare(`UPDATE repositories SET ${sets.join(', ')} WHERE id = ?`)
+          .bind(...values)
+          .run(),
       'update repository',
     );
   }

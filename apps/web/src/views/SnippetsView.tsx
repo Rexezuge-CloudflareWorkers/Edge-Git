@@ -56,7 +56,8 @@ export function SnippetsView({
         const list = signedIn && tab === 'mine' ? await listMySnippets() : await listPublicSnippets();
         if (!cancelled) setSnippets(list);
       } catch (error) {
-        if (!cancelled) showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadSnippets', 'Failed To Load Snippets.'));
+        if (!cancelled)
+          showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadSnippets', 'Failed To Load Snippets.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -109,7 +110,11 @@ export function SnippetsView({
     if (!body || !filename.trim()) return;
     setSaving(true);
     try {
-      const created = await createSnippet({ title: title.trim() || filename.trim(), visibility, files: [{ filename: filename.trim(), body }] });
+      const created = await createSnippet({
+        title: title.trim() || filename.trim(),
+        visibility,
+        files: [{ filename: filename.trim(), body }],
+      });
       setTitle('');
       setFilename('');
       setBody('');
@@ -129,83 +134,126 @@ export function SnippetsView({
         crumb={<span className="text-xl font-semibold text-[var(--color-text-primary)] truncate">{t('snippets.title', 'Snippets')}</span>}
       />
       <AppPage>
-      <SegmentedTabs
-        ariaLabel="Snippet scope"
-        tabs={[
-          { id: 'public', label: t('snippets.public', 'Public') },
-          ...(signedIn ? [{ id: 'mine', label: t('snippets.mine', 'Mine') }] : []),
-        ]}
-        value={tab}
-        onChange={(id) => setTab(id as SnippetTab)}
-      />
+        <SegmentedTabs
+          ariaLabel="Snippet scope"
+          tabs={[
+            { id: 'public', label: t('snippets.public', 'Public') },
+            ...(signedIn ? [{ id: 'mine', label: t('snippets.mine', 'Mine') }] : []),
+          ]}
+          value={tab}
+          onChange={(id) => setTab(id as SnippetTab)}
+        />
 
-      {signedIn && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('snippets.newSnippet', 'New Snippet')}</CardTitle>
-          </CardHeader>
-          <form onSubmit={submit} className="space-y-3">
-            <Input placeholder={t('snippets.titlePlaceholder', 'Title (Optional)')} value={title} onChange={(e) => setTitle(e.target.value)} />
-            <div className="flex gap-2">
-              <Input placeholder={t('snippets.filenamePlaceholder', 'hello.txt')} value={filename} onChange={(e) => setFilename(e.target.value)} required />
-              <select value={visibility} onChange={(e) => setVisibility(e.target.value as 'public' | 'secret')} className="rounded-md border border-[var(--color-border)] bg-transparent px-2 py-1.5 text-sm">
-                <option value="public">{t('snippets.public', 'Public')}</option>
-                <option value="secret">{t('snippets.secret', 'Secret')}</option>
-              </select>
-            </div>
-            <Textarea placeholder={t('snippets.bodyPlaceholder', 'Code…')} value={body} onChange={(e) => setBody(e.target.value)} rows={6} required />
-            <Button type="submit" variant="primary" size="sm" loading={saving}>{t('snippets.createSnippet', 'Create Snippet')}</Button>
-          </form>
-        </Card>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{tab === 'mine' ? t('snippets.mine', 'Mine') : t('snippets.public', 'Public')}</CardTitle>
-          <RefreshButton onRefresh={reload} loading={loading} />
-        </CardHeader>
-        {!loading && snippets.length === 0 ? (
-          <div className="text-center text-[var(--color-text-muted)] py-10 text-sm">
-            <StickyNote className="h-6 w-6 mx-auto mb-3" />
-            {t('snippets.noSnippets', 'No Snippets Yet.')}
-          </div>
-        ) : (
-          <ul className="divide-y divide-[var(--color-border)]">
-            {snippets.map((s) => (
-              <li key={s.id} className="py-2 flex items-center gap-2 flex-wrap">
-                <button type="button" onClick={() => selectSnippet(s.id)} className="text-left text-[var(--color-accent)] hover:underline">
-                  {s.title || s.id.slice(0, 8)}
-                </button>
-                <span className="text-xs text-[var(--color-text-muted)]">{s.visibility} · {s.ownerEmail}</span>
-                {signedIn && tab === 'mine' && (
-                  <>
-                    <Button size="sm" onClick={() => updateSnippet(s.id, { visibility: s.visibility === 'public' ? 'secret' : 'public' }).then(() => reload())}>
-                      {s.visibility === 'public' ? t('snippets.makeSecret', 'Make Secret') : t('snippets.makePublic', 'Make Public')}
-                    </Button>
-                    <Button size="sm" onClick={() => deleteSnippet(s.id).then(() => { if (selected === s.id) { setSelected(null); setFiles([]); } reload(); })}>
-                      {t('common.delete', 'Delete')}
-                    </Button>
-                  </>
-                )}
-              </li>
-            ))}
-          </ul>
+        {signedIn && (
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('snippets.newSnippet', 'New Snippet')}</CardTitle>
+            </CardHeader>
+            <form onSubmit={submit} className="space-y-3">
+              <Input
+                placeholder={t('snippets.titlePlaceholder', 'Title (Optional)')}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+              <div className="flex gap-2">
+                <Input
+                  placeholder={t('snippets.filenamePlaceholder', 'hello.txt')}
+                  value={filename}
+                  onChange={(e) => setFilename(e.target.value)}
+                  required
+                />
+                <select
+                  value={visibility}
+                  onChange={(e) => setVisibility(e.target.value as 'public' | 'secret')}
+                  className="rounded-md border border-[var(--color-border)] bg-transparent px-2 py-1.5 text-sm"
+                >
+                  <option value="public">{t('snippets.public', 'Public')}</option>
+                  <option value="secret">{t('snippets.secret', 'Secret')}</option>
+                </select>
+              </div>
+              <Textarea
+                placeholder={t('snippets.bodyPlaceholder', 'Code…')}
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                rows={6}
+                required
+              />
+              <Button type="submit" variant="primary" size="sm" loading={saving}>
+                {t('snippets.createSnippet', 'Create Snippet')}
+              </Button>
+            </form>
+          </Card>
         )}
-      </Card>
 
-      {selected && files.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-mono">{selected.slice(0, 8)}</CardTitle>
+            <CardTitle>{tab === 'mine' ? t('snippets.mine', 'Mine') : t('snippets.public', 'Public')}</CardTitle>
+            <RefreshButton onRefresh={reload} loading={loading} />
           </CardHeader>
-          {files.map((f) => (
-            <div key={f.id} className="mb-3">
-              <p className="text-sm font-medium">{f.filename}</p>
-              <pre className="mt-1 overflow-auto rounded bg-[var(--color-surface-base)] p-3 text-xs">{f.body}</pre>
+          {!loading && snippets.length === 0 ? (
+            <div className="text-center text-[var(--color-text-muted)] py-10 text-sm">
+              <StickyNote className="h-6 w-6 mx-auto mb-3" />
+              {t('snippets.noSnippets', 'No Snippets Yet.')}
             </div>
-          ))}
+          ) : (
+            <ul className="divide-y divide-[var(--color-border)]">
+              {snippets.map((s) => (
+                <li key={s.id} className="py-2 flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => selectSnippet(s.id)}
+                    className="text-left text-[var(--color-accent)] hover:underline"
+                  >
+                    {s.title || s.id.slice(0, 8)}
+                  </button>
+                  <span className="text-xs text-[var(--color-text-muted)]">
+                    {s.visibility} · {s.ownerEmail}
+                  </span>
+                  {signedIn && tab === 'mine' && (
+                    <>
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          updateSnippet(s.id, { visibility: s.visibility === 'public' ? 'secret' : 'public' }).then(() => reload())
+                        }
+                      >
+                        {s.visibility === 'public' ? t('snippets.makeSecret', 'Make Secret') : t('snippets.makePublic', 'Make Public')}
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          deleteSnippet(s.id).then(() => {
+                            if (selected === s.id) {
+                              setSelected(null);
+                              setFiles([]);
+                            }
+                            reload();
+                          })
+                        }
+                      >
+                        {t('common.delete', 'Delete')}
+                      </Button>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
-      )}
+
+        {selected && files.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-mono">{selected.slice(0, 8)}</CardTitle>
+            </CardHeader>
+            {files.map((f) => (
+              <div key={f.id} className="mb-3">
+                <p className="text-sm font-medium">{f.filename}</p>
+                <pre className="mt-1 overflow-auto rounded bg-[var(--color-surface-base)] p-3 text-xs">{f.body}</pre>
+              </div>
+            ))}
+          </Card>
+        )}
       </AppPage>
     </div>
   );

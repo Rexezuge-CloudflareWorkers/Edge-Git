@@ -64,11 +64,15 @@ function createSocialFakeDb(): D1Queryable & { state: FakeState } {
           }
           if (q.startsWith('SELECT * FROM repo_events WHERE repository_id = ?')) {
             let rows = state.events.filter((e) => e.repository_id === params[0]);
-            rows = [...rows].sort((a, b) => (b.created_at as number) - (a.created_at as number) || String(b.id).localeCompare(String(a.id)));
+            rows = [...rows].sort(
+              (a, b) => (b.created_at as number) - (a.created_at as number) || String(b.id).localeCompare(String(a.id)),
+            );
             if (params.length === 5) {
               const [, cutoff, cutoffAgain, lastId, limitPlus] = params as [unknown, number, number, string, number];
               void cutoffAgain;
-              rows = rows.filter((e) => (e.created_at as number) < cutoff || ((e.created_at as number) === cutoff && String(e.id) < lastId));
+              rows = rows.filter(
+                (e) => (e.created_at as number) < cutoff || ((e.created_at as number) === cutoff && String(e.id) < lastId),
+              );
               return { results: rows.slice(0, limitPlus as number) as unknown as T[] };
             }
             return { results: rows.slice(0, params[1] as number) as unknown as T[] };
@@ -76,11 +80,15 @@ function createSocialFakeDb(): D1Queryable & { state: FakeState } {
           if (q.startsWith('SELECT * FROM notifications WHERE user_email = ?')) {
             const unreadOnly = q.includes('AND is_read = 0');
             let rows = state.notifications.filter((n) => n.user_email === params[0] && (!unreadOnly || n.is_read === 0));
-            rows = [...rows].sort((a, b) => (b.created_at as number) - (a.created_at as number) || String(b.id).localeCompare(String(a.id)));
+            rows = [...rows].sort(
+              (a, b) => (b.created_at as number) - (a.created_at as number) || String(b.id).localeCompare(String(a.id)),
+            );
             if (params.length === 5) {
               const [, cutoff, cutoffAgain, lastId, limitPlus] = params as [unknown, number, number, string, number];
               void cutoffAgain;
-              rows = rows.filter((n) => (n.created_at as number) < cutoff || ((n.created_at as number) === cutoff && String(n.id) < lastId));
+              rows = rows.filter(
+                (n) => (n.created_at as number) < cutoff || ((n.created_at as number) === cutoff && String(n.id) < lastId),
+              );
               return { results: rows.slice(0, limitPlus as number) as unknown as T[] };
             }
             return { results: rows.slice(0, params[1] as number) as unknown as T[] };
@@ -125,8 +133,20 @@ function createSocialFakeDb(): D1Queryable & { state: FakeState } {
             return { success: true, meta: { changes: before - state.watches.length } };
           }
           if (q.startsWith('INSERT INTO repo_events')) {
-            const [id, repository_id, full_name, actor_email, type, subject_type, subject_number, subject_oid, payload, created_at] = params as Array<string | number | null>;
-            state.events.push({ id, repository_id, full_name, actor_email, type, subject_type, subject_number, subject_oid, payload, created_at });
+            const [id, repository_id, full_name, actor_email, type, subject_type, subject_number, subject_oid, payload, created_at] =
+              params as Array<string | number | null>;
+            state.events.push({
+              id,
+              repository_id,
+              full_name,
+              actor_email,
+              type,
+              subject_type,
+              subject_number,
+              subject_oid,
+              payload,
+              created_at,
+            });
             return { success: true, meta: { changes: 1 } };
           }
           if (q.startsWith('DELETE FROM repo_events WHERE repository_id = ?')) {
@@ -142,9 +162,22 @@ function createSocialFakeDb(): D1Queryable & { state: FakeState } {
             return { success: true, meta: { changes: victims.length } };
           }
           if (q.startsWith('INSERT OR IGNORE INTO notifications')) {
-            const [id, user_email, repository_id, full_name, actor_email, type, title, subject_type, subject_number, created_at] = params as Array<string | number | null>;
+            const [id, user_email, repository_id, full_name, actor_email, type, title, subject_type, subject_number, created_at] =
+              params as Array<string | number | null>;
             if (!state.notifications.some((n) => n.id === id)) {
-              state.notifications.push({ id, user_email, repository_id, full_name, actor_email, type, title, subject_type, subject_number, is_read: 0, created_at });
+              state.notifications.push({
+                id,
+                user_email,
+                repository_id,
+                full_name,
+                actor_email,
+                type,
+                title,
+                subject_type,
+                subject_number,
+                is_read: 0,
+                created_at,
+              });
               return { success: true, meta: { changes: 1 } };
             }
             return { success: true, meta: { changes: 0 } };
@@ -223,7 +256,16 @@ describe('EventDAO', () => {
     const db = createSocialFakeDb();
     const dao = new EventDAO(db);
     for (let i = 1; i <= 3; i += 1) {
-      await dao.append({ id: `e${i}`, repositoryId: 'r1', fullName: 'o/r', actorEmail: 'a@example.com', type: 'issue_opened', subjectType: 'issue', subjectNumber: i, now: 100 + i });
+      await dao.append({
+        id: `e${i}`,
+        repositoryId: 'r1',
+        fullName: 'o/r',
+        actorEmail: 'a@example.com',
+        type: 'issue_opened',
+        subjectType: 'issue',
+        subjectNumber: i,
+        now: 100 + i,
+      });
     }
     const first = await dao.listByRepo('r1', 2);
     expect(first.events.map((e) => e.id)).toEqual(['e3', 'e2']);
@@ -247,8 +289,26 @@ describe('NotificationDAO', () => {
   it('inserts, lists unread-first, and marks read', async () => {
     const db = createSocialFakeDb();
     const dao = new NotificationDAO(db);
-    await dao.insert({ id: 'n1', userEmail: 'a@example.com', repositoryId: 'r1', fullName: 'o/r', actorEmail: 'b@example.com', type: 'issue_opened', title: 'Bug', now: 100 });
-    await dao.insert({ id: 'n2', userEmail: 'a@example.com', repositoryId: 'r1', fullName: 'o/r', actorEmail: 'b@example.com', type: 'push', title: 'Push', now: 200 });
+    await dao.insert({
+      id: 'n1',
+      userEmail: 'a@example.com',
+      repositoryId: 'r1',
+      fullName: 'o/r',
+      actorEmail: 'b@example.com',
+      type: 'issue_opened',
+      title: 'Bug',
+      now: 100,
+    });
+    await dao.insert({
+      id: 'n2',
+      userEmail: 'a@example.com',
+      repositoryId: 'r1',
+      fullName: 'o/r',
+      actorEmail: 'b@example.com',
+      type: 'push',
+      title: 'Push',
+      now: 200,
+    });
     expect(await dao.unreadCount('a@example.com')).toBe(2);
     const unread = await dao.listByUser('a@example.com', 50, undefined, true);
     expect(unread.notifications.map((n) => n.id)).toEqual(['n2', 'n1']);
@@ -262,8 +322,26 @@ describe('NotificationDAO', () => {
   it('prunes only read notifications older than cutoff', async () => {
     const db = createSocialFakeDb();
     const dao = new NotificationDAO(db);
-    await dao.insert({ id: 'read-old', userEmail: 'a@example.com', repositoryId: 'r1', fullName: 'o/r', actorEmail: 'b@example.com', type: 'push', title: 'Old', now: 10 });
-    await dao.insert({ id: 'unread-old', userEmail: 'a@example.com', repositoryId: 'r1', fullName: 'o/r', actorEmail: 'b@example.com', type: 'push', title: 'Unread', now: 10 });
+    await dao.insert({
+      id: 'read-old',
+      userEmail: 'a@example.com',
+      repositoryId: 'r1',
+      fullName: 'o/r',
+      actorEmail: 'b@example.com',
+      type: 'push',
+      title: 'Old',
+      now: 10,
+    });
+    await dao.insert({
+      id: 'unread-old',
+      userEmail: 'a@example.com',
+      repositoryId: 'r1',
+      fullName: 'o/r',
+      actorEmail: 'b@example.com',
+      type: 'push',
+      title: 'Unread',
+      now: 10,
+    });
     await dao.markRead('read-old', 'a@example.com');
     expect(await dao.pruneReadOlderThan(100, 100)).toBe(1);
     expect(db.state.notifications.map((n) => n.id)).toEqual(['unread-old']);
@@ -273,7 +351,10 @@ describe('NotificationDAO', () => {
 describe('social services', () => {
   it('StarService lowercases emails and delegates', async () => {
     const calls: string[] = [];
-    const svc = new StarService({ DB: {} as never }, { starDAO: async () => ({ star: async (r: string, e: string) => void calls.push(`${r}:${e}`) }) as never });
+    const svc = new StarService(
+      { DB: {} as never },
+      { starDAO: async () => ({ star: async (r: string, e: string) => void calls.push(`${r}:${e}`) }) as never },
+    );
     await svc.star('r1', 'A@Example.COM');
     expect(calls).toEqual(['r1:a@example.com']);
   });
@@ -315,7 +396,8 @@ describe('social services', () => {
       {
         notificationDAO: async () => ({ insert: async (input: { userEmail: string }) => void inserted.push(input.userEmail) }) as never,
         watchDAO: async () => ({ listWatchers: async () => ['Watcher@Example.COM', 'actor@example.com'] }) as never,
-        userDAO: async () => ({ getByUsernameCi: async (u: string) => (u === 'mentioned' ? { email: 'Mentioned@Example.COM' } : null) }) as never,
+        userDAO: async () =>
+          ({ getByUsernameCi: async (u: string) => (u === 'mentioned' ? { email: 'Mentioned@Example.COM' } : null) }) as never,
         repositoryDAO: async () => ({ getById: async () => ({ id: 'r1', owner: 'o', name: 'r', is_private: 0 }) }) as never,
         permissionService: async () =>
           ({

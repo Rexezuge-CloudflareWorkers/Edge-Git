@@ -93,114 +93,112 @@ export function SearchView({ showNotice }: { showNotice: (type: 'success' | 'err
         }
       />
       <AppPage>
-      <SegmentedTabs ariaLabel="Search categories" tabs={searchTabs} value={type} onChange={(id) => switchTab(id as SearchTab)} />
-      {loading ? (
-        <p className="text-sm text-[var(--color-text-secondary)]">{t('common.loading', 'Loading…')}</p>
-      ) : query.length < 2 ? (
-        <Card>
-          <p className="text-sm text-[var(--color-text-secondary)]">{t('search.hint', 'Type At Least 2 Characters To Search.')}</p>
-        </Card>
-      ) : type === 'repos' ? (
-        <div className="grid gap-3">
-          {repos.length === 0 ? (
-            <Card>
-              <p className="text-sm text-[var(--color-text-secondary)]">{t('search.noRepos', 'No Repositories Found.')}</p>
-            </Card>
-          ) : (
-            repos.map((r) => (
-              <Card key={r.id}>
-                <Link to={`/${r.owner}/${r.name}`} className="font-semibold text-[var(--color-accent)]">
-                  {r.fullName}
-                </Link>
-                {r.description ? <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{r.description}</p> : null}
+        <SegmentedTabs ariaLabel="Search categories" tabs={searchTabs} value={type} onChange={(id) => switchTab(id as SearchTab)} />
+        {loading ? (
+          <p className="text-sm text-[var(--color-text-secondary)]">{t('common.loading', 'Loading…')}</p>
+        ) : query.length < 2 ? (
+          <Card>
+            <p className="text-sm text-[var(--color-text-secondary)]">{t('search.hint', 'Type At Least 2 Characters To Search.')}</p>
+          </Card>
+        ) : type === 'repos' ? (
+          <div className="grid gap-3">
+            {repos.length === 0 ? (
+              <Card>
+                <p className="text-sm text-[var(--color-text-secondary)]">{t('search.noRepos', 'No Repositories Found.')}</p>
               </Card>
-            ))
-          )}
-        </div>
-      ) : type === 'issues' ? (
-        <div className="grid gap-3">
-          {issues.length === 0 ? (
-            <Card>
-              <p className="text-sm text-[var(--color-text-secondary)]">{t('search.noIssues', 'No Issues Found.')}</p>
-            </Card>
-          ) : (
-            issues.map((i) => (
-              <Card key={i.id}>
-                <Link to={`/${i.full_name}/issues/${i.number}`} className="font-semibold text-[var(--color-accent)]">
-                  {i.full_name}#{i.number} — {i.title}
-                </Link>
-                {i.body ? <p className="mt-1 text-sm text-[var(--color-text-secondary)] line-clamp-2">{i.body}</p> : null}
+            ) : (
+              repos.map((r) => (
+                <Card key={r.id}>
+                  <Link to={`/${r.owner}/${r.name}`} className="font-semibold text-[var(--color-accent)]">
+                    {r.fullName}
+                  </Link>
+                  {r.description ? <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{r.description}</p> : null}
+                </Card>
+              ))
+            )}
+          </div>
+        ) : type === 'issues' ? (
+          <div className="grid gap-3">
+            {issues.length === 0 ? (
+              <Card>
+                <p className="text-sm text-[var(--color-text-secondary)]">{t('search.noIssues', 'No Issues Found.')}</p>
               </Card>
-            ))
-          )}
-        </div>
-      ) : type === 'pulls' ? (
-        <div className="grid gap-3">
-          {pulls.length === 0 ? (
-            <Card>
-              <p className="text-sm text-[var(--color-text-secondary)]">{t('search.noPulls', 'No Pull Requests Found.')}</p>
-            </Card>
-          ) : (
-            pulls.map((p) => (
-              <Card key={p.id}>
-                <Link to={`/${p.full_name}/pulls/${p.number}`} className="font-semibold text-[var(--color-accent)]">
-                  {p.full_name}#{p.number} — {p.title}
-                </Link>
-                {p.body ? <p className="mt-1 text-sm text-[var(--color-text-secondary)] line-clamp-2">{p.body}</p> : null}
+            ) : (
+              issues.map((i) => (
+                <Card key={i.id}>
+                  <Link to={`/${i.full_name}/issues/${i.number}`} className="font-semibold text-[var(--color-accent)]">
+                    {i.full_name}#{i.number} — {i.title}
+                  </Link>
+                  {i.body ? <p className="mt-1 text-sm text-[var(--color-text-secondary)] line-clamp-2">{i.body}</p> : null}
+                </Card>
+              ))
+            )}
+          </div>
+        ) : type === 'pulls' ? (
+          <div className="grid gap-3">
+            {pulls.length === 0 ? (
+              <Card>
+                <p className="text-sm text-[var(--color-text-secondary)]">{t('search.noPulls', 'No Pull Requests Found.')}</p>
               </Card>
-            ))
-          )}
-        </div>
-      ) : type === 'discussions' ? (
-        <div className="grid gap-3">
-          {discussions.length === 0 ? (
-            <Card>
-              <p className="text-sm text-[var(--color-text-secondary)]">{t('search.noDiscussions', 'No Discussions Found.')}</p>
-            </Card>
-          ) : (
-            discussions.map((d) => (
-              <Card key={d.id}>
-                <p className="font-semibold text-[var(--color-accent)]">
-                  {d.title}
-                </p>
-                {d.body ? <p className="mt-1 text-sm text-[var(--color-text-secondary)] line-clamp-2">{d.body}</p> : null}
+            ) : (
+              pulls.map((p) => (
+                <Card key={p.id}>
+                  <Link to={`/${p.full_name}/pulls/${p.number}`} className="font-semibold text-[var(--color-accent)]">
+                    {p.full_name}#{p.number} — {p.title}
+                  </Link>
+                  {p.body ? <p className="mt-1 text-sm text-[var(--color-text-secondary)] line-clamp-2">{p.body}</p> : null}
+                </Card>
+              ))
+            )}
+          </div>
+        ) : type === 'discussions' ? (
+          <div className="grid gap-3">
+            {discussions.length === 0 ? (
+              <Card>
+                <p className="text-sm text-[var(--color-text-secondary)]">{t('search.noDiscussions', 'No Discussions Found.')}</p>
               </Card>
-            ))
-          )}
-        </div>
-      ) : type === 'snippets' ? (
-        <div className="grid gap-3">
-          {snippets.length === 0 ? (
-            <Card>
-              <p className="text-sm text-[var(--color-text-secondary)]">{t('search.noSnippets', 'No Snippets Found.')}</p>
-            </Card>
-          ) : (
-            snippets.map((s) => (
-              <Card key={s.id}>
-                <Link to="/snippets" className="font-semibold text-[var(--color-accent)]">
-                  {s.title || s.id.slice(0, 8)}
-                </Link>
-                <p className="mt-1 text-xs text-[var(--color-text-secondary)]">{s.ownerEmail}</p>
+            ) : (
+              discussions.map((d) => (
+                <Card key={d.id}>
+                  <p className="font-semibold text-[var(--color-accent)]">{d.title}</p>
+                  {d.body ? <p className="mt-1 text-sm text-[var(--color-text-secondary)] line-clamp-2">{d.body}</p> : null}
+                </Card>
+              ))
+            )}
+          </div>
+        ) : type === 'snippets' ? (
+          <div className="grid gap-3">
+            {snippets.length === 0 ? (
+              <Card>
+                <p className="text-sm text-[var(--color-text-secondary)]">{t('search.noSnippets', 'No Snippets Found.')}</p>
               </Card>
-            ))
-          )}
-        </div>
-      ) : (
-        <div className="grid gap-3">
-          {code.length === 0 ? (
-            <Card>
-              <p className="text-sm text-[var(--color-text-secondary)]">{t('search.noCode', 'No Code Matches Found.')}</p>
-            </Card>
-          ) : (
-            code.map((hit) => (
-              <Card key={`${hit.repo_id}:${hit.path}`}>
-                <p className="font-mono text-sm text-[var(--color-accent)]">{hit.path}</p>
-                <pre className="mt-1 text-xs text-[var(--color-text-secondary)] whitespace-pre-wrap break-words">{hit.snippet}</pre>
+            ) : (
+              snippets.map((s) => (
+                <Card key={s.id}>
+                  <Link to="/snippets" className="font-semibold text-[var(--color-accent)]">
+                    {s.title || s.id.slice(0, 8)}
+                  </Link>
+                  <p className="mt-1 text-xs text-[var(--color-text-secondary)]">{s.ownerEmail}</p>
+                </Card>
+              ))
+            )}
+          </div>
+        ) : (
+          <div className="grid gap-3">
+            {code.length === 0 ? (
+              <Card>
+                <p className="text-sm text-[var(--color-text-secondary)]">{t('search.noCode', 'No Code Matches Found.')}</p>
               </Card>
-            ))
-          )}
-        </div>
-      )}
+            ) : (
+              code.map((hit) => (
+                <Card key={`${hit.repo_id}:${hit.path}`}>
+                  <p className="font-mono text-sm text-[var(--color-accent)]">{hit.path}</p>
+                  <pre className="mt-1 text-xs text-[var(--color-text-secondary)] whitespace-pre-wrap break-words">{hit.snippet}</pre>
+                </Card>
+              ))
+            )}
+          </div>
+        )}
       </AppPage>
     </div>
   );

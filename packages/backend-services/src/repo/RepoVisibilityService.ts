@@ -53,11 +53,7 @@ class RepoVisibilityService {
     return { repo, role };
   }
 
-  public async listVisibleForUser(
-    userEmail: string,
-    resolveCallerUsernameCi: CallerResolver,
-    limit = 100,
-  ): Promise<RepositoryRow[]> {
+  public async listVisibleForUser(userEmail: string, resolveCallerUsernameCi: CallerResolver, limit = 100): Promise<RepositoryRow[]> {
     const dao = await this.deps.repositoryDAO();
     const normalizedEmail = EmailAddress.normalize(userEmail);
     const seen = new Map<string, RepositoryRow>();

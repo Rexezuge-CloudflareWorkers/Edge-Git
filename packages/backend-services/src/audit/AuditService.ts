@@ -44,7 +44,12 @@ class AuditService {
     };
   }
 
-  public static buildRequestEvent(request: Request, userEmail: string, statusCode: number, scope?: { orgId?: string | null; repoId?: string | null; resource?: string | null }): AuditEvent {
+  public static buildRequestEvent(
+    request: Request,
+    userEmail: string,
+    statusCode: number,
+    scope?: { orgId?: string | null; repoId?: string | null; resource?: string | null },
+  ): AuditEvent {
     return buildRequestEvent(request, userEmail, statusCode, scope);
   }
 
@@ -63,7 +68,11 @@ class AuditService {
     }
   }
 
-  public async query(filters: AuditLogFilters, limit?: number, cursor?: string): Promise<{ logs: AuditLogRow[]; nextCursor: string | null }> {
+  public async query(
+    filters: AuditLogFilters,
+    limit?: number,
+    cursor?: string,
+  ): Promise<{ logs: AuditLogRow[]; nextCursor: string | null }> {
     const dao = await this.deps.auditLogDAO();
     return dao.query(filters, clampLimit(limit), cursor);
   }
@@ -71,7 +80,13 @@ class AuditService {
   /**
   Org-scoped read: org owners only (Edge-Git has no superadmin tier).
   */
-  public async queryByOrg(orgUsername: string, requesterEmail: string, filters: Omit<AuditLogFilters, 'orgId' | 'resourcePrefix'>, limit?: number, cursor?: string): Promise<{ logs: AuditLogRow[]; nextCursor: string | null }> {
+  public async queryByOrg(
+    orgUsername: string,
+    requesterEmail: string,
+    filters: Omit<AuditLogFilters, 'orgId' | 'resourcePrefix'>,
+    limit?: number,
+    cursor?: string,
+  ): Promise<{ logs: AuditLogRow[]; nextCursor: string | null }> {
     const orgDAO = await this.deps.organizationDAO();
     const org = await orgDAO.getByUsernameCi(orgUsername.toLowerCase());
     if (!org) {
@@ -89,7 +104,12 @@ class AuditService {
   /**
   Personal trail: callers only ever see their own actions.
   */
-  public async queryMine(requesterEmail: string, filters: Omit<AuditLogFilters, 'userEmail'>, limit?: number, cursor?: string): Promise<{ logs: AuditLogRow[]; nextCursor: string | null }> {
+  public async queryMine(
+    requesterEmail: string,
+    filters: Omit<AuditLogFilters, 'userEmail'>,
+    limit?: number,
+    cursor?: string,
+  ): Promise<{ logs: AuditLogRow[]; nextCursor: string | null }> {
     const dao = await this.deps.auditLogDAO();
     return dao.query({ ...filters, userEmail: requesterEmail.toLowerCase() }, clampLimit(limit), cursor);
   }

@@ -11,10 +11,7 @@ import type { IAuthorizationGuard } from './AuthorizationGuard';
 class AuthorizationGuard implements IAuthorizationGuard {
   constructor(private readonly permissions: PermissionService) {}
 
-  public async requireVisible(
-    viewerEmail: string | null,
-    repo: RepositoryRow | null,
-  ): Promise<RepositoryRow | null> {
+  public async requireVisible(viewerEmail: string | null, repo: RepositoryRow | null): Promise<RepositoryRow | null> {
     if (!repo) return null;
     const role = await this.permissions.getRole(viewerEmail, repo).catch(() => null);
     if (!role) return null;

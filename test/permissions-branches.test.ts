@@ -46,9 +46,38 @@ describe('PermissionService edge branches', () => {
 
 describe('RepoService visibility branches', () => {
   it('lists owned, org, and collaborated repos and enforces roles', async () => {
-    const owned = { id: 'r1', owner: 'alice', owner_email: 'alice@x.co', owner_type: 'user', owner_user_email: 'alice@x.co', org_id: null, name: 'one', is_private: 0, updated_at: 3 };
-    const orgRepo = { id: 'r2', owner: 'acme', owner_email: 'alice@x.co', owner_type: 'org', org_id: 'o1', name: 'two', is_private: 1, updated_at: 2 };
-    const collabRepo = { id: 'r3', owner: 'bob', owner_email: 'bob@x.co', owner_type: 'user', owner_user_email: 'bob@x.co', org_id: null, name: 'three', is_private: 1, updated_at: 1 };
+    const owned = {
+      id: 'r1',
+      owner: 'alice',
+      owner_email: 'alice@x.co',
+      owner_type: 'user',
+      owner_user_email: 'alice@x.co',
+      org_id: null,
+      name: 'one',
+      is_private: 0,
+      updated_at: 3,
+    };
+    const orgRepo = {
+      id: 'r2',
+      owner: 'acme',
+      owner_email: 'alice@x.co',
+      owner_type: 'org',
+      org_id: 'o1',
+      name: 'two',
+      is_private: 1,
+      updated_at: 2,
+    };
+    const collabRepo = {
+      id: 'r3',
+      owner: 'bob',
+      owner_email: 'bob@x.co',
+      owner_type: 'user',
+      owner_user_email: 'bob@x.co',
+      org_id: null,
+      name: 'three',
+      is_private: 1,
+      updated_at: 1,
+    };
     const svc = new RepoService({ DB: {} } as never, {
       repositoryDAO: async () =>
         ({

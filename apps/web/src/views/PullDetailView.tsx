@@ -85,7 +85,9 @@ export function PullDetailView({
     return (
       <AppPage>
         <Card>
-          <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('repos.repositoryNotFound', 'Repository Not Found')}</h1>
+          <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">
+            {t('repos.repositoryNotFound', 'Repository Not Found')}
+          </h1>
         </Card>
       </AppPage>
     );
@@ -102,7 +104,12 @@ export function PullDetailView({
   if (!Number.isSafeInteger(pullNumber)) {
     return (
       <div>
-        <RepoHeader repo={repoData} activeTab="pulls" showSettings={false} onTabChange={(id: RepoTab) => navigate(`/${owner}/${repo}${id === 'code' ? '' : `?tab=${id}`}`)} />
+        <RepoHeader
+          repo={repoData}
+          activeTab="pulls"
+          showSettings={false}
+          onTabChange={(id: RepoTab) => navigate(`/${owner}/${repo}${id === 'code' ? '' : `?tab=${id}`}`)}
+        />
         <AppPage>
           <Card>
             <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('pulls.pullNotFound', 'Pull Request Not Found.')}</h1>
@@ -114,7 +121,12 @@ export function PullDetailView({
 
   return (
     <div>
-      <RepoHeader repo={repoData} activeTab="pulls" showSettings={false} onTabChange={(id: RepoTab) => navigate(`/${owner}/${repo}${id === 'code' ? '' : `?tab=${id}`}`)} />
+      <RepoHeader
+        repo={repoData}
+        activeTab="pulls"
+        showSettings={false}
+        onTabChange={(id: RepoTab) => navigate(`/${owner}/${repo}${id === 'code' ? '' : `?tab=${id}`}`)}
+      />
       <AppPage>
         <PullDetail
           owner={owner}

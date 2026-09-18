@@ -2,7 +2,19 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { KanbanSquare } from 'lucide-react';
 import type { Project, ProjectBoard, ProjectCard } from '../../types';
-import { createCard, createColumn, createProject, deleteCard, deleteColumn, listProjects, loadProjectBoard, moveCard, renameColumn, setCardArchived, updateProject } from '../../services/projectService';
+import {
+  createCard,
+  createColumn,
+  createProject,
+  deleteCard,
+  deleteColumn,
+  listProjects,
+  loadProjectBoard,
+  moveCard,
+  renameColumn,
+  setCardArchived,
+  updateProject,
+} from '../../services/projectService';
 import { nextPosition } from '../../lib/projectOrder';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
@@ -208,7 +220,12 @@ export function ProjectsTab({
             <CardTitle>{t('projects.newProject', 'New Project')}</CardTitle>
           </CardHeader>
           <form onSubmit={submitProject} className="flex gap-2">
-            <Input placeholder={t('projects.titlePlaceholder', 'Project Title')} value={title} onChange={(e) => setTitle(e.target.value)} required />
+            <Input
+              placeholder={t('projects.titlePlaceholder', 'Project Title')}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
             <Button type="submit" variant="primary" size="sm" loading={saving}>
               {t('common.create', 'Create')}
             </Button>
@@ -250,14 +267,22 @@ export function ProjectsTab({
             </CardTitle>
             {canWrite && (
               <Button size="sm" onClick={() => void toggleStatus()}>
-                {board.project.status === 'open' ? t('projects.closeProject', 'Close Project') : t('projects.reopenProject', 'Reopen Project')}
+                {board.project.status === 'open'
+                  ? t('projects.closeProject', 'Close Project')
+                  : t('projects.reopenProject', 'Reopen Project')}
               </Button>
             )}
           </CardHeader>
           {canWrite && (
             <form onSubmit={submitColumn} className="flex gap-2 mb-4">
-              <Input placeholder={t('projects.columnPlaceholder', 'New Column Title')} value={columnTitle} onChange={(e) => setColumnTitle(e.target.value)} />
-              <Button type="submit" size="sm">{t('projects.addColumn', 'Add Column')}</Button>
+              <Input
+                placeholder={t('projects.columnPlaceholder', 'New Column Title')}
+                value={columnTitle}
+                onChange={(e) => setColumnTitle(e.target.value)}
+              />
+              <Button type="submit" size="sm">
+                {t('projects.addColumn', 'Add Column')}
+              </Button>
             </form>
           )}
           <div className="grid gap-3 md:grid-cols-3">
@@ -277,17 +302,19 @@ export function ProjectsTab({
                   )}
                 </div>
                 <ul className="space-y-2">
-                  {board.cards.filter((c) => c.columnId === col.id && !c.archived).map((card) => (
-                    <ProjectCardItem
-                      key={card.id}
-                      card={card}
-                      columnTitles={board.columns.filter((c) => c.id !== col.id).map((c) => ({ id: c.id, title: c.title }))}
-                      onMove={(toColumnId) => void moveCardTo(card.id, toColumnId)}
-                      onArchive={() => archiveCard(card.id)}
-                      onDelete={() => removeCard(card.id)}
-                      moveLabel={(title) => `→ ${title}`}
-                    />
-                  ))}
+                  {board.cards
+                    .filter((c) => c.columnId === col.id && !c.archived)
+                    .map((card) => (
+                      <ProjectCardItem
+                        key={card.id}
+                        card={card}
+                        columnTitles={board.columns.filter((c) => c.id !== col.id).map((c) => ({ id: c.id, title: c.title }))}
+                        onMove={(toColumnId) => void moveCardTo(card.id, toColumnId)}
+                        onArchive={() => archiveCard(card.id)}
+                        onDelete={() => removeCard(card.id)}
+                        moveLabel={(title) => `→ ${title}`}
+                      />
+                    ))}
                 </ul>
                 {canWrite && (
                   <form onSubmit={submitCard} className="mt-2 flex gap-1">
@@ -295,9 +322,14 @@ export function ProjectsTab({
                       placeholder={t('projects.cardPlaceholder', 'New Card Title')}
                       value={activeColumn === col.id ? noteTitle : ''}
                       onFocus={() => setActiveColumn(col.id)}
-                      onChange={(e) => { setActiveColumn(col.id); setNoteTitle(e.target.value); }}
+                      onChange={(e) => {
+                        setActiveColumn(col.id);
+                        setNoteTitle(e.target.value);
+                      }}
                     />
-                    <Button type="submit" size="sm">+</Button>
+                    <Button type="submit" size="sm">
+                      +
+                    </Button>
                   </form>
                 )}
               </div>

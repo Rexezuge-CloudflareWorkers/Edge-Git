@@ -19,19 +19,11 @@ class RealtimeLimits {
   }
 
   public getMaxConnPerRepoShard(): number {
-    return EnvParser.positiveInt(
-      this.env,
-      'REALTIME_MAX_CONN_PER_REPO_SHARD',
-      DEFAULT_REALTIME_MAX_CONN_PER_REPO_SHARD,
-    );
+    return EnvParser.positiveInt(this.env, 'REALTIME_MAX_CONN_PER_REPO_SHARD', DEFAULT_REALTIME_MAX_CONN_PER_REPO_SHARD);
   }
 
   public getMaxConnPerInboxShard(): number {
-    return EnvParser.positiveInt(
-      this.env,
-      'REALTIME_MAX_CONN_PER_INBOX_SHARD',
-      DEFAULT_REALTIME_MAX_CONN_PER_INBOX_SHARD,
-    );
+    return EnvParser.positiveInt(this.env, 'REALTIME_MAX_CONN_PER_INBOX_SHARD', DEFAULT_REALTIME_MAX_CONN_PER_INBOX_SHARD);
   }
 }
 

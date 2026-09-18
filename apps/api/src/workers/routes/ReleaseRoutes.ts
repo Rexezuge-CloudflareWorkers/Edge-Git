@@ -88,7 +88,13 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
     } catch {
       return c.json({ error: 'Forbidden' }, 403);
     }
-    const body = (await c.req.json().catch(() => ({}))) as { tagName?: unknown; name?: unknown; body?: unknown; isDraft?: unknown; isPrerelease?: unknown };
+    const body = (await c.req.json().catch(() => ({}))) as {
+      tagName?: unknown;
+      name?: unknown;
+      body?: unknown;
+      isDraft?: unknown;
+      isPrerelease?: unknown;
+    };
     try {
       const scope = createRequestScope(c.env);
       const isDraft = body.isDraft === undefined || body.isDraft === true;
@@ -98,7 +104,13 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
           return c.json({ error: 'git tag does not exist yet — create the tag first or save as draft' }, 400);
         }
       }
-      const release = await scope.get(Tokens.ReleaseService).createRelease(row.id, { tagName: body.tagName, name: body.name, body: body.body, isDraft: body.isDraft, isPrerelease: body.isPrerelease }, email);
+      const release = await scope
+        .get(Tokens.ReleaseService)
+        .createRelease(
+          row.id,
+          { tagName: body.tagName, name: body.name, body: body.body, isDraft: body.isDraft, isPrerelease: body.isPrerelease },
+          email,
+        );
       const fullName = `${row.owner}/${row.name}`;
       void recordAndNotify(c.env, {
         repositoryId: row.id,

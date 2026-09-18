@@ -41,7 +41,9 @@ class PullThreadDAO extends BaseDAO {
     await this.withRetry(
       () =>
         this.database
-          .prepare('INSERT INTO pull_review_threads (id, pull_request_id, path, line, side, commit_oid, status, author_email, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+          .prepare(
+            'INSERT INTO pull_review_threads (id, pull_request_id, path, line, side, commit_oid, status, author_email, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          )
           .bind(input.id, input.pullRequestId, input.path, input.line, input.side, input.commitOid, 'open', input.authorEmail, input.now)
           .run(),
       'open pull review thread',
@@ -86,7 +88,10 @@ class PullThreadDAO extends BaseDAO {
   public async addThreadComment(id: string, threadId: string, authorEmail: string, body: string, now: number): Promise<void> {
     await this.withRetry(
       () =>
-        this.database.prepare('INSERT INTO pull_thread_comments (id, thread_id, author_email, body, created_at) VALUES (?, ?, ?, ?, ?)').bind(id, threadId, authorEmail, body, now).run(),
+        this.database
+          .prepare('INSERT INTO pull_thread_comments (id, thread_id, author_email, body, created_at) VALUES (?, ?, ?, ?, ?)')
+          .bind(id, threadId, authorEmail, body, now)
+          .run(),
       'add pull thread comment',
     );
   }
@@ -107,7 +112,9 @@ class PullThreadDAO extends BaseDAO {
     await this.withRetry(
       () =>
         this.database
-          .prepare('DELETE FROM pull_thread_comments WHERE thread_id IN (SELECT id FROM pull_review_threads WHERE pull_request_id IN (SELECT id FROM pull_requests WHERE repository_id = ?))')
+          .prepare(
+            'DELETE FROM pull_thread_comments WHERE thread_id IN (SELECT id FROM pull_review_threads WHERE pull_request_id IN (SELECT id FROM pull_requests WHERE repository_id = ?))',
+          )
           .bind(repositoryId)
           .run(),
       'delete pull thread comments by repo',

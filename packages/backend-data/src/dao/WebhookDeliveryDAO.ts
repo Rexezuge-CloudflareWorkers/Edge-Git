@@ -60,7 +60,9 @@ class WebhookDeliveryDAO extends BaseDAO {
 
   public async listDue(now: number, limit: number): Promise<WebhookDeliveryRow[]> {
     const result = await this.database
-      .prepare("SELECT * FROM webhook_deliveries WHERE status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC, id ASC LIMIT ?")
+      .prepare(
+        "SELECT * FROM webhook_deliveries WHERE status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC, id ASC LIMIT ?",
+      )
       .bind(now, limit)
       .all<WebhookDeliveryRow>();
     return result.results ?? [];
@@ -90,7 +92,9 @@ class WebhookDeliveryDAO extends BaseDAO {
     await this.withRetry(
       () =>
         this.database
-          .prepare('UPDATE webhook_deliveries SET status = ?, next_retry_at = ?, last_http_status = ?, last_error = ?, updated_at = ? WHERE id = ?')
+          .prepare(
+            'UPDATE webhook_deliveries SET status = ?, next_retry_at = ?, last_http_status = ?, last_error = ?, updated_at = ? WHERE id = ?',
+          )
           .bind(input.status, input.nextRetryAt, input.httpStatus, input.error, input.now, id)
           .run(),
       'settle webhook delivery',
@@ -101,14 +105,20 @@ class WebhookDeliveryDAO extends BaseDAO {
     await this.withRetry(
       () =>
         this.database
-          .prepare("UPDATE webhook_deliveries SET status = 'pending', attempts = 0, next_retry_at = ?, last_http_status = NULL, last_error = NULL, updated_at = ? WHERE id = ?")
+          .prepare(
+            "UPDATE webhook_deliveries SET status = 'pending', attempts = 0, next_retry_at = ?, last_http_status = NULL, last_error = NULL, updated_at = ? WHERE id = ?",
+          )
           .bind(now, now, id)
           .run(),
       'reset webhook delivery',
     );
   }
 
-  public async listByHook(hookId: string, limit: number, cursor?: string): Promise<{ deliveries: WebhookDeliveryRow[]; nextCursor: string | null }> {
+  public async listByHook(
+    hookId: string,
+    limit: number,
+    cursor?: string,
+  ): Promise<{ deliveries: WebhookDeliveryRow[]; nextCursor: string | null }> {
     const decoded = this.decodeCursor<{ created_at: number; id: string }>(cursor);
     const pageSize = limit + 1;
     const result =

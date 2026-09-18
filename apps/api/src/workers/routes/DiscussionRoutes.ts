@@ -197,7 +197,9 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
     if (number === null) return c.json({ error: 'Invalid discussion number' }, 400);
     const body = (await c.req.json().catch(() => ({}))) as { body?: unknown };
     try {
-      const comment = await createRequestScope(c.env).get(Tokens.DiscussionService).addComment(row.id, number, body as { body: unknown }, email);
+      const comment = await createRequestScope(c.env)
+        .get(Tokens.DiscussionService)
+        .addComment(row.id, number, body as { body: unknown }, email);
       void recordAndNotify(c.env, {
         repositoryId: row.id,
         fullName: `${row.owner}/${row.name}`,

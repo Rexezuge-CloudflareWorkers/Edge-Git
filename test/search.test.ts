@@ -32,14 +32,20 @@ function createSearchFakeDb(opts: {
           if (q.includes('FROM repo_fts')) {
             const hits = repos.filter((r) => {
               const hay = `${r.owner}/${r.name} ${r.description ?? ''}`.toLowerCase();
-              const tokens = fts.replaceAll('"', '').replaceAll('*', '').split(/\s*(?:and|or)\s*/);
+              const tokens = fts
+                .replaceAll('"', '')
+                .replaceAll('*', '')
+                .split(/\s*(?:and|or)\s*/);
               return tokens.filter(Boolean).every((t) => hay.includes(t.trim()));
             });
             return Promise.resolve({ results: hits.slice(0, params[1] as number) as T[] });
           }
           const hits = issues.filter((i) => {
             const hay = `${i.title} ${i.body ?? ''}`.toLowerCase();
-            const tokens = fts.replaceAll('"', '').replaceAll('*', '').split(/\s*(?:and|or)\s*/);
+            const tokens = fts
+              .replaceAll('"', '')
+              .replaceAll('*', '')
+              .split(/\s*(?:and|or)\s*/);
             return tokens.filter(Boolean).every((t) => hay.includes(t.trim()));
           });
           const scoped = params.length === 3 ? hits.filter((i) => i.repository_id === params[1]) : hits;
@@ -166,17 +172,22 @@ describe('SearchService', () => {
     const db = createSearchFakeDb({
       repos: [
         { id: 'r1', owner: 'alice', name: 'demo', description: 'public demo', is_private: 0, owner_email: 'alice@x.co', updated_at: 1 },
-        { id: 'r2', owner: 'alice', name: 'demo-secret', description: 'private demo', is_private: 1, owner_email: 'alice@x.co', updated_at: 2 },
+        {
+          id: 'r2',
+          owner: 'alice',
+          name: 'demo-secret',
+          description: 'private demo',
+          is_private: 1,
+          owner_email: 'alice@x.co',
+          updated_at: 2,
+        },
       ],
     });
-    const svc = new SearchService(
-      { DB: db } as never,
-      {
-        searchDAO: () => Promise.resolve(new SearchDAO(db)),
-        repositoryDAO: () => Promise.resolve(new RepositoryDAO(db)),
-        permissionService: () => Promise.resolve(new PermissionService({ DB: db } as never)),
-      },
-    );
+    const svc = new SearchService({ DB: db } as never, {
+      searchDAO: () => Promise.resolve(new SearchDAO(db)),
+      repositoryDAO: () => Promise.resolve(new RepositoryDAO(db)),
+      permissionService: () => Promise.resolve(new PermissionService({ DB: db } as never)),
+    });
     const anon = await svc.searchRepos('demo', null, 10);
     expect(anon.map((r) => r.id)).toEqual(['r1']);
     const owner = await svc.searchRepos('demo', 'alice@x.co', 10);
@@ -188,14 +199,11 @@ describe('SearchService', () => {
       repos: [{ id: 'r1', owner: 'alice', name: 'secret', description: '', is_private: 1, owner_email: 'alice@x.co', updated_at: 1 }],
       issues: [{ id: 'i1', repository_id: 'r1', number: 1, title: 'Secret bug', body: 'private', updated_at: 1 }],
     });
-    const svc = new SearchService(
-      { DB: db } as never,
-      {
-        searchDAO: () => Promise.resolve(new SearchDAO(db)),
-        repositoryDAO: () => Promise.resolve(new RepositoryDAO(db)),
-        permissionService: () => Promise.resolve(new PermissionService({ DB: db } as never)),
-      },
-    );
+    const svc = new SearchService({ DB: db } as never, {
+      searchDAO: () => Promise.resolve(new SearchDAO(db)),
+      repositoryDAO: () => Promise.resolve(new RepositoryDAO(db)),
+      permissionService: () => Promise.resolve(new PermissionService({ DB: db } as never)),
+    });
     await expect(svc.searchIssues('secret', 'bob@x.co', { limit: 10 })).resolves.toHaveLength(0);
     await expect(svc.searchIssues('secret', 'alice@x.co', { limit: 10 })).resolves.toHaveLength(1);
   });
@@ -203,14 +211,11 @@ describe('SearchService', () => {
 
 describe('Code search', () => {
   function makeService(db: D1Queryable): SearchService {
-    return new SearchService(
-      { DB: db } as never,
-      {
-        searchDAO: () => Promise.resolve(new SearchDAO(db)),
-        repositoryDAO: () => Promise.resolve(new RepositoryDAO(db)),
-        permissionService: () => Promise.resolve(new PermissionService({ DB: db } as never)),
-      },
-    );
+    return new SearchService({ DB: db } as never, {
+      searchDAO: () => Promise.resolve(new SearchDAO(db)),
+      repositoryDAO: () => Promise.resolve(new RepositoryDAO(db)),
+      permissionService: () => Promise.resolve(new PermissionService({ DB: db } as never)),
+    });
   }
 
   it('indexes, finds, and removes code without FTS5', async () => {
@@ -218,7 +223,9 @@ describe('Code search', () => {
       repos: [{ id: 'r1', owner: 'alice', name: 'demo', description: '', is_private: 0, owner_email: 'alice@x.co', updated_at: 1 }],
     });
     const svc = makeService(db);
-    await expect(svc.indexFile({ repoId: 'r1', path: 'src/app.ts', oid: 'abc', content: 'export function hello() {}' })).resolves.toBe(true);
+    await expect(svc.indexFile({ repoId: 'r1', path: 'src/app.ts', oid: 'abc', content: 'export function hello() {}' })).resolves.toBe(
+      true,
+    );
     const hits = await svc.searchCode('hello', null, { limit: 10 });
     expect(hits).toHaveLength(1);
     expect(hits[0].path).toBe('src/app.ts');
@@ -233,7 +240,9 @@ describe('Code search', () => {
     });
     const svc = makeService(db);
     await expect(svc.indexFile({ repoId: 'r1', path: 'node_modules/lib.js', oid: null, content: 'hello' })).resolves.toBe(false);
-    await expect(svc.indexFile({ repoId: 'r1', path: 'bin.dat', oid: null, content: 'a' + String.fromCharCode(0) + 'b' })).resolves.toBe(false);
+    await expect(svc.indexFile({ repoId: 'r1', path: 'bin.dat', oid: null, content: 'a' + String.fromCharCode(0) + 'b' })).resolves.toBe(
+      false,
+    );
     await expect(svc.searchCode('hello', null, { limit: 10 })).resolves.toHaveLength(0);
   });
 

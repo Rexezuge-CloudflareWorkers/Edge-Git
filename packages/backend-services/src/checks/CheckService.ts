@@ -182,7 +182,15 @@ class CheckService {
     const outputSummary = normalizeOptionalText(input.outputSummary, MAX_SUMMARY, 'outputSummary');
     if (detailsUrl ?? outputTitle ?? outputSummary) {
       await dao
-        .updateStatus(id, input.repositoryId, { status: 'queued', conclusion: null, detailsUrl, outputTitle, outputSummary, now, completedAt: null })
+        .updateStatus(id, input.repositoryId, {
+          status: 'queued',
+          conclusion: null,
+          detailsUrl,
+          outputTitle,
+          outputSummary,
+          now,
+          completedAt: null,
+        })
         .catch(() => undefined);
     }
     const created = await dao.getById(id, input.repositoryId);
@@ -217,9 +225,12 @@ class CheckService {
       status: input.status,
       conclusion,
       detailsUrl: input.detailsUrl === undefined ? existing.detailsUrl : normalizeDetailsUrl(input.detailsUrl),
-      outputTitle: input.outputTitle === undefined ? existing.outputTitle : normalizeOptionalText(input.outputTitle, MAX_TITLE, 'outputTitle'),
+      outputTitle:
+        input.outputTitle === undefined ? existing.outputTitle : normalizeOptionalText(input.outputTitle, MAX_TITLE, 'outputTitle'),
       outputSummary:
-        input.outputSummary === undefined ? existing.outputSummary : normalizeOptionalText(input.outputSummary, MAX_SUMMARY, 'outputSummary'),
+        input.outputSummary === undefined
+          ? existing.outputSummary
+          : normalizeOptionalText(input.outputSummary, MAX_SUMMARY, 'outputSummary'),
       now,
       completedAt: input.status === 'completed' ? now : null,
     });

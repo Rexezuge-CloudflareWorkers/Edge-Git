@@ -52,7 +52,18 @@ class IssueDAO extends BaseDAO {
           .prepare(
             'INSERT INTO issues (id, repository_id, full_name, number, title, body, status, creator_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           )
-          .bind(input.id, input.repositoryId, input.fullName, input.number, input.title, input.body, 'open', input.creatorEmail, input.now, input.now)
+          .bind(
+            input.id,
+            input.repositoryId,
+            input.fullName,
+            input.number,
+            input.title,
+            input.body,
+            'open',
+            input.creatorEmail,
+            input.now,
+            input.now,
+          )
           .run(),
       'create issue',
     );
@@ -97,7 +108,11 @@ class IssueDAO extends BaseDAO {
 
   public async addComment(id: string, issueId: string, authorEmail: string, body: string, now: number): Promise<void> {
     await this.withRetry(
-      () => this.database.prepare('INSERT INTO comments (id, issue_id, author_email, body, created_at) VALUES (?, ?, ?, ?, ?)').bind(id, issueId, authorEmail, body, now).run(),
+      () =>
+        this.database
+          .prepare('INSERT INTO comments (id, issue_id, author_email, body, created_at) VALUES (?, ?, ?, ?, ?)')
+          .bind(id, issueId, authorEmail, body, now)
+          .run(),
       'add comment',
     );
   }

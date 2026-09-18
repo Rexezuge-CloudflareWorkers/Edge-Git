@@ -180,7 +180,12 @@ class PullRequestService {
     return updated;
   }
 
-  public async markMerged(input: { repositoryId: string; number: number; mergedBy: string; commitOid?: string | null }): Promise<PullRequestRow> {
+  public async markMerged(input: {
+    repositoryId: string;
+    number: number;
+    mergedBy: string;
+    commitOid?: string | null;
+  }): Promise<PullRequestRow> {
     const pr = await this.getByNumber(input.repositoryId, input.number);
     if (pr.status === 'merged') throw new BadRequestError('pull request is already merged');
     if (pr.status === 'closed') throw new BadRequestError('closed pull requests cannot be merged');
@@ -221,7 +226,15 @@ class PullRequestService {
       commitOid: input.commitOid ?? null,
       now,
     });
-    return { id, pull_request_id: pr.id, author_email: input.authorEmail, state: input.state, body, commit_oid: input.commitOid ?? null, created_at: now };
+    return {
+      id,
+      pull_request_id: pr.id,
+      author_email: input.authorEmail,
+      state: input.state,
+      body,
+      commit_oid: input.commitOid ?? null,
+      created_at: now,
+    };
   }
 
   public async listReviews(repositoryId: string, number: number): Promise<PullRequestReviewRow[]> {
@@ -230,7 +243,12 @@ class PullRequestService {
     return dao.listReviews(pr.id);
   }
 
-  public async addComment(input: { repositoryId: string; number: number; authorEmail: string; body: string }): Promise<PullRequestCommentRow> {
+  public async addComment(input: {
+    repositoryId: string;
+    number: number;
+    authorEmail: string;
+    body: string;
+  }): Promise<PullRequestCommentRow> {
     const trimmed = input.body.trim();
     if (!trimmed) throw new BadRequestError('body is required');
     if (trimmed.length > 10_000) throw new BadRequestError('body must be at most 10000 characters');

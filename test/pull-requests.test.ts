@@ -27,7 +27,9 @@ function createPullFakeDb() {
       first<T>(): Promise<T | null> {
         if (q.includes('FROM repositories WHERE lower(owner)')) {
           const row = state.repos.find(
-            (r) => String(r.owner).toLowerCase() === String(params[0]).toLowerCase() && String(r.name).toLowerCase() === String(params[1]).toLowerCase(),
+            (r) =>
+              String(r.owner).toLowerCase() === String(params[0]).toLowerCase() &&
+              String(r.name).toLowerCase() === String(params[1]).toLowerCase(),
           );
           return Promise.resolve((row ?? null) as T | null);
         }
@@ -73,9 +75,42 @@ function createPullFakeDb() {
       },
       run(): Promise<{ success: boolean; meta?: { changes?: number } }> {
         if (q.startsWith('INSERT INTO pull_requests')) {
-          const [id, repository_id, full_name, number, title, body, status, base_branch, head_branch, base_oid, head_oid, merge_base_oid, creator_email, created_at, updated_at] =
-            params as Array<string | number | null>;
-          state.pulls.push({ id, repository_id, full_name, number, title, body, status, base_branch, head_branch, base_oid, head_oid, merge_base_oid, creator_email, merged_by: null, merged_at: null, created_at, updated_at });
+          const [
+            id,
+            repository_id,
+            full_name,
+            number,
+            title,
+            body,
+            status,
+            base_branch,
+            head_branch,
+            base_oid,
+            head_oid,
+            merge_base_oid,
+            creator_email,
+            created_at,
+            updated_at,
+          ] = params as Array<string | number | null>;
+          state.pulls.push({
+            id,
+            repository_id,
+            full_name,
+            number,
+            title,
+            body,
+            status,
+            base_branch,
+            head_branch,
+            base_oid,
+            head_oid,
+            merge_base_oid,
+            creator_email,
+            merged_by: null,
+            merged_at: null,
+            created_at,
+            updated_at,
+          });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE pull_requests SET status = ?') && q.includes('merged_by')) {
@@ -151,13 +186,34 @@ describe('PullRequestService', () => {
   it('numbers PRs per repo and rejects same-branch PRs', async () => {
     const db = createPullFakeDb();
     const svc = new PullRequestService({ DB: db });
-    const first = await svc.createPull({ repositoryId: 'r1', fullName: 'alice/demo', title: 'One', baseBranch: 'main', headBranch: 'feat', creatorEmail: 'a@x.com' });
-    const second = await svc.createPull({ repositoryId: 'r1', fullName: 'alice/demo', title: 'Two', baseBranch: 'main', headBranch: 'feat2', creatorEmail: 'a@x.com' });
+    const first = await svc.createPull({
+      repositoryId: 'r1',
+      fullName: 'alice/demo',
+      title: 'One',
+      baseBranch: 'main',
+      headBranch: 'feat',
+      creatorEmail: 'a@x.com',
+    });
+    const second = await svc.createPull({
+      repositoryId: 'r1',
+      fullName: 'alice/demo',
+      title: 'Two',
+      baseBranch: 'main',
+      headBranch: 'feat2',
+      creatorEmail: 'a@x.com',
+    });
     expect(first.number).toBe(1);
     expect(second.number).toBe(2);
-    await expect(svc.createPull({ repositoryId: 'r1', fullName: 'alice/demo', title: 'Bad', baseBranch: 'main', headBranch: 'main', creatorEmail: 'a@x.com' })).rejects.toThrow(
-      /must differ/,
-    );
+    await expect(
+      svc.createPull({
+        repositoryId: 'r1',
+        fullName: 'alice/demo',
+        title: 'Bad',
+        baseBranch: 'main',
+        headBranch: 'main',
+        creatorEmail: 'a@x.com',
+      }),
+    ).rejects.toThrow(/must differ/);
   });
 
   it('closes, reopens, and forbids merged transitions', async () => {
@@ -174,7 +230,9 @@ describe('PullRequestService', () => {
     const svc = new PullRequestService({ DB: db });
     await svc.createPull({ repositoryId: 'r1', fullName: 'a/b', title: 'T', baseBranch: 'main', headBranch: 'x', creatorEmail: 'a@x.com' });
     await svc.addReview({ repositoryId: 'r1', number: 1, authorEmail: 'r@x.com', state: 'changes_requested', body: 'fix it' });
-    await expect(svc.markMerged({ repositoryId: 'r1', number: 1, mergedBy: 'a@x.com', commitOid: 'c1' })).rejects.toThrow(/unresolved change requests/);
+    await expect(svc.markMerged({ repositoryId: 'r1', number: 1, mergedBy: 'a@x.com', commitOid: 'c1' })).rejects.toThrow(
+      /unresolved change requests/,
+    );
     await svc.addReview({ repositoryId: 'r1', number: 1, authorEmail: 'r@x.com', state: 'approved' });
     const merged = await svc.markMerged({ repositoryId: 'r1', number: 1, mergedBy: 'a@x.com', commitOid: 'c1' });
     expect(merged.status).toBe('merged');
@@ -210,7 +268,8 @@ describe('Pull request API routes', () => {
     return {
       setFullName: () => Promise.resolve(),
       ensureRepoInitialized: () => Promise.resolve(),
-      getMergePreview: () => Promise.resolve({ baseOid: OID_A, headOid: OID_B, mergeBase: OID_A, alreadyMerged: false, canFastForward: true }),
+      getMergePreview: () =>
+        Promise.resolve({ baseOid: OID_A, headOid: OID_B, mergeBase: OID_A, alreadyMerged: false, canFastForward: true }),
       getPullDiff: () => Promise.resolve({ mergeBase: OID_A, truncated: false, changes: [{ type: 'add', path: 'f.txt' }] }),
       mergePull: () => Promise.resolve({ type: 'fast-forward', commitOid: OID_B }),
       ...overrides,
@@ -250,17 +309,28 @@ describe('Pull request API routes', () => {
     });
     expect(opened.status).toBe(201);
 
-    expect((await call(bob, '/user/repos/alice/demo/pulls/1', { method: 'PATCH', headers: json, body: JSON.stringify({ status: 'closed' }) })).status).toBe(403);
+    expect(
+      (await call(bob, '/user/repos/alice/demo/pulls/1', { method: 'PATCH', headers: json, body: JSON.stringify({ status: 'closed' }) }))
+        .status,
+    ).toBe(403);
     expect((await call(bob, '/user/repos/alice/demo/pulls/1/merge', { method: 'POST', headers: json, body: '{}' })).status).toBe(403);
 
     // Same-branch PR is a 400, unknown branch is a 400.
     expect(
-      (await call(alice, '/user/repos/alice/demo/pulls', { method: 'POST', headers: json, body: JSON.stringify({ title: 'Bad', baseBranch: 'main', headBranch: 'main' }) })).status,
+      (
+        await call(alice, '/user/repos/alice/demo/pulls', {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ title: 'Bad', baseBranch: 'main', headBranch: 'main' }),
+        })
+      ).status,
     ).toBe(400);
 
     // Public read surface mirrors the PR.
     await expect(call(alice, '/repos/alice/demo/pulls').then((r) => r.json())).resolves.toMatchObject({ pulls: [{ number: 1 }] });
-    await expect(call(alice, '/repos/alice/demo/pulls/1/diff').then((r) => r.json())).resolves.toMatchObject({ diff: { truncated: false } });
+    await expect(call(alice, '/repos/alice/demo/pulls/1/diff').then((r) => r.json())).resolves.toMatchObject({
+      diff: { truncated: false },
+    });
   });
 
   it('blocks merge while change requests are unresolved, then merges', async () => {
@@ -270,17 +340,35 @@ describe('Pull request API routes', () => {
     const alice = createEnv(db, stub, 'alice@example.com');
 
     expect(
-      (await call(alice, '/user/repos/alice/demo/pulls', { method: 'POST', headers: json, body: JSON.stringify({ title: 'Feat', baseBranch: 'main', headBranch: 'feat' }) })).status,
+      (
+        await call(alice, '/user/repos/alice/demo/pulls', {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ title: 'Feat', baseBranch: 'main', headBranch: 'feat' }),
+        })
+      ).status,
     ).toBe(201);
     expect(
-      (await call(alice, '/user/repos/alice/demo/pulls/1/reviews', { method: 'POST', headers: json, body: JSON.stringify({ state: 'changes_requested', body: 'fix' }) })).status,
+      (
+        await call(alice, '/user/repos/alice/demo/pulls/1/reviews', {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ state: 'changes_requested', body: 'fix' }),
+        })
+      ).status,
     ).toBe(201);
 
     const blocked = await call(alice, '/user/repos/alice/demo/pulls/1/merge', { method: 'POST', headers: json, body: '{}' });
     expect(blocked.status).toBe(409);
 
     expect(
-      (await call(alice, '/user/repos/alice/demo/pulls/1/reviews', { method: 'POST', headers: json, body: JSON.stringify({ state: 'approved' }) })).status,
+      (
+        await call(alice, '/user/repos/alice/demo/pulls/1/reviews', {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ state: 'approved' }),
+        })
+      ).status,
     ).toBe(201);
     const merged = await call(alice, '/user/repos/alice/demo/pulls/1/merge', { method: 'POST', headers: json, body: '{}' });
     expect(merged.status).toBe(200);
@@ -294,7 +382,13 @@ describe('Pull request API routes', () => {
     const alice = createEnv(db, stub, 'alice@example.com');
 
     expect(
-      (await call(alice, '/user/repos/alice/demo/pulls', { method: 'POST', headers: json, body: JSON.stringify({ title: 'Feat', baseBranch: 'main', headBranch: 'feat' }) })).status,
+      (
+        await call(alice, '/user/repos/alice/demo/pulls', {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ title: 'Feat', baseBranch: 'main', headBranch: 'feat' }),
+        })
+      ).status,
     ).toBe(201);
     const res = await call(alice, '/user/repos/alice/demo/pulls/1/merge', { method: 'POST', headers: json, body: '{}' });
     expect(res.status).toBe(409);
@@ -305,10 +399,18 @@ describe('Pull request API routes', () => {
     const db = createPullFakeDb();
     seedRepo(db);
     let previewCalls = 0;
-    const stub = createStub({ getMergePreview: () => {
-      previewCalls += 1;
-      return Promise.resolve({ baseOid: 'a'.repeat(40), headOid: 'b'.repeat(40), mergeBase: 'a'.repeat(40), alreadyMerged: false, canFastForward: true });
-    } });
+    const stub = createStub({
+      getMergePreview: () => {
+        previewCalls += 1;
+        return Promise.resolve({
+          baseOid: 'a'.repeat(40),
+          headOid: 'b'.repeat(40),
+          mergeBase: 'a'.repeat(40),
+          alreadyMerged: false,
+          canFastForward: true,
+        });
+      },
+    });
     const alice = createEnv(db, stub, 'alice@example.com');
     expect(PullRequestService.isValidBranchName('../escape')).toBe(false);
     expect(PullRequestService.isValidBranchName('main')).toBe(true);
@@ -321,9 +423,16 @@ describe('Pull request API routes', () => {
     });
     expect(res.status).toBe(400);
     expect(previewCalls).toBe(0);
-    await expect(new PullRequestService({ DB: db }).createPull({ repositoryId: 'r1', fullName: 'a/b', title: 'T', baseBranch: 'main', headBranch: 'main..x', creatorEmail: 'a@x.com' })).rejects.toThrow(
-      /invalid branch/,
-    );
+    await expect(
+      new PullRequestService({ DB: db }).createPull({
+        repositoryId: 'r1',
+        fullName: 'a/b',
+        title: 'T',
+        baseBranch: 'main',
+        headBranch: 'main..x',
+        creatorEmail: 'a@x.com',
+      }),
+    ).rejects.toThrow(/invalid branch/);
   });
 
   it('exposes merge preview publicly and refreshes oids plus deleteHead on merge', async () => {
@@ -333,7 +442,8 @@ describe('Pull request API routes', () => {
     const OID_B = 'b'.repeat(40);
     const seen: Array<Record<string, unknown>> = [];
     const stub = createStub({
-      getMergePreview: () => Promise.resolve({ baseOid: OID_A, headOid: OID_B, mergeBase: OID_A, alreadyMerged: false, canFastForward: true }),
+      getMergePreview: () =>
+        Promise.resolve({ baseOid: OID_A, headOid: OID_B, mergeBase: OID_A, alreadyMerged: false, canFastForward: true }),
       mergePull: ((args: unknown) => {
         seen.push(args as Record<string, unknown>);
         return Promise.resolve({ type: 'fast-forward', commitOid: OID_B, deletedHead: true });
@@ -342,11 +452,21 @@ describe('Pull request API routes', () => {
     const alice = createEnv(db, stub, 'alice@example.com');
 
     expect(
-      (await call(alice, '/user/repos/alice/demo/pulls', { method: 'POST', headers: json, body: JSON.stringify({ title: 'Feat', baseBranch: 'main', headBranch: 'feat' }) })).status,
+      (
+        await call(alice, '/user/repos/alice/demo/pulls', {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ title: 'Feat', baseBranch: 'main', headBranch: 'feat' }),
+        })
+      ).status,
     ).toBe(201);
     // Public preview mirrors the authed preview without auth.
-    await expect(call(alice, '/repos/alice/demo/pulls/1/preview').then((r) => r.json())).resolves.toMatchObject({ preview: { headOid: OID_B } });
-    await expect(call(alice, '/user/repos/alice/demo/pulls/1/preview').then((r) => r.json())).resolves.toMatchObject({ preview: { headOid: OID_B } });
+    await expect(call(alice, '/repos/alice/demo/pulls/1/preview').then((r) => r.json())).resolves.toMatchObject({
+      preview: { headOid: OID_B },
+    });
+    await expect(call(alice, '/user/repos/alice/demo/pulls/1/preview').then((r) => r.json())).resolves.toMatchObject({
+      preview: { headOid: OID_B },
+    });
 
     const merged = await call(alice, '/user/repos/alice/demo/pulls/1/merge', {
       method: 'POST',
@@ -369,10 +489,18 @@ describe('Pull request API routes', () => {
   it('surfaces criss-cross reason in conflict payload', async () => {
     const db = createPullFakeDb();
     seedRepo(db);
-    const stub = createStub({ mergePull: () => Promise.resolve({ type: 'conflict', conflicts: [], reason: 'criss-cross merges are not supported' }) });
+    const stub = createStub({
+      mergePull: () => Promise.resolve({ type: 'conflict', conflicts: [], reason: 'criss-cross merges are not supported' }),
+    });
     const alice = createEnv(db, stub, 'alice@example.com');
     expect(
-      (await call(alice, '/user/repos/alice/demo/pulls', { method: 'POST', headers: json, body: JSON.stringify({ title: 'Feat', baseBranch: 'main', headBranch: 'feat' }) })).status,
+      (
+        await call(alice, '/user/repos/alice/demo/pulls', {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ title: 'Feat', baseBranch: 'main', headBranch: 'feat' }),
+        })
+      ).status,
     ).toBe(201);
     const res = await call(alice, '/user/repos/alice/demo/pulls/1/merge', { method: 'POST', headers: json, body: '{}' });
     expect(res.status).toBe(409);
@@ -448,12 +576,20 @@ describe('MergeService true merge', () => {
     const svc = mergerFor(gitdir);
     const mainOid = await svc.resolveRef('refs/heads/main');
     expect(mainOid).toBeTruthy();
-    await expect(svc.mergeBranches({ baseBranch: 'main', headOid: mainOid as string, author: { name: 't', email: 't@x.com' } })).resolves.toMatchObject({
+    await expect(
+      svc.mergeBranches({ baseBranch: 'main', headOid: mainOid as string, author: { name: 't', email: 't@x.com' } }),
+    ).resolves.toMatchObject({
       type: 'already-merged',
     });
-    await expect(svc.mergeBranches({ baseBranch: 'nope', headOid: 'a'.repeat(40), author: { name: 't', email: 't@x.com' } })).rejects.toThrow(/base branch not found/);
-    await expect(svc.mergeBranches({ baseBranch: 'main', headOid: 'short', author: { name: 't', email: 't@x.com' } })).rejects.toThrow(/invalid head oid/);
-    await expect(svc.mergeBranches({ baseBranch: '../x', headOid: 'a'.repeat(40), author: { name: 't', email: 't@x.com' } })).rejects.toThrow(/invalid base branch/);
+    await expect(
+      svc.mergeBranches({ baseBranch: 'nope', headOid: 'a'.repeat(40), author: { name: 't', email: 't@x.com' } }),
+    ).rejects.toThrow(/base branch not found/);
+    await expect(svc.mergeBranches({ baseBranch: 'main', headOid: 'short', author: { name: 't', email: 't@x.com' } })).rejects.toThrow(
+      /invalid head oid/,
+    );
+    await expect(
+      svc.mergeBranches({ baseBranch: '../x', headOid: 'a'.repeat(40), author: { name: 't', email: 't@x.com' } }),
+    ).rejects.toThrow(/invalid base branch/);
 
     // Conflicting edit to the same file on both branches.
     await git.branch({ fs, dir, ref: 'feat', checkout: true });

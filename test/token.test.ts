@@ -45,7 +45,10 @@ function createTokenFakeDb(): D1Queryable & { tokens: Array<Record<string, unkno
       },
     };
   }
-  return { prepare: (query: string) => ({ bind: (...params: unknown[]) => statement(query, params) }), tokens: state.tokens } as unknown as D1Queryable & {
+  return {
+    prepare: (query: string) => ({ bind: (...params: unknown[]) => statement(query, params) }),
+    tokens: state.tokens,
+  } as unknown as D1Queryable & {
     tokens: Array<Record<string, unknown>>;
   };
 }

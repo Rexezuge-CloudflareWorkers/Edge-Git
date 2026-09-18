@@ -88,7 +88,8 @@ export function PullDetail({
       if (pullRes.status === 'loaded') {
         setPull(pullRes.data);
         setStatus('ready');
-      }      const [c, r, d] = await Promise.all([
+      }
+      const [c, r, d] = await Promise.all([
         fetchUpgraded(commentsStateRef.current, `${key}/comments`, () => listPullComments(owner, repo, number, authOpt))
           .then((res) => (res.status === 'loaded' ? res.data : null))
           .catch(() => [] as PullComment[]),
@@ -121,9 +122,11 @@ export function PullDetail({
   useEffect(() => {
     if (!useAuthed) return;
     let cancelled = false;
-    void getPullMeta(owner, repo, number).then((meta) => {
-      if (!cancelled) setMetaLabels(meta.labels ?? []);
-    }).catch(() => undefined);
+    void getPullMeta(owner, repo, number)
+      .then((meta) => {
+        if (!cancelled) setMetaLabels(meta.labels ?? []);
+      })
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
@@ -167,7 +170,10 @@ export function PullDetail({
     try {
       const updated = await updatePullStatus(owner, repo, number, next);
       setPull(updated);
-      showNotice('success', next === 'closed' ? t('pulls.pullClosed', 'Pull Request Closed.') : t('pulls.pullReopened', 'Pull Request Reopened.'));
+      showNotice(
+        'success',
+        next === 'closed' ? t('pulls.pullClosed', 'Pull Request Closed.') : t('pulls.pullReopened', 'Pull Request Reopened.'),
+      );
     } catch (error) {
       showNotice('error', error instanceof Error ? error.message : t('errors.failedToUpdatePull', 'Failed To Update Pull Request.'));
     } finally {
@@ -188,7 +194,10 @@ export function PullDetail({
       setPull(result.pull);
       showNotice('success', t('pulls.pullMerged', 'Pull Request Merged.'));
       try {
-        const [d, p] = await Promise.all([getPullDiff(owner, repo, number).catch(() => null), getMergePreview(owner, repo, number).catch(() => null)]);
+        const [d, p] = await Promise.all([
+          getPullDiff(owner, repo, number).catch(() => null),
+          getMergePreview(owner, repo, number).catch(() => null),
+        ]);
         if (d) setDiff(d);
         setPreview(p);
       } catch {
@@ -230,7 +239,9 @@ export function PullDetail({
         {metaLabels.length > 0 && (
           <div className="mt-2 flex gap-1 flex-wrap">
             {metaLabels.map((l) => (
-              <Badge key={l.name} variant="neutral">{l.name}</Badge>
+              <Badge key={l.name} variant="neutral">
+                {l.name}
+              </Badge>
             ))}
           </div>
         )}
@@ -261,11 +272,17 @@ export function PullDetail({
                 onClick={() => {
                   const next = (pull as { is_draft?: number }).is_draft !== 1;
                   void setPullDraft(owner, repo, number, next)
-                    .then(() => getPull(owner, repo, number, { isAuthed: true }).then(setPull).catch(() => undefined))
+                    .then(() =>
+                      getPull(owner, repo, number, { isAuthed: true })
+                        .then(setPull)
+                        .catch(() => undefined),
+                    )
                     .catch((error) => showNotice('error', error instanceof Error ? error.message : 'Failed To Update Draft.'));
                 }}
               >
-                {(pull as { is_draft?: number }).is_draft === 1 ? t('pulls.markReady', 'Mark Ready For Review') : t('pulls.markDraft', 'Mark As Draft')}
+                {(pull as { is_draft?: number }).is_draft === 1
+                  ? t('pulls.markReady', 'Mark Ready For Review')
+                  : t('pulls.markDraft', 'Mark As Draft')}
               </Button>
             )}
           </div>
@@ -295,7 +312,9 @@ export function PullDetail({
           <p className="text-sm text-[var(--color-text-muted)]">{t('pulls.previewUnavailable', 'Merge Preview Unavailable.')}</p>
         )}
         {blockedByReview && (
-          <p className="mt-2 text-sm text-[var(--color-error-text)]">{t('pulls.blockedByReview', 'Blocked: Unresolved Change Requests.')}</p>
+          <p className="mt-2 text-sm text-[var(--color-error-text)]">
+            {t('pulls.blockedByReview', 'Blocked: Unresolved Change Requests.')}
+          </p>
         )}
         <PullChecks owner={owner} repo={repo} headOid={pull.head_oid} authorized={authorized} />
         {(conflicts.length > 0 || conflictReason) && (
@@ -329,7 +348,8 @@ export function PullDetail({
                 <option value="rebase">rebase</option>
               </Select>
             </label>
-            {(pull.head_full_name ?? pull.full_name).toLowerCase() !== pull.full_name.toLowerCase() || pull.head_branch !== pull.base_branch ? (
+            {(pull.head_full_name ?? pull.full_name).toLowerCase() !== pull.full_name.toLowerCase() ||
+            pull.head_branch !== pull.base_branch ? (
               <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
                 <input type="checkbox" checked={deleteHead} onChange={(e) => setDeleteHead(e.target.checked)} />
                 {t('pulls.deleteHeadAfterMerge', 'Delete Head Branch After Merge')}
@@ -377,7 +397,15 @@ export function PullDetail({
       </Card>
 
       <Card>
-        <PullThreads owner={owner} repo={repo} number={number} canWrite={canWrite} showNotice={showNotice} authorized={authorized} refreshKey={liveKey} />
+        <PullThreads
+          owner={owner}
+          repo={repo}
+          number={number}
+          canWrite={canWrite}
+          showNotice={showNotice}
+          authorized={authorized}
+          refreshKey={liveKey}
+        />
       </Card>
 
       <Card>

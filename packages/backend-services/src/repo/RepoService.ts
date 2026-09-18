@@ -193,7 +193,19 @@ class RepoService {
 
     // Self-owned fast path (covers legacy fakes with no users/orgs tables).
     if (callerCi && ownerCi === callerCi) {
-      await dao.create({ id, ownerEmail: callerEmail, owner: normalizedOwner, name, description, isPrivate, now, ownerType: 'user', ownerUserEmail: callerEmail, forkedFromRepoId: opts.forkedFromRepoId ?? null, forkedFromFullName: opts.forkedFromFullName ?? null });
+      await dao.create({
+        id,
+        ownerEmail: callerEmail,
+        owner: normalizedOwner,
+        name,
+        description,
+        isPrivate,
+        now,
+        ownerType: 'user',
+        ownerUserEmail: callerEmail,
+        forkedFromRepoId: opts.forkedFromRepoId ?? null,
+        forkedFromFullName: opts.forkedFromFullName ?? null,
+      });
       return { id };
     }
 
@@ -245,7 +257,19 @@ class RepoService {
       if (error instanceof ForbiddenError) throw error;
       // missing namespaces table → allow legacy free-form owner
     }
-    await dao.create({ id, ownerEmail: callerEmail, owner: normalizedOwner, name, description, isPrivate, now, ownerType: 'user', ownerUserEmail: callerEmail, forkedFromRepoId: opts.forkedFromRepoId ?? null, forkedFromFullName: opts.forkedFromFullName ?? null });
+    await dao.create({
+      id,
+      ownerEmail: callerEmail,
+      owner: normalizedOwner,
+      name,
+      description,
+      isPrivate,
+      now,
+      ownerType: 'user',
+      ownerUserEmail: callerEmail,
+      forkedFromRepoId: opts.forkedFromRepoId ?? null,
+      forkedFromFullName: opts.forkedFromFullName ?? null,
+    });
     return { id };
   }
 
@@ -300,7 +324,11 @@ class RepoService {
       throw new BadRequestError('isPrivate must be a boolean');
     }
     const dao = await this.deps.repositoryDAO();
-    await dao.update(repo.id, { description: patch.description, isPrivate: patch.isPrivate, now: TimestampUtil.getCurrentUnixTimestampInSeconds() });
+    await dao.update(repo.id, {
+      description: patch.description,
+      isPrivate: patch.isPrivate,
+      now: TimestampUtil.getCurrentUnixTimestampInSeconds(),
+    });
     const updated = await dao.getById(repo.id);
     if (!updated) {
       throw new NotFoundError('Repository not found');

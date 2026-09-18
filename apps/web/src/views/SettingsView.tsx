@@ -27,7 +27,11 @@ export function SettingsView({
   return (
     <div>
       <ContextBar
-        crumb={<span className="text-xl font-semibold text-[var(--color-text-primary)] truncate">{t('settings.userSettings', 'User Settings')}</span>}
+        crumb={
+          <span className="text-xl font-semibold text-[var(--color-text-primary)] truncate">
+            {t('settings.userSettings', 'User Settings')}
+          </span>
+        }
       />
       <AppPage>
         <PageHeaderCard

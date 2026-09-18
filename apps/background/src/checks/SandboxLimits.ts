@@ -36,10 +36,4 @@ function resolveSandboxLimits(config: AppConfiguration, overrides: Partial<Sandb
   };
 }
 
-export {
-  MAX_OUTPUT_TITLE,
-  MAX_OUTPUT_SUMMARY,
-  MAX_FETCH_BODY_BYTES,
-  MAX_FETCH_HEADERS,
-  resolveSandboxLimits,
-};
+export { MAX_OUTPUT_TITLE, MAX_OUTPUT_SUMMARY, MAX_FETCH_BODY_BYTES, MAX_FETCH_HEADERS, resolveSandboxLimits };

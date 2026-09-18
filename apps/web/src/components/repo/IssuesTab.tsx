@@ -116,7 +116,11 @@ export function IssuesTab({
           <RefreshButton onRefresh={refresh} loading={loading} />
         </CardHeader>
         <div className="mb-3 flex gap-2">
-          <Input placeholder={t('issues.filterByLabel', 'Filter By Label…')} value={labelFilter} onChange={(e) => setLabelFilter(e.target.value)} />
+          <Input
+            placeholder={t('issues.filterByLabel', 'Filter By Label…')}
+            value={labelFilter}
+            onChange={(e) => setLabelFilter(e.target.value)}
+          />
         </div>
         {!loading && issues.length === 0 ? (
           <div className="text-center text-[var(--color-text-muted)] py-10 text-sm">

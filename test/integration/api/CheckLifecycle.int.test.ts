@@ -67,7 +67,10 @@ describe('checks lifecycle on real D1', () => {
     )
       .bind('pr-checks-7', repoId, `${OWNER}/${REPO}`, headSha, USER.toLowerCase(), now, now)
       .run();
-    await api(`/user/repos/${OWNER}/${REPO}/rules`, json({ method: 'POST', body: JSON.stringify({ pattern: 'main', requireStatusChecks: ['lint'] }) }));
+    await api(
+      `/user/repos/${OWNER}/${REPO}/rules`,
+      json({ method: 'POST', body: JSON.stringify({ pattern: 'main', requireStatusChecks: ['lint'] }) }),
+    );
 
     const mergePath = `/user/repos/${OWNER}/${REPO}/pulls/7/merge`;
     const blocked = await api(mergePath, json({ method: 'POST', body: JSON.stringify({}) }));
@@ -87,7 +90,8 @@ describe('checks lifecycle on real D1', () => {
 
   it('executes repo-defined scripts in the QuickJS sandbox inside workerd', async () => {
     const result = await runCustomCheckScript({
-      script: 'function main(ctx) { const names = ctx.listFiles(); return { conclusion: "success", title: "Workerd Ok", summary: "files=" + names.length + " readme=" + ctx.readFile("README.md") }; }',
+      script:
+        'function main(ctx) { const names = ctx.listFiles(); return { conclusion: "success", title: "Workerd Ok", summary: "files=" + names.length + " readme=" + ctx.readFile("README.md") }; }',
       files: { 'README.md': '# Hi' },
       env: {},
       allowHosts: [],

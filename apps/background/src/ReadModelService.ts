@@ -136,13 +136,7 @@ class ReadModelService {
    * tree?withLastCommit=0, commits, blob) with a single RPC so the DO input
    * gate is paid once instead of per call.
    */
-  public async getOverview(args: {
-    ref?: string;
-    path?: string;
-    depth?: number;
-    includeTags?: boolean;
-    includeReadme?: boolean;
-  }): Promise<{
+  public async getOverview(args: { ref?: string; path?: string; depth?: number; includeTags?: boolean; includeReadme?: boolean }): Promise<{
     branches: string[];
     currentBranch: string | null;
     resolvedRef: string | null;
@@ -227,7 +221,7 @@ class ReadModelService {
   public async getPullDiff(baseOid: string | null, headOid: string, maxFiles: number): Promise<unknown> {
     if (!baseOid) {
       const commit = (await this.git.getCommit(headOid)) as { changes?: unknown } | null;
-      const changes = Array.isArray((commit as { changes?: unknown })?.changes) ? ((commit as { changes: unknown[] }).changes) : [];
+      const changes = Array.isArray((commit as { changes?: unknown })?.changes) ? (commit as { changes: unknown[] }).changes : [];
       return { mergeBase: null, truncated: changes.length > maxFiles, changes: changes.slice(0, maxFiles) };
     }
     const mergeBase = await this.git.findMergeBase([baseOid, headOid]);
