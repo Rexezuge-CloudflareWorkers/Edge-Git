@@ -37,6 +37,11 @@ class IssueService {
     body?: string | null;
     creatorEmail: string;
   }): Promise<{ id: string; number: number }> {
+    const title = input.title.trim();
+    if (!title) throw new BadRequestError('title is required');
+    if (title.length > 200) throw new BadRequestError('title must be at most 200 characters');
+    const body = input.body?.trim() ? input.body.trim() : null;
+    if (body && body.length > 10_000) throw new BadRequestError('body must be at most 10000 characters');
     const dao = await this.deps.issueDAO();
     const number = await dao.nextNumber(input.repositoryId);
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
@@ -46,8 +51,8 @@ class IssueService {
       repositoryId: input.repositoryId,
       fullName: input.fullName,
       number,
-      title: input.title,
-      body: input.body ?? null,
+      title,
+      body,
       creatorEmail: input.creatorEmail,
       now,
     });

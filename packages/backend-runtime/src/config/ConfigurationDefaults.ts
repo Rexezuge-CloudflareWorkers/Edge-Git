@@ -1,4 +1,5 @@
 export const DEFAULT_DEBUG_MODE = 'false';
+export const DEFAULT_ENVIRONMENT = 'development';
 export const DEFAULT_MAX_REPOS_PER_USER = '100';
 export const DEFAULT_MAX_TOKENS_PER_USER = '5';
 export const DEFAULT_MAX_TOKEN_EXPIRY_DAYS = '90';

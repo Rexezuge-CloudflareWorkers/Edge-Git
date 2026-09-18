@@ -8,6 +8,7 @@ interface AccessAuthEnv {
   POLICY_AUD?: string;
   DEV_AUTH_EMAIL?: string;
   DEMO_MODE?: string;
+  ENVIRONMENT?: string;
 }
 
 interface AccessIdentityContext {
@@ -18,12 +19,23 @@ interface AccessIdentityContext {
 
 type AccessAuthStrategy = (env: AccessAuthEnv, request: Request, accessCtx?: AccessIdentityContext) => Promise<string | null>;
 
+function isBypassAllowed(env: AccessAuthEnv): boolean {
+  return ConfigurationManager.auth.isBypassAllowed(env);
+}
+
 function demoModeStrategy(env: AccessAuthEnv): Promise<string | null> {
+  if (!isBypassAllowed(env)) return Promise.resolve(null);
   return Promise.resolve(ConfigurationManager.auth.isDemoMode(env) ? DEMO_USER_EMAIL : null);
 }
 
 function devEmailStrategy(env: AccessAuthEnv): Promise<string | null> {
-  return Promise.resolve(env.DEV_AUTH_EMAIL ?? null);
+  if (!isBypassAllowed(env)) return Promise.resolve(null);
+  const raw = env.DEV_AUTH_EMAIL?.trim() ?? '';
+  if (!raw) return Promise.resolve(null);
+  // Fail closed on malformed bypass emails — fall through to JWT instead of
+  // authenticating an invalid identity.
+  if (!raw.includes('@') || raw.length > 254 || /\s/.test(raw)) return Promise.resolve(null);
+  return Promise.resolve(raw.toLowerCase());
 }
 
 async function accessJwtStrategy(env: AccessAuthEnv, request: Request): Promise<string | null> {
@@ -46,6 +58,17 @@ const DEFAULT_ACCESS_AUTH_STRATEGIES: readonly AccessAuthStrategy[] = [
 ];
 
 class AccessAuthService {
+  private static readonly jwksCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
+
+  private static jwksFor(teamDomain: string): ReturnType<typeof createRemoteJWKSet> {
+    const cached = this.jwksCache.get(teamDomain);
+    if (cached) return cached;
+    const created = createRemoteJWKSet(new URL(`${teamDomain}/cdn-cgi/access/certs`));
+    // Bound the cache so distinct team domains cannot grow it without limit.
+    if (this.jwksCache.size >= 10) this.jwksCache.clear();
+    this.jwksCache.set(teamDomain, created);
+    return created;
+  }
   private readonly strategies: readonly AccessAuthStrategy[];
 
   constructor(
@@ -89,19 +112,23 @@ class AccessAuthService {
     }
 
     try {
-      const JWKS = createRemoteJWKSet(new URL(`${normalizedTeamDomain}/cdn-cgi/access/certs`));
+      const JWKS = this.jwksFor(normalizedTeamDomain);
       const { payload } = await jwtVerify(token, JWKS, {
         issuer: normalizedTeamDomain,
         audience: normalizedPolicyAud,
       });
 
-      const email = payload.email as string;
-      if (!email) {
-        throw new UnauthorizedError('No email found in JWT token.');
+      if (payload.email_verified === false) {
+        throw new UnauthorizedError('Cloudflare Access authentication failed.');
+      }
+      const email = typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : '';
+      if (!email || !email.includes('@')) {
+        throw new UnauthorizedError('Cloudflare Access authentication failed.');
       }
       return email;
     } catch (error) {
-      throw new UnauthorizedError(`JWT verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      if (error instanceof UnauthorizedError) throw error;
+      throw new UnauthorizedError('Cloudflare Access authentication failed.');
     }
   }
 }

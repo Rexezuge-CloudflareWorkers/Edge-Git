@@ -40,12 +40,11 @@ async function requireWriteRole(
 
 // Direct web commits to a `require_pr` branch must go through a pull
 // request instead. Returns a 403 response when blocked, else null.
-async function checkProtectedBranch(
-  env: Env,
-  repoId: string,
-  branch: string,
-): Promise<{ error: string } | null> {
-  const rule = await createRequestScope(env).get(Tokens.BranchProtectionService).matchForRepo(repoId, branch).catch(() => null);
+async function checkProtectedBranch(env: Env, repoId: string, branch: string): Promise<{ error: string } | null> {
+  const rule = await createRequestScope(env)
+    .get(Tokens.BranchProtectionService)
+    .matchForRepo(repoId, branch)
+    .catch(() => null);
   if (rule?.requirePr) return { error: `branch "${branch}" is protected: open a pull request instead` };
   return null;
 }
@@ -69,12 +68,14 @@ async function indexWrittenFile(env: Env, repoId: string, path: string, contentB
   const text = decodeIndexableText(contentBase64);
   if (text === null) return;
   try {
-    await createRequestScope(env).get(Tokens.SearchService).indexFile({
-      repoId,
-      path,
-      oid: typeof commitOid === 'string' ? commitOid : null,
-      content: text,
-    });
+    await createRequestScope(env)
+      .get(Tokens.SearchService)
+      .indexFile({
+        repoId,
+        path,
+        oid: typeof commitOid === 'string' ? commitOid : null,
+        content: text,
+      });
   } catch {
     // Index failures must never fail the file write.
   }
@@ -101,6 +102,13 @@ function decodeBase64(input: string): Uint8Array | null {
   } catch {
     return null;
   }
+}
+
+function isSafeFilePath(path: string): boolean {
+  if (!path || path.length > 512) return false;
+  if (path.startsWith('/') || path.includes(String.fromCodePoint(0))) return false;
+  if (path.split('/').some((seg) => ['', '.', '..'].includes(seg))) return false;
+  return true;
 }
 
 function parseExpectedOid(value: unknown): { ok: true; value: string | null | undefined } | { ok: false } {
@@ -152,16 +160,22 @@ function registerFileWriteRoutes(app: RepoApp): void {
     if (!branch) return c.json({ error: 'branch is required' }, 400);
     const filePath = (body.path ?? '').trim();
     if (!filePath) return c.json({ error: 'path is required' }, 400);
+    if (!isSafeFilePath(filePath)) return c.json({ error: 'path must be a safe relative file path' }, 400);
     if (typeof body.contentBase64 !== 'string') return c.json({ error: 'contentBase64 is required' }, 400);
     const expected = parseExpectedOid(body.expectedOid);
     if (!expected.ok) return c.json({ error: 'expectedOid must be a 40-char hex string' }, 400);
-    const content = decodeBase64(body.contentBase64);
-    if (!content) return c.json({ error: 'contentBase64 is not valid base64' }, 400);
     const maxFileBytes = ConfigurationManager.repo.getMaxFileBytes(c.env);
-    if (content.byteLength > maxFileBytes) return c.json({ error: `file too large (max ${maxFileBytes} bytes)` }, 413);
+    // Pre-auth size tripwire on the base64 length (≈4/3 of bytes) so
+    // unauthenticated oversized bodies are rejected without an `atob` burn.
+    if (body.contentBase64.length > Math.ceil(maxFileBytes * 1.4) + 4) {
+      return c.json({ error: `file too large (max ${maxFileBytes} bytes)` }, 413);
+    }
     try {
       const gate = await requireWriteRole(c.env, owner, repoName, email);
       if (!gate.ok) return c.json({ error: gate.status === 404 ? 'Not found' : 'Forbidden' }, gate.status);
+      const content = decodeBase64(body.contentBase64);
+      if (!content) return c.json({ error: 'contentBase64 is not valid base64' }, 400);
+      if (content.byteLength > maxFileBytes) return c.json({ error: `file too large (max ${maxFileBytes} bytes)` }, 413);
       const blocked = await checkProtectedBranch(c.env, gate.repo.id, branch);
       if (blocked) return c.json({ error: blocked.error }, 403);
       const secret = await checkSecretContent(c.env, gate.repo.id, content);
@@ -182,7 +196,8 @@ function registerFileWriteRoutes(app: RepoApp): void {
       if (result.ok) {
         void indexWrittenFile(c.env, gate.repo.id, filePath, body.contentBase64, (result as { commitOid?: unknown }).commitOid);
       }
-      if (secretWarning > 0) c.header('X-EdgeGit-Secret-Warning', `${secretWarning} possible secret(s) detected; rotate any exposed credentials`);
+      if (secretWarning > 0)
+        c.header('X-EdgeGit-Secret-Warning', `${secretWarning} possible secret(s) detected; rotate any exposed credentials`);
       return c.json(out, status);
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'Failed to save file' }, toServiceStatus(error));
@@ -200,6 +215,7 @@ function registerFileWriteRoutes(app: RepoApp): void {
     if (!branch) return c.json({ error: 'branch query param is required' }, 400);
     const filePath = (params.get('path') ?? '').trim();
     if (!filePath) return c.json({ error: 'path query param is required' }, 400);
+    if (!isSafeFilePath(filePath)) return c.json({ error: 'path must be a safe relative file path' }, 400);
     const expected = parseExpectedOid(params.get('expectedOid'));
     if (!expected.ok) return c.json({ error: 'expectedOid must be a 40-char hex string' }, 400);
     try {
@@ -233,4 +249,4 @@ function registerFileWriteRoutes(app: RepoApp): void {
   });
 }
 
-export { registerFileWriteRoutes };
+export { registerFileWriteRoutes, isSafeFilePath };

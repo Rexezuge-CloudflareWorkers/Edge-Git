@@ -75,6 +75,17 @@ class RepoFullName {
     if (!OWNER_PATTERN.test(normalizedOwner) || !REPO_PATTERN.test(normalizedName)) {
       throw new Error('Invalid owner or repository name');
     }
+    if (
+      normalizedName === '.' ||
+      normalizedName === '..' ||
+      normalizedName.startsWith('.') ||
+      normalizedName.startsWith('-') ||
+      normalizedName.endsWith('.lock') ||
+      normalizedName.includes('..') ||
+      normalizedName.includes('//')
+    ) {
+      throw new Error('Invalid owner or repository name');
+    }
     return new this(normalizedOwner, normalizedName);
   }
 

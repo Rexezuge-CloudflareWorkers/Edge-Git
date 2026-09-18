@@ -2,7 +2,7 @@ import { AbstractEntrypointWorker } from '@edge-git/backend-runtime/base';
 import { fromHono } from 'chanfana';
 import type { HonoOpenAPIRouterType } from 'chanfana';
 import { Hono } from 'hono';
-import { MiddlewareHandlers } from '@/middleware';
+import { MiddlewareHandlers, rateLimit, securityHeaders } from '@/middleware';
 import { scopeMiddleware } from '@/middleware/scopeMiddleware';
 import { RESERVED_NAMESPACE_NAMES } from '@edge-git/shared/constants';
 import { SPA_HTML } from '@/generated/spa-shell';
@@ -14,7 +14,13 @@ import { registerRuleRoutes } from './routes/RuleRoutes';
 import { registerFileWriteRoutes } from './routes/FileWriteRoutes';
 import { registerTokenRoutes } from './routes/TokenRoutes';
 import { registerIssueRoutes, registerUserIssueRoutes } from './routes/IssueRoutes';
-import { registerPullRoutes, registerUserPullMergeRoutes, registerUserPullRoutes, registerPullThreadRoutes, registerUserPullThreadRoutes } from './routes/PullRoutes';
+import {
+  registerPullRoutes,
+  registerUserPullMergeRoutes,
+  registerUserPullRoutes,
+  registerPullThreadRoutes,
+  registerUserPullThreadRoutes,
+} from './routes/PullRoutes';
 import { registerRealtimePublicRoutes, registerRealtimeUserRoutes } from './routes/RealtimeRoutes';
 import { registerUserProfileRoutes, registerUserSettingsRoutes } from './routes/UserRoutes';
 import { registerOrgRoutes } from './routes/OrgRoutes';
@@ -53,6 +59,10 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
       Variables: { AuthenticatedUserEmailAddress: string };
     }>();
 
+    // Security headers first so even the shell/health early routes carry
+    // them; scope + guards follow for the remaining routes.
+    app.use('*', securityHeaders());
+
     // User home (public shell; data is gated per-endpoint). /user stays the
     // Cloudflare Access entry point and redirects into the authenticated app.
     app.get('/', (c) => {
@@ -65,6 +75,10 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     // first so every handler resolves via `getScope(c)` instead of minting
     // N containers per request.
     app.use('*', scopeMiddleware);
+    // Minimal abuse guards (per-isolate token buckets; cron/DOs are the
+    // cross-isolate backstop). Generous limits so legitimate use never 429s.
+    app.use('/:owner/:repo/git-upload-pack', rateLimit({ windowMs: 60_000, max: 300, keyPrefix: 'git-fetch' }));
+    app.use('/:owner/:repo/git-receive-pack', rateLimit({ windowMs: 60_000, max: 60, keyPrefix: 'git-push' }));
     // Immediate webhook dispatch runs after mutating handlers via
     // `waitUntil` (cron retries the rest). Registered before the routes so
     // Hono executes the middleware first.
@@ -81,17 +95,17 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     registerIssueRoutes(app);
     registerPullRoutes(app);
     registerPullThreadRoutes(app);
-  registerUserProfileRoutes(app);
-  registerSearchRoutes(app);
-  registerSocialRoutes(app);
-  registerCheckPublicRoutes(app);
-  registerReleasePublicRoutes(app);
-  registerReleaseAssetPublicRoutes(app);
-  registerProjectPublicRoutes(app);
-  registerDiscussionPublicRoutes(app);
-  registerWikiPublicRoutes(app);
-  registerSnippetPublicRoutes(app);
-  registerCollabPublicRoutes(app);
+    registerUserProfileRoutes(app);
+    registerSearchRoutes(app);
+    registerSocialRoutes(app);
+    registerCheckPublicRoutes(app);
+    registerReleasePublicRoutes(app);
+    registerReleaseAssetPublicRoutes(app);
+    registerProjectPublicRoutes(app);
+    registerDiscussionPublicRoutes(app);
+    registerWikiPublicRoutes(app);
+    registerSnippetPublicRoutes(app);
+    registerCollabPublicRoutes(app);
 
     // Protected UI/API surface
     // Audit-everything runs BEFORE authentication so denied requests are
@@ -99,6 +113,8 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     app.use('/user/*', MiddlewareHandlers.activityAudit());
     app.use('/user/*', MiddlewareHandlers.userAuthentication());
     app.use('/user/*', MiddlewareHandlers.webhookFlush());
+    app.use('/user/tokens*', rateLimit({ windowMs: 60_000, max: 30, keyPrefix: 'tokens' }));
+    app.use('/user/realtime/*', rateLimit({ windowMs: 60_000, max: 60, keyPrefix: 'realtime' }));
 
     registerUserRepoRoutes(app);
     registerUserSettingsRoutes(app);
@@ -115,25 +131,25 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     registerUserForkRoutes(app);
     registerTokenRoutes(app);
     registerUserIssueRoutes(app);
-  registerUserPullRoutes(app);
-  registerUserPullMergeRoutes(app);
-  registerUserPullThreadRoutes(app);
-  registerUserSocialRoutes(app);
-  registerUserNotificationRoutes(app);
-  registerRealtimeUserRoutes(app);
-  registerCollabUserRoutes(app);
-  registerProjectUserRoutes(app);
-  registerDiscussionUserRoutes(app);
-  registerWikiUserRoutes(app);
-  registerSnippetUserRoutes(app);
-  registerReleaseUserRoutes(app);
-  registerReleaseAssetUserRoutes(app);
-  registerWebhookRoutes(app);
-  registerCheckUserRoutes(app);
-  registerImportRoutes(app);
-  registerMirrorRoutes(app);
-  registerDeployKeyRoutes(app);
-  registerSecurityRoutes(app);
+    registerUserPullRoutes(app);
+    registerUserPullMergeRoutes(app);
+    registerUserPullThreadRoutes(app);
+    registerUserSocialRoutes(app);
+    registerUserNotificationRoutes(app);
+    registerRealtimeUserRoutes(app);
+    registerCollabUserRoutes(app);
+    registerProjectUserRoutes(app);
+    registerDiscussionUserRoutes(app);
+    registerWikiUserRoutes(app);
+    registerSnippetUserRoutes(app);
+    registerReleaseUserRoutes(app);
+    registerReleaseAssetUserRoutes(app);
+    registerWebhookRoutes(app);
+    registerCheckUserRoutes(app);
+    registerImportRoutes(app);
+    registerMirrorRoutes(app);
+    registerDeployKeyRoutes(app);
+    registerSecurityRoutes(app);
 
     // SPA catch-all — public shell for user home (/), profile home
     // (/:username, GitHub-style), repo home (/:owner/:repo), and the legacy
@@ -141,7 +157,16 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     // Git Smart HTTP paths never reach here: they match exact routes above.
     app.get('*', (c) => {
       const path: string = new URL(c.req.url).pathname;
-      if (path === '/' || path === '/settings' || path === '/new' || path === '/search' || path === '/notifications' || path === '/snippets' || path.startsWith('/user/') || path.startsWith('/snippets/')) {
+      if (
+        path === '/' ||
+        path === '/settings' ||
+        path === '/new' ||
+        path === '/search' ||
+        path === '/notifications' ||
+        path === '/snippets' ||
+        path.startsWith('/user/') ||
+        path.startsWith('/snippets/')
+      ) {
         return c.html(SPA_HTML);
       }
       if (/^\/[^/]+\/?$/.test(path)) {

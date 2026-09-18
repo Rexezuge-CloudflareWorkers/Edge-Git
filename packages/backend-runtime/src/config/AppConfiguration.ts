@@ -301,6 +301,14 @@ class AppConfiguration {
     return this.auth.isDemoMode();
   }
 
+  public getEnvironment(): string {
+    return this.auth.getEnvironment();
+  }
+
+  public isBypassAllowed(): boolean {
+    return this.auth.isBypassAllowed();
+  }
+
   public getDevAuthEmail(): string | null {
     return this.auth.getDevAuthEmail();
   }
