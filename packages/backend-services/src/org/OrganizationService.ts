@@ -1,9 +1,21 @@
-import { NamespaceDAO, OrganizationDAO, OrganizationMemberDAO, RepositoryDAO, UserDAO } from '@edge-git/backend-data/dao';
+import {
+  EventDAO,
+  IssueDAO,
+  NamespaceDAO,
+  NotificationDAO,
+  OrganizationDAO,
+  OrganizationMemberDAO,
+  PullRequestDAO,
+  RepositoryDAO,
+  UserDAO,
+  WebhookDAO,
+} from '@edge-git/backend-data/dao';
 import type { OrganizationRow, OrgMemberRole } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError, ForbiddenError, NotFoundError } from '@edge-git/backend-errors';
 import { isReservedNamespaceName } from '@edge-git/shared/constants';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
+import { cascadeOwnerRepos } from '../repo/repoRenameCascade';
 
 interface OrganizationServiceEnv {
   DB: D1Queryable;
@@ -15,6 +27,11 @@ interface OrganizationServiceDeps {
   namespaceDAO?: () => Promise<NamespaceDAO>;
   userDAO?: () => Promise<UserDAO>;
   repositoryDAO?: () => Promise<RepositoryDAO>;
+  issueDAO?: () => Promise<IssueDAO>;
+  pullRequestDAO?: () => Promise<PullRequestDAO>;
+  eventDAO?: () => Promise<EventDAO>;
+  notificationDAO?: () => Promise<NotificationDAO>;
+  webhookDAO?: () => Promise<WebhookDAO>;
 }
 
 const ORG_NAME_RE = /^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$/i;
@@ -32,6 +49,11 @@ class OrganizationService {
       namespaceDAO: () => Promise.resolve(new NamespaceDAO(env.DB)),
       userDAO: () => Promise.resolve(new UserDAO(env.DB)),
       repositoryDAO: () => Promise.resolve(new RepositoryDAO(env.DB)),
+      issueDAO: () => Promise.resolve(new IssueDAO(env.DB)),
+      pullRequestDAO: () => Promise.resolve(new PullRequestDAO(env.DB)),
+      eventDAO: () => Promise.resolve(new EventDAO(env.DB)),
+      notificationDAO: () => Promise.resolve(new NotificationDAO(env.DB)),
+      webhookDAO: () => Promise.resolve(new WebhookDAO(env.DB)),
       ...deps,
     };
   }
@@ -236,10 +258,24 @@ class OrganizationService {
     } catch {
       // ignore
     }
-    // Simple rename: cascade owner on org repos, free the old name immediately.
+    // Simple rename: cascade owner on org repos (plus denormalized
+    // `full_name` sidecars), free the old name immediately. Legacy
+    // owner-named rows without `org_id` are covered by the owner snapshot
+    // inside the cascade; `org_id`-keyed rows are passed explicitly.
     try {
       const repoDAO = await this.deps.repositoryDAO();
-      await repoDAO.renameOwner(org.username_ci, handle);
+      const orgRepos = await repoDAO.listByOrgId(org.id, 1000).catch(() => []);
+      await cascadeOwnerRepos(
+        {
+          repositoryDAO: this.deps.repositoryDAO,
+          issueDAO: this.deps.issueDAO,
+          pullRequestDAO: this.deps.pullRequestDAO,
+          eventDAO: this.deps.eventDAO,
+          notificationDAO: this.deps.notificationDAO,
+          webhookDAO: this.deps.webhookDAO,
+        },
+        { oldOwnerCi: org.username_ci, newOwner: handle, now, extraRepos: orgRepos },
+      );
     } catch {
       // ignore — repos remain addressable by id; lookup falls back to legacy columns
     }

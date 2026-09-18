@@ -243,13 +243,39 @@ function createRequestScope(env: RequestScopeEnv): Container {
         config: AppConfiguration.fromEnv(env),
       }),
   );
-  scope.bind(Tokens.UserService, () => new UserService(env as never, { userDAO, namespaceDAO, organizationDAO, repositoryDAO }));
+  scope.bind(
+    Tokens.UserService,
+    () =>
+      new UserService(env as never, {
+        userDAO,
+        namespaceDAO,
+        organizationDAO,
+        repositoryDAO,
+        issueDAO,
+        pullRequestDAO,
+        eventDAO,
+        notificationDAO,
+        webhookDAO,
+      }),
+  );
   scope.bind(Tokens.IssueService, () => new IssueService(env as never, { issueDAO }));
   scope.bind(Tokens.PullRequestService, () => new PullRequestService(env as never, { pullRequestDAO }));
   scope.bind(Tokens.PullThreadService, () => new PullThreadService(env as never, { pullRequestDAO, pullThreadDAO }));
   scope.bind(
     Tokens.OrganizationService,
-    () => new OrganizationService(env as never, { organizationDAO, organizationMemberDAO, namespaceDAO, userDAO, repositoryDAO }),
+    () =>
+      new OrganizationService(env as never, {
+        organizationDAO,
+        organizationMemberDAO,
+        namespaceDAO,
+        userDAO,
+        repositoryDAO,
+        issueDAO,
+        pullRequestDAO,
+        eventDAO,
+        notificationDAO,
+        webhookDAO,
+      }),
   );
   scope.bind(
     Tokens.TeamService,

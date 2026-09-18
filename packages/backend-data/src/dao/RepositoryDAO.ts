@@ -178,8 +178,22 @@ class RepositoryDAO extends BaseDAO {
     }
   }
 
-  public async renameOwner(oldOwnerCi: string, newOwner: string): Promise<void> {
+  public async renameOwner(oldOwnerCi: string, newOwner: string, now?: number): Promise<void> {
     const newCi = newOwner.toLowerCase();
+    const stamp = now ?? Math.floor(Date.now() / 1000);
+    try {
+      await this.withRetry(
+        () =>
+          this.database
+            .prepare('UPDATE repositories SET owner = ?, owner_ci = ?, updated_at = ? WHERE lower(owner) = ?')
+            .bind(newOwner, newCi, stamp, oldOwnerCi)
+            .run(),
+        'rename repo owner',
+      );
+      return;
+    } catch {
+      // Fall through to legacy variants below (missing columns on old D1).
+    }
     try {
       await this.withRetry(
         () =>
@@ -194,6 +208,23 @@ class RepositoryDAO extends BaseDAO {
         () => this.database.prepare('UPDATE repositories SET owner = ? WHERE owner = ?').bind(newOwner, oldOwnerCi).run(),
         'rename repo owner legacy',
       );
+    }
+  }
+
+  // Refresh denormalized fork-source names after the source owner renames.
+  // Best-effort: silently skips DBs without the 0004 fork columns.
+  public async updateForkSourceFullName(sourceRepoId: string, sourceFullName: string): Promise<void> {
+    try {
+      await this.withRetry(
+        () =>
+          this.database
+            .prepare('UPDATE repositories SET forked_from_full_name = ? WHERE forked_from_repo_id = ?')
+            .bind(sourceFullName, sourceRepoId)
+            .run(),
+        'rename fork source full name',
+      );
+    } catch {
+      // Legacy DBs without fork columns — nothing to refresh.
     }
   }
 

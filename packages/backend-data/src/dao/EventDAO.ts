@@ -113,6 +113,15 @@ class EventDAO extends BaseDAO {
     );
   }
 
+  // Refresh denormalized `full_name` after an owner/org rename. Keyed by
+  // stable `repository_id` so history rows follow the new `owner/name`.
+  public async updateFullNameByRepo(repositoryId: string, fullName: string): Promise<void> {
+    await this.withRetry(
+      () => this.database.prepare('UPDATE repo_events SET full_name = ? WHERE repository_id = ?').bind(fullName, repositoryId).run(),
+      'rename repo event full name',
+    ).catch(() => undefined);
+  }
+
   public async pruneOlderThan(cutoff: number, limit: number): Promise<number> {
     return this.deleteRowsOlderThan('repo_events', 'created_at', cutoff, limit, 'id');
   }

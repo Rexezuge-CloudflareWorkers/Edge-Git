@@ -164,6 +164,33 @@ class PullRequestDAO extends BaseDAO {
     );
   }
 
+  // Refresh denormalized names after an owner/org rename. Base `full_name` is
+  // keyed by stable `repository_id`; fork `head_full_name` by stable
+  // `head_repository_id` (0004 columns — missing-column DBs resolve to zero
+  // rows via the caught fallback). FTS follows via `trg_pull_fts_au`.
+  public async updateFullNameByRepo(repositoryId: string, fullName: string): Promise<void> {
+    await this.withRetry(
+      () =>
+        this.database.prepare('UPDATE pull_requests SET full_name = ? WHERE repository_id = ?').bind(fullName, repositoryId).run(),
+      'rename pull request full name',
+    ).catch(() => undefined);
+  }
+
+  public async updateHeadFullNameByHeadRepo(headRepositoryId: string, headFullName: string): Promise<void> {
+    try {
+      await this.withRetry(
+        () =>
+          this.database
+            .prepare('UPDATE pull_requests SET head_full_name = ? WHERE head_repository_id = ?')
+            .bind(headFullName, headRepositoryId)
+            .run(),
+        'rename pull request head full name',
+      );
+    } catch {
+      // Legacy DBs without 0004 head-repo columns — nothing to refresh.
+    }
+  }
+
   public async markMerged(id: string, mergedBy: string, commitOid: string | null, now: number): Promise<void> {
     await this.withRetry(
       () =>

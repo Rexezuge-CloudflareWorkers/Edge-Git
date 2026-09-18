@@ -91,6 +91,15 @@ class IssueDAO extends BaseDAO {
     );
   }
 
+  // Refresh denormalized `full_name` after an owner/org rename. Keyed by
+  // stable `repository_id` — FTS follows via the `trg_issue_fts_au` trigger.
+  public async updateFullNameByRepo(repositoryId: string, fullName: string): Promise<void> {
+    await this.withRetry(
+      () => this.database.prepare('UPDATE issues SET full_name = ? WHERE repository_id = ?').bind(fullName, repositoryId).run(),
+      'rename issue full name',
+    ).catch(() => undefined);
+  }
+
   public async deleteByRepo(repositoryId: string): Promise<void> {
     await this.withRetry(
       () =>

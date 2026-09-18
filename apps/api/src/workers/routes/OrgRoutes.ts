@@ -1,7 +1,6 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
-import { getRepoStub, ensureRepo } from '../repoStub';
 import { toServiceStatus } from './PublicViewerResolver';
 
 type OrgApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -54,25 +53,56 @@ function registerOrgRoutes(app: OrgApp): void {
       let org = await scope.get(Tokens.OrganizationService).requireOwner(orgName, email);
       if (body.username) {
         const before = org.username;
+        // Snapshot org repos BEFORE the D1 rename — afterwards `owner_ci`
+        // already reads new, so a post-rename filter by the old name matches
+        // nothing and the DO move silently never runs. `org_id`-keyed rows
+        // plus legacy owner-named rows cover backfill gaps.
+        const snapshot: Array<{ id: string; name: string }> = [];
+        const seen = new Set<string>();
+        const remember = (rows: Array<{ id: string; name: string }>): void => {
+          for (const row of rows) {
+            if (!row.id || !row.name || seen.has(row.id)) continue;
+            seen.add(row.id);
+            snapshot.push({ id: row.id, name: row.name });
+          }
+        };
+        try {
+          remember(await scope.get(Tokens.RepositoryDAO)().then((dao) => dao.listByOrgId(org.id, 1000)));
+        } catch {
+          // ignore — owner snapshot below still applies
+        }
+        try {
+          remember(await scope.get(Tokens.RepositoryDAO)().then((dao) => dao.listByOwner(before, 1000)));
+        } catch {
+          // ignore — org_id snapshot above still applies
+        }
         org = await scope.get(Tokens.OrganizationService).rename(org.username, email, body.username);
-        // Best-effort DO move for org repos.
+        // Fail-closed DO move: git objects + release assets are copied old→new
+        // and the old isolate is purged only after the copy verifies. On copy
+        // failure the new isolate is purged, D1 is rolled back to the old
+        // handle, and the request surfaces 413 (pack limit) / 500.
         if (before.toLowerCase() !== org.username.toLowerCase()) {
-          // Enumerate via listVisibleForUser and move matching owner.
-          try {
-            const visible = await scope.get(Tokens.RepoService).listVisibleForUser(email, 500);
-            const owned = visible.filter((r) => (r.owner_ci ?? r.owner).toLowerCase() === before.toLowerCase());
-            for (const repo of owned) {
-              try {
-                await ensureRepo(c.env, `${org.username}/${repo.name}`);
-                await getRepoStub(c.env, `${before}/${repo.name}`)
-                  .deleteRepo()
-                  .catch(() => undefined);
-              } catch {
-                // ignore per-repo
+          const moves = snapshot.map((repo) => ({
+            id: repo.id,
+            name: repo.name,
+            oldFull: `${before}/${repo.name}`,
+            newFull: `${org.username}/${repo.name}`,
+          }));
+          if (moves.length > 0) {
+            const { moveRepoDosForRename } = await import('./RepoMove');
+            const { isPackLimitError } = await import('./CrossFork');
+            try {
+              await moveRepoDosForRename(c.env, email, moves);
+            } catch (moveError) {
+              await scope
+                .get(Tokens.OrganizationService)
+                .rename(org.username, email, before)
+                .catch(() => undefined);
+              if (isPackLimitError(moveError)) {
+                return c.json({ error: moveError instanceof Error ? moveError.message : 'Repository too large to move' }, 413);
               }
+              return c.json({ error: 'Failed to move repository data' }, 500);
             }
-          } catch {
-            // ignore
           }
         }
       }
