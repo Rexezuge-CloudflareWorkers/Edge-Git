@@ -2,14 +2,12 @@ import type { Hono } from 'hono';
 import { requireVisibleRepo } from '../PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
+import { parsePositiveInt } from '@edge-git/shared/validation';
 
 type CollabApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
 function parseNumber(raw: string | undefined): number | null {
-  if (!raw) return null;
-  const parsed = Number(raw);
-  if (!Number.isSafeInteger(parsed)) return null;
-  return parsed;
+  return parsePositiveInt(raw ?? null);
 }
 
 async function needWrite(env: Env, owner: string, repo: string, email: string): Promise<boolean> {

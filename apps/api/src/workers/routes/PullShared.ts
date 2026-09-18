@@ -1,12 +1,10 @@
 import type { Hono } from 'hono';
+import { parsePositiveInt } from '@edge-git/shared/validation';
 
 type PullApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
 function parsePullNumber(raw: string | undefined): number | null {
-  if (!raw) return null;
-  const parsed = Number(raw);
-  if (!Number.isSafeInteger(parsed)) return null;
-  return parsed;
+  return parsePositiveInt(raw ?? null);
 }
 
 interface MergePreviewShape {

@@ -1,7 +1,8 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
-import { toServiceStatus } from './PublicViewerResolver';
+import { clampAuditLimit, truncateAuditFilter } from '@edge-git/shared/validation';
+import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 
 type AuditApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -21,10 +22,10 @@ function parseAuditQuery(url: string): {
   const action = params.get('action');
   const repo = params.get('repo');
   const cursor = params.get('cursor');
-  if (userEmail) out.userEmail = userEmail;
-  if (action) out.action = action;
-  if (repo) out.repo = repo;
-  if (cursor) out.cursor = cursor;
+  if (truncateAuditFilter(userEmail ?? undefined)) out.userEmail = truncateAuditFilter(userEmail ?? undefined);
+  if (truncateAuditFilter(action ?? undefined)) out.action = truncateAuditFilter(action ?? undefined);
+  if (truncateAuditFilter(repo ?? undefined)) out.repo = truncateAuditFilter(repo ?? undefined);
+  if (cursor) out.cursor = cursor.slice(0, 500);
   // NOTE: `Number(null)` is 0, so missing params must stay unset — otherwise
   // every unfiltered query would silently gain `timestamp <= 0` and match
   // nothing (fail-closed the wrong way: empty audit trails).
@@ -36,7 +37,8 @@ function parseAuditQuery(url: string): {
   const limit = limitRaw === null ? NaN : Number(limitRaw);
   if (Number.isSafeInteger(startTime)) out.startTime = startTime;
   if (Number.isSafeInteger(endTime)) out.endTime = endTime;
-  if (Number.isSafeInteger(limit)) out.limit = limit;
+  const clamped = clampAuditLimit(Number.isSafeInteger(limit) ? limit : undefined);
+  if (clamped !== undefined) out.limit = clamped;
   return out;
 }
 
@@ -97,7 +99,7 @@ function registerAuditRoutes(app: AuditApp): void {
         );
       return c.json({ logs: logJson(logs), nextCursor });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -110,7 +112,7 @@ function registerAuditRoutes(app: AuditApp): void {
         .queryMine(email, { action: query.action, startTime: query.startTime, endTime: query.endTime }, query.limit, query.cursor);
       return c.json({ logs: logJson(logs), nextCursor });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
     }
   });
 }

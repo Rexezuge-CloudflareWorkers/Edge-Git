@@ -9,15 +9,21 @@ const SECURITY_HEADERS: Record<string, string> = {
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Cross-Origin-Resource-Policy': 'same-origin',
+  'Cross-Origin-Embedder-Policy': 'require-corp',
+  'Origin-Agent-Cluster': '?1',
 };
 
 // Paths carrying bearer secrets — never allow caching of their responses.
+// Exact-prefix match (not substring) so future `/hooks`-like paths cannot
+// accidentally inherit `no-store`, and secret routes cannot be missed.
 function isSensitiveJsonPath(pathname: string): boolean {
   return (
-    pathname.includes('/user/tokens') ||
-    pathname.includes('/hooks') ||
-    pathname.includes('/realtime/ticket') ||
-    pathname.includes('/realtime/inbox-ticket')
+    pathname === '/user/tokens' ||
+    pathname.startsWith('/user/tokens/') ||
+    pathname.includes('/hooks/') ||
+    pathname.endsWith('/hooks') ||
+    pathname === '/user/realtime/ticket' ||
+    pathname === '/user/realtime/inbox-ticket'
   );
 }
 
@@ -47,8 +53,15 @@ function applySecurityHeaders(c: HeaderContext): void {
   } catch {
     // URL parsing must never fail the request.
   }
-  // HSTS only makes sense over HTTPS; harmless locally, enforced in prod.
-  c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  // HSTS only over HTTPS — sending it over plain HTTP risks local pinning
+  // and is ignored by browsers anyway.
+  try {
+    if (new URL(c.req.url).protocol === 'https:') {
+      c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+  } catch {
+    // URL parsing must never fail the request.
+  }
 }
 
 function securityHeaders(): (c: HeaderContext, next: Next) => Promise<Response | void> {

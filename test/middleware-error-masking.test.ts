@@ -36,15 +36,14 @@ describe('middleware error masking', () => {
     }
   });
 
-  it('requireUser maps unexpected failures to generic 401', async () => {
+  it('requireUser maps unexpected failures to generic 500 (not 401)', async () => {
     const c = authCtx();
     const out = await MiddlewareHandlers.requireUser(c);
     expect(out).toBeInstanceOf(Response);
     const res = out as unknown as Response;
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(500);
     const body = (await res.json()) as { error: string };
-    expect(typeof body.error).toBe('string');
-    expect(body.error.length).toBeGreaterThan(0);
+    expect(body.error).toBe('Internal error');
     // Must not contain stack traces or SQL fragments.
     expect(body.error).not.toMatch(/SELECT|D1_|Error: /i);
     void vi;

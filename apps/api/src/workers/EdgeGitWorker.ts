@@ -222,9 +222,9 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
             body: JSON.stringify({ cron: event.cron, scheduledTime: event.scheduledTime }),
           }),
         )
-        .then(async (res: Response) => {
+        .then((res: Response) => {
           if (!res.ok && res.status !== 202) {
-            console.error('CronTasksWorker error', res.status, await res.text());
+            console.error('CronTasksWorker error', res.status);
           }
         })
         .catch((error: unknown) => console.error('Cron invoke failed', error)),

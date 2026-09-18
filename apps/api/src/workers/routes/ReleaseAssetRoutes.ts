@@ -2,21 +2,16 @@ import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { RepoService } from '@edge-git/backend-services/repo';
+import { assetNameSchema, decodeBase64Strict, normalizeAssetContentType } from '@edge-git/shared/validation';
 import { getRepoStub } from '../repoStub';
-import { requireVisibleRepo, resolvePublicViewer, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { requireVisibleRepo, resolvePublicViewer, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { viewerCanSeeDrafts } from './ReleaseRoutes';
+import { readJsonBody } from './BodyParser';
 
 type ReleaseAssetApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
 function decodeBase64ToBytes(raw: string): Uint8Array | null {
-  try {
-    const binary = atob(raw);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.codePointAt(i) ?? 0;
-    return bytes;
-  } catch {
-    return null;
-  }
+  return decodeBase64Strict(raw);
 }
 
 async function sha256HexBytes(bytes: Uint8Array): Promise<string> {
@@ -29,14 +24,15 @@ function downloadResponse(bytes: Uint8Array, contentType: string, filename: stri
   const copy = new Uint8Array(bytes.byteLength);
   copy.set(bytes);
   // `attachment` + `nosniff` so even `text/html`/`image/svg+xml` assets
-  // cannot execute in the app origin.
+  // cannot execute in the app origin. PAT-gated and draft assets must never
+  // be cached — use `no-store` instead of a 1h private cache.
   return new Response(copy, {
     status: 200,
     headers: {
-      'Content-Type': contentType,
+      'Content-Type': normalizeAssetContentType(contentType),
       'Content-Length': String(bytes.byteLength),
       'Content-Disposition': `attachment; filename="${safe}"; filename*=UTF-8''${encodeURIComponent(safe)}`,
-      'Cache-Control': 'private, max-age=3600',
+      'Cache-Control': 'private, no-store',
       'X-Content-Type-Options': 'nosniff',
     },
   });
@@ -77,7 +73,7 @@ function registerReleaseAssetPublicRoutes(app: ReleaseAssetApp): void {
         if (!bytes || bytes.byteLength === 0) return c.json({ error: 'Not found' }, 404);
         return downloadResponse(bytes, asset.contentType, asset.name);
       } catch (error) {
-        return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+        return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
       }
     });
   });
@@ -112,10 +108,12 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
     } catch {
       return c.json({ error: 'Forbidden' }, 403);
     }
-    const body = (await c.req.json().catch(() => ({}))) as { name?: unknown; contentBase64?: unknown; contentType?: unknown };
+    const { malformed, body } = await readJsonBody<{ name?: unknown; contentBase64?: unknown; contentType?: unknown }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     if (typeof body.name !== 'string' || typeof body.contentBase64 !== 'string' || !body.contentBase64) {
       return c.json({ error: 'name and contentBase64 are required' }, 400);
     }
+    if (!assetNameSchema.safeParse(body.name).success) return c.json({ error: 'Invalid asset name' }, 400);
     const maxBytes = ConfigurationManager.releases.getMaxAssetBytes(c.env);
     // Pre-decode tripwire on base64 length so oversized bodies 413 without a
     // full `atob` allocation burn.
@@ -132,7 +130,7 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
       const sha256 = await sha256HexBytes(bytes);
       const asset = await scope
         .get(Tokens.ReleaseService)
-        .createAsset(row.id, c.req.param('tag'), { name: body.name, size: bytes.byteLength, contentType: body.contentType, sha256 }, email);
+        .createAsset(row.id, c.req.param('tag'), { name: body.name, size: bytes.byteLength, contentType: normalizeAssetContentType(body.contentType), sha256 }, email);
       const stored = (await getRepoStub(c.env, `${row.owner}/${row.name}`).storeReleaseAsset({
         releaseId: asset.releaseId,
         assetId: asset.id,
@@ -147,7 +145,7 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
       }
       return c.json({ asset }, 201);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to upload asset' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to upload asset') }, toServiceStatus(error));
     }
   });
 
@@ -166,7 +164,7 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
       if (!bytes || bytes.byteLength === 0) return c.json({ error: 'Not found' }, 404);
       return downloadResponse(bytes, asset.contentType, asset.name);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -192,7 +190,7 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
       await scope.get(Tokens.ReleaseService).deleteAsset(row.id, c.req.param('tag'), asset.id);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 }

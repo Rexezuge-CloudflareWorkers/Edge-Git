@@ -34,8 +34,8 @@ class ReleaseAssetStore {
       await this.fs.promises.mkdir(`/release-assets/${args.releaseId}`, { recursive: true });
       await this.fs.promises.writeFile(path, bytes);
       return { ok: true, size: bytes.byteLength };
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : 'failed to store asset', status: 500 };
+    } catch {
+      return { ok: false, error: 'failed to store asset', status: 500 };
     }
   }
 

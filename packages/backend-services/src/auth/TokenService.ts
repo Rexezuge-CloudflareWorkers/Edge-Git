@@ -179,7 +179,7 @@ class TokenService {
 
   public async listTokens(userEmail: string): Promise<UserAccessTokenMetadata[]> {
     const dao = await this.deps.tokenDAO();
-    const tokens = await dao.getByUserEmail(userEmail);
+    const tokens = await dao.getByUserEmail(userEmail.toLowerCase());
     const grantDAO = await this.deps.tokenGrantDAO();
     const repoDAO = await this.deps.repositoryDAO();
     const enriched: UserAccessTokenMetadata[] = [];

@@ -1,16 +1,15 @@
 import type { Hono } from 'hono';
-import { requireVisibleRepo, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
+import { parsePositiveInt } from '@edge-git/shared/validation';
+import { readJsonBody } from './BodyParser';
 
 type IssueApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
 function parseIssueNumber(raw: string | undefined): number | null {
-  if (!raw) return null;
-  const parsed = Number(raw);
-  if (!Number.isSafeInteger(parsed)) return null;
-  return parsed;
+  return parsePositiveInt(raw ?? null);
 }
 
 function registerIssueRoutes(app: IssueApp): void {
@@ -47,7 +46,7 @@ function registerIssueRoutes(app: IssueApp): void {
         const issue = await createRequestScope(c.env).get(Tokens.IssueService).getByNumber(row.id, number);
         return c.json({ issue });
       } catch (error) {
-        return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+        return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
       }
     });
   });
@@ -60,7 +59,7 @@ function registerIssueRoutes(app: IssueApp): void {
         const comments = await createRequestScope(c.env).get(Tokens.IssueService).listComments(row.id, number);
         return c.json({ comments });
       } catch (error) {
-        return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+        return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
       }
     });
   });
@@ -100,7 +99,8 @@ function registerUserIssueRoutes(app: IssueApp): void {
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return c.json({ error: 'Not found' }, 404);
-    const body = (await c.req.json().catch(() => ({}))) as { title?: string; body?: string };
+    const { malformed, body } = await readJsonBody<{ title?: string; body?: string }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     if (!body.title) return c.json({ error: 'title is required' }, 400);
     const created = await createRequestScope(c.env)
       .get(Tokens.IssueService)
@@ -136,7 +136,7 @@ function registerUserIssueRoutes(app: IssueApp): void {
       const issue = await createRequestScope(c.env).get(Tokens.IssueService).getByNumber(row.id, number);
       return c.json({ issue });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -154,7 +154,8 @@ function registerUserIssueRoutes(app: IssueApp): void {
     }
     const number = parseIssueNumber(c.req.param('number'));
     if (number === null) return c.json({ error: 'Not found' }, 404);
-    const body = (await c.req.json().catch(() => ({}))) as { status?: string };
+    const { malformed, body } = await readJsonBody<{ status?: string }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     try {
       const issue = await createRequestScope(c.env)
         .get(Tokens.IssueService)
@@ -171,7 +172,7 @@ function registerUserIssueRoutes(app: IssueApp): void {
       });
       return c.json({ issue });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to update issue' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to update issue') }, toServiceStatus(error));
     }
   });
 
@@ -187,7 +188,7 @@ function registerUserIssueRoutes(app: IssueApp): void {
       const comments = await createRequestScope(c.env).get(Tokens.IssueService).listComments(row.id, number);
       return c.json({ comments });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -199,7 +200,8 @@ function registerUserIssueRoutes(app: IssueApp): void {
     if (!row) return c.json({ error: 'Not found' }, 404);
     const number = parseIssueNumber(c.req.param('number'));
     if (number === null) return c.json({ error: 'Not found' }, 404);
-    const body = (await c.req.json().catch(() => ({}))) as { body?: string };
+    const { malformed, body } = await readJsonBody<{ body?: string }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     if (typeof body.body !== 'string' || !body.body.trim()) return c.json({ error: 'body is required' }, 400);
     try {
       const scope = createRequestScope(c.env);
@@ -223,7 +225,7 @@ function registerUserIssueRoutes(app: IssueApp): void {
       });
       return c.json({ comment }, 201);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to add comment' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to add comment') }, toServiceStatus(error));
     }
   });
 }

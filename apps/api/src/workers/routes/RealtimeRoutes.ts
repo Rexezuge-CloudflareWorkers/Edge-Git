@@ -4,8 +4,10 @@ import { RealtimeService } from '@edge-git/backend-services/realtime';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { isShard } from '@edge-git/shared/realtime';
+import { repoNameSchema, usernameSchema } from '@edge-git/shared/validation';
 import { getRealtimeStub } from '../realtimeStub';
-import { toServiceStatus } from './PublicViewerResolver';
+import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { readJsonBody } from './BodyParser';
 
 type RealtimeApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -48,9 +50,15 @@ function registerRealtimeUserRoutes(app: RealtimeApp): void {
   app.post('/user/realtime/ticket', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     if (realtimeDisabled(c.env)) return c.json({ error: 'Realtime is disabled' }, 503);
-    const body = (await c.req.json().catch(() => ({}))) as { owner?: unknown; repo?: unknown; channels?: unknown };
+    const { malformed, body } = await readJsonBody<{ owner?: unknown; repo?: unknown; channels?: unknown }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     if (typeof body.owner !== 'string' || typeof body.repo !== 'string') {
       return c.json({ error: 'owner and repo are required' }, 400);
+    }
+    if (!usernameSchema.safeParse(body.owner.trim()).success) return c.json({ error: 'Invalid owner' }, 400);
+    if (!repoNameSchema.safeParse(body.repo.trim()).success) return c.json({ error: 'Invalid repo' }, 400);
+    if (body.channels !== undefined && !Array.isArray(body.channels)) {
+      return c.json({ error: 'channels must be an array' }, 400);
     }
     let grant;
     try {
@@ -63,7 +71,7 @@ function registerRealtimeUserRoutes(app: RealtimeApp): void {
           channels: body.channels,
         });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
     try {
       const issued = await getRealtimeStub(c.env, grant.shard).issueTicket({ shard: grant.shard, channels: grant.channels, viewer: email });

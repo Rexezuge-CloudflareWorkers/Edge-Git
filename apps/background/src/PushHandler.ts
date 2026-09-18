@@ -9,6 +9,7 @@ import {
   validateReceivePackCounts,
 } from '@edge-git/git-protocol';
 import type { ProtectedRefRule } from '@edge-git/git-protocol';
+import { UUIDUtil } from '@edge-git/shared/utils';
 import { createLogger } from '@edge-git/backend-runtime/logger';
 
 const logger = createLogger('PushHandler');
@@ -86,7 +87,7 @@ class PushHandler {
       return buildReportStatus(results, true);
     }
 
-    const packFilePath = `/repo/objects/pack/pack-${Date.now()}.pack`;
+    const packFilePath = `/repo/objects/pack/pack-${UUIDUtil.getRandomUUIDNoDash()}.pack`;
     let wrotePack = false;
     try {
       await isoGitFs.promises.writeFile(packFilePath, packfile);
@@ -102,7 +103,7 @@ class PushHandler {
           {
             ref: '*',
             ok: false,
-            error: `unpack failed: ${(error as Error).message}`,
+            error: 'unpack failed: unable to index packfile',
           },
         ],
         false,

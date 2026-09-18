@@ -47,7 +47,9 @@ async function accessJwtStrategy(env: AccessAuthEnv, request: Request): Promise<
 
 async function accessCtxStrategy(_env: AccessAuthEnv, _request: Request, accessCtx?: AccessIdentityContext): Promise<string | null> {
   const identity = await accessCtx?.access?.getIdentity?.().catch(() => null);
-  return identity?.email ?? null;
+  const raw = identity?.email?.trim().toLowerCase() ?? '';
+  if (!raw || !raw.includes('@') || raw.length > 254 || /\s/.test(raw)) return null;
+  return raw;
 }
 
 const DEFAULT_ACCESS_AUTH_STRATEGIES: readonly AccessAuthStrategy[] = [
