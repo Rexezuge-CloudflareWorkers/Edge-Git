@@ -59,6 +59,25 @@ describe('repo CRUD on real D1', () => {
     expect((await api(`/repos/${OWNER}/${REPO}`)).status).toBe(404);
   });
 
+  it('recreates a deleted repo name without orphaning the DO', async () => {
+    // Regression: `deleteRepo` used `storage.deleteAll()`, wiping the dofs
+    // schema on the warm DO isolate, so recreating the same name 500'd with
+    // `no such table: dofs_files` while the D1 row was already committed.
+    const name = 'crud-recreate';
+    const created = await api('/user/repos', json({ method: 'POST', body: JSON.stringify({ name }) }));
+    expect(created.status).toBe(201);
+    const deleted = await api(`/user/repos/${OWNER}/${name}`, { method: 'DELETE' });
+    expect(deleted.status).toBe(200);
+    const recreated = await api('/user/repos', json({ method: 'POST', body: JSON.stringify({ name }) }));
+    expect(recreated.status).toBe(201);
+    const body = (await recreated.json()) as { fullName: string };
+    expect(body.fullName).toBe(`${OWNER}/${name}`);
+    expect((await api(`/repos/${OWNER}/${name}`)).status).toBe(200);
+    const refs = await api(`/${OWNER}/${name}/info/refs?service=git-upload-pack`);
+    expect(refs.status).toBe(200);
+    expect(refs.headers.get('content-type')).toContain('x-git-upload-pack-advertisement');
+  });
+
   it('rejects invalid creates and unknown repos', async () => {
     const missing = await api('/user/repos', json({ method: 'POST', body: JSON.stringify({}) }));
     expect(missing.status).toBe(400);
