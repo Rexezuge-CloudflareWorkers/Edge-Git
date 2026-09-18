@@ -309,7 +309,7 @@ function seedRepo(state: ReturnType<typeof createWebhookFakeDb>['state'], overri
 }
 
 function routeEnv(db: D1Queryable) {
-  return { DB: db, DEV_AUTH_EMAIL: 'alice@example.com' };
+  return { DB: db, ENVIRONMENT: 'development', DEV_AUTH_EMAIL: 'alice@example.com' };
 }
 
 const routeCtx = { waitUntil: () => undefined, passThroughOnException: () => undefined };
@@ -859,7 +859,7 @@ describe('webhook HTTP routes', () => {
     seedRepo(state);
     expect((await callRoute(db, '/user/repos/alice/missing/hooks')).status).toBe(404);
     // Public repo: strangers keep read access (masked list) but cannot mutate.
-    const strangerEnv = { DB: db, DEV_AUTH_EMAIL: 'mallory@example.com' };
+    const strangerEnv = { DB: db, ENVIRONMENT: 'development', DEV_AUTH_EMAIL: 'mallory@example.com' };
     const worker = new EdgeGitWorker() as unknown as { onRequest(r: Request, e: unknown, c: unknown): Promise<Response> };
     const listed = await worker.onRequest(new Request('https://git.example.com/user/repos/alice/demo/hooks'), strangerEnv, routeCtx);
     expect(listed.status).toBe(200);

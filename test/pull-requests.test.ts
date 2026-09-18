@@ -221,6 +221,7 @@ describe('Pull request API routes', () => {
     return {
       DB: db,
       REPO: { getByName: () => stub, get: () => stub, idFromName: (n: string) => n },
+      ENVIRONMENT: 'development',
       DEV_AUTH_EMAIL: email,
     };
   }

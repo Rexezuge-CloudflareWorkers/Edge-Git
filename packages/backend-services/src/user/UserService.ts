@@ -160,7 +160,43 @@ class UserService {
     if (taken) throw new BadRequestError('Username is already taken');
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const oldCi = existing.username?.toLowerCase();
-    await dao.setUsername(normalized, handle, now);
+    // Claim-first ordering narrows the rename TOCTOU: claim the new name
+    // before mutating `users`, so a concurrent claimer wins with a clean
+    // abort instead of leaving `users.username` renamed without a namespace.
+    // If the subsequent update fails, best-effort release the new claim.
+    // Legacy DBs without a namespaces table fall back to `users.username`
+    // as authoritative (claim/isTaken both throw there).
+    let namespaceClaimed = false;
+    let legacyNamespaces = false;
+    try {
+      const ns = await this.deps.namespaceDAO();
+      await ns.claim({ usernameCi: handleCi, kind: 'user', userEmail: normalized, now });
+      namespaceClaimed = true;
+    } catch (error) {
+      // Claim race or legacy-DB error: check once more to report taken cleanly.
+      try {
+        const nsDao = await this.deps.namespaceDAO();
+        if (await nsDao.isTaken(handleCi)) throw new BadRequestError('Username is already taken');
+      } catch (inner) {
+        if (inner instanceof BadRequestError) throw inner;
+        // isTaken itself threw → namespaces table missing → legacy path.
+        legacyNamespaces = true;
+      }
+      if (!legacyNamespaces) throw error instanceof Error ? error : new BadRequestError('Username is already taken');
+    }
+    try {
+      await dao.setUsername(normalized, handle, now);
+    } catch (error) {
+      if (namespaceClaimed) {
+        try {
+          const ns = await this.deps.namespaceDAO();
+          await ns.release(handleCi);
+        } catch {
+          // ignore rollback failure
+        }
+      }
+      throw error;
+    }
     try {
       const ns = await this.deps.namespaceDAO();
       if (oldCi) {
@@ -170,7 +206,6 @@ class UserService {
           // ignore
         }
       }
-      await ns.claim({ usernameCi: handleCi, kind: 'user', userEmail: normalized, now });
     } catch {
       // ignore — users.username is source of truth on legacy DBs
     }

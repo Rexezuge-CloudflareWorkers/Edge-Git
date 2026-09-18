@@ -270,6 +270,7 @@ function createEnv(db: D1Queryable, harness: ReturnType<typeof createGitHarness>
   return {
     DB: db,
     REPO: { getByName: (name: string) => harness.stubFor(name), get: (name: string) => harness.stubFor(name), idFromName: (n: string) => n },
+    ENVIRONMENT: 'development',
     DEV_AUTH_EMAIL: email,
   };
 }

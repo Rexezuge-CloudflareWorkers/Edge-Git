@@ -20,6 +20,7 @@
     { "binding": "DB", "database_name": "edge-git-test-db", "database_id": "00000000-0000-0000-0000-000000000000" }
   ],
   "vars": {
+    "ENVIRONMENT": "development",
     "DEV_AUTH_EMAIL": "test@example.com",
     "SITE_URL": "https://example.com",
     "REALTIME_ENABLED": "true"

@@ -6,7 +6,11 @@ import { applyMigrations } from './migrations';
  * Centralizes the `beforeAll` boilerplate for
  * `test/integration/api/*.int.test.ts`: migrations, user seeding, and direct
  * D1 repo seeding. Auth is `DEV_AUTH_EMAIL`-based (`test@example.com` in
- * `wrangler.test.jsonc`), so no per-request credentials are needed.
+ * `wrangler.test.jsonc`), so `/user/*` requests need no per-request
+ * credentials. Git (`/:owner/:repo/info/refs|git-*-pack`) and public
+ * (`/repos/*`) routes additionally accept PAT Bearer/Basic and deploy keys,
+ * which the helpers below mint for second users (the DEV user can mint its
+ * own PATs via `POST /user/tokens`).
  */
 
 type TestEnv = Record<string, unknown> & { DB: D1Database };
@@ -75,4 +79,62 @@ export async function seedRepo(
     )
     .run();
   return id;
+}
+
+async function sha256Hex(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Mint a PAT row directly for any seeded user (including non-DEV second
+ * users that cannot use `POST /user/tokens`, which always acts as DEV).
+ * Returns the raw token for `Authorization: Bearer` / Basic use.
+ * Scopes default to full access; pass explicit subsets to test scope gates.
+ * Fail-closed note: rows with NULL/invalid scopes now deny (see
+ * `parseTokenScopes`), so this helper always serializes explicit scopes.
+ */
+export async function mintPatForEmail(
+  db: D1Database,
+  email: string,
+  input: { name?: string; scopes?: string[]; expiresInDays?: number } = {},
+): Promise<{ tokenId: string; token: string }> {
+  const normalized = email.toLowerCase();
+  await ensureUser(db, normalized);
+  const tokenId = crypto.randomUUID();
+  const raw = [...crypto.getRandomValues(new Uint8Array(32))].map((b) => b.toString(16).padStart(2, '0')).join('');
+  const tokenHash = await sha256Hex(`edge-git-pat:${raw}`);
+  const now = Math.floor(Date.now() / 1000);
+  const expiresAt = now + (input.expiresInDays ?? 90) * 86_400;
+  const scopes = input.scopes ?? ['repo:read', 'repo:write', 'admin'];
+  await db
+    .prepare(
+      `INSERT INTO user_access_tokens (token_id, user_email, token_hash, name, expires_at, last_used_at, created_at, scopes, token_prefix) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
+    )
+    .bind(tokenId, normalized, tokenHash, input.name ?? 'test-token', expiresAt, now, JSON.stringify(scopes), raw.slice(0, 12))
+    .run();
+  return { tokenId, token: raw };
+}
+
+export function bearerHeader(token: string): Record<string, string> {
+  return { Authorization: `Bearer ${token}` };
+}
+
+export function basicAuthHeader(username: string, password: string): Record<string, string> {
+  return { Authorization: `Basic ${btoa(`${username}:${password}`)}` };
+}
+
+export async function addCollaborator(
+  db: D1Database,
+  repoId: string,
+  userEmail: string,
+  role: 'admin' | 'write' | 'read',
+  grantedBy?: string,
+): Promise<void> {
+  const now = Math.floor(Date.now() / 1000);
+  await ensureUser(db, userEmail);
+  await db
+    .prepare(`INSERT OR REPLACE INTO repo_collaborators (repo_id, user_email, role, granted_by, created_at) VALUES (?, ?, ?, ?, ?)`)
+    .bind(repoId, userEmail.toLowerCase(), role, grantedBy?.toLowerCase() ?? null, now)
+    .run();
 }
