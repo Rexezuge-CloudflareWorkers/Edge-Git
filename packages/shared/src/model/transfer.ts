@@ -1,4 +1,4 @@
-import type { TokenScope } from './index';
+import type { TokenScope } from './token';
 
 export interface TokenRepoGrantMetadata {
   tokenId: string;

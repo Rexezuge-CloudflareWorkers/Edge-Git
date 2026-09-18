@@ -1,14 +1,17 @@
 import { DurableObject } from 'cloudflare:workers';
-import { createDofsFs, GitService, IsoGitFs, PackLimitError } from '@edge-git/git-service';
 import type { DofsFs } from '@edge-git/git-service';
+import type { IsoGitFs } from '@edge-git/git-service';
+import type { GitService } from '@edge-git/git-service';
 import type { ProtectedRefRule } from '@edge-git/git-protocol';
-import { AppConfiguration } from '@edge-git/backend-runtime/config';
-import { FetchHandler } from './FetchHandler';
-import { PushHandler } from './PushHandler';
-import { ReadModelService } from './ReadModelService';
-import { ReleaseAssetStore } from './ReleaseAssetStore';
-import { RepoLifecycle } from './RepoLifecycle';
-import { RepoReadRpc } from './RepoReadRpc';
+import type { AppConfiguration } from '@edge-git/backend-runtime/config';
+import type { FetchHandler } from './FetchHandler';
+import type { PushHandler } from './PushHandler';
+import type { ReadModelService } from './ReadModelService';
+import type { ReleaseAssetStore } from './ReleaseAssetStore';
+import type { RepoLifecycle } from './RepoLifecycle';
+import type { RepoReadRpc } from './RepoReadRpc';
+import { createRepoWorkerDeps } from './RepoWorkerFactory';
+import { PackLimitError } from '@edge-git/git-service';
 
 // NOTE: intentionally still extends the real `DurableObject` rather than
 // `AbstractDurableObjectWorker` (see return notes): the abstract base does
@@ -40,35 +43,21 @@ class RepoWorker extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
 
-    this.dofs = createDofsFs(ctx, env);
-
-    this.isoGitFs = new IsoGitFs(this.dofs).getPromiseFsClient();
-    this.git = new GitService(this.isoGitFs, '/repo');
-    this.config = AppConfiguration.fromEnv(env);
-    this.fetchHandler = new FetchHandler({ git: this.git, env, getFullName: () => this.fullNameValue });
-    this.pushHandler = new PushHandler({ isoGitFs: this.isoGitFs, git: this.git, getFullName: () => this.fullNameValue });
-    this.readModel = new ReadModelService(this.git);
-    this.releaseAssets = new ReleaseAssetStore(this.isoGitFs, env);
-    this.lifecycle = new RepoLifecycle(
-      ctx,
-      env,
-      this.dofs,
-      this.isoGitFs,
-      this.git,
-      this.config,
-      () => this.fullNameValue,
-      () => this.loadFullNameIfNeeded(),
-    );
-    this.reads = new RepoReadRpc(
-      this.git,
-      this.readModel,
-      () => this.prepare(),
-      () => this.config.getMaxMergeDiffFiles(),
-      () => this.config.getMaxFileBytes(),
-      this.isoGitFs,
-      this.releaseAssets,
-      () => this.lifecycle.getLimits(),
-    );
+    const deps = createRepoWorkerDeps(ctx, env, {
+      getFullName: () => this.fullNameValue,
+      loadFullName: () => this.loadFullNameIfNeeded(),
+      prepare: () => this.prepare(),
+    });
+    this.dofs = deps.dofs;
+    this.isoGitFs = deps.isoGitFs;
+    this.git = deps.git;
+    this.config = deps.config;
+    this.fetchHandler = deps.fetchHandler;
+    this.pushHandler = deps.pushHandler;
+    this.readModel = deps.readModel;
+    this.releaseAssets = deps.releaseAssets;
+    this.lifecycle = deps.lifecycle;
+    this.reads = deps.reads;
 
     // NOTE: Do NOT call blockConcurrencyWhile here. `createDofsFs()` already
     // schedules its own blockConcurrencyWhile(ensureSchema). Nesting a second

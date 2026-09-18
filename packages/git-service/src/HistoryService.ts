@@ -2,6 +2,7 @@ import * as git from 'isomorphic-git';
 import type { IsoGitFs } from './IsoGitFs';
 import { diffText } from './DiffHunks';
 import type { DiffHunk } from './DiffHunks';
+import { TreeReader } from './TreeReader';
 
 const logger = {
   warn: (...args: unknown[]): void => console.warn('[WARN] [GitService]', ...args),
@@ -33,10 +34,12 @@ export class HistoryService {
   private readonly gitdir: string;
   private cache: object = {};
   private cacheCreatedAt = Date.now();
+  private readonly trees: TreeReader;
 
   constructor(fs: PromiseFsClient, gitdir: string) {
     this.fs = fs;
     this.gitdir = gitdir;
+    this.trees = new TreeReader(fs, gitdir, () => this.cache);
   }
 
   public clearCache(): void {
@@ -87,57 +90,19 @@ export class HistoryService {
   }
 
   async getTree(resolvedRef: string, path = '') {
-    try {
-      const { tree } = await git.readTree({
-        fs: this.fs,
-        gitdir: this.gitdir,
-        oid: resolvedRef,
-        filepath: path,
-        cache: this.cache,
-      });
-
-      return tree;
-    } catch (error) {
-      logger.error(`(get-tree) Failed to get tree for ${resolvedRef}:${path}: ${String(error)}`);
-      return [];
-    }
+    return this.trees.getTree(resolvedRef, path);
   }
 
   async getBlob(resolvedRef: string, filepath: string) {
-    try {
-      const { blob, oid } = await git.readBlob({
-        fs: this.fs,
-        gitdir: this.gitdir,
-        oid: resolvedRef,
-        filepath,
-        cache: this.cache,
-      });
-      const isBinary = this.detectBinary(blob);
-
-      return {
-        oid,
-        content: blob,
-        size: blob.length,
-        isBinary,
-      };
-    } catch (error) {
-      logger.error(`(get-blob) Failed to get blob for ${resolvedRef}:${filepath}: ${String(error)}`);
-      return null;
-    }
+    return this.trees.getBlob(resolvedRef, filepath);
   }
 
   getBlobSize(content: Uint8Array): number {
-    return content.length;
+    return this.trees.getBlobSize(content);
   }
 
   detectBinary(content: Uint8Array): boolean {
-    const bytesToCheck = Math.min(8000, content.length);
-    for (let i = 0; i < bytesToCheck; i += 1) {
-      if (content[i] === 0) {
-        return true;
-      }
-    }
-    return false;
+    return this.trees.detectBinary(content);
   }
 
   async getFileStateChanges(oldCommit: string | undefined, newCommit: string | undefined) {

@@ -26,6 +26,9 @@ const baseResources = {
 } as const;
 
 function canonicalizeTag(tag: string): string {
+  // Mirrors `canonicalizeLanguageTag` in `@edge-git/shared/utils/LanguageTag`
+  // (web ships with 0 `@edge-git/*` runtime deps, so the 10-line body is
+  // intentionally duplicated rather than imported; keep both in sync).
   // eslint-disable-next-line unicorn/prefer-string-replace-all -- tsconfig lib is ES2020 (no replaceAll types)
   const normalized = tag.trim().replace(/_/g, '-');
   const parts = normalized.split('-').filter(Boolean);

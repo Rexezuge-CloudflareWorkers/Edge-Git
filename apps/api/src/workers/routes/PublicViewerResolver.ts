@@ -1,9 +1,9 @@
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import type { AccessIdentityContext } from '@edge-git/backend-services/auth';
-import { ServiceError } from '@edge-git/backend-errors';
 import { getRequestScope } from '@edge-git/backend-runtime/di';
 import { RepoFullName } from '@edge-git/shared/utils';
+import { RoleRank } from '@edge-git/backend-services/permission';
 import { getBasicCredentials, getBearerToken } from '@edge-git/git-protocol';
 import type { RequestContext } from '@/middleware';
 
@@ -56,9 +56,7 @@ async function requireRoleForRepo(
   if (!row) return null;
   const role = await active.get(Tokens.PermissionService).getRole(viewerEmail, row);
   if (!role) return null;
-  const rank = role === 'admin' ? 3 : role === 'write' ? 2 : 1;
-  const need = minimum === 'admin' ? 3 : minimum === 'write' ? 2 : 1;
-  if (rank < need) return null;
+  if (!RoleRank.meets(role, minimum)) return null;
   return { row, role };
 }
 
@@ -122,14 +120,10 @@ async function withVisibleRepo(
   return fn(row, `${owner}/${normalized}`);
 }
 
+import { toServiceStatus as toMappedStatus } from '@edge-git/backend-services/errors';
+
 function toServiceStatus(error: unknown): 400 | 403 | 404 | 500 {
-  if (error instanceof ServiceError) {
-    const code = error.getErrorCode();
-    if (([400, 403, 404] as readonly number[]).includes(code)) {
-      return code as 400 | 403 | 404;
-    }
-  }
-  return 500;
+  return toMappedStatus(error);
 }
 
 export { toRepoJson, requireVisibleRepo, requireRoleForRepo, resolvePublicViewer, withPublicRepo, withVisibleRepo, toServiceStatus, getScope };

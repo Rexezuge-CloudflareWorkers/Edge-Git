@@ -10,7 +10,7 @@ import type {
   TagInfo,
   TreeEntry,
 } from '../types';
-import { apiDelete, apiGet, apiPatch, apiPost } from '../lib/api';
+import { apiAuthedFirst, apiDelete, apiGet, apiPatch, apiPost, buildQuery } from '../lib/api';
 
 function authedBase(owner: string, repo: string): string {
   return `/user/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
@@ -48,16 +48,7 @@ export async function loadRepoPublic(owner: string, repo: string): Promise<Repo>
 }
 
 async function tryAuthedFirst<T>(authedPath: string, publicPath: string, isAuthed?: boolean | null): Promise<T> {
-  // Anonymous viewers hit Cloudflare Access on /user/* (302 → cross-origin
-  // login HTML → CORS failure). Skip the wasted authed attempt entirely.
-  if (isAuthed === false) {
-    return apiGet<T>(publicPath);
-  }
-  try {
-    return await apiGet<T>(authedPath);
-  } catch {
-    return apiGet<T>(publicPath);
-  }
+  return apiAuthedFirst<T>(authedPath, publicPath, isAuthed);
 }
 
 export async function loadBranches(owner: string, repo: string, opts?: { isAuthed?: boolean | null }): Promise<BranchesResponse> {
@@ -198,11 +189,7 @@ export async function loadCompare(
 }
 
 function toQuery(params: Record<string, string | undefined>): string {
-  const p = new URLSearchParams();
-  for (const [k, v] of Object.entries(params)) {
-    if (v !== undefined && v !== '') p.set(k, v);
-  }
-  const qs = p.toString();
+  const qs = buildQuery(params);
   return qs ? `?${qs}` : '';
 }
 

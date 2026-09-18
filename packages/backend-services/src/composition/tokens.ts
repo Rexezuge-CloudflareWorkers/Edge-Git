@@ -5,10 +5,12 @@ import type {
   CollaborationDAO,
   DeployKeyDAO,
   DiscussionDAO,
+  EventDAO,
   ImportDAO,
   IssueDAO,
   MirrorDAO,
   NamespaceDAO,
+  NotificationDAO,
   OrganizationDAO,
   OrganizationMemberDAO,
   ProjectDAO,
@@ -17,14 +19,17 @@ import type {
   ReleaseDAO,
   RepoCollaboratorDAO,
   RepositoryDAO,
+  SearchDAO,
   SecuritySettingsDAO,
   SnippetDAO,
+  StarDAO,
   TeamDAO,
   TeamMemberDAO,
   TeamRepoGrantDAO,
   TokenRepoGrantDAO,
   UserAccessTokenDAO,
   UserDAO,
+  WatchDAO,
   WebhookDAO,
   WebhookDeliveryDAO,
   WikiDAO,
@@ -64,7 +69,6 @@ import type { WatchService } from '../social/WatchService';
 import type { CollaborationService } from '../collab/CollaborationService';
 import type { ReleaseService } from '../release/ReleaseService';
 import type { RealtimeService } from '../realtime/RealtimeService';
-import type { SearchDAO } from '@edge-git/backend-data/dao';
 
 // Central token registry for the per-request composition root
 // (`requestScope.ts`). Call sites resolve services via
@@ -100,10 +104,10 @@ const Tokens = {
   CheckRunDAO: Symbol('CheckRunDAO') as Token<() => Promise<CheckRunDAO>>,
   CollaborationDAO: Symbol('CollaborationDAO') as Token<() => Promise<CollaborationDAO>>,
   SearchDAO: Symbol('SearchDAO') as Token<() => Promise<SearchDAO>>,
-  StarDAO: Symbol('StarDAO') as Token<() => Promise<import('@edge-git/backend-data/dao').StarDAO>>,
-  WatchDAO: Symbol('WatchDAO') as Token<() => Promise<import('@edge-git/backend-data/dao').WatchDAO>>,
-  EventDAO: Symbol('EventDAO') as Token<() => Promise<import('@edge-git/backend-data/dao').EventDAO>>,
-  NotificationDAO: Symbol('NotificationDAO') as Token<() => Promise<import('@edge-git/backend-data/dao').NotificationDAO>>,
+  StarDAO: Symbol('StarDAO') as Token<() => Promise<StarDAO>>,
+  WatchDAO: Symbol('WatchDAO') as Token<() => Promise<WatchDAO>>,
+  EventDAO: Symbol('EventDAO') as Token<() => Promise<EventDAO>>,
+  NotificationDAO: Symbol('NotificationDAO') as Token<() => Promise<NotificationDAO>>,
   WebhookDAO: Symbol('WebhookDAO') as Token<() => Promise<WebhookDAO>>,
   WebhookDeliveryDAO: Symbol('WebhookDeliveryDAO') as Token<() => Promise<WebhookDeliveryDAO>>,
   ReleaseDAO: Symbol('ReleaseDAO') as Token<() => Promise<ReleaseDAO>>,

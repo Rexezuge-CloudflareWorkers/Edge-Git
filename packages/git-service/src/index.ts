@@ -8,6 +8,7 @@ export { RefService } from './RefService';
 export { ObjectReader } from './ObjectReader';
 export { PackCollector } from './PackCollector';
 export { HistoryService } from './HistoryService';
+export { TreeReader } from './TreeReader';
 export { MergeService } from './MergeService';
 export { WriteService, splitFilePath, DEFAULT_MAX_FILE_BYTES, MAX_FILE_PATH_LENGTH } from './WriteService';
 export type { CommitFileInput, CommitFileResult, FileAuthor } from './WriteService';

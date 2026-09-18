@@ -4,6 +4,7 @@ const enStrings: BackendLocaleStrings = {
   common: {
     unauthorized: 'Authentication Required.',
     forbidden: 'Access Denied.',
+    internalError: 'Internal Server Error.',
   },
   repo: {
     notFound: 'Repository Not Found.',

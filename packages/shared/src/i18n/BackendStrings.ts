@@ -1,3 +1,5 @@
+import { canonicalizeLanguageTag } from '../utils/LanguageTag';
+
 const SUPPORTED_BACKEND_LOCALES = ['en', 'zh-CN'] as const;
 
 type SupportedBackendLocale = (typeof SUPPORTED_BACKEND_LOCALES)[number];
@@ -5,6 +7,7 @@ type SupportedBackendLocale = (typeof SUPPORTED_BACKEND_LOCALES)[number];
 interface CommonStrings {
   unauthorized: string;
   forbidden: string;
+  internalError: string;
 }
 
 interface RepoStrings {
@@ -49,13 +52,7 @@ function formatBackendString(template: string, vars: Record<string, string | num
 }
 
 function canonicalizeBackendLocaleTag(tag: string): string {
-  const normalized = tag.trim().replaceAll('_', '-');
-  const parts = normalized.split('-').filter(Boolean);
-  if (parts.length === 0) return 'en';
-  const language = (parts[0] ?? 'en').toLowerCase();
-  if (parts.length === 1) return language;
-  const rest = parts.slice(1).map((part) => (part.length === 2 ? part.toUpperCase() : part.toLowerCase()));
-  return [language, ...rest].join('-');
+  return canonicalizeLanguageTag(tag);
 }
 
 function normalizeBackendLocale(locale: string | null | undefined): SupportedBackendLocale {

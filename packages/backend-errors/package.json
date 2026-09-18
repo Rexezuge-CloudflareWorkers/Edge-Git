@@ -11,9 +11,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "hono": "4.13.7"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/node": "26.5.1",
     "typescript": "6.0.3"

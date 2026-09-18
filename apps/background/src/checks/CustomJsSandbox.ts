@@ -2,6 +2,10 @@ import { shouldInterruptAfterDeadline } from 'quickjs-emscripten';
 import type { QuickJSAsyncContext, QuickJSHandle } from 'quickjs-emscripten';
 import { validateWebhookUrl } from '@edge-git/backend-services/webhook';
 import { getQuickJSModule } from './quickjsLoader';
+import { MAX_FETCH_BODY_BYTES, MAX_FETCH_HEADERS, MAX_OUTPUT_SUMMARY, MAX_OUTPUT_TITLE } from './SandboxLimits';
+import type { SandboxInput } from './SandboxLimits';
+
+export type { SandboxInput, SandboxLimits } from './SandboxLimits';
 
 // Sandboxed execution for repo-defined custom check scripts (`.edgegit/`).
 //
@@ -30,31 +34,9 @@ export interface SandboxResult {
   summary: string;
 }
 
-export interface SandboxLimits {
-  cpuMs: number;
-  memoryMb: number;
-  maxFetches: number;
-  fetchTimeoutMs: number;
-  maxResponseBytes: number;
-  wallMs: number;
-  maxLogBytes: number;
-}
-
-export interface SandboxInput {
-  script: string;
-  files: Record<string, string>;
-  env: Record<string, string>;
-  allowHosts: string[];
-  limits: SandboxLimits;
-}
+type HandleBag = QuickJSHandle[];
 
 const CUSTOM_CONCLUSIONS: ReadonlySet<string> = new Set(['success', 'failure', 'neutral', 'skipped']);
-const MAX_OUTPUT_TITLE = 200;
-const MAX_OUTPUT_SUMMARY = 2000;
-const MAX_FETCH_BODY_BYTES = 65_536;
-const MAX_FETCH_HEADERS = 20;
-
-type HandleBag = QuickJSHandle[];
 
 function own(bag: HandleBag, handle: QuickJSHandle): QuickJSHandle {
   bag.push(handle);

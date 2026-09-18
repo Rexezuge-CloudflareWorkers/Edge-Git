@@ -7,7 +7,7 @@ export {
   OAuth2TokenRetryableError,
   ProviderApiNonRetryableError,
   ProviderApiRetryableError,
-} from './EmailProcessingError';
+} from './ProviderErrors';
 export { ForbiddenError } from './ForbiddenError';
 export { InternalServerError, DefaultInternalServerError } from './InternalServerError';
 export { MethodNotAllowedError } from './MethodNotAllowedError';

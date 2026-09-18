@@ -10,7 +10,6 @@ import {
   DEFAULT_CHECK_RETENTION_DAYS,
   DEFAULT_CHECK_TIMEOUT_SECONDS,
   DEFAULT_DEBUG_MODE,
-  DEFAULT_GIT_CACHE_TTL_SECONDS,
   DEFAULT_IMPORT_CLAIM_STALE_SECONDS,
   DEFAULT_MAX_DEPLOY_KEYS_PER_REPO,
   DEFAULT_MAX_EXPORT_BYTES,
@@ -20,57 +19,68 @@ import {
   DEFAULT_MAX_CHECKS_PER_SHA,
   DEFAULT_MAX_COLUMNS_PER_PROJECT,
   DEFAULT_MAX_DISCUSSIONS_PER_REPO,
-  DEFAULT_MAX_FETCH_BODY_BYTES,
-  DEFAULT_MAX_FETCH_HAVES,
-  DEFAULT_MAX_FETCH_WANTS,
-  DEFAULT_MAX_FILE_BYTES,
-  DEFAULT_MAX_FILES_PER_SNIPPET,
-  DEFAULT_MAX_HOOKS_PER_REPO,
   DEFAULT_MAX_IMPORT_BYTES,
   DEFAULT_MAX_IMPORT_REFS,
-  DEFAULT_MAX_MERGE_DIFF_FILES,
   DEFAULT_MAX_MIRROR_FAILURES,
-  DEFAULT_MAX_PACK_BYTES,
-  DEFAULT_MAX_PACK_OBJECTS,
   DEFAULT_MAX_PROJECTS_PER_REPO,
-  DEFAULT_MAX_PUSH_COMMANDS,
   DEFAULT_MAX_RELEASES_PER_REPO,
-  DEFAULT_MAX_REPOS_PER_USER,
-  DEFAULT_MAX_RULES_PER_REPO,
-  DEFAULT_MAX_SNIPPET_BYTES,
-  DEFAULT_MAX_SNIPPETS_PER_USER,
-  DEFAULT_MAX_TEAM_GRANTS,
-  DEFAULT_MAX_TEAM_MEMBERS,
-  DEFAULT_MAX_TEAMS_PER_ORG,
-  DEFAULT_MAX_TOKENS_PER_USER,
-  DEFAULT_MAX_TOKEN_EXPIRY_DAYS,
-  DEFAULT_MAX_TOKEN_REPO_GRANTS,
   DEFAULT_MAX_WIKI_BODY_BYTES,
   DEFAULT_MAX_WIKI_PAGES_PER_REPO,
-  DEFAULT_REALTIME_ENABLED,
-  DEFAULT_REALTIME_MAX_CONN_PER_INBOX_SHARD,
-  DEFAULT_REALTIME_MAX_CONN_PER_REPO_SHARD,
-  DEFAULT_REALTIME_TICKET_TTL_SECONDS,
   DEFAULT_SITE_URL,
-  DEFAULT_WEBHOOK_DELIVERY_RETENTION_DAYS,
-  DEFAULT_WEBHOOK_MAX_ATTEMPTS,
-  DEFAULT_WEBHOOK_MAX_CONSECUTIVE_FAILURES,
-  DEFAULT_WEBHOOK_MAX_PAYLOAD_BYTES,
-  DEFAULT_WEBHOOK_TIMEOUT_MS,
 } from './ConfigurationDefaults';
+
+import { AuthConfig } from './sections/AuthConfig';
+import { GitLimits } from './sections/GitLimits';
+import { RealtimeLimits } from './sections/RealtimeLimits';
+import { RepoLimits } from './sections/RepoLimits';
+import { WebhookLimits } from './sections/WebhookLimits';
 
 /**
  * Injectable instance view over Edge-Git environment configuration.
  *
- * `ConfigurationManager` statics remain as a thin facade delegating here for
- * backward compatibility. New code should accept `AppConfiguration` via
- * constructor injection so env parsing is stubbable.
+ * Composed of focused section objects (`RepoLimits`, `GitLimits`,
+ * `WebhookLimits`, `RealtimeLimits`, `AuthConfig`) so the god-file stays a
+ * thin facade. `ConfigurationManager` statics delegate here for backward
+ * compatibility. New code should accept `AppConfiguration` via constructor
+ * injection so env parsing is stubbable.
  */
 class AppConfiguration {
-  constructor(private readonly env: unknown) {}
+  private readonly repos: RepoLimits;
+  private readonly git: GitLimits;
+  private readonly webhooks: WebhookLimits;
+  private readonly realtime: RealtimeLimits;
+  private readonly auth: AuthConfig;
+
+  constructor(private readonly env: unknown) {
+    this.repos = new RepoLimits(env);
+    this.git = new GitLimits(env);
+    this.webhooks = new WebhookLimits(env);
+    this.realtime = new RealtimeLimits(env);
+    this.auth = new AuthConfig(env);
+  }
 
   public static fromEnv(env: unknown): AppConfiguration {
     return new AppConfiguration(env);
+  }
+
+  public get repo(): RepoLimits {
+    return this.repos;
+  }
+
+  public get gitLimits(): GitLimits {
+    return this.git;
+  }
+
+  public get webhook(): WebhookLimits {
+    return this.webhooks;
+  }
+
+  public get realtimeLimits(): RealtimeLimits {
+    return this.realtime;
+  }
+
+  public get authConfig(): AuthConfig {
+    return this.auth;
   }
 
   public getDebugMode(): boolean {
@@ -84,55 +94,55 @@ class AppConfiguration {
   }
 
   public getMaxReposPerUser(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_REPOS_PER_USER', DEFAULT_MAX_REPOS_PER_USER);
+    return this.repos.getMaxReposPerUser();
   }
 
   public getMaxTokensPerUser(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_TOKENS_PER_USER', DEFAULT_MAX_TOKENS_PER_USER);
+    return this.repos.getMaxTokensPerUser();
   }
 
   public getMaxTokenExpiryDays(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_TOKEN_EXPIRY_DAYS', DEFAULT_MAX_TOKEN_EXPIRY_DAYS);
+    return this.repos.getMaxTokenExpiryDays();
   }
 
   public getMaxPackObjects(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_PACK_OBJECTS', DEFAULT_MAX_PACK_OBJECTS);
+    return this.git.getMaxPackObjects();
   }
 
   public getGitCacheTtlSeconds(): number {
-    return EnvParser.positiveInt(this.env, 'GIT_CACHE_TTL_SECONDS', DEFAULT_GIT_CACHE_TTL_SECONDS);
+    return this.git.getGitCacheTtlSeconds();
   }
 
   public getMaxFetchWants(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_FETCH_WANTS', DEFAULT_MAX_FETCH_WANTS);
+    return this.git.getMaxFetchWants();
   }
 
   public getMaxFetchHaves(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_FETCH_HAVES', DEFAULT_MAX_FETCH_HAVES);
+    return this.git.getMaxFetchHaves();
   }
 
   public getMaxPushCommands(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_PUSH_COMMANDS', DEFAULT_MAX_PUSH_COMMANDS);
+    return this.git.getMaxPushCommands();
   }
 
   public getMaxPackBytes(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_PACK_BYTES', DEFAULT_MAX_PACK_BYTES);
+    return this.git.getMaxPackBytes();
   }
 
   public getMaxFetchBodyBytes(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_FETCH_BODY_BYTES', DEFAULT_MAX_FETCH_BODY_BYTES);
+    return this.git.getMaxFetchBodyBytes();
   }
 
   public getMaxMergeDiffFiles(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_MERGE_DIFF_FILES', DEFAULT_MAX_MERGE_DIFF_FILES);
+    return this.git.getMaxMergeDiffFiles();
   }
 
   public getMaxFileBytes(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_FILE_BYTES', DEFAULT_MAX_FILE_BYTES);
+    return this.git.getMaxFileBytes();
   }
 
   public getMaxRulesPerRepo(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_RULES_PER_REPO', DEFAULT_MAX_RULES_PER_REPO);
+    return this.repos.getMaxRulesPerRepo();
   }
 
   public getTaskRunRetentionDays(): number {
@@ -144,27 +154,27 @@ class AppConfiguration {
   }
 
   public getMaxHooksPerRepo(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_HOOKS_PER_REPO', DEFAULT_MAX_HOOKS_PER_REPO);
+    return this.webhooks.getMaxHooksPerRepo();
   }
 
   public getWebhookDeliveryRetentionDays(): number {
-    return EnvParser.positiveInt(this.env, 'WEBHOOK_DELIVERY_RETENTION_DAYS', DEFAULT_WEBHOOK_DELIVERY_RETENTION_DAYS);
+    return this.webhooks.getDeliveryRetentionDays();
   }
 
   public getWebhookMaxAttempts(): number {
-    return EnvParser.positiveInt(this.env, 'WEBHOOK_MAX_ATTEMPTS', DEFAULT_WEBHOOK_MAX_ATTEMPTS);
+    return this.webhooks.getMaxAttempts();
   }
 
   public getWebhookTimeoutMs(): number {
-    return EnvParser.positiveInt(this.env, 'WEBHOOK_TIMEOUT_MS', DEFAULT_WEBHOOK_TIMEOUT_MS);
+    return this.webhooks.getTimeoutMs();
   }
 
   public getWebhookMaxConsecutiveFailures(): number {
-    return EnvParser.positiveInt(this.env, 'WEBHOOK_MAX_CONSECUTIVE_FAILURES', DEFAULT_WEBHOOK_MAX_CONSECUTIVE_FAILURES);
+    return this.webhooks.getMaxConsecutiveFailures();
   }
 
   public getWebhookMaxPayloadBytes(): number {
-    return EnvParser.positiveInt(this.env, 'WEBHOOK_MAX_PAYLOAD_BYTES', DEFAULT_WEBHOOK_MAX_PAYLOAD_BYTES);
+    return this.webhooks.getMaxPayloadBytes();
   }
 
   public getMaxReleasesPerRepo(): number {
@@ -204,27 +214,27 @@ class AppConfiguration {
   }
 
   public getMaxSnippetsPerUser(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_SNIPPETS_PER_USER', DEFAULT_MAX_SNIPPETS_PER_USER);
+    return this.repos.getMaxSnippetsPerUser();
   }
 
   public getMaxFilesPerSnippet(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_FILES_PER_SNIPPET', DEFAULT_MAX_FILES_PER_SNIPPET);
+    return this.repos.getMaxFilesPerSnippet();
   }
 
   public getMaxSnippetBytes(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_SNIPPET_BYTES', DEFAULT_MAX_SNIPPET_BYTES);
+    return this.repos.getMaxSnippetBytes();
   }
 
   public getMaxTeamsPerOrg(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_TEAMS_PER_ORG', DEFAULT_MAX_TEAMS_PER_ORG);
+    return this.repos.getMaxTeamsPerOrg();
   }
 
   public getMaxTeamMembers(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_TEAM_MEMBERS', DEFAULT_MAX_TEAM_MEMBERS);
+    return this.repos.getMaxTeamMembers();
   }
 
   public getMaxTeamGrants(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_TEAM_GRANTS', DEFAULT_MAX_TEAM_GRANTS);
+    return this.repos.getMaxTeamGrants();
   }
 
   public getMaxImportBytes(): number {
@@ -244,7 +254,7 @@ class AppConfiguration {
   }
 
   public getMaxTokenRepoGrants(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_TOKEN_REPO_GRANTS', DEFAULT_MAX_TOKEN_REPO_GRANTS);
+    return this.repos.getMaxTokenRepoGrants();
   }
 
   public getMaxMirrorFailures(): number {
@@ -288,23 +298,39 @@ class AppConfiguration {
   }
 
   public isDemoMode(): boolean {
-    return EnvParser.boolean(this.env, 'DEMO_MODE', 'false');
+    return this.auth.isDemoMode();
+  }
+
+  public getDevAuthEmail(): string | null {
+    return this.auth.getDevAuthEmail();
+  }
+
+  public getDemoUserEmail(): string | null {
+    return this.auth.getDemoUserEmail();
+  }
+
+  public getTeamDomain(): string | null {
+    return this.auth.getTeamDomain();
+  }
+
+  public getPolicyAud(): string | null {
+    return this.auth.getPolicyAud();
   }
 
   public isRealtimeEnabled(): boolean {
-    return EnvParser.boolean(this.env, 'REALTIME_ENABLED', DEFAULT_REALTIME_ENABLED);
+    return this.realtime.isEnabled();
   }
 
   public getRealtimeTicketTtlSeconds(): number {
-    return EnvParser.positiveInt(this.env, 'REALTIME_TICKET_TTL_SECONDS', DEFAULT_REALTIME_TICKET_TTL_SECONDS);
+    return this.realtime.getTicketTtlSeconds();
   }
 
   public getRealtimeMaxConnPerRepoShard(): number {
-    return EnvParser.positiveInt(this.env, 'REALTIME_MAX_CONN_PER_REPO_SHARD', DEFAULT_REALTIME_MAX_CONN_PER_REPO_SHARD);
+    return this.realtime.getMaxConnPerRepoShard();
   }
 
   public getRealtimeMaxConnPerInboxShard(): number {
-    return EnvParser.positiveInt(this.env, 'REALTIME_MAX_CONN_PER_INBOX_SHARD', DEFAULT_REALTIME_MAX_CONN_PER_INBOX_SHARD);
+    return this.realtime.getMaxConnPerInboxShard();
   }
 }
 
