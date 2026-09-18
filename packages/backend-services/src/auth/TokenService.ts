@@ -94,8 +94,8 @@ class TokenService {
     const resolved: RepoGrantInput[] = [];
     const seen = new Set<string>();
     for (const entry of grants) {
-      const owner = typeof (entry as { owner?: unknown }).owner === 'string' ? ((entry as { owner: string }).owner.trim()) : '';
-      const rawName = typeof (entry as { name?: unknown }).name === 'string' ? ((entry as { name: string }).name.trim()) : '';
+      const owner = typeof (entry as { owner?: unknown }).owner === 'string' ? (entry as { owner: string }).owner.trim() : '';
+      const rawName = typeof (entry as { name?: unknown }).name === 'string' ? (entry as { name: string }).name.trim() : '';
       const name = rawName.endsWith('.git') ? rawName.slice(0, -4) : rawName;
       if (!owner || !name) throw new BadRequestError('Each repoGrant needs owner and name');
       const scope = (entry as { scope?: unknown }).scope;
@@ -103,7 +103,7 @@ class TokenService {
         throw new BadRequestError(`Each repoGrant scope must be one of ${TOKEN_SCOPES.join(', ')}`);
       }
       const repo = await repoDAO.getByOwnerAndName(owner, name).catch(() => null);
-      if (!repo) throw new NotFoundError(`Repository not found: ${owner}/${name}`);
+      if (!repo) throw new NotFoundError('Repository not found');
       if (seen.has(repo.id)) throw new BadRequestError(`Duplicate grant for ${owner}/${name}`);
       seen.add(repo.id);
       resolved.push({ repositoryId: repo.id, scope: scope as TokenScope });
@@ -114,7 +114,7 @@ class TokenService {
   public async createToken(
     userEmail: string,
     name: string,
-    expiresInDays?: number,
+    expiresInDays?: unknown,
     scopes?: unknown,
     repoGrants?: unknown,
   ): Promise<CreatedToken> {
@@ -126,9 +126,22 @@ class TokenService {
     if (existingTokens.length >= maxTokens) {
       throw new BadRequestError(`Maximum ${maxTokens} tokens allowed per user`);
     }
-    const effectiveExpiryInDays: number = expiresInDays || maxExpiryInDays;
-    if (effectiveExpiryInDays > maxExpiryInDays) {
-      throw new BadRequestError(`Token expiry cannot exceed ${maxExpiryInDays} days`);
+    const trimmedName = typeof name === 'string' ? name.trim() : '';
+    if (!trimmedName) throw new BadRequestError('name is required');
+    if (trimmedName.length > 100) throw new BadRequestError('name must be at most 100 characters');
+    let effectiveExpiryInDays: number;
+    if (expiresInDays === undefined || expiresInDays === null) {
+      effectiveExpiryInDays = maxExpiryInDays;
+    } else {
+      const numeric: unknown = typeof expiresInDays === 'string' ? Number(expiresInDays) : expiresInDays;
+      if (!Number.isSafeInteger(numeric) || (numeric as number) < 1) {
+        throw new BadRequestError('expiresInDays must be a positive integer');
+      }
+      const days = numeric as number;
+      if (days > maxExpiryInDays) {
+        throw new BadRequestError(`Token expiry cannot exceed ${maxExpiryInDays} days`);
+      }
+      effectiveExpiryInDays = days;
     }
     const effectiveScopes: TokenScope[] = scopes === undefined ? [...DEFAULT_TOKEN_SCOPES] : normalizeTokenScopes(scopes);
     const resolvedGrants = await this.resolveGrantInputs(repoGrants);
@@ -138,12 +151,12 @@ class TokenService {
     const expiresAt: number = TimestampUtil.addDays(now, effectiveExpiryInDays);
     const tokenHash = await TokenService.hashToken(token);
     const prefix = tokenPrefixOf(token);
-    await dao.create(tokenId, normalized, tokenHash, name, expiresAt, now, effectiveScopes, prefix);
+    await dao.create(tokenId, normalized, tokenHash, trimmedName, expiresAt, now, effectiveScopes, prefix);
     if (resolvedGrants.length > 0) {
       const grantDAO = await this.deps.tokenGrantDAO();
       await grantDAO.setGrants(tokenId, resolvedGrants, now).catch(() => undefined);
     }
-    return { tokenId, token, name, expiresAt, scopes: effectiveScopes, prefix };
+    return { tokenId, token, name: trimmedName, expiresAt, scopes: effectiveScopes, prefix };
   }
 
   public async listTokens(userEmail: string): Promise<UserAccessTokenMetadata[]> {
@@ -189,7 +202,13 @@ class TokenService {
     const lifetimeDays = Math.min(Math.max(Math.round((existing.expiresAt - existing.createdAt) / 86_400), 1), maxExpiry);
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const raw = UUIDUtil.getRandomUUIDNoDash() + UUIDUtil.getRandomUUIDNoDash();
-    const rotated = await dao.rotate(tokenId, userEmail, await TokenService.hashToken(raw), tokenPrefixOf(raw), TimestampUtil.addDays(now, lifetimeDays));
+    const rotated = await dao.rotate(
+      tokenId,
+      userEmail,
+      await TokenService.hashToken(raw),
+      tokenPrefixOf(raw),
+      TimestampUtil.addDays(now, lifetimeDays),
+    );
     if (!rotated) throw new NotFoundError('Token not found');
     const current = await dao.getByUserEmail(userEmail);
     const refreshed = current.find((t) => t.tokenId === tokenId);

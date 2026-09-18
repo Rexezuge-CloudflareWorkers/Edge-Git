@@ -28,6 +28,8 @@ function downloadResponse(bytes: Uint8Array, contentType: string, filename: stri
   const safe = filename.replaceAll(/["\r\n]/g, '_').slice(0, 200) || 'asset';
   const copy = new Uint8Array(bytes.byteLength);
   copy.set(bytes);
+  // `attachment` + `nosniff` so even `text/html`/`image/svg+xml` assets
+  // cannot execute in the app origin.
   return new Response(copy, {
     status: 200,
     headers: {
@@ -35,6 +37,7 @@ function downloadResponse(bytes: Uint8Array, contentType: string, filename: stri
       'Content-Length': String(bytes.byteLength),
       'Content-Disposition': `attachment; filename="${safe}"; filename*=UTF-8''${encodeURIComponent(safe)}`,
       'Cache-Control': 'private, max-age=3600',
+      'X-Content-Type-Options': 'nosniff',
     },
   });
 }
@@ -67,7 +70,10 @@ function registerReleaseAssetPublicRoutes(app: ReleaseAssetApp): void {
           if (!(await viewerCanSeeDrafts(c.env, viewerEmail, row.owner, row.name))) return c.json({ error: 'Not found' }, 404);
         }
         const asset = await scope.get(Tokens.ReleaseService).getAsset(row.id, release.tagName, c.req.param('assetId'));
-        const bytes = await getRepoStub(c.env, `${row.owner}/${row.name}`).getReleaseAsset({ releaseId: asset.releaseId, assetId: asset.id });
+        const bytes = await getRepoStub(c.env, `${row.owner}/${row.name}`).getReleaseAsset({
+          releaseId: asset.releaseId,
+          assetId: asset.id,
+        });
         if (!bytes || bytes.byteLength === 0) return c.json({ error: 'Not found' }, 404);
         return downloadResponse(bytes, asset.contentType, asset.name);
       } catch (error) {
@@ -110,9 +116,14 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
     if (typeof body.name !== 'string' || typeof body.contentBase64 !== 'string' || !body.contentBase64) {
       return c.json({ error: 'name and contentBase64 are required' }, 400);
     }
+    const maxBytes = ConfigurationManager.releases.getMaxAssetBytes(c.env);
+    // Pre-decode tripwire on base64 length so oversized bodies 413 without a
+    // full `atob` allocation burn.
+    if (body.contentBase64.length > Math.ceil(maxBytes * 1.4) + 4) {
+      return c.json({ error: `asset size must be 1-${maxBytes} bytes` }, 413);
+    }
     const bytes = decodeBase64ToBytes(body.contentBase64);
     if (!bytes) return c.json({ error: 'contentBase64 must be valid base64' }, 400);
-    const maxBytes = ConfigurationManager.releases.getMaxAssetBytes(c.env);
     if (bytes.byteLength === 0 || bytes.byteLength > maxBytes) {
       return c.json({ error: `asset size must be 1-${maxBytes} bytes` }, 413);
     }
@@ -128,7 +139,10 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
         bytes,
       })) as { ok?: boolean; error?: string };
       if (!stored?.ok) {
-        await scope.get(Tokens.ReleaseService).deleteAsset(row.id, c.req.param('tag'), asset.id).catch(() => undefined);
+        await scope
+          .get(Tokens.ReleaseService)
+          .deleteAsset(row.id, c.req.param('tag'), asset.id)
+          .catch(() => undefined);
         return c.json({ error: typeof stored?.error === 'string' ? stored.error : 'Failed to store asset bytes' }, 500);
       }
       return c.json({ asset }, 201);

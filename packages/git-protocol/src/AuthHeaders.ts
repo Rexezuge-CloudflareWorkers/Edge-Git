@@ -1,5 +1,8 @@
+const MAX_AUTHORIZATION_HEADER_LENGTH = 8192;
+
 export function getBasicCredentials(req: Request): { username: string; password: string } | null {
   const header = req.headers.get('Authorization') || '';
+  if (header.length > MAX_AUTHORIZATION_HEADER_LENGTH) return null;
   const match = /^Basic\s+(\S+)$/i.exec(header);
   if (!match) return null;
   try {
@@ -16,6 +19,7 @@ export function getBasicCredentials(req: Request): { username: string; password:
 
 export function getBearerToken(req: Request): string | null {
   const header = req.headers.get('Authorization') || '';
+  if (header.length > MAX_AUTHORIZATION_HEADER_LENGTH) return null;
   const match = /^Bearer\s+(\S+)\s*$/i.exec(header);
   return match?.[1] ? match[1].trim() : null;
 }

@@ -8,6 +8,8 @@ import { AppConfiguration } from './AppConfiguration';
 class ConfigurationManager {
   public static readonly auth = {
     isDemoMode: (env: unknown): boolean => AppConfiguration.fromEnv(env).isDemoMode(),
+    getEnvironment: (env: unknown): string => AppConfiguration.fromEnv(env).getEnvironment(),
+    isBypassAllowed: (env: unknown): boolean => AppConfiguration.fromEnv(env).isBypassAllowed(),
   };
 
   public static readonly token = {
@@ -40,12 +42,10 @@ class ConfigurationManager {
 
   public static readonly webhooks = {
     getMaxPerRepo: (env: unknown): number => AppConfiguration.fromEnv(env).getMaxHooksPerRepo(),
-    getDeliveryRetentionDays: (env: unknown): number =>
-      AppConfiguration.fromEnv(env).getWebhookDeliveryRetentionDays(),
+    getDeliveryRetentionDays: (env: unknown): number => AppConfiguration.fromEnv(env).getWebhookDeliveryRetentionDays(),
     getMaxAttempts: (env: unknown): number => AppConfiguration.fromEnv(env).getWebhookMaxAttempts(),
     getTimeoutMs: (env: unknown): number => AppConfiguration.fromEnv(env).getWebhookTimeoutMs(),
-    getMaxConsecutiveFailures: (env: unknown): number =>
-      AppConfiguration.fromEnv(env).getWebhookMaxConsecutiveFailures(),
+    getMaxConsecutiveFailures: (env: unknown): number => AppConfiguration.fromEnv(env).getWebhookMaxConsecutiveFailures(),
     getMaxPayloadBytes: (env: unknown): number => AppConfiguration.fromEnv(env).getWebhookMaxPayloadBytes(),
   };
 
@@ -93,8 +93,7 @@ class ConfigurationManager {
     getRetentionDays: (env: unknown): number => AppConfiguration.fromEnv(env).getCheckRetentionDays(),
     isCustomJsEnabled: (env: unknown): boolean => AppConfiguration.fromEnv(env).isCheckCustomJsEnabled(),
     getCustomJsMaxCpuMs: (env: unknown): number => AppConfiguration.fromEnv(env).getCheckCustomJsMaxCpuMs(),
-    getCustomJsMaxScriptBytes: (env: unknown): number =>
-      AppConfiguration.fromEnv(env).getCheckCustomJsMaxScriptBytes(),
+    getCustomJsMaxScriptBytes: (env: unknown): number => AppConfiguration.fromEnv(env).getCheckCustomJsMaxScriptBytes(),
     getCustomJsMaxFetches: (env: unknown): number => AppConfiguration.fromEnv(env).getCheckCustomJsMaxFetches(),
     getCustomJsMemoryMb: (env: unknown): number => AppConfiguration.fromEnv(env).getCheckCustomJsMemoryMb(),
   };
@@ -102,10 +101,8 @@ class ConfigurationManager {
   public static readonly realtime = {
     isEnabled: (env: unknown): boolean => AppConfiguration.fromEnv(env).isRealtimeEnabled(),
     getTicketTtlSeconds: (env: unknown): number => AppConfiguration.fromEnv(env).getRealtimeTicketTtlSeconds(),
-    getMaxConnPerRepoShard: (env: unknown): number =>
-      AppConfiguration.fromEnv(env).getRealtimeMaxConnPerRepoShard(),
-    getMaxConnPerInboxShard: (env: unknown): number =>
-      AppConfiguration.fromEnv(env).getRealtimeMaxConnPerInboxShard(),
+    getMaxConnPerRepoShard: (env: unknown): number => AppConfiguration.fromEnv(env).getRealtimeMaxConnPerRepoShard(),
+    getMaxConnPerInboxShard: (env: unknown): number => AppConfiguration.fromEnv(env).getRealtimeMaxConnPerInboxShard(),
   };
 }
 

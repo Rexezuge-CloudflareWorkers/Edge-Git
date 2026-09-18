@@ -259,6 +259,7 @@ export function validateFetchRequestOids(fetchRequest: Pick<FetchRequest, 'wants
 }
 
 const BLOB_LIMIT_RE = /^blob:limit=(\d+)$/;
+const MAX_BLOB_LIMIT_BYTES = 100_000_000;
 const SUPPORTED_FILTERS = new Set(['blob:none', 'tree:0']);
 
 // Only filters the pack collector implements. Unknown filters previously
@@ -268,6 +269,10 @@ export function validateFilterSpec(filterSpec: string | undefined): string | nul
   const filter = filterSpec?.trim() ?? '';
   if (filter === '' || SUPPORTED_FILTERS.has(filter)) return null;
   const limitMatch = BLOB_LIMIT_RE.exec(filter);
-  if (limitMatch && Number.isSafeInteger(Number(limitMatch[1]))) return null;
+  if (limitMatch) {
+    const value = Number(limitMatch[1]);
+    if (Number.isSafeInteger(value) && value >= 0 && value <= MAX_BLOB_LIMIT_BYTES) return null;
+    return `unsupported filter: ${filterSpec ?? ''}`;
+  }
   return `unsupported filter: ${filterSpec ?? ''}`;
 }

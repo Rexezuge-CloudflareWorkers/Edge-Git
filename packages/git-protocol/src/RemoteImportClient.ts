@@ -4,7 +4,41 @@ import { PktLine } from './pkt';
 const MAX_URL_LENGTH = 2048;
 const OID_RE = /^[0-9a-f]{40}$/;
 const UPLOAD_PACK_ADVERTISEMENT = 'application/x-git-upload-pack-advertisement';
-const LOOPBACK_HOSTS = new Set(['::1', '0.0.0.0']);
+const LOOPBACK_HOSTS = new Set(['::1', '0.0.0.0', '::']);
+
+function stripBrackets(host: string): string {
+  const h = host.trim();
+  if (h.startsWith('[') && h.endsWith(']')) return h.slice(1, -1);
+  return h;
+}
+
+function stripTrailingDot(host: string): string {
+  const unbracketed = stripBrackets(host);
+  let end = unbracketed.length;
+  while (end > 0 && unbracketed.charAt(end - 1) === '.') end -= 1;
+  return unbracketed.slice(0, end);
+}
+
+function isEncodedNumericHost(host: string): boolean {
+  const h = host.toLowerCase();
+  if (/^0x[\da-f]+$/i.test(h)) return true;
+  if (/^\d+$/.test(h)) return true;
+  if (/^0[0-7]+(?:\.0[0-7]+)+$/.test(h)) return true;
+  if (/^0x[\da-f.]+$/i.test(h)) return true;
+  if (/^[\d.]+$/.test(h) && !/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return true;
+  return false;
+}
+
+function isBlockedIpv6Host(host: string): boolean {
+  const h = host.toLowerCase();
+  if (h === '::') return true;
+  if (h.startsWith('::ffff:')) return true;
+  if (/^::ffff:\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/i.test(h)) return true;
+  if (h.startsWith('fc') || h.startsWith('fd')) return true;
+  if (/^fe[89ab]/i.test(h)) return true;
+  if (h.startsWith('ff')) return true;
+  return false;
+}
 
 interface RemoteRef {
   ref: string;
@@ -21,7 +55,11 @@ interface RemotePack {
  * network access. Production call sites adapt the global `fetch`.
  */
 interface RemoteGitFetcher {
-  get(url: string, headers: Record<string, string>, signal: AbortSignal): Promise<{ status: number; contentType: string | null; body: Uint8Array }>;
+  get(
+    url: string,
+    headers: Record<string, string>,
+    signal: AbortSignal,
+  ): Promise<{ status: number; contentType: string | null; body: Uint8Array }>;
   post(url: string, headers: Record<string, string>, body: Uint8Array, signal: AbortSignal): Promise<{ status: number; body: Uint8Array }>;
 }
 
@@ -43,10 +81,14 @@ function normalizePublicGitUrl(raw: string): string {
   }
   if (parsed.protocol !== 'https:') throw new BadRequestError('sourceUrl must use https');
   if (parsed.username || parsed.password) throw new BadRequestError('sourceUrl must not embed credentials');
-  const host = parsed.hostname.toLowerCase();
+  const rawHost = parsed.hostname.toLowerCase();
+  const host = stripTrailingDot(rawHost);
+  if (host === '' || host.includes('%') || host.includes('_')) throw new BadRequestError('sourceUrl must target a valid hostname');
   if (host === 'localhost' || host === 'localhost.localdomain' || host.endsWith('.localhost')) {
     throw new BadRequestError('sourceUrl must not target localhost');
   }
+  if (isBlockedIpv6Host(host)) throw new BadRequestError('sourceUrl must not target a private or reserved address');
+  if (isEncodedNumericHost(host)) throw new BadRequestError('sourceUrl must not target a private or reserved address');
   if (LOOPBACK_HOSTS.has(host) || host.startsWith('::ffff:127.')) {
     throw new BadRequestError('sourceUrl must not target a loopback address');
   }
@@ -127,7 +169,8 @@ function buildUploadPackRequest(wants: string[]): Uint8Array {
   for (const oid of wants) {
     if (!OID_RE.test(oid)) throw new Error('invalid want oid');
   }
-  const caps = 'multi_ack_detailed no-done side-band-64k thin-pack ofs-delta deepen-since deepen-not filter object-format=sha1 agent=edge-git/1.0';
+  const caps =
+    'multi_ack_detailed no-done side-band-64k thin-pack ofs-delta deepen-since deepen-not filter object-format=sha1 agent=edge-git/1.0';
   const lines: Uint8Array[] = [
     PktLine.encode(`want ${wants[0]} ${caps}\n`),
     ...wants.slice(1).map((oid) => PktLine.encode(`want ${oid}\n`)),
@@ -190,9 +233,17 @@ async function fetchRemotePack(
 ): Promise<RemotePack> {
   const base = normalizePublicGitUrl(sourceUrl);
   const advertiseSignal = AbortSignal.timeout(opts.timeoutMs);
-  const advertised = await fetcher.get(`${base}/info/refs?service=git-upload-pack`, { Accept: 'application/x-git-upload-pack-advertisement' }, advertiseSignal);
+  const advertised = await fetcher.get(
+    `${base}/info/refs?service=git-upload-pack`,
+    { Accept: 'application/x-git-upload-pack-advertisement' },
+    advertiseSignal,
+  );
   if (advertised.status !== 200) throw new Error(`remote advertise failed with HTTP ${advertised.status}`);
-  if (advertised.contentType && !advertised.contentType.includes(UPLOAD_PACK_ADVERTISEMENT) && !advertised.contentType.includes('x-git-upload-pack')) {
+  if (
+    advertised.contentType &&
+    !advertised.contentType.includes(UPLOAD_PACK_ADVERTISEMENT) &&
+    !advertised.contentType.includes('x-git-upload-pack')
+  ) {
     throw new Error('remote is not a git Smart HTTP endpoint');
   }
   const refs = parseUploadPackAdvertisement(advertised.body, opts.maxRefs);

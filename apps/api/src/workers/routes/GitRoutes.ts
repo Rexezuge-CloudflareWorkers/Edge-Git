@@ -1,8 +1,15 @@
 import type { Hono } from 'hono';
 import { gitAuthForRepo } from '@/middleware';
 import { getRepoStub } from '../repoStub';
-import { advertiseUploadPack, advertiseReceivePack, branchNameFromRef, buildReportStatus, parseReceivePackRequest } from '@edge-git/git-protocol';
+import {
+  advertiseUploadPack,
+  advertiseReceivePack,
+  branchNameFromRef,
+  buildReportStatus,
+  parseReceivePackRequest,
+} from '@edge-git/git-protocol';
 import type { ProtectedRefRule } from '@edge-git/git-protocol';
+import type { BranchProtectionRuleMetadata } from '@edge-git/shared';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { BranchProtectionService } from '@edge-git/backend-services/protection';
 import { scanBytes } from '@edge-git/backend-services/security';
@@ -110,9 +117,19 @@ function registerGitRoutes(app: GitApp): void {
       // Scanning never fails the push; block-mode errors above return early.
     }
     // Branch protection is resolved here (D1) and passed into the DO (which
-    // owns git truth but cannot read D1). Unresolvable (legacy DBs) means
-    // no rules — the DO then behaves as before.
-    const protections = await resolvePushProtections(c.env, auth.repo.id, body).catch(() => []);
+    // owns git truth but cannot read D1). Protection resolution is fail-closed:
+    // a D1 failure rejects the push with 503 instead of pushing unprotected.
+    // Unparseable bodies yield no branch rules and let the DO validate the
+    // pack itself.
+    let protections: ProtectedRefRule[];
+    try {
+      protections = await resolvePushProtections(c.env, auth.repo.id, body);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'push protections unavailable') {
+        return c.text('push protections unavailable; try again later', 503);
+      }
+      protections = [];
+    }
     const res = await stub.receivePack(body, protections);
     if (res.ok && auth.userEmail) {
       try {
@@ -124,7 +141,10 @@ function registerGitRoutes(app: GitApp): void {
           fullName,
           actorEmail: auth.userEmail,
           type: 'push',
-          title: branches.length > 0 ? `Pushed to ${branches.slice(0, 3).join(', ')}${branches.length > 3 ? ` and ${branches.length - 3} more` : ''}` : 'Pushed commits',
+          title:
+            branches.length > 0
+              ? `Pushed to ${branches.slice(0, 3).join(', ')}${branches.length > 3 ? ` and ${branches.length - 3} more` : ''}`
+              : 'Pushed commits',
           subjectOid: headOid,
           payload: { refs: branches.slice(0, 10), count: commands.length },
         });
@@ -150,16 +170,25 @@ function registerGitRoutes(app: GitApp): void {
       headers: {
         'Content-Type': 'application/x-git-receive-pack-result',
         'Cache-Control': 'no-cache',
-        ...((secretWarning > 0) && { 'X-EdgeGit-Secret-Warning': `${secretWarning} possible secret(s) detected; rotate any exposed credentials` }),
+        ...(secretWarning > 0 && {
+          'X-EdgeGit-Secret-Warning': `${secretWarning} possible secret(s) detected; rotate any exposed credentials`,
+        }),
       },
     });
   });
 }
 
 // Map this push's branch commands to their longest-matching protection
-// rules. Tags and other non-branch refs never match.
+// rules. Tags and other non-branch refs never match. Parse failures return
+// no rules (the DO validates the pack); D1 failures throw so callers can
+// fail closed with 503.
 async function resolvePushProtections(env: Env, repositoryId: string, body: Uint8Array): Promise<ProtectedRefRule[]> {
-  const { commands } = parseReceivePackRequest(body);
+  let commands: Array<{ ref: string }>;
+  try {
+    commands = parseReceivePackRequest(body).commands;
+  } catch {
+    return [];
+  }
   const branches = new Set<string>();
   for (const cmd of commands) {
     const branch = branchNameFromRef(cmd.ref);
@@ -167,13 +196,23 @@ async function resolvePushProtections(env: Env, repositoryId: string, body: Uint
   }
   if (branches.size === 0) return [];
   const scope = createRequestScope(env);
-  const rules = await scope.get(Tokens.BranchProtectionService).listRules(repositoryId);
+  let rules: BranchProtectionRuleMetadata[];
+  try {
+    rules = await scope.get(Tokens.BranchProtectionService).listRules(repositoryId);
+  } catch {
+    throw new Error('push protections unavailable');
+  }
   if (rules.length === 0) return [];
   const protections: ProtectedRefRule[] = [];
   for (const branch of branches) {
     const rule = BranchProtectionService.matchRule(rules, branch);
     if (rule) {
-      protections.push({ ref: `refs/heads/${branch}`, requirePr: rule.requirePr, blockForcePush: rule.blockForcePush, blockDeletion: rule.blockDeletion });
+      protections.push({
+        ref: `refs/heads/${branch}`,
+        requirePr: rule.requirePr,
+        blockForcePush: rule.blockForcePush,
+        blockDeletion: rule.blockDeletion,
+      });
     }
   }
   return protections;
