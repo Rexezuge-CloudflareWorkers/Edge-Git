@@ -74,11 +74,11 @@ describe('token scope helpers', () => {
     expect(coversScope([], 'repo:read')).toBe(false);
   });
 
-  it('parseTokenScopes falls back to full access for legacy rows', () => {
-    expect(parseTokenScopes(null)).toEqual(['repo:read', 'repo:write', 'admin']);
-    expect(parseTokenScopes(undefined)).toEqual(['repo:read', 'repo:write', 'admin']);
-    expect(parseTokenScopes('not-json')).toEqual(['repo:read', 'repo:write', 'admin']);
-    expect(parseTokenScopes('[]')).toEqual(['repo:read', 'repo:write', 'admin']);
+  it('parseTokenScopes fails closed for legacy/invalid rows', () => {
+    expect(parseTokenScopes(null)).toEqual([]);
+    expect(parseTokenScopes(undefined)).toEqual([]);
+    expect(parseTokenScopes('not-json')).toEqual([]);
+    expect(parseTokenScopes('[]')).toEqual([]);
     expect(parseTokenScopes('["repo:read"]')).toEqual(['repo:read']);
     expect(parseTokenScopes('["repo:write","repo:read"]')).toEqual(['repo:read', 'repo:write']);
   });
@@ -112,7 +112,7 @@ describe('TokenService scoped lifecycle', () => {
     await expect(svc.createToken('alice@example.com', 'bad', undefined, ['nope'])).rejects.toThrow('scopes must be');
   });
 
-  it('treats legacy rows without scopes as full access', async () => {
+  it('denies legacy rows without scopes (fail-closed)', async () => {
     const db = createTokenFakeDb();
     db.tokens.push({
       token_id: 'legacy',
@@ -126,6 +126,23 @@ describe('TokenService scoped lifecycle', () => {
     });
     const svc = new TokenService({ DB: db });
     const identity = await svc.authenticateWithPAT('legacy-token');
-    expect(identity.scopes).toEqual(['repo:read', 'repo:write', 'admin']);
+    expect(identity.scopes).toEqual([]);
+    expect(TokenService.coversScope(identity.scopes, 'repo:read')).toBe(false);
+  });
+
+  it('fails closed when repo grants cannot be read', async () => {
+    const db = createTokenFakeDb();
+    const svc = new TokenService({ DB: db });
+    const created = await svc.createToken('alice@example.com', 'scoped', undefined, ['repo:read']);
+    const failing = new TokenService(
+      { DB: db },
+      {
+        tokenGrantDAO: () =>
+          Promise.resolve({
+            listByToken: () => Promise.reject(new Error('D1 unavailable')),
+          } as never),
+      },
+    );
+    await expect(failing.authenticateWithPAT(created.token)).rejects.toThrow('temporarily unavailable');
   });
 });

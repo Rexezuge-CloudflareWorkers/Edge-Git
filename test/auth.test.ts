@@ -3,7 +3,7 @@ import { AccessAuthService } from '@edge-git/backend-services/auth';
 
 describe('AccessAuthService', () => {
   it('returns DEV_AUTH_EMAIL bypass', async () => {
-    const svc = new AccessAuthService({ DEV_AUTH_EMAIL: 'dev@example.com' });
+    const svc = new AccessAuthService({ ENVIRONMENT: 'development', DEV_AUTH_EMAIL: 'dev@example.com' });
     await expect(svc.getAuthenticatedUserEmail(new Request('https://example.com/'))).resolves.toBe('dev@example.com');
   });
 

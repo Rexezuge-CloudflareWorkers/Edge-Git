@@ -479,7 +479,7 @@ describe('Collab API routes', () => {
   }
 
   function createEnv(db: D1Queryable, stub: unknown) {
-    return { DB: db, REPO: { getByName: () => stub, get: () => stub, idFromName: (n: string) => n }, DEV_AUTH_EMAIL: 'alice@example.com' };
+    return { DB: db, REPO: { getByName: () => stub, get: () => stub, idFromName: (n: string) => n }, ENVIRONMENT: 'development', DEV_AUTH_EMAIL: 'alice@example.com' };
   }
 
   async function call(env: unknown, path: string, init?: RequestInit): Promise<{ status: number; body: unknown }> {

@@ -103,10 +103,17 @@ function createIssueFakeDb() {
 }
 
 describe('auth bypass hardening', () => {
-  it('defaults ENVIRONMENT to development and allows bypass locally', () => {
-    expect(ConfigurationManager.auth.getEnvironment({})).toBe('development');
-    expect(ConfigurationManager.auth.isBypassAllowed({})).toBe(true);
-    expect(AppConfiguration.fromEnv({}).isBypassAllowed()).toBe(true);
+  it('defaults ENVIRONMENT to production (secure by default) and denies bypass', () => {
+    expect(ConfigurationManager.auth.getEnvironment({})).toBe('production');
+    expect(ConfigurationManager.auth.isBypassAllowed({})).toBe(false);
+    expect(AppConfiguration.fromEnv({}).isBypassAllowed()).toBe(false);
+  });
+
+  it('allows bypass only when ENVIRONMENT is explicitly non-production', async () => {
+    const dev = { ENVIRONMENT: 'development', DEV_AUTH_EMAIL: 'dev@example.com' };
+    expect(ConfigurationManager.auth.isBypassAllowed(dev)).toBe(true);
+    const svc = new AccessAuthService(dev);
+    await expect(svc.getAuthenticatedUserEmail(new Request('https://example.com/'))).resolves.toBe('dev@example.com');
   });
 
   it('disables DEMO/DEV bypass in production even when vars are set', async () => {
@@ -121,10 +128,10 @@ describe('auth bypass hardening', () => {
   });
 
   it('normalizes DEV email and rejects malformed bypass values', async () => {
-    const upper = new AccessAuthService({ DEV_AUTH_EMAIL: '  DEV@Example.COM  ' });
+    const upper = new AccessAuthService({ ENVIRONMENT: 'development', DEV_AUTH_EMAIL: '  DEV@Example.COM  ' });
     await expect(upper.getAuthenticatedUserEmail(new Request('https://example.com/'))).resolves.toBe('dev@example.com');
     for (const bad of ['not-an-email', 'a b@c.com', 'x'.repeat(300) + '@example.com']) {
-      const svc = new AccessAuthService({ DEV_AUTH_EMAIL: bad });
+      const svc = new AccessAuthService({ ENVIRONMENT: 'development', DEV_AUTH_EMAIL: bad });
       await expect(svc.getAuthenticatedUserEmail(new Request('https://example.com/'))).rejects.toThrow();
     }
   });

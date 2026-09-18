@@ -376,6 +376,6 @@ describe('cursor/d1/search/config utils', () => {
     const app = AppConfiguration.fromEnv({ ENVIRONMENT: 'Production ', DEMO_MODE: 'true' });
     expect(app.getEnvironment()).toBe('production');
     expect(app.isBypassAllowed()).toBe(false);
-    expect(AppConfiguration.fromEnv({}).getEnvironment()).toBe('development');
+    expect(AppConfiguration.fromEnv({}).getEnvironment()).toBe('production');
   });
 });

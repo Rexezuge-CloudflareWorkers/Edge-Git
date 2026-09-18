@@ -70,7 +70,15 @@ class TokenService {
     const tokenData: UserAccessTokenMetadata | undefined = await dao.getByTokenHash(tokenHash, now);
     if (tokenData) {
       await dao.updateLastUsedByHash(tokenHash, now);
-      const grants = await this.deps.tokenGrantDAO().then((d) => d.listByToken(tokenData.tokenId).catch(() => []));
+      // Fail closed: if the grant list cannot be read, deny rather than
+      // treating a scoped token as unrestricted (previous `.catch(() => [])`
+      // fail-open). A scoped token with unreadable grants must not escalate.
+      let grants: Array<{ repository_id: string; scope: TokenScope }>;
+      try {
+        grants = await this.deps.tokenGrantDAO().then((d) => d.listByToken(tokenData.tokenId));
+      } catch {
+        throw new UnauthorizedError('Your personal access token is temporarily unavailable.');
+      }
       return {
         email: tokenData.userEmail.toLowerCase(),
         scopes: tokenData.scopes,

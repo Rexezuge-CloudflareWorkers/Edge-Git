@@ -67,6 +67,7 @@
     "crons": ["*/10 * * * *"]
   },
   "vars": {
+    "ENVIRONMENT": "production",
     "DEBUG_MODE": "false",
     "SITE_URL": "",
     "POLICY_AUD": "",

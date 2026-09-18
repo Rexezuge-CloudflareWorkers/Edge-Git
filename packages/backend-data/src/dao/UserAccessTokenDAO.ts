@@ -15,15 +15,18 @@ export interface TokenRow {
 }
 
 function parseScopes(raw: string | null | undefined): TokenScope[] {
-  const full: TokenScope[] = ['repo:read', 'repo:write', 'admin'];
-  if (raw === null || raw === undefined) return full;
+  // Fail closed: legacy NULL/invalid/empty scope rows grant nothing.
+  // Previously these fell back to full access; that fail-open could
+  // escalate a corrupt row to admin. New mints always serialize explicit
+  // scopes, so empty here means deny.
+  if (raw === null || raw === undefined) return [];
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return full;
+    if (!Array.isArray(parsed)) return [];
     const valid = parsed.filter((s): s is TokenScope => typeof s === 'string' && (['repo:read', 'repo:write', 'admin'] as const).includes(s as TokenScope));
-    return valid.length > 0 ? valid : full;
+    return valid.length > 0 ? valid : [];
   } catch {
-    return full;
+    return [];
   }
 }
 

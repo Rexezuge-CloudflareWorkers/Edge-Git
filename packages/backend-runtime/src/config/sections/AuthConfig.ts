@@ -12,9 +12,11 @@ class AuthConfig {
   }
 
   public isBypassAllowed(): boolean {
-    // Local/dev bypasses (DEMO_MODE/DEV_AUTH_EMAIL) are only honored outside
-    // production. Production deploys must set ENVIRONMENT=production; unset
-    // defaults to development to preserve local `wrangler dev` behavior.
+    // Local/dev bypasses (DEMO_MODE/DEV_AUTH_EMAIL) are only honored when
+    // ENVIRONMENT is explicitly non-production. The default is production
+    // (secure by default): deploys that forget ENVIRONMENT deny bypass
+    // instead of opening auth. Local `wrangler dev` and integration tests
+    // must set ENVIRONMENT=development explicitly.
     return this.getEnvironment() !== 'production';
   }
 

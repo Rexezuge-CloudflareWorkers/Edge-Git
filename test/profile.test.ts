@@ -227,6 +227,7 @@ function createEnv(db: D1Queryable, devEmail?: string) {
     DB: db,
     REPO: { getByName: () => stub, get: () => stub, idFromName: (n: string) => n },
     CRON_TASKS: { get: () => stub, idFromName: (n: string) => n },
+    ENVIRONMENT: 'development',
     ...(devEmail ? { DEV_AUTH_EMAIL: devEmail } : {}),
   };
 }
