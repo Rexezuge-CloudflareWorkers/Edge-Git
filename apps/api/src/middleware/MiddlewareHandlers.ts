@@ -41,7 +41,9 @@ async function userAuthenticationHandler(c: RequestContext, next: Next): Promise
     await next();
   } catch (error: unknown) {
     const status = error instanceof UnauthorizedError ? 401 : error instanceof ForbiddenError ? 403 : 500;
-    const message = error instanceof Error ? error.message : 'Unauthorized';
+    // Never leak DB/DO internals on 500 — callers only need a generic message.
+    const message =
+      status === 500 ? 'Internal error' : error instanceof Error ? error.message : 'Unauthorized';
     return c.json({ error: message }, status as 401);
   }
 }
@@ -241,8 +243,11 @@ class MiddlewareHandlers {
       c.set('AuthenticatedUserEmailAddress', email);
       return email;
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unauthorized';
-      return c.json({ error: message }, 401);
+      if (error instanceof UnauthorizedError || error instanceof ForbiddenError) {
+        const message = error instanceof Error ? error.message : 'Unauthorized';
+        return c.json({ error: message }, 401);
+      }
+      return c.json({ error: 'Internal error' }, 401);
     }
   }
 }

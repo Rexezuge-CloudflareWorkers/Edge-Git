@@ -193,6 +193,26 @@ function generateHookSecret(): string {
   return CryptoUtil.randomBase64Url(32);
 }
 
+/**
+ * Re-validate a webhook redirect target. Callers following redirects
+ * manually must pass every hop through `validateWebhookUrl` (same guard as
+ * the original URL); DNS-rebind between validation and connect is NOT
+ * covered (no resolver in Workers) — documented on the route.
+ */
+function resolveWebhookRedirect(base: string, location: string): string {
+  if (typeof location !== 'string' || location.trim().length === 0) {
+    throw new Error('webhook returned an empty redirect');
+  }
+  let next: string;
+  try {
+    next = new URL(location, base).href;
+  } catch {
+    throw new Error('webhook returned an invalid redirect');
+  }
+  validateWebhookUrl(next);
+  return next;
+}
+
 async function signDelivery(secret: string, body: string): Promise<string> {
   return `sha256=${await CryptoUtil.hmacSha256Hex(body, secret)}`;
 }
@@ -247,6 +267,7 @@ export {
   secretSuffix,
   validateWebhookUrl,
   generateHookSecret,
+  resolveWebhookRedirect,
   signDelivery,
   verifyDeliverySignature,
   buildWebhookPayload,

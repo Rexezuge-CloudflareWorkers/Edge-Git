@@ -45,6 +45,22 @@ class FetchHandler {
     }
     const { command, args } = parseCommand(data);
 
+    // Bound ls-refs/feature args before any git I/O — parseCommand itself is
+    // unbounded, so cap the arg count and per-arg length here (1MB body cap
+    // alone still allows tens of thousands of tiny args).
+    if (args.length > 64) {
+      const message = `too many ls-refs arguments: ${args.length} > 64`;
+      logger.error(`(upload-pack-fetch) Rejected ${getFullName() ?? 'unknown repo'}: ${message}`);
+      return buildFetchErrorResponse(message, 400);
+    }
+    for (const arg of args) {
+      if (arg.length > 1024) {
+        const message = 'ls-refs argument too long';
+        logger.error(`(upload-pack-fetch) Rejected ${getFullName() ?? 'unknown repo'}: ${message}`);
+        return buildFetchErrorResponse(message, 400);
+      }
+    }
+
     if (command === 'ls-refs') {
       const { refs, symbolicHead } = await git.listRefs();
 
@@ -105,9 +121,18 @@ class FetchHandler {
       if (shouldSendPackfile) {
         try {
           // deepen-not entries may be ref names; resolve to oids for exclusion.
+          // Bound count/length first so a flood of entries cannot fan out into
+          // unbounded `resolveRef` git I/O, and validate each entry shape.
           const excludeOids: string[] = [];
           const deepenNot = fetchRequest.shallowOptions?.deepenNot ?? [];
+          if (deepenNot.length > limits.maxHaves) {
+            throw new PackLimitError(`too many deepen-not entries: limit is ${limits.maxHaves}`);
+          }
+          const OID_OR_REF_RE = /^(?:[0-9a-f]{40}|refs\/[\w./-]{1,250})$/i;
           for (const entry of deepenNot) {
+            if (entry.length > 255 || !OID_OR_REF_RE.test(entry)) {
+              return buildFetchErrorResponse(`invalid deepen-not entry: ${entry.slice(0, 64)}`, 400);
+            }
             const resolved = await git.resolveRef(entry);
             excludeOids.push(resolved ?? entry);
           }
@@ -126,6 +151,11 @@ class FetchHandler {
           });
 
           // include-tag: also send annotated tags pointing at packed commits.
+          // Pre-check before the tag walk so a tag bomb cannot burn CPU
+          // before the limit is enforced.
+          if (oids.length > limits.maxObjects) {
+            throw new PackLimitError(`too many objects: limit is ${limits.maxObjects}`);
+          }
           let oidsToPack = oids;
           if (fetchRequest.capabilities.includeTag) {
             oidsToPack = await this.expandWithTags(oidsToPack);

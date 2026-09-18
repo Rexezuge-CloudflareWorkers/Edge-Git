@@ -115,6 +115,14 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     app.use('/user/*', MiddlewareHandlers.webhookFlush());
     app.use('/user/tokens*', rateLimit({ windowMs: 60_000, max: 30, keyPrefix: 'tokens' }));
     app.use('/user/realtime/*', rateLimit({ windowMs: 60_000, max: 60, keyPrefix: 'realtime' }));
+    // Abuse-prone mutating surfaces: imports/mirrors fan out to third-party
+    // hosts (SSRF amplification), webhook test/redeliver triggers outbound
+    // fetch, file-write drives DO I/O. Per-isolate buckets; cron/DOs remain
+    // the cross-isolate backstop.
+    app.use('/user/repos/:owner/:repo/import*', rateLimit({ windowMs: 60_000, max: 10, keyPrefix: 'import' }));
+    app.use('/user/repos/:owner/:repo/mirror*', rateLimit({ windowMs: 60_000, max: 20, keyPrefix: 'mirror' }));
+    app.use('/user/repos/:owner/:repo/hooks*', rateLimit({ windowMs: 60_000, max: 30, keyPrefix: 'webhook-mutate' }));
+    app.use('/user/repos/:owner/:repo/contents*', rateLimit({ windowMs: 60_000, max: 60, keyPrefix: 'file-write' }));
 
     registerUserRepoRoutes(app);
     registerUserSettingsRoutes(app);

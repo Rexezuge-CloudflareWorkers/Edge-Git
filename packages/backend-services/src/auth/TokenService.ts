@@ -141,7 +141,17 @@ class TokenService {
     if (expiresInDays === undefined || expiresInDays === null) {
       effectiveExpiryInDays = maxExpiryInDays;
     } else {
-      const numeric: unknown = typeof expiresInDays === 'string' ? Number(expiresInDays) : expiresInDays;
+      // Strict numeric-string handling: only clean integer strings coerce
+      // (matches DeployKeyService's reject-non-number posture for real
+      // numbers while tolerating JSON clients that send "30").
+      let numeric: unknown = expiresInDays;
+      if (typeof expiresInDays === 'string') {
+        const trimmed = expiresInDays.trim();
+        if (!/^\d+$/.test(trimmed)) {
+          throw new BadRequestError('expiresInDays must be a positive integer');
+        }
+        numeric = Number(trimmed);
+      }
       if (!Number.isSafeInteger(numeric) || (numeric as number) < 1) {
         throw new BadRequestError('expiresInDays must be a positive integer');
       }

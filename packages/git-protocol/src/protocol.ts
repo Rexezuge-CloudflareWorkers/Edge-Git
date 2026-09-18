@@ -14,5 +14,7 @@ export {
   buildUploadPackRequest,
   decodeUploadPackResponse,
   normalizePublicGitUrl,
+  resolveRedirectUrl,
+  MAX_REDIRECTS,
 } from './RemoteImportClient';
 export type { RemoteRef, RemotePack, RemoteGitFetcher } from './RemoteImportClient';
