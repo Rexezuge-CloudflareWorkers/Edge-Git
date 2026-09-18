@@ -1,13 +1,6 @@
 export type CheckRunStatus = 'queued' | 'in_progress' | 'completed';
 
-export type CheckConclusion =
-  | 'success'
-  | 'failure'
-  | 'neutral'
-  | 'cancelled'
-  | 'skipped'
-  | 'timed_out'
-  | 'action_required';
+export type CheckConclusion = 'success' | 'failure' | 'neutral' | 'cancelled' | 'skipped' | 'timed_out' | 'action_required';
 
 export type CheckCombinedState = 'pending' | 'success' | 'failure';
 

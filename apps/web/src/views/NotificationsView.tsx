@@ -45,7 +45,8 @@ export function NotificationsView({ showNotice }: { showNotice: (type: 'success'
         setCursor(data.nextCursor);
         setUnreadCount(data.unreadCount);
       } catch (error) {
-        if (!cancelled) showNotice('error', error instanceof Error ? error.message : t('notifications.failedToLoad', 'Failed To Load Notifications.'));
+        if (!cancelled)
+          showNotice('error', error instanceof Error ? error.message : t('notifications.failedToLoad', 'Failed To Load Notifications.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -110,66 +111,82 @@ export function NotificationsView({ showNotice }: { showNotice: (type: 'success'
   return (
     <div>
       <ContextBar
-        crumb={<span className="text-xl font-semibold text-[var(--color-text-primary)] truncate">{t('notifications.title', 'Notifications')}</span>}
+        crumb={
+          <span className="text-xl font-semibold text-[var(--color-text-primary)] truncate">
+            {t('notifications.title', 'Notifications')}
+          </span>
+        }
       />
       <AppPage>
-      <PageHeaderCard
-        title={
-          <>
-            {t('notifications.title', 'Notifications')}
-            {unreadCount > 0 && <span className="ml-2 text-sm font-normal text-[var(--color-text-muted)]">{t('notifications.unreadCount', '{{count}} Unread', { count: unreadCount })}</span>}
-          </>
-        }
-        actions={
-          <>
-            <label className="inline-flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
-              <input type="checkbox" checked={unreadOnly} onChange={(e) => setUnreadOnly(e.target.checked)} className="accent-[var(--color-accent)]" />
-              {t('notifications.unreadOnly', 'Unread Only')}
-            </label>
-            <Button variant="secondary" size="sm" onClick={() => void markAll()} disabled={unreadCount === 0}>
-              {t('notifications.markAllRead', 'Mark All Read')}
-            </Button>
-            <RefreshButton onRefresh={refresh} loading={loading} />
-          </>
-        }
-      />
+        <PageHeaderCard
+          title={
+            <>
+              {t('notifications.title', 'Notifications')}
+              {unreadCount > 0 && (
+                <span className="ml-2 text-sm font-normal text-[var(--color-text-muted)]">
+                  {t('notifications.unreadCount', '{{count}} Unread', { count: unreadCount })}
+                </span>
+              )}
+            </>
+          }
+          actions={
+            <>
+              <label className="inline-flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
+                <input
+                  type="checkbox"
+                  checked={unreadOnly}
+                  onChange={(e) => setUnreadOnly(e.target.checked)}
+                  className="accent-[var(--color-accent)]"
+                />
+                {t('notifications.unreadOnly', 'Unread Only')}
+              </label>
+              <Button variant="secondary" size="sm" onClick={() => void markAll()} disabled={unreadCount === 0}>
+                {t('notifications.markAllRead', 'Mark All Read')}
+              </Button>
+              <RefreshButton onRefresh={refresh} loading={loading} />
+            </>
+          }
+        />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('notifications.inbox', 'Inbox')}</CardTitle>
-        </CardHeader>
-        {loading && items.length === 0 ? (
-          <p className="text-sm text-[var(--color-text-muted)]">{t('common.loading', 'Loading…')}</p>
-        ) : items.length === 0 ? (
-          <EmptyState
-            icon={<Bell className="h-6 w-6 text-[var(--color-text-muted)]" />}
-            message={t('notifications.empty', 'No Notifications.')}
-          />
-        ) : (
-          <ul className="divide-y divide-[var(--color-border)]">
-            {items.map((item) => (
-              <li key={item.id} className={cn('py-3 flex items-start justify-between gap-3 first:pt-0 last:pb-0', item.is_read === 0 && 'font-medium')}>
-                <div className="min-w-0">
-                  <p className="text-sm text-[var(--color-text-primary)] truncate">{item.title}</p>
-                  <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-                    <Link to={`/${item.full_name}`} className="text-[var(--color-accent)] hover:underline">
-                      {item.full_name}
-                    </Link>
-                    {' · '}
-                    {item.actor_email} · {formatTimestamp(item.created_at)}
-                  </p>
-                </div>
-                {item.is_read === 0 && (
-                  <Button variant="ghost" size="sm" onClick={() => void markRead(item.id)}>
-                    {t('notifications.markRead', 'Mark Read')}
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-        {cursor && <LoadMoreButton onLoadMore={() => void loadMore()} loading={loadingMore} />}
-      </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('notifications.inbox', 'Inbox')}</CardTitle>
+          </CardHeader>
+          {loading && items.length === 0 ? (
+            <p className="text-sm text-[var(--color-text-muted)]">{t('common.loading', 'Loading…')}</p>
+          ) : items.length === 0 ? (
+            <EmptyState
+              icon={<Bell className="h-6 w-6 text-[var(--color-text-muted)]" />}
+              message={t('notifications.empty', 'No Notifications.')}
+            />
+          ) : (
+            <ul className="divide-y divide-[var(--color-border)]">
+              {items.map((item) => (
+                <li
+                  key={item.id}
+                  className={cn('py-3 flex items-start justify-between gap-3 first:pt-0 last:pb-0', item.is_read === 0 && 'font-medium')}
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm text-[var(--color-text-primary)] truncate">{item.title}</p>
+                    <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+                      <Link to={`/${item.full_name}`} className="text-[var(--color-accent)] hover:underline">
+                        {item.full_name}
+                      </Link>
+                      {' · '}
+                      {item.actor_email} · {formatTimestamp(item.created_at)}
+                    </p>
+                  </div>
+                  {item.is_read === 0 && (
+                    <Button variant="ghost" size="sm" onClick={() => void markRead(item.id)}>
+                      {t('notifications.markRead', 'Mark Read')}
+                    </Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {cursor && <LoadMoreButton onLoadMore={() => void loadMore()} loading={loadingMore} />}
+        </Card>
       </AppPage>
     </div>
   );

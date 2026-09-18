@@ -38,7 +38,8 @@ function createProfileFakeDb() {
         }
         if (q.includes('FROM organization_members WHERE org_id = ? AND') && q.includes('user_email')) {
           return Promise.resolve(
-            (state.members.find((m) => m.org_id === params[0] && String(m.user_email).toLowerCase() === String(params[1]).toLowerCase()) ?? null) as T | null,
+            (state.members.find((m) => m.org_id === params[0] && String(m.user_email).toLowerCase() === String(params[1]).toLowerCase()) ??
+              null) as T | null,
           );
         }
         if (q.includes('FROM namespaces WHERE username_ci = ?')) {
@@ -46,11 +47,11 @@ function createProfileFakeDb() {
         }
         if (q.includes('FROM repositories WHERE lower(owner) = ? AND lower(name) = ?')) {
           return Promise.resolve(
-            (
-              state.repos.find(
-                (r) => String(r.owner).toLowerCase() === String(params[0]).toLowerCase() && String(r.name).toLowerCase() === String(params[1]).toLowerCase(),
-              ) ?? null
-            ) as T | null,
+            (state.repos.find(
+              (r) =>
+                String(r.owner).toLowerCase() === String(params[0]).toLowerCase() &&
+                String(r.name).toLowerCase() === String(params[1]).toLowerCase(),
+            ) ?? null) as T | null,
           );
         }
         if (q.includes('FROM repositories WHERE owner = ? AND name = ?')) {
@@ -157,7 +158,12 @@ function createProfileFakeDb() {
         if (q.startsWith('DELETE FROM organization_members WHERE org_id = ?')) {
           if (params.length >= 3) {
             state.members = state.members.filter(
-              (m) => !(m.org_id === params[0] && String(m.user_email).toLowerCase() === String(params[1]).toLowerCase() && m.user_email !== params[2]),
+              (m) =>
+                !(
+                  m.org_id === params[0] &&
+                  String(m.user_email).toLowerCase() === String(params[1]).toLowerCase() &&
+                  m.user_email !== params[2]
+                ),
             );
           } else {
             state.members = state.members.filter(
@@ -179,12 +185,53 @@ function createProfileFakeDb() {
         }
         if (q.startsWith('INSERT INTO repositories')) {
           if (params.length >= 13) {
-            const [id, owner_email, owner, name, description, is_private, created_at, updated_at, owner_type, owner_ci, name_ci, owner_user_email, org_id] =
-              params as Array<string | number | null>;
-            state.repos.push({ id, owner_email, owner, name, description, is_private, created_at, updated_at, owner_type, owner_ci, name_ci, owner_user_email, org_id });
+            const [
+              id,
+              owner_email,
+              owner,
+              name,
+              description,
+              is_private,
+              created_at,
+              updated_at,
+              owner_type,
+              owner_ci,
+              name_ci,
+              owner_user_email,
+              org_id,
+            ] = params as Array<string | number | null>;
+            state.repos.push({
+              id,
+              owner_email,
+              owner,
+              name,
+              description,
+              is_private,
+              created_at,
+              updated_at,
+              owner_type,
+              owner_ci,
+              name_ci,
+              owner_user_email,
+              org_id,
+            });
           } else {
             const [id, owner_email, owner, name, description, is_private, created_at, updated_at] = params as Array<string | number | null>;
-            state.repos.push({ id, owner_email, owner, name, description, is_private, created_at, updated_at, owner_type: 'user', owner_ci: String(owner).toLowerCase(), name_ci: String(name).toLowerCase(), owner_user_email: owner_email, org_id: null });
+            state.repos.push({
+              id,
+              owner_email,
+              owner,
+              name,
+              description,
+              is_private,
+              created_at,
+              updated_at,
+              owner_type: 'user',
+              owner_ci: String(owner).toLowerCase(),
+              name_ci: String(name).toLowerCase(),
+              owner_user_email: owner_email,
+              org_id: null,
+            });
           }
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
@@ -249,7 +296,9 @@ describe('profile + permission management surface', () => {
     expect((await call('/user/me').then((r) => r.json())).email).toBe('alice@example.com');
     const json = { 'Content-Type': 'application/json' };
     expect((await call('/user/repos', { method: 'POST', headers: json, body: JSON.stringify({ name: 'pub' }) })).status).toBe(201);
-    expect((await call('/user/repos', { method: 'POST', headers: json, body: JSON.stringify({ name: 'sec', isPrivate: true }) })).status).toBe(201);
+    expect(
+      (await call('/user/repos', { method: 'POST', headers: json, body: JSON.stringify({ name: 'sec', isPrivate: true }) })).status,
+    ).toBe(201);
 
     const profile = (await (await callAnon('/users/alice')).json()) as { type: string; repoCount: number; viewerIsSelf: boolean };
     expect(profile).toMatchObject({ type: 'user', viewerIsSelf: false });
@@ -264,7 +313,7 @@ describe('profile + permission management surface', () => {
     const ownRepos = (await (await call('/users/alice/repos?limit=1')).json()) as { repos: Array<{ name: string }> };
     expect(ownRepos.repos).toHaveLength(1);
 
-    expect(((await callAnon('/users/alice/orgs')).json())).resolves.toMatchObject({ username: 'alice', orgs: [] });
+    expect((await callAnon('/users/alice/orgs')).json()).resolves.toMatchObject({ username: 'alice', orgs: [] });
     expect((await callAnon('/users/missing')).status).toBe(404);
     expect((await callAnon('/users/missing/repos')).status).toBe(404);
     expect((await callAnon('/users/missing/orgs')).status).toBe(404);
@@ -284,7 +333,9 @@ describe('profile + permission management surface', () => {
     await call('/user/me');
     const created = await call('/user/orgs', { method: 'POST', headers: json, body: JSON.stringify({ username: 'acme' }) });
     expect(created.status).toBe(201);
-    expect((await call('/user/repos', { method: 'POST', headers: json, body: JSON.stringify({ owner: 'acme', name: 'site' }) })).status).toBe(201);
+    expect(
+      (await call('/user/repos', { method: 'POST', headers: json, body: JSON.stringify({ owner: 'acme', name: 'site' }) })).status,
+    ).toBe(201);
 
     const anonOrg = (await (await callAnon('/users/acme')).json()) as { type: string; memberCount: unknown; viewerIsMember: boolean };
     expect(anonOrg).toMatchObject({ type: 'org', memberCount: null, viewerIsMember: false });

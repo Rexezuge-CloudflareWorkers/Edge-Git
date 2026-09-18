@@ -2,4 +2,11 @@ export { AccessAuthService, DEFAULT_ACCESS_AUTH_STRATEGIES } from './AccessAuthS
 export type { AccessAuthEnv, AccessIdentityContext, AccessAuthStrategy } from './AccessAuthService';
 export { TokenService } from './TokenService';
 export type { CreatedToken, AuthenticatedToken, TokenServiceDeps, TokenServiceEnv } from './TokenService';
-export { TOKEN_SCOPES, DEFAULT_TOKEN_SCOPES, coversScope, parseTokenScopes, normalizeTokenScopes, serializeTokenScopes } from './TokenScopes';
+export {
+  TOKEN_SCOPES,
+  DEFAULT_TOKEN_SCOPES,
+  coversScope,
+  parseTokenScopes,
+  normalizeTokenScopes,
+  serializeTokenScopes,
+} from './TokenScopes';

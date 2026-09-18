@@ -23,7 +23,9 @@ describe('advertise', () => {
   });
 
   it('advertises receive-pack refs with symref', async () => {
-    const res = await advertiseReceivePack(() => Promise.resolve({ refs: [{ ref: 'refs/heads/main', oid: 'a'.repeat(40) }], symbolicHead: 'refs/heads/main' }));
+    const res = await advertiseReceivePack(() =>
+      Promise.resolve({ refs: [{ ref: 'refs/heads/main', oid: 'a'.repeat(40) }], symbolicHead: 'refs/heads/main' }),
+    );
     const text = await res.text();
     expect(text).toContain('refs/heads/main');
     expect(text).toContain('symref=HEAD');
@@ -125,11 +127,8 @@ describe('upload-pack parsing', () => {
   it('peels annotated tags in ls-refs', async () => {
     const tagOid = 'c'.repeat(40);
     const peeled = 'd'.repeat(40);
-    const res = await buildLsRefsResponse(
-      [{ ref: 'refs/tags/v1', oid: tagOid }],
-      ['peel'],
-      null,
-      () => Promise.resolve({ type: 'tag', object: `object ${peeled}\ntype commit\ntag v1\n` }),
+    const res = await buildLsRefsResponse([{ ref: 'refs/tags/v1', oid: tagOid }], ['peel'], null, () =>
+      Promise.resolve({ type: 'tag', object: `object ${peeled}\ntype commit\ntag v1\n` }),
     );
     const text = new TextDecoder().decode(new Uint8Array(await res.arrayBuffer()));
     expect(text).toContain(`${peeled} refs/tags/v1^{}`);
@@ -171,7 +170,10 @@ describe('upload-pack parsing', () => {
 describe('auth header helpers', () => {
   it('decodes basic credentials and bearer tokens', () => {
     const basic = `Basic ${btoa('alice:s3cret')}`;
-    expect(getBasicCredentials(new Request('https://x/', { headers: { Authorization: basic } }))).toEqual({ username: 'alice', password: 's3cret' });
+    expect(getBasicCredentials(new Request('https://x/', { headers: { Authorization: basic } }))).toEqual({
+      username: 'alice',
+      password: 's3cret',
+    });
     expect(getBasicCredentials(new Request('https://x/'))).toBeNull();
     expect(getBasicCredentials(new Request('https://x/', { headers: { Authorization: 'Basic !!!' } }))).toBeNull();
     expect(getBearerToken(new Request('https://x/', { headers: { Authorization: 'Bearer tok123 ' } }))).toBe('tok123');

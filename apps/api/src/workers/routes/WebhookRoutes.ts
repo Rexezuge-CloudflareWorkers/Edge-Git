@@ -121,9 +121,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
     try {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
-      const delivery = await scope
-        .get(Tokens.WebhookDeliveryService)
-        .sendTestPing(id, repo.id, `${repo.owner}/${repo.name}`, email);
+      const delivery = await scope.get(Tokens.WebhookDeliveryService).sendTestPing(id, repo.id, `${repo.owner}/${repo.name}`, email);
       return c.json({ delivery }, 201);
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'Failed to send test ping' }, toServiceStatus(error));

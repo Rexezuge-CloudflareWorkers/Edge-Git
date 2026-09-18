@@ -67,7 +67,12 @@ export function PullComments({
       )}
       {canWrite && (
         <form onSubmit={submitComment} className="mt-4 space-y-2">
-          <Textarea placeholder={t('pulls.commentPlaceholder', 'Write A Comment…')} value={draft} onChange={(e) => setDraft(e.target.value)} rows={3} />
+          <Textarea
+            placeholder={t('pulls.commentPlaceholder', 'Write A Comment…')}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={3}
+          />
           <Button type="submit" variant="primary" size="sm" loading={saving} disabled={draft.trim() === ''}>
             {t('pulls.addComment', 'Add Comment')}
           </Button>

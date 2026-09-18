@@ -47,7 +47,9 @@ class MirrorDAO extends BaseDAO {
 
   public async listDue(now: number, limit: number): Promise<RepoMirrorRow[]> {
     const result = await this.database
-      .prepare('SELECT * FROM repo_mirrors WHERE enabled = 1 AND (last_run_at IS NULL OR last_run_at + interval_minutes * 60 <= ?) ORDER BY last_run_at ASC NULLS FIRST, repository_id ASC LIMIT ?')
+      .prepare(
+        'SELECT * FROM repo_mirrors WHERE enabled = 1 AND (last_run_at IS NULL OR last_run_at + interval_minutes * 60 <= ?) ORDER BY last_run_at ASC NULLS FIRST, repository_id ASC LIMIT ?',
+      )
       .bind(now, limit)
       .all<RepoMirrorRow>();
     return result.results ?? [];
@@ -58,7 +60,9 @@ class MirrorDAO extends BaseDAO {
       await this.withRetry(
         () =>
           this.database
-            .prepare("UPDATE repo_mirrors SET last_run_at = ?, last_status = 'ok', last_error = NULL, consecutive_failures = 0, updated_at = ? WHERE repository_id = ?")
+            .prepare(
+              "UPDATE repo_mirrors SET last_run_at = ?, last_status = 'ok', last_error = NULL, consecutive_failures = 0, updated_at = ? WHERE repository_id = ?",
+            )
             .bind(now, now, repositoryId)
             .run(),
         'record mirror success',

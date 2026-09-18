@@ -60,7 +60,8 @@ function normalizeTagName(raw: unknown): string {
   if (TAG_FORBIDDEN_RE.test(tag) || tag.includes('..') || tag.includes('//')) {
     throw new BadRequestError('tagName must not contain `..`, `//`, spaces, or `~^:?*[\\@{`');
   }
-  if (tag.startsWith('/') || tag.endsWith('/') || tag.endsWith('.')) throw new BadRequestError('tagName must not start with `/` or end with `/` or `.`');
+  if (tag.startsWith('/') || tag.endsWith('/') || tag.endsWith('.'))
+    throw new BadRequestError('tagName must not start with `/` or end with `/` or `.`');
   return tag;
 }
 
@@ -236,7 +237,8 @@ class ReleaseService {
     const byteCount = input.size;
     if (!Number.isSafeInteger(byteCount) || byteCount <= 0 || byteCount > maxBytes)
       throw new BadRequestError(`asset size must be 1-${maxBytes} bytes`);
-    if (typeof input.sha256 !== 'string' || !/^[0-9a-f]{64}$/i.test(input.sha256)) throw new BadRequestError('sha256 must be a 64-char hex string');
+    if (typeof input.sha256 !== 'string' || !/^[0-9a-f]{64}$/i.test(input.sha256))
+      throw new BadRequestError('sha256 must be a 64-char hex string');
     const dao = await this.deps.releaseDAO();
     const existing = await dao.getAssetByName(row.id, name).catch(() => null);
     if (existing) throw new BadRequestError('an asset with this name already exists');

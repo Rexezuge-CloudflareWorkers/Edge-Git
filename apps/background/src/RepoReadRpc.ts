@@ -120,7 +120,9 @@ class RepoReadRpc {
     return result;
   }
 
-  public async getTags(): Promise<Array<{ name: string; ref: string; oid: string; peeledOid: string | null; type: 'lightweight' | 'annotated' }>> {
+  public async getTags(): Promise<
+    Array<{ name: string; ref: string; oid: string; peeledOid: string | null; type: 'lightweight' | 'annotated' }>
+  > {
     await this.prepare();
     return this.readModel.getTags();
   }
@@ -135,7 +137,13 @@ class RepoReadRpc {
     return this.readModel.getBlob(args);
   }
 
-  public async getOverview(args: { ref?: string; path?: string; depth?: number; includeTags?: boolean; includeReadme?: boolean }): Promise<unknown> {
+  public async getOverview(args: {
+    ref?: string;
+    path?: string;
+    depth?: number;
+    includeTags?: boolean;
+    includeReadme?: boolean;
+  }): Promise<unknown> {
     await this.prepare();
     return this.readModel.getOverview(args);
   }
@@ -193,7 +201,11 @@ class RepoReadRpc {
   public async updateRefs(updates: Array<{ ref: string; oldOid: string; newOid: string }>): Promise<unknown> {
     await this.prepare();
     const pending = (updates ?? []).filter(
-      (u) => typeof u.ref === 'string' && (u.ref.startsWith('refs/heads/') || u.ref.startsWith('refs/tags/')) && /^[0-9a-f]{40}$/.test(u.oldOid) && /^[0-9a-f]{40}$/.test(u.newOid),
+      (u) =>
+        typeof u.ref === 'string' &&
+        (u.ref.startsWith('refs/heads/') || u.ref.startsWith('refs/tags/')) &&
+        /^[0-9a-f]{40}$/.test(u.oldOid) &&
+        /^[0-9a-f]{40}$/.test(u.newOid),
     );
     if (pending.length === 0) return { updated: [] };
     const results = await this.git.applyRefUpdates(

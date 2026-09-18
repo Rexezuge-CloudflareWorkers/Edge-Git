@@ -126,7 +126,9 @@ describe('OrganizationService namespace and members', () => {
 
 describe('UserService usernames', () => {
   it('derives a handle on upsert and renames with cascade', async () => {
-    const users = new Map<string, { email: string; username: string | null }>([['alice@example.com', { email: 'alice@example.com', username: null }]]);
+    const users = new Map<string, { email: string; username: string | null }>([
+      ['alice@example.com', { email: 'alice@example.com', username: null }],
+    ]);
     const namespaces = new Set<string>();
     const renamedOwners: Array<{ oldCi: string; next: string }> = [];
     const svc = new UserService({ DB: {} } as never, {
@@ -277,9 +279,12 @@ describe('OrganizationService happy paths', () => {
               const role = members.get(orgId)?.get(email);
               return role ? { role } : null;
             },
-            listByOrg: async (orgId: string) => [...(members.get(orgId)?.entries() ?? [])].map(([user_email, role]) => ({ org_id: orgId, user_email, role })),
+            listByOrg: async (orgId: string) =>
+              [...(members.get(orgId)?.entries() ?? [])].map(([user_email, role]) => ({ org_id: orgId, user_email, role })),
             listOrgsByUser: async (email: string) =>
-              [...members.entries()].filter(([, m]) => m.has(email)).map(([org_id]) => ({ org_id, user_email: email, role: members.get(org_id)!.get(email)! })),
+              [...members.entries()]
+                .filter(([, m]) => m.has(email))
+                .map(([org_id]) => ({ org_id, user_email: email, role: members.get(org_id)!.get(email)! })),
             countOwners: async (orgId: string) => [...(members.get(orgId)?.values() ?? [])].filter((r) => r === 'owner').length,
             remove: async (orgId: string, email: string) => {
               members.get(orgId)?.delete(email);
@@ -329,8 +334,7 @@ describe('OrganizationService happy paths', () => {
     await h.service.createOrganization('alice@x.co', 'acme');
     const withRepos = new OrganizationService({ DB: {} } as never, {
       organizationDAO: async () => ({ getByUsernameCi: async () => ({ id: 'o1', username: 'acme', username_ci: 'acme' }) }) as never,
-      organizationMemberDAO: async () =>
-        ({ get: async () => ({ role: 'owner' }), deleteByOrg: async () => undefined }) as never,
+      organizationMemberDAO: async () => ({ get: async () => ({ role: 'owner' }), deleteByOrg: async () => undefined }) as never,
       namespaceDAO: async () => ({ release: async () => undefined }) as never,
       userDAO: async () => ({ getByUsernameCi: async () => null }) as never,
       repositoryDAO: async () => ({ listByOrgId: async () => [{ id: 'r1' }], listByOwner: async () => [] }) as never,

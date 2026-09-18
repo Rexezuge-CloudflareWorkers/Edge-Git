@@ -29,11 +29,7 @@ class WebhookLimits {
   }
 
   public getMaxConsecutiveFailures(): number {
-    return EnvParser.positiveInt(
-      this.env,
-      'WEBHOOK_MAX_CONSECUTIVE_FAILURES',
-      DEFAULT_WEBHOOK_MAX_CONSECUTIVE_FAILURES,
-    );
+    return EnvParser.positiveInt(this.env, 'WEBHOOK_MAX_CONSECUTIVE_FAILURES', DEFAULT_WEBHOOK_MAX_CONSECUTIVE_FAILURES);
   }
 
   public getMaxPayloadBytes(): number {

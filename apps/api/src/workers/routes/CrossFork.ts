@@ -51,7 +51,13 @@ interface CrossOids {
 }
 
 // Split ref resolution across base/head DOs (cross-fork PRs).
-async function resolveCrossOids(env: Env, baseFullName: string, baseBranch: string, headFullName: string, headBranch: string): Promise<CrossOids | null> {
+async function resolveCrossOids(
+  env: Env,
+  baseFullName: string,
+  baseBranch: string,
+  headFullName: string,
+  headBranch: string,
+): Promise<CrossOids | null> {
   const base = getRepoStub(env, baseFullName);
   const head = getRepoStub(env, headFullName);
   const [baseOid, headOid] = await Promise.all([base.resolveRef(`refs/heads/${baseBranch}`), head.resolveRef(`refs/heads/${headBranch}`)]);
@@ -70,7 +76,10 @@ async function getCrossRepoPreview(
   const oids = await resolveCrossOids(env, baseFullName, baseBranch, headFullName, headBranch);
   if (!oids) return { preview: null, baseOid: null, headOid: null };
   await ensureHeadObjects(env, baseFullName, headFullName, oids.headOid);
-  const preview = (await getRepoStub(env, baseFullName).getMergePreviewByOids({ baseOid: oids.baseOid, headOid: oids.headOid })) as MergePreviewShape | null;
+  const preview = (await getRepoStub(env, baseFullName).getMergePreviewByOids({
+    baseOid: oids.baseOid,
+    headOid: oids.headOid,
+  })) as MergePreviewShape | null;
   return { preview, baseOid: oids.baseOid, headOid: oids.headOid };
 }
 
@@ -101,7 +110,9 @@ async function resolveHeadRepo(env: Env, pull: PullHeadRef): Promise<ResolvedHea
   if (pull.head_full_name) {
     const slash = pull.head_full_name.indexOf('/');
     if (slash > 0) {
-      const byName = await svc.getByOwnerAndName(pull.head_full_name.slice(0, slash), pull.head_full_name.slice(slash + 1)).catch(() => null);
+      const byName = await svc
+        .getByOwnerAndName(pull.head_full_name.slice(0, slash), pull.head_full_name.slice(slash + 1))
+        .catch(() => null);
       if (byName) return { row: byName, fullName: `${byName.owner}/${byName.name}` };
     }
   }
@@ -111,8 +122,20 @@ async function resolveHeadRepo(env: Env, pull: PullHeadRef): Promise<ResolvedHea
 // Read access check on the head repo (hides private forks via null).
 async function getHeadRole(env: Env, head: ResolvedHeadRepo, viewerEmail: string | null): Promise<'admin' | 'write' | 'read' | null> {
   const scope = createRequestScope(env);
-  return scope.get(Tokens.PermissionService).getRole(viewerEmail, head.row).catch(() => null);
+  return scope
+    .get(Tokens.PermissionService)
+    .getRole(viewerEmail, head.row)
+    .catch(() => null);
 }
 
-export { copyRepoGit, ensureHeadObjects, getCrossRepoPreview, getHeadRole, isCrossRepoPull, isPackLimitError, resolveCrossOids, resolveHeadRepo };
+export {
+  copyRepoGit,
+  ensureHeadObjects,
+  getCrossRepoPreview,
+  getHeadRole,
+  isCrossRepoPull,
+  isPackLimitError,
+  resolveCrossOids,
+  resolveHeadRepo,
+};
 export type { ForkCopyResult };

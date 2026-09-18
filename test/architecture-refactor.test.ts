@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { canonicalizeLanguageTag } from '@edge-git/shared/utils';
 import { canonicalizeBackendLocaleTag, getBackendStrings } from '@edge-git/shared/i18n';
-import {
-  assetNameSchema,
-  branchNameSchema,
-  repoNameSchema,
-  teamSlugSchema,
-  usernameSchema,
-} from '@edge-git/shared/validation';
+import { assetNameSchema, branchNameSchema, repoNameSchema, teamSlugSchema, usernameSchema } from '@edge-git/shared/validation';
 import { RoleRank } from '@edge-git/backend-services/permission';
 import { hideExistence, mapServiceError, toServiceStatus } from '@edge-git/backend-services/errors';
 import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
@@ -77,9 +71,7 @@ describe('refactor: config composition', () => {
     expect(config.getMaxHooksPerRepo()).toBe(3);
     expect(config.webhook.getMaxHooksPerRepo()).toBe(3);
     expect(config.getDevAuthEmail()).toBeNull();
-    expect(AppConfiguration.fromEnv({ DEV_AUTH_EMAIL: 'dev@example.com' }).getDevAuthEmail()).toBe(
-      'dev@example.com',
-    );
+    expect(AppConfiguration.fromEnv({ DEV_AUTH_EMAIL: 'dev@example.com' }).getDevAuthEmail()).toBe('dev@example.com');
   });
 
   it('resolves sandbox limits from injected config', () => {

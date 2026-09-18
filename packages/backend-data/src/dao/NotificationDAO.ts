@@ -55,7 +55,12 @@ class NotificationDAO extends BaseDAO {
     );
   }
 
-  public async listByUser(userEmail: string, limit = 50, cursor?: string, unreadOnly = false): Promise<{ notifications: NotificationRow[]; nextCursor: string | null }> {
+  public async listByUser(
+    userEmail: string,
+    limit = 50,
+    cursor?: string,
+    unreadOnly = false,
+  ): Promise<{ notifications: NotificationRow[]; nextCursor: string | null }> {
     const decoded = this.decodeCursor<{ created_at: number; id: string }>(cursor);
     const readFilter = unreadOnly ? 'AND is_read = 0' : '';
     const pageSize = limit + 1;
@@ -79,7 +84,10 @@ class NotificationDAO extends BaseDAO {
   }
 
   public async unreadCount(userEmail: string): Promise<number> {
-    const row = await this.database.prepare('SELECT COUNT(*) AS n FROM notifications WHERE user_email = ? AND is_read = 0').bind(userEmail).first<{ n: number }>();
+    const row = await this.database
+      .prepare('SELECT COUNT(*) AS n FROM notifications WHERE user_email = ? AND is_read = 0')
+      .bind(userEmail)
+      .first<{ n: number }>();
     return row?.n ?? 0;
   }
 
@@ -108,7 +116,10 @@ class NotificationDAO extends BaseDAO {
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {
-    await this.withRetry(() => this.database.prepare('DELETE FROM notifications WHERE repository_id = ?').bind(repositoryId).run(), 'delete notifications by repo');
+    await this.withRetry(
+      () => this.database.prepare('DELETE FROM notifications WHERE repository_id = ?').bind(repositoryId).run(),
+      'delete notifications by repo',
+    );
   }
 }
 

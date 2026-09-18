@@ -109,7 +109,11 @@ class WebhookDAO extends BaseDAO {
     }
     params.push(id, repositoryId);
     await this.withRetry(
-      () => this.database.prepare(`UPDATE repo_webhooks SET ${sets.join(', ')} WHERE id = ? AND repository_id = ?`).bind(...params).run(),
+      () =>
+        this.database
+          .prepare(`UPDATE repo_webhooks SET ${sets.join(', ')} WHERE id = ? AND repository_id = ?`)
+          .bind(...params)
+          .run(),
       'update repo webhook',
     );
   }
@@ -118,7 +122,9 @@ class WebhookDAO extends BaseDAO {
     await this.withRetry(
       () =>
         this.database
-          .prepare('UPDATE repo_webhooks SET secret = ?, secret_suffix = ?, consecutive_failures = 0, updated_at = ? WHERE id = ? AND repository_id = ?')
+          .prepare(
+            'UPDATE repo_webhooks SET secret = ?, secret_suffix = ?, consecutive_failures = 0, updated_at = ? WHERE id = ? AND repository_id = ?',
+          )
           .bind(secret, secretSuffix, now, id, repositoryId)
           .run(),
       'rotate repo webhook secret',
@@ -130,7 +136,9 @@ class WebhookDAO extends BaseDAO {
       await this.withRetry(
         () =>
           this.database
-            .prepare('UPDATE repo_webhooks SET last_delivery_at = ?, last_delivery_status = ?, consecutive_failures = 0, updated_at = ? WHERE id = ?')
+            .prepare(
+              'UPDATE repo_webhooks SET last_delivery_at = ?, last_delivery_status = ?, consecutive_failures = 0, updated_at = ? WHERE id = ?',
+            )
             .bind(now, 'success', now, hookId)
             .run(),
         'record webhook delivery success',

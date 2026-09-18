@@ -14,7 +14,9 @@ function blobOf(text: string): { contentBase64: string; isBinary: boolean } {
   return { contentBase64: btoa(binary), isBinary: false };
 }
 
-function stubWithFiles(files: Record<string, string>): { getBlob(args: { filepath: string }): Promise<{ contentBase64: string; isBinary: boolean } | null> } {
+function stubWithFiles(files: Record<string, string>): {
+  getBlob(args: { filepath: string }): Promise<{ contentBase64: string; isBinary: boolean } | null>;
+} {
   return {
     getBlob: ({ filepath }: { filepath: string }) => {
       const text = files[filepath];
@@ -31,7 +33,9 @@ describe('parseCheckDefinitionFile', () => {
 
   it('parses env and allowHosts', () => {
     const checks = parseCheckDefinitionFile(
-      JSON.stringify({ checks: [{ context: 'e2e', script: '.edgegit/checks/e2e.js', env: { LEVEL: 'strict' }, allowHosts: ['Example.COM'] }] }),
+      JSON.stringify({
+        checks: [{ context: 'e2e', script: '.edgegit/checks/e2e.js', env: { LEVEL: 'strict' }, allowHosts: ['Example.COM'] }],
+      }),
     );
     expect(checks[0]?.env).toEqual({ LEVEL: 'strict' });
     expect(checks[0]?.allowHosts).toEqual(['example.com']);
@@ -45,10 +49,18 @@ describe('parseCheckDefinitionFile', () => {
   });
 
   it('rejects bad contexts, scripts, and duplicates', () => {
-    expect(() => parseCheckDefinitionFile(JSON.stringify({ checks: [{ context: '', script: '.edgegit/checks/a.js' }] }))).toThrow('context');
-    expect(() => parseCheckDefinitionFile(JSON.stringify({ checks: [{ context: 'secret-scan', script: '.edgegit/checks/a.js' }] }))).toThrow('reserved built-in');
-    expect(() => parseCheckDefinitionFile(JSON.stringify({ checks: [{ context: 'lint', script: 'checks/lint.js' }] }))).toThrow('.edgegit/checks/');
-    expect(() => parseCheckDefinitionFile(JSON.stringify({ checks: [{ context: 'lint', script: '.edgegit/checks/../evil.js' }] }))).toThrow('.edgegit/checks/');
+    expect(() => parseCheckDefinitionFile(JSON.stringify({ checks: [{ context: '', script: '.edgegit/checks/a.js' }] }))).toThrow(
+      'context',
+    );
+    expect(() =>
+      parseCheckDefinitionFile(JSON.stringify({ checks: [{ context: 'secret-scan', script: '.edgegit/checks/a.js' }] })),
+    ).toThrow('reserved built-in');
+    expect(() => parseCheckDefinitionFile(JSON.stringify({ checks: [{ context: 'lint', script: 'checks/lint.js' }] }))).toThrow(
+      '.edgegit/checks/',
+    );
+    expect(() => parseCheckDefinitionFile(JSON.stringify({ checks: [{ context: 'lint', script: '.edgegit/checks/../evil.js' }] }))).toThrow(
+      '.edgegit/checks/',
+    );
     expect(() =>
       parseCheckDefinitionFile(
         JSON.stringify({
@@ -63,16 +75,22 @@ describe('parseCheckDefinitionFile', () => {
 
   it('rejects bad env and allowHosts', () => {
     expect(() =>
-      parseCheckDefinitionFile(JSON.stringify({ checks: [{ context: 'lint', script: '.edgegit/checks/a.js', env: { 'has space': 'x' } }] })),
+      parseCheckDefinitionFile(
+        JSON.stringify({ checks: [{ context: 'lint', script: '.edgegit/checks/a.js', env: { 'has space': 'x' } }] }),
+      ),
     ).toThrow('env key');
     expect(() =>
-      parseCheckDefinitionFile(JSON.stringify({ checks: [{ context: 'lint', script: '.edgegit/checks/a.js', allowHosts: ['localhost'] }] })),
+      parseCheckDefinitionFile(
+        JSON.stringify({ checks: [{ context: 'lint', script: '.edgegit/checks/a.js', allowHosts: ['localhost'] }] }),
+      ),
     ).toThrow('loopback, private, or reserved');
     expect(() =>
       parseCheckDefinitionFile(JSON.stringify({ checks: [{ context: 'lint', script: '.edgegit/checks/a.js', allowHosts: ['10.0.0.1'] }] })),
     ).toThrow('loopback, private, or reserved');
     expect(() =>
-      parseCheckDefinitionFile(JSON.stringify({ checks: [{ context: 'lint', script: '.edgegit/checks/a.js', allowHosts: ['not a host!'] }] })),
+      parseCheckDefinitionFile(
+        JSON.stringify({ checks: [{ context: 'lint', script: '.edgegit/checks/a.js', allowHosts: ['not a host!'] }] }),
+      ),
     ).toThrow('not a valid hostname');
   });
 

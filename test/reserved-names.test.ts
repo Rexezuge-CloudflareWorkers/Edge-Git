@@ -22,7 +22,22 @@ function emptyDb() {
 
 describe('reserved namespace names (shared)', () => {
   it('covers worker, SPA, and future auth/product roots', () => {
-    for (const name of ['health', 'docs', 'repos', 'users', 'user', 'api', 'settings', 'new', 'search', 'notifications', 'login', 'admin', 'orgs', 'explore']) {
+    for (const name of [
+      'health',
+      'docs',
+      'repos',
+      'users',
+      'user',
+      'api',
+      'settings',
+      'new',
+      'search',
+      'notifications',
+      'login',
+      'admin',
+      'orgs',
+      'explore',
+    ]) {
       expect(RESERVED_NAMESPACE_NAMES.has(name)).toBe(true);
     }
   });
@@ -84,7 +99,9 @@ describe('reserved namespace validation (services)', () => {
   });
 
   it('skips reserved names when bootstrapping a username from email', async () => {
-    const users = new Map<string, { email: string; username: string | null }>([['health@example.com', { email: 'health@example.com', username: null }]]);
+    const users = new Map<string, { email: string; username: string | null }>([
+      ['health@example.com', { email: 'health@example.com', username: null }],
+    ]);
     const namespaces = new Set<string>();
     const svc = new UserService({ DB: {} } as never, {
       userDAO: async () =>

@@ -9,7 +9,15 @@ import { RefreshButton } from '../shared/RefreshButton';
 
 const MODES: SecretScanMode[] = ['off', 'warn', 'block'];
 
-export function SecretScanCard({ owner, repo, showNotice }: { owner: string; repo: string; showNotice: (type: 'success' | 'error', text: string) => void }) {
+export function SecretScanCard({
+  owner,
+  repo,
+  showNotice,
+}: {
+  owner: string;
+  repo: string;
+  showNotice: (type: 'success' | 'error', text: string) => void;
+}) {
   const { t } = useTranslation();
   const [mode, setMode] = useState<SecretScanMode>('warn');
   const [loading, setLoading] = useState(true);
@@ -80,7 +88,10 @@ export function SecretScanCard({ owner, repo, showNotice }: { owner: string; rep
         </Button>
       </div>
       <p className="mt-2 text-xs text-[var(--color-text-muted)]">
-        {t('security.hint', 'Warn Flags Pushes And Saves Without Blocking. Block Rejects The Whole Push. Applies To Everyone Including Admins.')}
+        {t(
+          'security.hint',
+          'Warn Flags Pushes And Saves Without Blocking. Block Rejects The Whole Push. Applies To Everyone Including Admins.',
+        )}
       </p>
     </Card>
   );

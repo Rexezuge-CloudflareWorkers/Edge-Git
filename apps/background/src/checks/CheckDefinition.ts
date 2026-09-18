@@ -72,14 +72,16 @@ function parseOne(raw: unknown, index: number): CustomCheckDefinition {
     if (pairs.length > MAX_ENV_VARS) throw new Error(`checks[${index}].env must have at most ${MAX_ENV_VARS} entries`);
     for (const [key, value] of pairs) {
       if (!ENV_KEY_RE.test(key)) throw new Error(`checks[${index}].env key "${key}" is not a valid env name`);
-      if (typeof value !== 'string' || value.length > MAX_ENV_VALUE) throw new Error(`checks[${index}].env["${key}"] must be a string of at most ${MAX_ENV_VALUE} chars`);
+      if (typeof value !== 'string' || value.length > MAX_ENV_VALUE)
+        throw new Error(`checks[${index}].env["${key}"] must be a string of at most ${MAX_ENV_VALUE} chars`);
       env[key] = value;
     }
   }
   const allowHosts: string[] = [];
   if (entry.allowHosts !== undefined && entry.allowHosts !== null) {
     if (!Array.isArray(entry.allowHosts)) throw new Error(`checks[${index}].allowHosts must be an array of hostnames`);
-    if (entry.allowHosts.length > MAX_ALLOW_HOSTS) throw new Error(`checks[${index}].allowHosts must have at most ${MAX_ALLOW_HOSTS} entries`);
+    if (entry.allowHosts.length > MAX_ALLOW_HOSTS)
+      throw new Error(`checks[${index}].allowHosts must have at most ${MAX_ALLOW_HOSTS} entries`);
     for (const host of entry.allowHosts) {
       if (typeof host !== 'string') throw new Error(`checks[${index}].allowHosts entries must be strings`);
       const normalized = host.trim().toLowerCase();
@@ -109,7 +111,8 @@ export function parseCheckDefinitionFile(text: string): CustomCheckDefinition[] 
   } catch {
     throw new Error(`${CHECKS_FILE_PATH} is not valid JSON`);
   }
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new Error(`${CHECKS_FILE_PATH} must be an object with a "checks" array`);
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed))
+    throw new Error(`${CHECKS_FILE_PATH} must be an object with a "checks" array`);
   const list = (parsed as Record<string, unknown>).checks;
   if (!Array.isArray(list)) throw new Error(`${CHECKS_FILE_PATH} must contain a "checks" array`);
   if (list.length > MAX_CHECKS) throw new Error(`${CHECKS_FILE_PATH} must define at most ${MAX_CHECKS} checks`);
@@ -132,7 +135,8 @@ export async function loadCheckDefinition(repoStub: RepoStubShape, headSha: stri
   const blob = await repoStub.getBlob({ ref: headSha, filepath: CHECKS_FILE_PATH }).catch(() => null);
   if (!blob) return { state: 'absent' };
   const text = decodeBlobToText(blob, MAX_DEFINITION_BYTES);
-  if (text === null) return { state: 'error', message: `${CHECKS_FILE_PATH} is missing, binary, or larger than ${MAX_DEFINITION_BYTES} bytes` };
+  if (text === null)
+    return { state: 'error', message: `${CHECKS_FILE_PATH} is missing, binary, or larger than ${MAX_DEFINITION_BYTES} bytes` };
   try {
     return { state: 'ok', checks: parseCheckDefinitionFile(text) };
   } catch (error) {
@@ -140,7 +144,12 @@ export async function loadCheckDefinition(repoStub: RepoStubShape, headSha: stri
   }
 }
 
-export async function loadCheckScript(repoStub: RepoStubShape, headSha: string, scriptPath: string, maxBytes: number): Promise<string | null> {
+export async function loadCheckScript(
+  repoStub: RepoStubShape,
+  headSha: string,
+  scriptPath: string,
+  maxBytes: number,
+): Promise<string | null> {
   const blob = await repoStub.getBlob({ ref: headSha, filepath: scriptPath }).catch(() => null);
   return decodeBlobToText(blob, maxBytes);
 }

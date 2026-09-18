@@ -15,7 +15,8 @@ const EXCLUDE_DIRS = new Set(['node_modules', 'dist', '.wrangler', 'coverage', '
 const EXCLUDE_SUFFIX = ['.test.ts', '.spec.ts', '.int.test.ts', '.d.ts'];
 
 function shouldSkip(path) {
-  if (path.includes('/locales/') || path.includes('/generated/') || path.includes('/__tests__/') || path.includes('/__mocks__/')) return true;
+  if (path.includes('/locales/') || path.includes('/generated/') || path.includes('/__tests__/') || path.includes('/__mocks__/'))
+    return true;
   if (path.endsWith('.json') || path.endsWith('.sql') || path.endsWith('.md')) return true;
   if (EXCLUDE_SUFFIX.some((s) => path.endsWith(s))) return true;
   if (path.endsWith('/index.ts') && path.includes('backend-services/src')) return false;

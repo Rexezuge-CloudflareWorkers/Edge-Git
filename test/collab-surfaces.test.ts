@@ -20,8 +20,28 @@ function fakeProjectDAO(overrides: Record<string, (...args: never[]) => Promise<
     nextNumber: async () => 1,
     createProject: async () => undefined,
     listByRepo: async () => [],
-    getByNumber: async () => ({ id: 'p1', repository_id: 'r1', number: 1, title: 'T', description: null, status: 'open', creator_email: 'a@x.com', created_at: 1, updated_at: 1 }),
-    getById: async () => ({ id: 'p1', repository_id: 'r1', number: 1, title: 'T', description: null, status: 'open', creator_email: 'a@x.com', created_at: 1, updated_at: 1 }),
+    getByNumber: async () => ({
+      id: 'p1',
+      repository_id: 'r1',
+      number: 1,
+      title: 'T',
+      description: null,
+      status: 'open',
+      creator_email: 'a@x.com',
+      created_at: 1,
+      updated_at: 1,
+    }),
+    getById: async () => ({
+      id: 'p1',
+      repository_id: 'r1',
+      number: 1,
+      title: 'T',
+      description: null,
+      status: 'open',
+      creator_email: 'a@x.com',
+      created_at: 1,
+      updated_at: 1,
+    }),
     countByRepo: async () => 0,
     setStatus: async () => undefined,
     updateProject: async () => undefined,
@@ -46,7 +66,17 @@ function fakeProjectDAO(overrides: Record<string, (...args: never[]) => Promise<
 describe('collab surfaces: projects', () => {
   it('creates a project with seeded-board defaults', async () => {
     const dao = fakeProjectDAO({
-      getById: async () => ({ id: 'p1', repository_id: 'r1', number: 1, title: 'Roadmap', description: null, status: 'open', creator_email: 'a@x.com', created_at: 1, updated_at: 1 }),
+      getById: async () => ({
+        id: 'p1',
+        repository_id: 'r1',
+        number: 1,
+        title: 'Roadmap',
+        description: null,
+        status: 'open',
+        creator_email: 'a@x.com',
+        created_at: 1,
+        updated_at: 1,
+      }),
     }) as never;
     const svc = new ProjectService(env, { projectDAO: async () => dao });
     const project = await svc.createProject('r1', { title: '  Roadmap  ' }, 'A@x.com');
@@ -58,9 +88,7 @@ describe('collab surfaces: projects', () => {
   it('rejects blank titles and duplicate column names', async () => {
     const svc = new ProjectService(env, { projectDAO: async () => fakeProjectDAO() as never });
     await expect(svc.createProject('r1', { title: '   ' }, 'a@x.com')).rejects.toThrow('title is required');
-    await expect(
-      svc.createColumn('r1', 1, { title: 'todo' }),
-    ).rejects.toThrow('a column with this title already exists');
+    await expect(svc.createColumn('r1', 1, { title: 'todo' })).rejects.toThrow('a column with this title already exists');
   });
 
   it('enforces the per-repo project cap', async () => {
@@ -71,7 +99,17 @@ describe('collab surfaces: projects', () => {
 
   it('validates card kinds and payloads', async () => {
     const dao = fakeProjectDAO({
-      getByNumber: async () => ({ id: 'p1', repository_id: 'r1', number: 1, title: 'T', description: null, status: 'open', creator_email: 'a@x.com', created_at: 1, updated_at: 1 }),
+      getByNumber: async () => ({
+        id: 'p1',
+        repository_id: 'r1',
+        number: 1,
+        title: 'T',
+        description: null,
+        status: 'open',
+        creator_email: 'a@x.com',
+        created_at: 1,
+        updated_at: 1,
+      }),
     }) as never;
     const svc = new ProjectService(env, { projectDAO: async () => dao });
     await expect(svc.createCard('r1', 1, { columnId: 'c1', kind: 'nope' }, 'a@x.com')).rejects.toThrow('kind must be');
@@ -109,7 +147,18 @@ describe('collab surfaces: discussions', () => {
 
   it('numbers new discussions per repo', async () => {
     const dao = discussionDAO({
-      getByNumber: async () => ({ id: 'd3', repository_id: 'r1', category_id: null, number: 3, title: 'Hello', body: null, author_email: 'a@x.com', status: 'open', created_at: 1, updated_at: 1 }),
+      getByNumber: async () => ({
+        id: 'd3',
+        repository_id: 'r1',
+        category_id: null,
+        number: 3,
+        title: 'Hello',
+        body: null,
+        author_email: 'a@x.com',
+        status: 'open',
+        created_at: 1,
+        updated_at: 1,
+      }),
     }) as never;
     const svc = new DiscussionService(env, { discussionDAO: async () => dao });
     const discussion = await svc.createDiscussion('r1', { title: 'Hello' }, 'A@X.com');
@@ -125,7 +174,18 @@ describe('collab surfaces: discussions', () => {
 
   it('blocks comments on locked discussions', async () => {
     const dao = discussionDAO({
-      getByNumber: async () => ({ id: 'd1', repository_id: 'r1', category_id: null, number: 1, title: 'T', body: null, author_email: 'a@x.com', status: 'locked', created_at: 1, updated_at: 1 }),
+      getByNumber: async () => ({
+        id: 'd1',
+        repository_id: 'r1',
+        category_id: null,
+        number: 1,
+        title: 'T',
+        body: null,
+        author_email: 'a@x.com',
+        status: 'locked',
+        created_at: 1,
+        updated_at: 1,
+      }),
     }) as never;
     const svc = new DiscussionService(env, { discussionDAO: async () => dao });
     await expect(svc.addComment('r1', 1, { body: 'hi' }, 'b@x.com')).rejects.toThrow('locked');
@@ -139,7 +199,17 @@ describe('collab surfaces: wiki', () => {
       listByRepo: async () => [],
       getBySlug: async () => null,
       countByRepo: async () => 0,
-      updatePage: async () => ({ id: 'w1', repository_id: 'r1', slug: 'home', title: 'Home', body: 'v2', revision: 2, updated_by: 'a@x.com', created_at: 1, updated_at: 2 }),
+      updatePage: async () => ({
+        id: 'w1',
+        repository_id: 'r1',
+        slug: 'home',
+        title: 'Home',
+        body: 'v2',
+        revision: 2,
+        updated_by: 'a@x.com',
+        created_at: 1,
+        updated_at: 2,
+      }),
       deletePage: async () => undefined,
       listRevisions: async () => [],
       searchByRepo: async () => [],
@@ -156,7 +226,17 @@ describe('collab surfaces: wiki', () => {
 
   it('surfaces revision conflicts for routes to map to 409', async () => {
     const dao = wikiDAO({
-      getBySlug: async () => ({ id: 'w1', repository_id: 'r1', slug: 'home', title: 'Home', body: 'v1', revision: 2, updated_by: 'a@x.com', created_at: 1, updated_at: 1 }),
+      getBySlug: async () => ({
+        id: 'w1',
+        repository_id: 'r1',
+        slug: 'home',
+        title: 'Home',
+        body: 'v1',
+        revision: 2,
+        updated_by: 'a@x.com',
+        created_at: 1,
+        updated_at: 1,
+      }),
       updatePage: async () => {
         throw new Error('revision conflict: expected 1 but found 2');
       },
@@ -197,7 +277,14 @@ describe('collab surfaces: snippets', () => {
     const svc = new SnippetService(env, { snippetDAO: async () => snippetDAO() as never });
     await expect(svc.createSnippet('a@x.com', { files: [] })).rejects.toThrow('non-empty array');
     await expect(svc.createSnippet('a@x.com', { files: [{ filename: '../evil', body: 'x' }] })).rejects.toThrow('invalid filename');
-    await expect(svc.createSnippet('a@x.com', { files: [{ filename: 'a.txt', body: 'x' }, { filename: 'A.TXT', body: 'y' }] })).rejects.toThrow('duplicate filename');
+    await expect(
+      svc.createSnippet('a@x.com', {
+        files: [
+          { filename: 'a.txt', body: 'x' },
+          { filename: 'A.TXT', body: 'y' },
+        ],
+      }),
+    ).rejects.toThrow('duplicate filename');
   });
 
   it('hides secret snippets from non-owners', async () => {

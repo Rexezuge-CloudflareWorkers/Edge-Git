@@ -64,7 +64,10 @@ export class MergeService {
   }
 
   private async removeWorkdir(workdir: string): Promise<void> {
-    const promises = this.fs.promises as unknown as { rm?: (p: string, o?: object) => Promise<void>; rmdir?: (p: string, o?: object) => Promise<void> };
+    const promises = this.fs.promises as unknown as {
+      rm?: (p: string, o?: object) => Promise<void>;
+      rmdir?: (p: string, o?: object) => Promise<void>;
+    };
     try {
       if (typeof promises.rm === 'function') {
         await promises.rm(workdir, { recursive: true, force: true });
@@ -157,7 +160,9 @@ export class MergeService {
       throw new Error('head commit not found');
     }
     const author = this.toAuthor(input.author);
-    const message = input.message?.trim() ? input.message.trim().slice(0, 1000) : headMessage.trim() || `Squash merge ${input.headOid.slice(0, 7)}`;
+    const message = input.message?.trim()
+      ? input.message.trim().slice(0, 1000)
+      : headMessage.trim() || `Squash merge ${input.headOid.slice(0, 7)}`;
     const oid = await git.writeCommit({
       fs: this.fs,
       gitdir: this.gitdir,
@@ -208,7 +213,13 @@ export class MergeService {
       const oid = await git.writeCommit({
         fs: this.fs,
         gitdir: this.gitdir,
-        commit: { message: head.commit.message.endsWith('\n') ? head.commit.message : `${head.commit.message}\n`, tree: head.commit.tree, parent: [baseOid], author, committer: author },
+        commit: {
+          message: head.commit.message.endsWith('\n') ? head.commit.message : `${head.commit.message}\n`,
+          tree: head.commit.tree,
+          parent: [baseOid],
+          author,
+          committer: author,
+        },
       });
       await git.writeRef({ fs: this.fs, gitdir: this.gitdir, ref: baseRef, value: oid, force: true });
       this.clearCache();
@@ -273,7 +284,10 @@ export class MergeService {
         // with abortOnConflict=true (default) leaves the branch untouched.
         return { type: 'conflict', conflicts: filepaths };
       }
-      if (error instanceof Error && (error.name === 'MergeNotSupportedError' || (error as { code?: string }).code === 'MergeNotSupportedError')) {
+      if (
+        error instanceof Error &&
+        (error.name === 'MergeNotSupportedError' || (error as { code?: string }).code === 'MergeNotSupportedError')
+      ) {
         return { type: 'conflict', conflicts: [], reason: 'criss-cross merges are not supported' };
       }
       logger.error(`(merge) failed ${baseRef} <- ${input.headOid}: ${String(error)}`);

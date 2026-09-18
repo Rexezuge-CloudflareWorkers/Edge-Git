@@ -14,7 +14,10 @@ async function triggerRequiredChecks(
   try {
     if (!/^[0-9a-f]{40}$/i.test(input.headSha) || /^0{40}$/.test(input.headSha)) return { triggered: [] };
     const scope = createRequestScope(env);
-    const rule = await scope.get(Tokens.BranchProtectionService).matchForRepo(input.repositoryId, input.branch).catch(() => null);
+    const rule = await scope
+      .get(Tokens.BranchProtectionService)
+      .matchForRepo(input.repositoryId, input.branch)
+      .catch(() => null);
     const required = rule?.requireStatusChecks ?? [];
     if (required.length === 0) return { triggered: [] };
     const checks = scope.get(Tokens.CheckService);

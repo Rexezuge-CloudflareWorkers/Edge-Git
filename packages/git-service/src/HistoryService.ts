@@ -280,7 +280,14 @@ export class HistoryService {
    * hunks: lines surviving from an older version keep their commit, new lines
    * take the current commit. Capped to 5000 lines / 200 commits.
    */
-  async getBlame(ref: string, filepath: string): Promise<{ oid: string; lines: Array<{ line: number; commitOid: string; author: string; content: string }>; truncated: boolean } | null> {
+  async getBlame(
+    ref: string,
+    filepath: string,
+  ): Promise<{
+    oid: string;
+    lines: Array<{ line: number; commitOid: string; author: string; content: string }>;
+    truncated: boolean;
+  } | null> {
     let resolved: string | null = null;
     try {
       resolved = await git.resolveRef({ fs: this.fs, gitdir: this.gitdir, ref });
@@ -331,13 +338,19 @@ export class HistoryService {
       // Rebuild attribution anchored to the newest content at the end.
       if (next.length === currentLines.length) {
         for (const [i, line] of next.entries()) {
-          if (previous[i] !== line) attribution[i] = { commitOid: entry.oid, author: entry.commit.author.email || entry.commit.author.name };
+          if (previous[i] !== line)
+            attribution[i] = { commitOid: entry.oid, author: entry.commit.author.email || entry.commit.author.name };
         }
       }
       previous = next;
     }
     // Anchor to current content length (history tip should equal ref).
-    const lines = currentLines.map((content, i) => ({ line: i + 1, commitOid: attribution[i]?.commitOid ?? resolved ?? '', author: attribution[i]?.author ?? '', content }));
+    const lines = currentLines.map((content, i) => ({
+      line: i + 1,
+      commitOid: attribution[i]?.commitOid ?? resolved ?? '',
+      author: attribution[i]?.author ?? '',
+      content,
+    }));
     return { oid: resolved, lines, truncated: false };
   }
 }

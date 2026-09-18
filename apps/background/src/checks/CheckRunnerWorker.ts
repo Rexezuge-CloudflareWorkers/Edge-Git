@@ -2,7 +2,14 @@ import { DurableObject } from 'cloudflare:workers';
 import type { CheckRunDAO } from '@edge-git/backend-data/dao';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { parseCodeowners } from '@edge-git/backend-services/collab';
-import { isBuiltInCheckContext, parseRequiredGlobs, runCodeownersStep, runDiffLimitStep, runRequiredFilesStep, runSecretScanStep } from '@edge-git/backend-services/checks';
+import {
+  isBuiltInCheckContext,
+  parseRequiredGlobs,
+  runCodeownersStep,
+  runDiffLimitStep,
+  runRequiredFilesStep,
+  runSecretScanStep,
+} from '@edge-git/backend-services/checks';
 import type { StepOutcome } from '@edge-git/backend-services/checks';
 import { scanText } from '@edge-git/backend-services/security';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
@@ -63,8 +70,16 @@ class CheckRunnerWorker extends DurableObject<Env> {
   public async enqueueChecks(input: EnqueueChecksInput): Promise<{ queued: number }> {
     const contexts = [...new Set(input.contexts.map((c) => c.trim()).filter((c) => c.length > 0))].slice(0, 50);
     if (contexts.length === 0) return { queued: 0 };
-    const pending = ((await this.ctx.storage.get<PendingItem[]>('pending')) ?? []).filter((p) => p.headSha !== input.headSha || p.repositoryId !== input.repositoryId);
-    pending.push({ repositoryId: input.repositoryId, headSha: input.headSha.toLowerCase(), contexts, actorEmail: input.actorEmail, attempts: 0 });
+    const pending = ((await this.ctx.storage.get<PendingItem[]>('pending')) ?? []).filter(
+      (p) => p.headSha !== input.headSha || p.repositoryId !== input.repositoryId,
+    );
+    pending.push({
+      repositoryId: input.repositoryId,
+      headSha: input.headSha.toLowerCase(),
+      contexts,
+      actorEmail: input.actorEmail,
+      attempts: 0,
+    });
     await this.ctx.storage.put('pending', pending.slice(-20));
     await this.ctx.storage.setAlarm(Date.now() + 1000).catch(() => undefined);
     return { queued: contexts.length };
@@ -111,7 +126,14 @@ class CheckRunnerWorker extends DurableObject<Env> {
         try {
           const { UUIDUtil } = await import('@edge-git/shared/utils');
           const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
-          await dao.create({ id: UUIDUtil.getRandomUUID(), repositoryId: item.repositoryId, headSha: item.headSha, context, creatorEmail: item.actorEmail, now });
+          await dao.create({
+            id: UUIDUtil.getRandomUUID(),
+            repositoryId: item.repositoryId,
+            headSha: item.headSha,
+            context,
+            creatorEmail: item.actorEmail,
+            now,
+          });
           run = await dao.getByRepoShaContext(item.repositoryId, item.headSha, context).catch(() => null);
         } catch {
           continue;
@@ -135,7 +157,11 @@ class CheckRunnerWorker extends DurableObject<Env> {
   ): Promise<void> {
     if (definition.state === 'absent') return;
     if (definition.state === 'error') {
-      await this.completeCustom(dao, item, context, null, { conclusion: 'action_required', title: 'Invalid Check Definition', summary: definition.message });
+      await this.completeCustom(dao, item, context, null, {
+        conclusion: 'action_required',
+        title: 'Invalid Check Definition',
+        summary: definition.message,
+      });
       return;
     }
     const entry = definition.checks.find((c) => c.context.toLowerCase() === context.toLowerCase()) ?? null;
@@ -161,7 +187,14 @@ class CheckRunnerWorker extends DurableObject<Env> {
         try {
           const { UUIDUtil } = await import('@edge-git/shared/utils');
           const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
-          await dao.create({ id: UUIDUtil.getRandomUUID(), repositoryId: item.repositoryId, headSha: item.headSha, context, creatorEmail: item.actorEmail, now });
+          await dao.create({
+            id: UUIDUtil.getRandomUUID(),
+            repositoryId: item.repositoryId,
+            headSha: item.headSha,
+            context,
+            creatorEmail: item.actorEmail,
+            now,
+          });
           const created = await dao.getByRepoShaContext(item.repositoryId, item.headSha, context).catch(() => null);
           if (!created) return;
           id = created.id;
@@ -195,7 +228,9 @@ class CheckRunnerWorker extends DurableObject<Env> {
     if (existing && existing.status === 'completed') return;
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     if (existing) {
-      await dao.updateStatus(existing.id, item.repositoryId, { status: 'in_progress', conclusion: null, now, completedAt: null }).catch(() => undefined);
+      await dao
+        .updateStatus(existing.id, item.repositoryId, { status: 'in_progress', conclusion: null, now, completedAt: null })
+        .catch(() => undefined);
     }
     try {
       const maxScriptBytes = ConfigurationManager.checks.getCustomJsMaxScriptBytes(this.env);
@@ -257,7 +292,9 @@ class CheckRunnerWorker extends DurableObject<Env> {
     context: string,
   ): Promise<void> {
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
-    await dao.updateStatus(runId, item.repositoryId, { status: 'in_progress', conclusion: null, now, completedAt: null }).catch(() => undefined);
+    await dao
+      .updateStatus(runId, item.repositoryId, { status: 'in_progress', conclusion: null, now, completedAt: null })
+      .catch(() => undefined);
     const [base, arg] = context.split(/:(.*)/).map((s) => s?.trim() ?? '');
     try {
       const step = await this.runStep(repoStub, item.headSha, base ?? context, arg ?? '');
@@ -289,12 +326,7 @@ class CheckRunnerWorker extends DurableObject<Env> {
     }
   }
 
-  private async runStep(
-    repoStub: RepoStubShape,
-    headSha: string,
-    base: string,
-    arg: string,
-  ): Promise<StepOutcome> {
+  private async runStep(repoStub: RepoStubShape, headSha: string, base: string, arg: string): Promise<StepOutcome> {
     switch (base) {
       case 'secret-scan': {
         const files = await repoStub.listAllFiles({ ref: headSha, maxFiles: MAX_SCAN_FILES }).catch(() => []);
@@ -327,7 +359,10 @@ class CheckRunnerWorker extends DurableObject<Env> {
         const required = parseRequiredGlobs(arg);
         const patterns = required.length > 0 ? required : ['README.md'];
         const files = await repoStub.listAllFiles({ ref: headSha, maxFiles: 500 }).catch(() => []);
-        return runRequiredFilesStep(files.map((f) => f.path), patterns);
+        return runRequiredFilesStep(
+          files.map((f) => f.path),
+          patterns,
+        );
       }
       default: {
         return { conclusion: 'neutral', title: 'Unknown Check', summary: `No built-in step for ${base}.` };
@@ -346,13 +381,7 @@ class CheckRunnerWorker extends DurableObject<Env> {
     }
   }
 
-  private async emitCheckCompleted(
-    item: PendingItem,
-    runId: string,
-    context: string,
-    conclusion: string,
-    title: string,
-  ): Promise<void> {
+  private async emitCheckCompleted(item: PendingItem, runId: string, context: string, conclusion: string, title: string): Promise<void> {
     const fullName = await this.resolveFullName(item.repositoryId);
     if (!fullName) return;
     await createRequestScope(this.env)

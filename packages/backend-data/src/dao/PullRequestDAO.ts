@@ -168,14 +168,20 @@ class PullRequestDAO extends BaseDAO {
     await this.withRetry(
       () =>
         this.database
-          .prepare('UPDATE pull_requests SET status = ?, merged_by = ?, merged_at = ?, head_oid = COALESCE(?, head_oid), updated_at = ? WHERE id = ?')
+          .prepare(
+            'UPDATE pull_requests SET status = ?, merged_by = ?, merged_at = ?, head_oid = COALESCE(?, head_oid), updated_at = ? WHERE id = ?',
+          )
           .bind('merged', mergedBy, now, commitOid, now, id)
           .run(),
       'mark pull request merged',
     );
   }
 
-  public async updateOids(id: string, oids: { baseOid?: string | null; headOid?: string | null; mergeBaseOid?: string | null }, now: number): Promise<void> {
+  public async updateOids(
+    id: string,
+    oids: { baseOid?: string | null; headOid?: string | null; mergeBaseOid?: string | null },
+    now: number,
+  ): Promise<void> {
     await this.withRetry(
       () =>
         this.database
@@ -189,11 +195,19 @@ class PullRequestDAO extends BaseDAO {
   }
 
   public async setDraft(id: string, isDraft: boolean, now: number): Promise<void> {
-    await this.database.prepare('UPDATE pull_requests SET is_draft = ?, updated_at = ? WHERE id = ?').bind(isDraft ? 1 : 0, now, id).run().catch(() => undefined);
+    await this.database
+      .prepare('UPDATE pull_requests SET is_draft = ?, updated_at = ? WHERE id = ?')
+      .bind(isDraft ? 1 : 0, now, id)
+      .run()
+      .catch(() => undefined);
   }
 
   public async setMilestone(id: string, milestoneId: string | null, now: number): Promise<void> {
-    await this.database.prepare('UPDATE pull_requests SET milestone_id = ?, updated_at = ? WHERE id = ?').bind(milestoneId, id, now).run().catch(() => undefined);
+    await this.database
+      .prepare('UPDATE pull_requests SET milestone_id = ?, updated_at = ? WHERE id = ?')
+      .bind(milestoneId, id, now)
+      .run()
+      .catch(() => undefined);
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {
@@ -231,7 +245,9 @@ class PullRequestDAO extends BaseDAO {
     await this.withRetry(
       () =>
         this.database
-          .prepare('INSERT INTO pull_request_reviews (id, pull_request_id, author_email, state, body, commit_oid, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+          .prepare(
+            'INSERT INTO pull_request_reviews (id, pull_request_id, author_email, state, body, commit_oid, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          )
           .bind(input.id, input.pullRequestId, input.authorEmail, input.state, input.body, input.commitOid, input.now)
           .run(),
       'add pull request review',
@@ -249,7 +265,10 @@ class PullRequestDAO extends BaseDAO {
   public async addComment(id: string, pullRequestId: string, authorEmail: string, body: string, now: number): Promise<void> {
     await this.withRetry(
       () =>
-        this.database.prepare('INSERT INTO pull_request_comments (id, pull_request_id, author_email, body, created_at) VALUES (?, ?, ?, ?, ?)').bind(id, pullRequestId, authorEmail, body, now).run(),
+        this.database
+          .prepare('INSERT INTO pull_request_comments (id, pull_request_id, author_email, body, created_at) VALUES (?, ?, ?, ?, ?)')
+          .bind(id, pullRequestId, authorEmail, body, now)
+          .run(),
       'add pull request comment',
     );
   }
@@ -293,7 +312,6 @@ class PullRequestDAO extends BaseDAO {
       ).catch(() => undefined);
     }
   }
-
 }
 
 export { PullRequestDAO };

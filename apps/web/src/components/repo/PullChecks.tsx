@@ -20,7 +20,17 @@ function labelFor(run: CheckRun): string {
   return run.conclusion ?? run.status;
 }
 
-export function PullChecks({ owner, repo, headOid, authorized }: { owner: string; repo: string; headOid: string | null; authorized?: boolean | null }) {
+export function PullChecks({
+  owner,
+  repo,
+  headOid,
+  authorized,
+}: {
+  owner: string;
+  repo: string;
+  headOid: string | null;
+  authorized?: boolean | null;
+}) {
   const { t } = useTranslation();
   const [runs, setRuns] = useState<CheckRun[]>([]);
   const [state, setState] = useState<CheckCombinedState>('pending');

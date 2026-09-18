@@ -55,6 +55,11 @@ export async function listWebhookDeliveries(
   return { deliveries: data.deliveries ?? [], nextCursor: data.nextCursor ?? null };
 }
 
-export async function redeliverWebhook(owner: string, repo: string, hookId: string, deliveryId: string): Promise<{ delivery: WebhookDelivery }> {
+export async function redeliverWebhook(
+  owner: string,
+  repo: string,
+  hookId: string,
+  deliveryId: string,
+): Promise<{ delivery: WebhookDelivery }> {
   return apiPost<{ delivery: WebhookDelivery }>(`${hookBase(owner, repo, hookId)}/deliveries/${encodeURIComponent(deliveryId)}/redeliver`);
 }

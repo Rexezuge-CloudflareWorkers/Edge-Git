@@ -64,7 +64,17 @@ function eventDetail(event: RepoEvent): string | null {
   return null;
 }
 
-export function ActivityTab({ owner, repo, showNotice, authorized }: { owner: string; repo: string; showNotice: (type: 'success' | 'error', text: string) => void; authorized?: boolean | null }) {
+export function ActivityTab({
+  owner,
+  repo,
+  showNotice,
+  authorized,
+}: {
+  owner: string;
+  repo: string;
+  showNotice: (type: 'success' | 'error', text: string) => void;
+  authorized?: boolean | null;
+}) {
   const { t } = useTranslation();
   const [events, setEvents] = useState<RepoEvent[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -81,7 +91,8 @@ export function ActivityTab({ owner, repo, showNotice, authorized }: { owner: st
         setEvents(data.events);
         setCursor(data.nextCursor);
       } catch (error) {
-        if (!cancelled) showNotice('error', error instanceof Error ? error.message : t('social.failedToLoadActivity', 'Failed To Load Activity.'));
+        if (!cancelled)
+          showNotice('error', error instanceof Error ? error.message : t('social.failedToLoadActivity', 'Failed To Load Activity.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -141,7 +152,10 @@ export function ActivityTab({ owner, repo, showNotice, authorized }: { owner: st
           {events.map((event) => (
             <li key={event.id} className="py-3 first:pt-0 last:pb-0">
               <p className="text-sm text-[var(--color-text-primary)]">
-                <span className="font-medium">{event.actor_email}</span> <span className="text-[var(--color-text-secondary)]">{t(`social.events.${event.type}`, EVENT_LABELS[event.type] ?? event.type)}</span>{' '}
+                <span className="font-medium">{event.actor_email}</span>{' '}
+                <span className="text-[var(--color-text-secondary)]">
+                  {t(`social.events.${event.type}`, EVENT_LABELS[event.type] ?? event.type)}
+                </span>{' '}
                 {eventTarget(event) && <span className="font-medium">{eventTarget(event)}</span>}
               </p>
               <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
@@ -149,12 +163,18 @@ export function ActivityTab({ owner, repo, showNotice, authorized }: { owner: st
                 {formatTimestamp(event.created_at)}
               </p>
               {event.subject_type === 'issue' && event.subject_number !== null && (
-                <Link to={`/${owner}/${repo}/issues/${event.subject_number}`} className="mt-0.5 inline-block text-xs text-[var(--color-accent)] hover:underline">
+                <Link
+                  to={`/${owner}/${repo}/issues/${event.subject_number}`}
+                  className="mt-0.5 inline-block text-xs text-[var(--color-accent)] hover:underline"
+                >
                   {t('social.viewIssue', 'View Issue #{{number}}', { number: event.subject_number })}
                 </Link>
               )}
               {event.subject_type === 'pull' && event.subject_number !== null && (
-                <Link to={`/${owner}/${repo}/pulls/${event.subject_number}`} className="mt-0.5 inline-block text-xs text-[var(--color-accent)] hover:underline">
+                <Link
+                  to={`/${owner}/${repo}/pulls/${event.subject_number}`}
+                  className="mt-0.5 inline-block text-xs text-[var(--color-accent)] hover:underline"
+                >
                   {t('social.viewPull', 'View Pull #{{number}}', { number: event.subject_number })}
                 </Link>
               )}

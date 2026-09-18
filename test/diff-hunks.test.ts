@@ -73,7 +73,11 @@ describe('HistoryService commit and compare diffs', () => {
 
   it('returns commit metadata plus hunks for the second commit', async () => {
     const { svc, second } = await makeRepo();
-    const result = (await svc.getCommitDiff(second, 10)) as { commit: { oid: string } | null; truncated: boolean; files: Array<{ path: string; hunks: unknown[] }> };
+    const result = (await svc.getCommitDiff(second, 10)) as {
+      commit: { oid: string } | null;
+      truncated: boolean;
+      files: Array<{ path: string; hunks: unknown[] }>;
+    };
     expect(result.commit).toMatchObject({ oid: second });
     expect(result.truncated).toBe(false);
     expect(result.files).toHaveLength(1);
@@ -89,7 +93,12 @@ describe('HistoryService commit and compare diffs', () => {
 
   it('compares refs three-dot via the merge base', async () => {
     const { svc, first, second } = await makeRepo();
-    const result = (await svc.getCompareDiff(first, second, 10)) as { baseOid: string; headOid: string; mergeBase: string | null; files: unknown[] } | null;
+    const result = (await svc.getCompareDiff(first, second, 10)) as {
+      baseOid: string;
+      headOid: string;
+      mergeBase: string | null;
+      files: unknown[];
+    } | null;
     expect(result).not.toBeNull();
     expect(result).toMatchObject({ baseOid: first, headOid: second, mergeBase: first });
     expect(result?.files).toHaveLength(1);

@@ -47,8 +47,14 @@ class SocialPruningTask extends BaseScheduledTask {
     const retentionDays = ConfigurationManager.processing.getAuditLogRetentionDays(env);
     const cutoff = TimestampUtil.getCurrentUnixTimestampInSeconds() - retentionDays * 86_400;
     const scope = createRequestScope(env);
-    const prunedEvents = await scope.get(Tokens.EventDAO)().then((dao) => dao.pruneOlderThan(cutoff, 500)).catch(() => 0);
-    const prunedNotifications = await scope.get(Tokens.NotificationDAO)().then((dao) => dao.pruneReadOlderThan(cutoff, 500)).catch(() => 0);
+    const prunedEvents = await scope
+      .get(Tokens.EventDAO)()
+      .then((dao) => dao.pruneOlderThan(cutoff, 500))
+      .catch(() => 0);
+    const prunedNotifications = await scope
+      .get(Tokens.NotificationDAO)()
+      .then((dao) => dao.pruneReadOlderThan(cutoff, 500))
+      .catch(() => 0);
     if (prunedEvents > 0 || prunedNotifications > 0) {
       logger.info(`Pruned ${prunedEvents} repo events and ${prunedNotifications} read notifications`);
     }

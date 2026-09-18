@@ -77,7 +77,10 @@ export function DashboardView({ showNotice }: { showNotice: (type: 'success' | '
                 <ChevronDown className="h-3.5 w-3.5" />
               </Button>
               {newOpen && (
-                <div role="menu" className="absolute right-0 mt-2 w-52 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-1)] p-1.5 shadow-xl z-30">
+                <div
+                  role="menu"
+                  className="absolute right-0 mt-2 w-52 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-1)] p-1.5 shadow-xl z-30"
+                >
                   <button
                     type="button"
                     role="menuitem"
@@ -116,7 +119,11 @@ export function DashboardView({ showNotice }: { showNotice: (type: 'success' | '
           <p className="text-sm text-[var(--color-text-secondary)]">
             Authenticated push and private fetch use a personal access token as the password:{' '}
             <code className="font-mono text-xs">https://&lt;owner&gt;:&lt;PAT&gt;@host/owner/repo</code>. Public repos allow anonymous
-            fetch. Manage tokens in <Link to="/settings" className="text-[var(--color-accent)] hover:underline">Settings</Link>.
+            fetch. Manage tokens in{' '}
+            <Link to="/settings" className="text-[var(--color-accent)] hover:underline">
+              Settings
+            </Link>
+            .
           </p>
         </div>
       </Card>

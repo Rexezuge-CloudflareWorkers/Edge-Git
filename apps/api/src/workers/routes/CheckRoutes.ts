@@ -57,9 +57,7 @@ function registerCheckPublicRoutes(app: CheckApp): void {
   app.get('/repos/:owner/:repo/commits/:sha/checks', async (c) => {
     return withPublicRepo(c as never, async (row) => {
       try {
-        const { runs, state } = await createRequestScope(c.env)
-          .get(Tokens.CheckService)
-          .listForSha(row.id, c.req.param('sha'));
+        const { runs, state } = await createRequestScope(c.env).get(Tokens.CheckService).listForSha(row.id, c.req.param('sha'));
         return c.json({ state, checks: runs.map(toCheckJson) });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : 'Failed to list checks' }, toServiceStatus(error));
@@ -104,17 +102,15 @@ function registerCheckUserRoutes(app: CheckApp): void {
       outputSummary?: unknown;
     };
     try {
-      const run = await createRequestScope(c.env)
-        .get(Tokens.CheckService)
-        .reportStatus({
-          repositoryId: row.id,
-          headSha: body.headSha,
-          context: body.context,
-          creatorEmail: email,
-          detailsUrl: body.detailsUrl,
-          outputTitle: body.outputTitle,
-          outputSummary: body.outputSummary,
-        });
+      const run = await createRequestScope(c.env).get(Tokens.CheckService).reportStatus({
+        repositoryId: row.id,
+        headSha: body.headSha,
+        context: body.context,
+        creatorEmail: email,
+        detailsUrl: body.detailsUrl,
+        outputTitle: body.outputTitle,
+        outputSummary: body.outputSummary,
+      });
       const fullName = `${row.owner}/${row.name}`;
       enqueueChecksBestEffort(c.env, fullName, {
         repositoryId: row.id,

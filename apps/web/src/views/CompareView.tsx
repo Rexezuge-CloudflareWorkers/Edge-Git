@@ -89,7 +89,12 @@ export function CompareView({
 
   return (
     <div>
-      <RepoHeader repo={repoData} activeTab="code" showSettings={false} onTabChange={(id: RepoTab) => navigate(`/${owner}/${repo}${id === 'code' ? '' : `?tab=${id}`}`)} />
+      <RepoHeader
+        repo={repoData}
+        activeTab="code"
+        showSettings={false}
+        onTabChange={(id: RepoTab) => navigate(`/${owner}/${repo}${id === 'code' ? '' : `?tab=${id}`}`)}
+      />
       <AppPage>
         <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">
           {t('commits.compare', 'Compare')} <code className="font-mono text-sm text-[var(--color-accent)]">{base || '…'}</code>

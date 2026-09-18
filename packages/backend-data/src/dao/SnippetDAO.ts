@@ -46,7 +46,11 @@ class SnippetDAO extends BaseDAO {
   }
 
   public async getById(id: string): Promise<SnippetRow | null> {
-    return this.database.prepare('SELECT * FROM snippets WHERE id = ? LIMIT 1').bind(id).first<SnippetRow>().catch(() => null);
+    return this.database
+      .prepare('SELECT * FROM snippets WHERE id = ? LIMIT 1')
+      .bind(id)
+      .first<SnippetRow>()
+      .catch(() => null);
   }
 
   public async listByOwner(ownerEmail: string, includeSecret: boolean): Promise<SnippetRow[]> {
@@ -105,13 +109,21 @@ class SnippetDAO extends BaseDAO {
     if (sets.length === 0) return;
     sets.push('updated_at = ?');
     await this.withRetry(
-      () => this.database.prepare(`UPDATE snippets SET ${sets.join(', ')} WHERE id = ?`).bind(...values, now, id).run(),
+      () =>
+        this.database
+          .prepare(`UPDATE snippets SET ${sets.join(', ')} WHERE id = ?`)
+          .bind(...values, now, id)
+          .run(),
       'update snippet',
     );
   }
 
   public async replaceFiles(snippetId: string, files: Array<{ filename: string; body: string }>, now: number): Promise<void> {
-    await this.database.prepare('DELETE FROM snippet_files WHERE snippet_id = ?').bind(snippetId).run().catch(() => undefined);
+    await this.database
+      .prepare('DELETE FROM snippet_files WHERE snippet_id = ?')
+      .bind(snippetId)
+      .run()
+      .catch(() => undefined);
     for (const [index, file] of files.entries()) {
       await this.withRetry(
         () =>
@@ -125,7 +137,11 @@ class SnippetDAO extends BaseDAO {
   }
 
   public async deleteSnippet(id: string): Promise<void> {
-    await this.database.prepare('DELETE FROM snippet_files WHERE snippet_id = ?').bind(id).run().catch(() => undefined);
+    await this.database
+      .prepare('DELETE FROM snippet_files WHERE snippet_id = ?')
+      .bind(id)
+      .run()
+      .catch(() => undefined);
     await this.withRetry(() => this.database.prepare('DELETE FROM snippets WHERE id = ?').bind(id).run(), 'delete snippet');
   }
 

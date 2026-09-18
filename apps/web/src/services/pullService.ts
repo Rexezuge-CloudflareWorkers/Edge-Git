@@ -30,7 +30,11 @@ export async function listPulls(owner: string, repo: string, opts?: ReadOpts & {
   if (opts?.label) params.set('label', opts.label);
   if (opts?.q) params.set('q', opts.q);
   const suffix = params.size > 0 ? `?${params.toString()}` : '';
-  const data = await tryAuthedFirst<{ pulls?: PullRequest[] }>(`${authedBase(owner, repo)}${suffix}`, `${publicBase(owner, repo)}${suffix}`, opts?.isAuthed);
+  const data = await tryAuthedFirst<{ pulls?: PullRequest[] }>(
+    `${authedBase(owner, repo)}${suffix}`,
+    `${publicBase(owner, repo)}${suffix}`,
+    opts?.isAuthed,
+  );
   return data.pulls ?? [];
 }
 
@@ -57,7 +61,11 @@ function unwrapPull(data: PullRequest | { pull?: PullRequest }): PullRequest {
 
 export async function getPull(owner: string, repo: string, number: number, opts?: ReadOpts): Promise<PullRequest> {
   return unwrapPull(
-    await tryAuthedFirst<PullRequest | { pull?: PullRequest }>(authedPull(owner, repo, number), publicPull(owner, repo, number), opts?.isAuthed),
+    await tryAuthedFirst<PullRequest | { pull?: PullRequest }>(
+      authedPull(owner, repo, number),
+      publicPull(owner, repo, number),
+      opts?.isAuthed,
+    ),
   );
 }
 
@@ -123,11 +131,23 @@ export async function mergePull(
   number: number,
   input?: { message?: string; deleteHead?: boolean; strategy?: 'merge' | 'squash' | 'rebase' },
 ): Promise<{ pull: PullRequest; merge: { type?: string; commitOid?: string; deletedHead?: boolean } }> {
-  return apiPost<{ pull: PullRequest; merge: { type?: string; commitOid?: string; deletedHead?: boolean } }>(`${authedPull(owner, repo, number)}/merge`, input ?? {});
+  return apiPost<{ pull: PullRequest; merge: { type?: string; commitOid?: string; deletedHead?: boolean } }>(
+    `${authedPull(owner, repo, number)}/merge`,
+    input ?? {},
+  );
 }
 
-export async function dismissPullReview(owner: string, repo: string, number: number, reviewId: string, reason?: string): Promise<PullReview> {
-  const data = await apiPost<PullReview | { review?: PullReview }>(`${authedPull(owner, repo, number)}/reviews/${encodeURIComponent(reviewId)}/dismiss`, reason ? { reason } : {});
+export async function dismissPullReview(
+  owner: string,
+  repo: string,
+  number: number,
+  reviewId: string,
+  reason?: string,
+): Promise<PullReview> {
+  const data = await apiPost<PullReview | { review?: PullReview }>(
+    `${authedPull(owner, repo, number)}/reviews/${encodeURIComponent(reviewId)}/dismiss`,
+    reason ? { reason } : {},
+  );
   const nested = (data as { review?: PullReview }).review;
   return nested ?? (data as PullReview);
 }
@@ -152,7 +172,13 @@ export async function openPullThread(
   return nested ?? (data as PullReviewThread);
 }
 
-export async function replyPullThread(owner: string, repo: string, number: number, threadId: string, body: string): Promise<PullThreadComment> {
+export async function replyPullThread(
+  owner: string,
+  repo: string,
+  number: number,
+  threadId: string,
+  body: string,
+): Promise<PullThreadComment> {
   const data = await apiPost<PullThreadComment | { comment?: PullThreadComment }>(
     `${authedPull(owner, repo, number)}/threads/${encodeURIComponent(threadId)}/replies`,
     { body },
@@ -161,10 +187,19 @@ export async function replyPullThread(owner: string, repo: string, number: numbe
   return nested ?? (data as PullThreadComment);
 }
 
-export async function resolvePullThread(owner: string, repo: string, number: number, threadId: string, resolved: boolean): Promise<PullReviewThread> {
-  const data = await apiPatch<PullReviewThread | { thread?: PullReviewThread }>(`${authedPull(owner, repo, number)}/threads/${encodeURIComponent(threadId)}`, {
-    resolved,
-  });
+export async function resolvePullThread(
+  owner: string,
+  repo: string,
+  number: number,
+  threadId: string,
+  resolved: boolean,
+): Promise<PullReviewThread> {
+  const data = await apiPatch<PullReviewThread | { thread?: PullReviewThread }>(
+    `${authedPull(owner, repo, number)}/threads/${encodeURIComponent(threadId)}`,
+    {
+      resolved,
+    },
+  );
   const nested = (data as { thread?: PullReviewThread }).thread;
   return nested ?? (data as PullReviewThread);
 }

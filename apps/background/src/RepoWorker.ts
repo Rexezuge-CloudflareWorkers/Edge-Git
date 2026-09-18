@@ -198,7 +198,9 @@ class RepoWorker extends DurableObject<Env> {
     return this.reads.setDefaultBranch(branch);
   }
 
-  public async getTags(): Promise<Array<{ name: string; ref: string; oid: string; peeledOid: string | null; type: 'lightweight' | 'annotated' }>> {
+  public async getTags(): Promise<
+    Array<{ name: string; ref: string; oid: string; peeledOid: string | null; type: 'lightweight' | 'annotated' }>
+  > {
     return this.reads.getTags();
   }
 
@@ -210,7 +212,13 @@ class RepoWorker extends DurableObject<Env> {
     return this.reads.getBlob(args);
   }
 
-  public async getOverview(args: { ref?: string; path?: string; depth?: number; includeTags?: boolean; includeReadme?: boolean }): Promise<unknown> {
+  public async getOverview(args: {
+    ref?: string;
+    path?: string;
+    depth?: number;
+    includeTags?: boolean;
+    includeReadme?: boolean;
+  }): Promise<unknown> {
     return this.reads.getOverview(args);
   }
 

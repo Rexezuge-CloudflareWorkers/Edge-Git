@@ -20,9 +20,7 @@ function createReleaseFakeDb(state: ReleaseState): D1Queryable {
           );
         }
         if (q.includes('FROM releases WHERE id = ? AND repository_id = ?')) {
-          return Promise.resolve(
-            (state.releases.find((r) => r.id === params[0] && r.repository_id === params[1]) ?? null) as T | null,
-          );
+          return Promise.resolve((state.releases.find((r) => r.id === params[0] && r.repository_id === params[1]) ?? null) as T | null);
         }
         if (q.includes('SELECT COUNT(*) AS count FROM releases')) {
           return Promise.resolve({ count: state.releases.filter((r) => r.repository_id === params[0]).length } as T);
@@ -31,14 +29,10 @@ function createReleaseFakeDb(state: ReleaseState): D1Queryable {
           return Promise.resolve({ count: state.assets.filter((a) => a.release_id === params[0]).length } as T);
         }
         if (q.includes('FROM release_assets WHERE id = ? AND release_id = ?')) {
-          return Promise.resolve(
-            (state.assets.find((a) => a.id === params[0] && a.release_id === params[1]) ?? null) as T | null,
-          );
+          return Promise.resolve((state.assets.find((a) => a.id === params[0] && a.release_id === params[1]) ?? null) as T | null);
         }
         if (q.includes('FROM release_assets WHERE release_id = ? AND name = ?')) {
-          return Promise.resolve(
-            (state.assets.find((a) => a.release_id === params[0] && a.name === params[1]) ?? null) as T | null,
-          );
+          return Promise.resolve((state.assets.find((a) => a.release_id === params[0] && a.name === params[1]) ?? null) as T | null);
         }
         return Promise.resolve(null);
       },
@@ -53,8 +47,9 @@ function createReleaseFakeDb(state: ReleaseState): D1Queryable {
       },
       run(): Promise<{ success: boolean; meta?: { changes?: number } }> {
         if (q.startsWith('INSERT INTO releases')) {
-          const [id, repository_id, tag_name, name, body, is_draft, is_prerelease, created_by, created_at, published_at] =
-            params as Array<string | number | null>;
+          const [id, repository_id, tag_name, name, body, is_draft, is_prerelease, created_by, created_at, published_at] = params as Array<
+            string | number | null
+          >;
           state.releases.push({ id, repository_id, tag_name, name, body, is_draft, is_prerelease, created_by, created_at, published_at });
           return Promise.resolve({ success: true });
         }
@@ -79,8 +74,9 @@ function createReleaseFakeDb(state: ReleaseState): D1Queryable {
           return Promise.resolve({ success: true });
         }
         if (q.startsWith('INSERT INTO release_assets')) {
-          const [id, release_id, repository_id, name, size, content_type, sha256, created_by, created_at] =
-            params as Array<string | number>;
+          const [id, release_id, repository_id, name, size, content_type, sha256, created_by, created_at] = params as Array<
+            string | number
+          >;
           state.assets.push({ id, release_id, repository_id, name, size, content_type, sha256, created_by, created_at });
           return Promise.resolve({ success: true });
         }
@@ -203,7 +199,12 @@ describe('ReleaseService assets', () => {
   it('creates, lists, gets, and deletes assets', async () => {
     const svc = new ReleaseService({ DB: createReleaseFakeDb(freshState()) });
     await svc.createRelease('r1', { tagName: 'v1' }, 'a@b.c');
-    const asset = await svc.createAsset('r1', 'v1', { name: 'app.tar.gz', size: 12, contentType: 'Application/Gzip', sha256: sha }, 'A@b.c');
+    const asset = await svc.createAsset(
+      'r1',
+      'v1',
+      { name: 'app.tar.gz', size: 12, contentType: 'Application/Gzip', sha256: sha },
+      'A@b.c',
+    );
     expect(asset.contentType).toBe('application/gzip');
     expect(asset.createdBy).toBe('a@b.c');
     await expect(svc.createAsset('r1', 'v1', { name: 'app.tar.gz', size: 5, sha256: sha }, 'a@b.c')).rejects.toThrow('already exists');
@@ -219,7 +220,9 @@ describe('ReleaseService assets', () => {
     await svc.createRelease('r1', { tagName: 'v1' }, 'a@b.c');
     await expect(svc.createAsset('r1', 'v1', { name: 'big.bin', size: 101, sha256: 'b'.repeat(64) }, 'a@b.c')).rejects.toThrow('size');
     await svc.createAsset('r1', 'v1', { name: 'a.bin', size: 10, sha256: 'b'.repeat(64) }, 'a@b.c');
-    await expect(svc.createAsset('r1', 'v1', { name: 'b.bin', size: 10, sha256: 'c'.repeat(64) }, 'a@b.c')).rejects.toThrow('Maximum 1 assets');
+    await expect(svc.createAsset('r1', 'v1', { name: 'b.bin', size: 10, sha256: 'c'.repeat(64) }, 'a@b.c')).rejects.toThrow(
+      'Maximum 1 assets',
+    );
   });
 });
 
@@ -227,13 +230,33 @@ describe('ReleaseDAO SQL', () => {
   it('round-trips releases and assets', async () => {
     const state = freshState();
     const dao = new ReleaseDAO(createReleaseFakeDb(state));
-    await dao.createRelease({ id: 'rel-1', repositoryId: 'r1', tagName: 'v1', name: 'V1', body: 'notes', isDraft: true, isPrerelease: false, createdBy: 'a@b.c', now: 7 });
+    await dao.createRelease({
+      id: 'rel-1',
+      repositoryId: 'r1',
+      tagName: 'v1',
+      name: 'V1',
+      body: 'notes',
+      isDraft: true,
+      isPrerelease: false,
+      createdBy: 'a@b.c',
+      now: 7,
+    });
     expect(await dao.countByRepo('r1')).toBe(1);
     expect((await dao.listByRepo('r1')).length).toBe(1);
     expect(await dao.getByTag('r1', 'v1')).toMatchObject({ id: 'rel-1' });
     await dao.updateRelease('rel-1', 'r1', { name: 'V1!', isDraft: false, publishedAt: 9 });
     expect(await dao.getByTag('r1', 'v1')).toMatchObject({ name: 'V1!', is_draft: 0, published_at: 9 });
-    await dao.createAsset({ id: 'a-1', releaseId: 'rel-1', repositoryId: 'r1', name: 'x.bin', size: 3, contentType: 'application/octet-stream', sha256: 'd'.repeat(64), createdBy: 'a@b.c', now: 8 });
+    await dao.createAsset({
+      id: 'a-1',
+      releaseId: 'rel-1',
+      repositoryId: 'r1',
+      name: 'x.bin',
+      size: 3,
+      contentType: 'application/octet-stream',
+      sha256: 'd'.repeat(64),
+      createdBy: 'a@b.c',
+      now: 8,
+    });
     expect(await dao.countAssets('rel-1')).toBe(1);
     expect(await dao.getAssetByName('rel-1', 'x.bin')).toMatchObject({ id: 'a-1' });
     await dao.deleteAsset('a-1', 'rel-1');
@@ -245,8 +268,28 @@ describe('ReleaseDAO SQL', () => {
   it('deletes releases and assets by repo', async () => {
     const state = freshState();
     const dao = new ReleaseDAO(createReleaseFakeDb(state));
-    await dao.createRelease({ id: 'rel-1', repositoryId: 'r1', tagName: 'v1', name: '', body: '', isDraft: true, isPrerelease: false, createdBy: 'a@b.c', now: 1 });
-    await dao.createAsset({ id: 'a-1', releaseId: 'rel-1', repositoryId: 'r1', name: 'x.bin', size: 1, contentType: 'application/octet-stream', sha256: 'e'.repeat(64), createdBy: 'a@b.c', now: 1 });
+    await dao.createRelease({
+      id: 'rel-1',
+      repositoryId: 'r1',
+      tagName: 'v1',
+      name: '',
+      body: '',
+      isDraft: true,
+      isPrerelease: false,
+      createdBy: 'a@b.c',
+      now: 1,
+    });
+    await dao.createAsset({
+      id: 'a-1',
+      releaseId: 'rel-1',
+      repositoryId: 'r1',
+      name: 'x.bin',
+      size: 1,
+      contentType: 'application/octet-stream',
+      sha256: 'e'.repeat(64),
+      createdBy: 'a@b.c',
+      now: 1,
+    });
     await dao.deleteByRepo('r1');
     expect(await dao.countByRepo('r1')).toBe(0);
   });

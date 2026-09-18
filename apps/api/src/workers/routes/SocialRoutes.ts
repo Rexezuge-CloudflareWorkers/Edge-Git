@@ -9,8 +9,14 @@ type SocialApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddres
 async function getCounts(env: Env, repoId: string): Promise<{ starsCount: number; watchersCount: number }> {
   const scope = createRequestScope(env);
   const [starsCount, watchersCount] = await Promise.all([
-    scope.get(Tokens.StarService).countByRepo(repoId).catch(() => 0),
-    scope.get(Tokens.WatchService).countByRepo(repoId).catch(() => 0),
+    scope
+      .get(Tokens.StarService)
+      .countByRepo(repoId)
+      .catch(() => 0),
+    scope
+      .get(Tokens.WatchService)
+      .countByRepo(repoId)
+      .catch(() => 0),
   ]);
   return { starsCount, watchersCount };
 }
@@ -24,8 +30,16 @@ function registerSocialRoutes(app: SocialApp): void {
       const scope = createRequestScope(c.env);
       const viewerEmail = await resolvePublicViewer(c as never);
       const [starsCount, viewerStarred] = await Promise.all([
-        scope.get(Tokens.StarService).countByRepo(row.id).catch(() => 0),
-        viewerEmail ? scope.get(Tokens.StarService).isStarred(row.id, viewerEmail).catch(() => false) : Promise.resolve(false),
+        scope
+          .get(Tokens.StarService)
+          .countByRepo(row.id)
+          .catch(() => 0),
+        viewerEmail
+          ? scope
+              .get(Tokens.StarService)
+              .isStarred(row.id, viewerEmail)
+              .catch(() => false)
+          : Promise.resolve(false),
       ]);
       return c.json({ count: starsCount, starsCount, viewerStarred });
     });
@@ -36,8 +50,16 @@ function registerSocialRoutes(app: SocialApp): void {
       const scope = createRequestScope(c.env);
       const viewerEmail = await resolvePublicViewer(c as never);
       const [watchersCount, viewerWatching] = await Promise.all([
-        scope.get(Tokens.WatchService).countByRepo(row.id).catch(() => 0),
-        viewerEmail ? scope.get(Tokens.WatchService).isWatching(row.id, viewerEmail).catch(() => false) : Promise.resolve(false),
+        scope
+          .get(Tokens.WatchService)
+          .countByRepo(row.id)
+          .catch(() => 0),
+        viewerEmail
+          ? scope
+              .get(Tokens.WatchService)
+              .isWatching(row.id, viewerEmail)
+              .catch(() => false)
+          : Promise.resolve(false),
       ]);
       return c.json({ count: watchersCount, watchersCount, viewerWatching });
     });
@@ -156,12 +178,26 @@ function registerUserSocialRoutes(app: SocialApp): void {
 async function listSocialRepos(env: Env, email: string, kind: 'stars' | 'watches'): Promise<unknown[]> {
   const scope = createRequestScope(env);
   const ids =
-    kind === 'stars' ? await scope.get(Tokens.StarService).listRepoIdsByUser(email, 200).catch(() => []) : await scope.get(Tokens.WatchService).listRepoIdsByUser(email, 200).catch(() => []);
+    kind === 'stars'
+      ? await scope
+          .get(Tokens.StarService)
+          .listRepoIdsByUser(email, 200)
+          .catch(() => [])
+      : await scope
+          .get(Tokens.WatchService)
+          .listRepoIdsByUser(email, 200)
+          .catch(() => []);
   const repos = [];
   for (const id of ids.slice(0, 200)) {
-    const row = await scope.get(Tokens.RepoService).getById(id).catch(() => null);
+    const row = await scope
+      .get(Tokens.RepoService)
+      .getById(id)
+      .catch(() => null);
     if (!row) continue;
-    const role = await scope.get(Tokens.PermissionService).getRole(email, row).catch(() => null);
+    const role = await scope
+      .get(Tokens.PermissionService)
+      .getRole(email, row)
+      .catch(() => null);
     if (!role) continue;
     const counts = await getCounts(env, row.id);
     repos.push({ ...(toRepoJson(row, role) as Record<string, unknown>), viewerRole: role, ...counts });

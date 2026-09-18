@@ -24,7 +24,12 @@ export function DeliveryStatusBadge({ status }: { status: WebhookDelivery['statu
   return <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${tone}`}>{label}</span>;
 }
 
-async function runHookAction(showNotice: Notice, successMessage: string, failureMessage: string, action: () => Promise<unknown>): Promise<void> {
+async function runHookAction(
+  showNotice: Notice,
+  successMessage: string,
+  failureMessage: string,
+  action: () => Promise<unknown>,
+): Promise<void> {
   try {
     await action();
     showNotice('success', successMessage);
@@ -178,7 +183,9 @@ export function WebhookRow({
       {expanded && (
         <div className="mt-2 rounded-md border border-[var(--color-border)] p-2">
           {loadingDeliveries && <p className="text-sm text-[var(--color-text-muted)]">{t('common.loading', 'Loading…')}</p>}
-          {!loadingDeliveries && deliveries.length === 0 && <p className="text-sm text-[var(--color-text-muted)]">{t('webhooks.noDeliveries', 'No Deliveries Yet.')}</p>}
+          {!loadingDeliveries && deliveries.length === 0 && (
+            <p className="text-sm text-[var(--color-text-muted)]">{t('webhooks.noDeliveries', 'No Deliveries Yet.')}</p>
+          )}
           <ul className="divide-y divide-[var(--color-border)]">
             {deliveries.map((delivery) => (
               <li key={delivery.id} className="py-2 flex items-center justify-between gap-3 first:pt-0 last:pb-0 flex-wrap">

@@ -28,7 +28,10 @@ function registerUserProfileRoutes(app: UserApp): void {
     const scope = createRequestScope(c.env);
     const rawViewer = await resolvePublicViewer(c as never).catch(() => null);
     const viewerEmail = rawViewer?.toLowerCase() ?? null;
-    const user = await scope.get(Tokens.UserService).getByUsername(username).catch(() => null);
+    const user = await scope
+      .get(Tokens.UserService)
+      .getByUsername(username)
+      .catch(() => null);
     if (user?.username) {
       const permission = scope.get(Tokens.PermissionService);
       let repoCount = 0;
@@ -49,24 +52,30 @@ function registerUserProfileRoutes(app: UserApp): void {
       try {
         const targetEmail = user.email.toLowerCase();
         viewerIsSelf = (viewerEmail ?? '').toLowerCase() === targetEmail;
-        const orgs = await scope.get(Tokens.OrganizationService).listOrgsForUser(user.email).catch(() => []);
+        const orgs = await scope
+          .get(Tokens.OrganizationService)
+          .listOrgsForUser(user.email)
+          .catch(() => []);
         if (viewerIsSelf) {
           orgCount = orgs.length;
         } else {
           // Outsiders only see orgs with at least one viewer-visible repo (or shared membership).
-          const repoDao = await scope.get(Tokens.RepositoryDAO)().catch(() => null);
+          const repoDao = await scope
+            .get(Tokens.RepositoryDAO)()
+            .catch(() => null);
           let count = 0;
           for (const org of orgs) {
             let visible = false;
             if (viewerEmail) {
-              const role = await scope.get(Tokens.OrganizationService).getMemberRole(org.id, viewerEmail).catch(() => null);
+              const role = await scope
+                .get(Tokens.OrganizationService)
+                .getMemberRole(org.id, viewerEmail)
+                .catch(() => null);
               if (role) visible = true;
             }
             if (!visible && repoDao) {
               const repos = await repoDao.listByOrgId(org.id, 5).catch(() => []);
-              visible = await hasVisibleRepo(repos, (repo) =>
-                permission.getRole(viewerEmail, repo as never).catch(() => null),
-              );
+              visible = await hasVisibleRepo(repos, (repo) => permission.getRole(viewerEmail, repo as never).catch(() => null));
             }
             if (visible) count += 1;
           }
@@ -84,7 +93,10 @@ function registerUserProfileRoutes(app: UserApp): void {
       });
     }
     // Fall back to org profile so `/:owner` stays unambiguous for clients.
-    const org = await scope.get(Tokens.OrganizationService).getByUsername(username).catch(() => null);
+    const org = await scope
+      .get(Tokens.OrganizationService)
+      .getByUsername(username)
+      .catch(() => null);
     if (!org) return c.json({ error: 'Not found' }, 404);
     let repoCount = 0;
     let memberCount: number | null = null;
@@ -108,7 +120,10 @@ function registerUserProfileRoutes(app: UserApp): void {
     }
     try {
       if (viewerEmail) {
-        const role = await scope.get(Tokens.OrganizationService).getMemberRole(org.id, viewerEmail).catch(() => null);
+        const role = await scope
+          .get(Tokens.OrganizationService)
+          .getMemberRole(org.id, viewerEmail)
+          .catch(() => null);
         viewerIsMember = role !== null;
         viewerIsOwner = role === 'owner';
       }
@@ -138,7 +153,10 @@ function registerUserProfileRoutes(app: UserApp): void {
     const rawViewer = await resolvePublicViewer(c as never).catch(() => null);
     const viewerEmail = rawViewer?.toLowerCase() ?? null;
     const permission = scope.get(Tokens.PermissionService);
-    const user = await scope.get(Tokens.UserService).getByUsername(username).catch(() => null);
+    const user = await scope
+      .get(Tokens.UserService)
+      .getByUsername(username)
+      .catch(() => null);
     if (user?.username) {
       const repoDao = await scope.get(Tokens.RepositoryDAO)();
       const rows = await repoDao.listByOwner(user.username, 200).catch(() => []);
@@ -155,7 +173,10 @@ function registerUserProfileRoutes(app: UserApp): void {
       }
       return c.json({ type: 'user', username: user.username, repos });
     }
-    const org = await scope.get(Tokens.OrganizationService).getByUsername(username).catch(() => null);
+    const org = await scope
+      .get(Tokens.OrganizationService)
+      .getByUsername(username)
+      .catch(() => null);
     if (!org) return c.json({ error: 'Not found' }, 404);
     const repoDao = await scope.get(Tokens.RepositoryDAO)();
     const byOrg = await repoDao.listByOrgId(org.id, 200).catch(() => []);
@@ -183,7 +204,10 @@ function registerUserProfileRoutes(app: UserApp): void {
     const scope = createRequestScope(c.env);
     const rawViewer = await resolvePublicViewer(c as never).catch(() => null);
     const viewerEmail = rawViewer?.toLowerCase() ?? null;
-    const user = await scope.get(Tokens.UserService).getByUsername(username).catch(() => null);
+    const user = await scope
+      .get(Tokens.UserService)
+      .getByUsername(username)
+      .catch(() => null);
     if (!user?.username) return c.json({ error: 'Not found' }, 404);
     const orgService = scope.get(Tokens.OrganizationService);
     const orgs = await orgService.listOrgsForUser(user.email).catch(() => []);
@@ -192,7 +216,9 @@ function registerUserProfileRoutes(app: UserApp): void {
       return c.json({ username: user.username, orgs: orgs.map((o) => ({ username: o.username })) });
     }
     const permission = scope.get(Tokens.PermissionService);
-    const repoDao = await scope.get(Tokens.RepositoryDAO)().catch(() => null);
+    const repoDao = await scope
+      .get(Tokens.RepositoryDAO)()
+      .catch(() => null);
     const visible: Array<{ username: string }> = [];
     for (const org of orgs) {
       let show = false;
@@ -217,7 +243,10 @@ function registerUserSettingsRoutes(app: UserApp): void {
     if (!body.username || typeof body.username !== 'string') return c.json({ error: 'username is required' }, 400);
     try {
       const scope = createRequestScope(c.env);
-      const before = await scope.get(Tokens.UserService).getProfileByEmail(email).catch(() => null);
+      const before = await scope
+        .get(Tokens.UserService)
+        .getProfileByEmail(email)
+        .catch(() => null);
       const renamed = await scope.get(Tokens.UserService).renameUsername(email, body.username);
       // Best-effort DO move for every owned repo: new stub initialized, old stub purged.
       // D1 is source of truth; git objects copy via fresh init (empty) when DO has no copy RPC.
@@ -231,7 +260,9 @@ function registerUserSettingsRoutes(app: UserApp): void {
             const newFull = `${renamed.username}/${repo.name}`;
             try {
               await ensureRepo(c.env, newFull);
-              await getRepoStub(c.env, oldFull).deleteRepo().catch(() => undefined);
+              await getRepoStub(c.env, oldFull)
+                .deleteRepo()
+                .catch(() => undefined);
             } catch {
               // ignore per-repo failures
             }
@@ -244,7 +275,8 @@ function registerUserSettingsRoutes(app: UserApp): void {
       return c.json({ email: profile.email, username: profile.username });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to rename';
-      const status = message.includes('taken') || message.includes('Invalid') || message.includes('reserved') ? 400 : toServiceStatus(error);
+      const status =
+        message.includes('taken') || message.includes('Invalid') || message.includes('reserved') ? 400 : toServiceStatus(error);
       return c.json({ error: message }, status);
     }
   });

@@ -128,7 +128,12 @@ export async function runCustomCheckScript(input: SandboxInput): Promise<Sandbox
   try {
     module_ = await getQuickJSModule();
   } catch (error) {
-    return toSandboxResult('action_required', 'Sandbox Unavailable', `Could not load the JS sandbox: ${error instanceof Error ? error.message : 'unknown error'}`, logs);
+    return toSandboxResult(
+      'action_required',
+      'Sandbox Unavailable',
+      `Could not load the JS sandbox: ${error instanceof Error ? error.message : 'unknown error'}`,
+      logs,
+    );
   }
 
   const runtime = module_.newRuntime();
@@ -153,7 +158,10 @@ export async function runCustomCheckScript(input: SandboxInput): Promise<Sandbox
     // Host implementations return promises (required by newAsyncifiedFunction)
     // but perform no awaits of their own; asyncify still presents them to the
     // guest as synchronous blocking calls.
-    const listFiles = own(bag, ctx.newAsyncifiedFunction('listFiles', () => Promise.resolve(newStringArray(ctx, bag, paths))));
+    const listFiles = own(
+      bag,
+      ctx.newAsyncifiedFunction('listFiles', () => Promise.resolve(newStringArray(ctx, bag, paths))),
+    );
     ctx.setProp(api, 'listFiles', listFiles);
     // readFile(path) -> string | null (preloaded, capped contents only).
     // Note: returned handles transfer to the guest — never bag them.
@@ -197,7 +205,8 @@ export async function runCustomCheckScript(input: SandboxInput): Promise<Sandbox
           return fail('fetch(url) must be an absolute URL');
         }
         if (parsed.protocol !== 'https:') return fail('fetch(url) must use https');
-        if (!input.allowHosts.includes(parsed.hostname.toLowerCase())) return fail(`fetch blocked: ${parsed.hostname} is not in allowHosts`);
+        if (!input.allowHosts.includes(parsed.hostname.toLowerCase()))
+          return fail(`fetch blocked: ${parsed.hostname} is not in allowHosts`);
         try {
           validateWebhookUrl(url);
         } catch {
@@ -286,12 +295,12 @@ export async function runCustomCheckScript(input: SandboxInput): Promise<Sandbox
     return failTeardown('Sandbox Setup Failed', error instanceof Error ? error.message.slice(0, 500) : 'Failed to build the sandbox.');
   }
 
-    // Guest contract: `function main(ctx)` MUST be synchronous and return
-    // `{ conclusion, title?, summary? }`. Host calls (readFile, fetch, ...)
-    // already block via asyncify — awaiting them suspends the VM forever, so
-    // the guard below rejects async/promise mains synchronously with a clear
-    // message instead of hanging until the wall watchdog fires.
-    const source = `${input.script}\n;(function () {\n  const result = main(__ctx);\n  if (result && typeof result.then === 'function') throw new Error('main(ctx) must be synchronous: return { conclusion } directly and never await host calls (they already block).');\n  return result;\n})();`;
+  // Guest contract: `function main(ctx)` MUST be synchronous and return
+  // `{ conclusion, title?, summary? }`. Host calls (readFile, fetch, ...)
+  // already block via asyncify — awaiting them suspends the VM forever, so
+  // the guard below rejects async/promise mains synchronously with a clear
+  // message instead of hanging until the wall watchdog fires.
+  const source = `${input.script}\n;(function () {\n  const result = main(__ctx);\n  if (result && typeof result.then === 'function') throw new Error('main(ctx) must be synchronous: return { conclusion } directly and never await host calls (they already block).');\n  return result;\n})();`;
   let settled: SandboxResult;
   let abandoned = false;
   try {
@@ -314,19 +323,34 @@ export async function runCustomCheckScript(input: SandboxInput): Promise<Sandbox
         // promise-state handle must never be disposed (it aborts the runtime),
         // so abandon instead of risking teardown.
         abandoned = true;
-        settled = toSandboxResult('action_required', 'Check Did Not Settle', 'main(ctx) must be synchronous and return { conclusion, title?, summary? }.', logs);
+        settled = toSandboxResult(
+          'action_required',
+          'Check Did Not Settle',
+          'main(ctx) must be synchronous and return { conclusion, title?, summary? }.',
+          logs,
+        );
       } else {
         outcome.value.dispose();
         settled = interpretReturn(dumped, logs);
       }
     } else {
-      settled = toSandboxResult('action_required', 'Check Returned Nothing', 'main(ctx) must return { conclusion, title?, summary? }.', logs);
+      settled = toSandboxResult(
+        'action_required',
+        'Check Returned Nothing',
+        'main(ctx) must return { conclusion, title?, summary? }.',
+        logs,
+      );
     }
   } catch (error) {
     settled =
       error instanceof Error && error.message === '__wall_timeout__'
         ? ((abandoned = true), toSandboxResult('timed_out', 'Check Timed Out', `Exceeded the ${input.limits.wallMs}ms wall budget.`, logs))
-        : toSandboxResult('action_required', 'Sandbox Error', error instanceof Error ? error.message.slice(0, 500) : 'Sandbox execution failed.', logs);
+        : toSandboxResult(
+            'action_required',
+            'Sandbox Error',
+            error instanceof Error ? error.message.slice(0, 500) : 'Sandbox execution failed.',
+            logs,
+          );
   }
 
   // Abandoned runs skip teardown: suspended asyncify state cannot be unwound
@@ -349,7 +373,13 @@ export async function runCustomCheckScript(input: SandboxInput): Promise<Sandbox
 function interpretReturn(dumped: unknown, logs: string[]): SandboxResult {
   // By construction (sync guard) this is the direct completion value.
   const value = dumped;
-  if (!isRecord(value)) return toSandboxResult('action_required', 'Check Returned Nothing Usable', 'main(ctx) must return { conclusion, title?, summary? }.', logs);
+  if (!isRecord(value))
+    return toSandboxResult(
+      'action_required',
+      'Check Returned Nothing Usable',
+      'main(ctx) must return { conclusion, title?, summary? }.',
+      logs,
+    );
   const conclusion = typeof value.conclusion === 'string' ? value.conclusion : null;
   if (conclusion === null || !CUSTOM_CONCLUSIONS.has(conclusion)) {
     return toSandboxResult(

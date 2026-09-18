@@ -49,7 +49,13 @@ describe('WriteService commitFile', () => {
 
   it('creates nested files and updates them', async () => {
     const { svc, gitdir } = await makeRepo();
-    const created = await svc.commitFile({ branch: 'main', path: 'docs/note.txt', content: new TextEncoder().encode('hello\n'), message: 'Create docs/note.txt', author });
+    const created = await svc.commitFile({
+      branch: 'main',
+      path: 'docs/note.txt',
+      content: new TextEncoder().encode('hello\n'),
+      message: 'Create docs/note.txt',
+      author,
+    });
     expect(created.ok).toBe(true);
     if (!created.ok) return;
     expect(created.created).toBe(true);
@@ -58,14 +64,26 @@ describe('WriteService commitFile', () => {
     const blob = await git.readBlob({ fs, gitdir, oid: head, filepath: 'docs/note.txt' });
     expect(new TextDecoder().decode(blob.blob)).toBe('hello\n');
 
-    const updated = await svc.commitFile({ branch: 'main', path: 'docs/note.txt', content: new TextEncoder().encode('v2\n'), message: 'Update docs/note.txt', author });
+    const updated = await svc.commitFile({
+      branch: 'main',
+      path: 'docs/note.txt',
+      content: new TextEncoder().encode('v2\n'),
+      message: 'Update docs/note.txt',
+      author,
+    });
     expect(updated).toMatchObject({ ok: true, created: false, deleted: false });
   });
 
   it('is a no-op (same oid) for identical content', async () => {
     const { svc, gitdir } = await makeRepo();
     const before = await git.resolveRef({ fs, gitdir, ref: 'refs/heads/main' });
-    const result = await svc.commitFile({ branch: 'main', path: 'base.txt', content: new TextEncoder().encode('base\n'), message: 'noop', author });
+    const result = await svc.commitFile({
+      branch: 'main',
+      path: 'base.txt',
+      content: new TextEncoder().encode('base\n'),
+      message: 'noop',
+      author,
+    });
     expect(result).toEqual({ ok: true, commitOid: before, created: false, deleted: false });
   });
 
@@ -77,16 +95,24 @@ describe('WriteService commitFile', () => {
     if (!deleted.ok) return;
     const { tree } = await git.readTree({ fs, gitdir, oid: (await git.readCommit({ fs, gitdir, oid: deleted.commitOid })).commit.tree });
     expect(tree.map((e) => e.path)).not.toContain('docs');
-    await expect(svc.commitFile({ branch: 'main', path: 'docs/note.txt', content: null, message: 'again', author })).resolves.toMatchObject({
-      ok: false,
-      status: 404,
-    });
+    await expect(svc.commitFile({ branch: 'main', path: 'docs/note.txt', content: null, message: 'again', author })).resolves.toMatchObject(
+      {
+        ok: false,
+        status: 404,
+      },
+    );
   });
 
   it('creates the initial commit on an empty repo', async () => {
     const { svc, dir } = await makeEmptyRepo();
     const gitdir = path.join(dir, '.git');
-    const result = await svc.commitFile({ branch: 'main', path: 'README.md', content: new TextEncoder().encode('# hi\n'), message: 'Create README.md', author });
+    const result = await svc.commitFile({
+      branch: 'main',
+      path: 'README.md',
+      content: new TextEncoder().encode('# hi\n'),
+      message: 'Create README.md',
+      author,
+    });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.created).toBe(true);
@@ -98,20 +124,48 @@ describe('WriteService commitFile', () => {
     const { svc, gitdir } = await makeRepo();
     const tip = await git.resolveRef({ fs, gitdir, ref: 'refs/heads/main' });
     await expect(
-      svc.commitFile({ branch: 'main', path: 'a.txt', content: new TextEncoder().encode('x\n'), message: 'm', author, expectedOid: '0'.repeat(40) }),
+      svc.commitFile({
+        branch: 'main',
+        path: 'a.txt',
+        content: new TextEncoder().encode('x\n'),
+        message: 'm',
+        author,
+        expectedOid: '0'.repeat(40),
+      }),
     ).resolves.toMatchObject({ ok: false, status: 409 });
-    const ok = await svc.commitFile({ branch: 'main', path: 'a.txt', content: new TextEncoder().encode('x\n'), message: 'm', author, expectedOid: tip });
+    const ok = await svc.commitFile({
+      branch: 'main',
+      path: 'a.txt',
+      content: new TextEncoder().encode('x\n'),
+      message: 'm',
+      author,
+      expectedOid: tip,
+    });
     expect(ok.ok).toBe(true);
   });
 
   it('rejects invalid branches, paths, authors, and messages', async () => {
     const { svc } = await makeRepo();
     const bytes = new TextEncoder().encode('x\n');
-    await expect(svc.commitFile({ branch: 'bad..name', path: 'a.txt', content: bytes, message: 'm', author })).resolves.toMatchObject({ ok: false, status: 400 });
-    await expect(svc.commitFile({ branch: 'nope', path: 'a.txt', content: bytes, message: 'm', author })).resolves.toMatchObject({ ok: false, status: 404 });
-    await expect(svc.commitFile({ branch: 'main', path: '../evil', content: bytes, message: 'm', author })).resolves.toMatchObject({ ok: false, status: 400 });
-    await expect(svc.commitFile({ branch: 'main', path: 'a.txt', content: bytes, message: '  ', author })).resolves.toMatchObject({ ok: false, status: 400 });
-    await expect(svc.commitFile({ branch: 'main', path: 'a.txt', content: bytes, message: 'm', author: { name: '', email: 'x' } })).resolves.toMatchObject({
+    await expect(svc.commitFile({ branch: 'bad..name', path: 'a.txt', content: bytes, message: 'm', author })).resolves.toMatchObject({
+      ok: false,
+      status: 400,
+    });
+    await expect(svc.commitFile({ branch: 'nope', path: 'a.txt', content: bytes, message: 'm', author })).resolves.toMatchObject({
+      ok: false,
+      status: 404,
+    });
+    await expect(svc.commitFile({ branch: 'main', path: '../evil', content: bytes, message: 'm', author })).resolves.toMatchObject({
+      ok: false,
+      status: 400,
+    });
+    await expect(svc.commitFile({ branch: 'main', path: 'a.txt', content: bytes, message: '  ', author })).resolves.toMatchObject({
+      ok: false,
+      status: 400,
+    });
+    await expect(
+      svc.commitFile({ branch: 'main', path: 'a.txt', content: bytes, message: 'm', author: { name: '', email: 'x' } }),
+    ).resolves.toMatchObject({
       ok: false,
       status: 400,
     });
@@ -124,7 +178,9 @@ describe('WriteService commitFile', () => {
       ok: false,
       status: 400,
     });
-    await expect(svc.commitFile({ branch: 'main', path: 'big.txt', content: new Uint8Array(10), message: 'm', author, maxFileBytes: 4 })).resolves.toMatchObject({
+    await expect(
+      svc.commitFile({ branch: 'main', path: 'big.txt', content: new Uint8Array(10), message: 'm', author, maxFileBytes: 4 }),
+    ).resolves.toMatchObject({
       ok: false,
       status: 413,
     });

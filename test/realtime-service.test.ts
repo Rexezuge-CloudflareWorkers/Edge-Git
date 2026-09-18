@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RealtimeService } from '@edge-git/backend-services/realtime';
 
-function makeService(opts: {
-  repo?: { id: string; owner: string; name: string; is_private: number } | null;
-  role?: string | null;
-} = {}) {
+function makeService(
+  opts: {
+    repo?: { id: string; owner: string; name: string; is_private: number } | null;
+    role?: string | null;
+  } = {},
+) {
   return new RealtimeService(
     { DB: {} as never },
     {
@@ -26,8 +28,18 @@ describe('RealtimeService repo authorization', () => {
 
   it('authorizes read+ viewers with their requested channels', async () => {
     const svc = makeService({ repo: publicRepo, role: 'read' });
-    const grant = await svc.authorizeRepoChannels({ viewerEmail: 'v@example.com', owner: 'alice', repo: 'demo', channels: ['issue:3', 'activity', 'bogus'] });
-    expect(grant).toMatchObject({ shard: 'repo:alice/demo', channels: ['issue:3', 'activity'], repositoryId: 'r1', fullName: 'Alice/Demo' });
+    const grant = await svc.authorizeRepoChannels({
+      viewerEmail: 'v@example.com',
+      owner: 'alice',
+      repo: 'demo',
+      channels: ['issue:3', 'activity', 'bogus'],
+    });
+    expect(grant).toMatchObject({
+      shard: 'repo:alice/demo',
+      channels: ['issue:3', 'activity'],
+      repositoryId: 'r1',
+      fullName: 'Alice/Demo',
+    });
   });
 
   it('admits anonymous viewers on public repos', async () => {
@@ -48,9 +60,9 @@ describe('RealtimeService repo authorization', () => {
 
   it('returns 404 for unknown repos', async () => {
     const svc = makeService({ repo: null, role: 'read' });
-    await expect(svc.authorizeRepoChannels({ viewerEmail: 'v@example.com', owner: 'alice', repo: 'nope', channels: ['activity'] })).rejects.toThrow(
-      'Repository not found.',
-    );
+    await expect(
+      svc.authorizeRepoChannels({ viewerEmail: 'v@example.com', owner: 'alice', repo: 'nope', channels: ['activity'] }),
+    ).rejects.toThrow('Repository not found.');
   });
 
   it('rejects empty and inbox-only channel requests', async () => {

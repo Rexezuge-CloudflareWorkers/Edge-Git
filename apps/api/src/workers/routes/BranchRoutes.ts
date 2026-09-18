@@ -72,7 +72,10 @@ function registerBranchRoutes(app: RepoApp): void {
       const scope = createRequestScope(c.env);
       const row = await scope.get(Tokens.RepoService).getByOwnerAndName(owner, repoName);
       if (row) {
-        const rule = await scope.get(Tokens.BranchProtectionService).matchForRepo(row.id, branch).catch(() => null);
+        const rule = await scope
+          .get(Tokens.BranchProtectionService)
+          .matchForRepo(row.id, branch)
+          .catch(() => null);
         if (rule?.blockDeletion) return c.json({ error: `branch "${branch}" is protected against deletion` }, 403);
       }
       const fullName = `${owner}/${repoName}`;

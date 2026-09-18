@@ -21,13 +21,7 @@ class ImportDAO extends BaseDAO {
     super(database);
   }
 
-  public async create(input: {
-    id: string;
-    repositoryId: string;
-    sourceUrl: string;
-    createdBy: string;
-    now: number;
-  }): Promise<void> {
+  public async create(input: { id: string; repositoryId: string; sourceUrl: string; createdBy: string; now: number }): Promise<void> {
     await this.withRetry(
       () =>
         this.database
@@ -86,7 +80,9 @@ class ImportDAO extends BaseDAO {
     await this.withRetry(
       () =>
         this.database
-          .prepare("UPDATE repo_imports SET status = 'done', error = NULL, refs_json = ?, imported_refs = ?, updated_at = ? WHERE id = ? AND status IN ('pending', 'running')")
+          .prepare(
+            "UPDATE repo_imports SET status = 'done', error = NULL, refs_json = ?, imported_refs = ?, updated_at = ? WHERE id = ? AND status IN ('pending', 'running')",
+          )
           .bind(refsJson, importedRefs, now, id)
           .run(),
       'mark repo import done',

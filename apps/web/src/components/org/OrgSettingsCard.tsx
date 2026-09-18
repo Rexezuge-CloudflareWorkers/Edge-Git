@@ -71,7 +71,9 @@ export function OrgSettingsCard({
           <div className="space-y-1.5">
             <Label htmlFor="org-username">{t('orgs.username', 'Username')}</Label>
             <Input id="org-username" value={newUsername} maxLength={39} onChange={(e) => setNewUsername(e.target.value)} />
-            <p className="text-xs text-[var(--color-text-muted)]">{t('orgs.renameHint', 'Renaming Changes All Repository URLs Under This Organization.')}</p>
+            <p className="text-xs text-[var(--color-text-muted)]">
+              {t('orgs.renameHint', 'Renaming Changes All Repository URLs Under This Organization.')}
+            </p>
           </div>
           <Button type="submit" variant="primary" size="sm" loading={saving} disabled={!dirtyUsername}>
             {t('common.saveChanges', 'Save Changes')}

@@ -56,7 +56,12 @@ function registerRealtimeUserRoutes(app: RealtimeApp): void {
     try {
       grant = await createRequestScope(c.env)
         .get(Tokens.RealtimeService)
-        .authorizeRepoChannels({ viewerEmail: email, owner: body.owner, repo: RepoService.normalizeRepo(body.repo), channels: body.channels });
+        .authorizeRepoChannels({
+          viewerEmail: email,
+          owner: body.owner,
+          repo: RepoService.normalizeRepo(body.repo),
+          channels: body.channels,
+        });
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
     }

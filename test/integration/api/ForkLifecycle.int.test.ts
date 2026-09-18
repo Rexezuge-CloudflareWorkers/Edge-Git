@@ -24,9 +24,17 @@ describe('fork lifecycle on real D1', () => {
   });
 
   it('forks with an explicit owner and name', async () => {
-    const res = await api(`/user/repos/${OWNER}/${SRC}/forks`, json({ method: 'POST', body: JSON.stringify({ owner: OWNER, name: 'fork-dst' }) }));
+    const res = await api(
+      `/user/repos/${OWNER}/${SRC}/forks`,
+      json({ method: 'POST', body: JSON.stringify({ owner: OWNER, name: 'fork-dst' }) }),
+    );
     expect(res.status).toBe(201);
-    await expect(res.json()).resolves.toMatchObject({ owner: OWNER, name: 'fork-dst', fullName: `${OWNER}/fork-dst`, forkedFrom: `${OWNER}/${SRC}` });
+    await expect(res.json()).resolves.toMatchObject({
+      owner: OWNER,
+      name: 'fork-dst',
+      fullName: `${OWNER}/fork-dst`,
+      forkedFrom: `${OWNER}/${SRC}`,
+    });
   });
 
   it('exposes lineage, fork listing, and counts', async () => {
@@ -46,9 +54,15 @@ describe('fork lifecycle on real D1', () => {
   });
 
   it('rejects forking into itself and unknown sources', async () => {
-    const itself = await api(`/user/repos/${OWNER}/${SRC}/forks`, json({ method: 'POST', body: JSON.stringify({ owner: OWNER, name: SRC }) }));
+    const itself = await api(
+      `/user/repos/${OWNER}/${SRC}/forks`,
+      json({ method: 'POST', body: JSON.stringify({ owner: OWNER, name: SRC }) }),
+    );
     expect(itself.status).toBe(400);
-    expect((await api(`/user/repos/${OWNER}/nope/forks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status).toBe(404);
+    expect(
+      (await api(`/user/repos/${OWNER}/nope/forks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }))
+        .status,
+    ).toBe(404);
     expect((await api(`/repos/${OWNER}/nope/forks`)).status).toBe(404);
   });
 
@@ -57,7 +71,10 @@ describe('fork lifecycle on real D1', () => {
     // but the head repo selector itself is accepted and resolved (400, not 404).
     const cross = await api(
       `/user/repos/${OWNER}/${SRC}/pulls`,
-      json({ method: 'POST', body: JSON.stringify({ title: 'From Fork', baseBranch: 'main', headBranch: 'main', headOwner: OWNER, headRepo: 'fork-dst' }) }),
+      json({
+        method: 'POST',
+        body: JSON.stringify({ title: 'From Fork', baseBranch: 'main', headBranch: 'main', headOwner: OWNER, headRepo: 'fork-dst' }),
+      }),
     );
     expect(cross.status).toBe(400);
 
@@ -69,7 +86,10 @@ describe('fork lifecycle on real D1', () => {
 
     const unknownHead = await api(
       `/user/repos/${OWNER}/${SRC}/pulls`,
-      json({ method: 'POST', body: JSON.stringify({ title: 'From Fork', baseBranch: 'main', headBranch: 'main', headOwner: OWNER, headRepo: 'nope' }) }),
+      json({
+        method: 'POST',
+        body: JSON.stringify({ title: 'From Fork', baseBranch: 'main', headBranch: 'main', headOwner: OWNER, headRepo: 'nope' }),
+      }),
     );
     expect(unknownHead.status).toBe(404);
   });

@@ -34,7 +34,12 @@ describe('resolveAction', () => {
 
 describe('AuditEventBuilder', () => {
   it('stamps ids and throws on missing fields', () => {
-    const event = new AuditEventBuilder().userEmail('Alice@Example.COM').action('PUSH').request('POST', '/acme/api/git-receive-pack').status(200).build();
+    const event = new AuditEventBuilder()
+      .userEmail('Alice@Example.COM')
+      .action('PUSH')
+      .request('POST', '/acme/api/git-receive-pack')
+      .status(200)
+      .build();
     expect(event.userEmail).toBe('Alice@Example.COM');
     expect(event.logId).toBeTruthy();
     expect(event.timestamp).toBeGreaterThan(0);
@@ -67,14 +72,25 @@ describe('TeamService guards', () => {
           getByOrgAndSlug: async () => null,
           countByOrg: async () => 0,
           create: async () => undefined,
-          getById: async () => ({ id: 't1', org_id: 'org-1', slug: 'frontend', slug_ci: 'frontend', name: 'frontend', description: null, created_by: 'a@x.com', created_at: 1, updated_at: 1 }),
+          getById: async () => ({
+            id: 't1',
+            org_id: 'org-1',
+            slug: 'frontend',
+            slug_ci: 'frontend',
+            name: 'frontend',
+            description: null,
+            created_by: 'a@x.com',
+            created_at: 1,
+            updated_at: 1,
+          }),
         }) as never,
       teamMemberDAO: async () => ({ get: async () => null, listByTeam: async () => [], upsert: async () => undefined }) as never,
       teamGrantDAO: async () => ({ get: async () => null, countByTeam: async () => 0, upsert: async () => undefined }) as never,
       organizationDAO: async () => ({ getByUsernameCi: async () => ({ id: 'org-1', username: 'acme', username_ci: 'acme' }) }) as never,
       organizationMemberDAO: async () =>
         ({
-          get: async (_org: string, email: string) => (email === 'owner@x.com' ? { role: 'owner' } : email === 'member@x.com' ? { role: 'member' } : null),
+          get: async (_org: string, email: string) =>
+            email === 'owner@x.com' ? { role: 'owner' } : email === 'member@x.com' ? { role: 'member' } : null,
         }) as never,
       userDAO: async () => ({ getByUsernameCi: async () => ({ email: 'bob@x.com', username: 'bob' }) }) as never,
       repositoryDAO: async () => ({ getById: async () => null }) as never,
@@ -96,11 +112,22 @@ describe('TeamService guards', () => {
       teamDeps({
         teamDAO: async () =>
           ({
-            getByOrgAndSlug: async () => ({ id: 't1', org_id: 'org-1', slug: 'frontend', slug_ci: 'frontend', name: 'frontend', description: null, created_by: 'a@x.com', created_at: 1, updated_at: 1 }),
+            getByOrgAndSlug: async () => ({
+              id: 't1',
+              org_id: 'org-1',
+              slug: 'frontend',
+              slug_ci: 'frontend',
+              name: 'frontend',
+              description: null,
+              created_by: 'a@x.com',
+              created_at: 1,
+              updated_at: 1,
+            }),
           }) as never,
         teamMemberDAO: async () =>
           ({
-            get: async (_t: string, email: string) => (email === 'solo@x.com' ? { role: 'admin', team_id: 't1', user_email: email, joined_at: 1 } : null),
+            get: async (_t: string, email: string) =>
+              email === 'solo@x.com' ? { role: 'admin', team_id: 't1', user_email: email, joined_at: 1 } : null,
             countAdmins: async () => 1,
             upsert: async () => undefined,
             remove: async () => undefined,
@@ -117,14 +144,35 @@ describe('TeamService guards', () => {
       teamDeps({
         teamDAO: async () =>
           ({
-            getByOrgAndSlug: async () => ({ id: 't1', org_id: 'org-1', slug: 'frontend', slug_ci: 'frontend', name: 'frontend', description: null, created_by: 'a@x.com', created_at: 1, updated_at: 1 }),
+            getByOrgAndSlug: async () => ({
+              id: 't1',
+              org_id: 'org-1',
+              slug: 'frontend',
+              slug_ci: 'frontend',
+              name: 'frontend',
+              description: null,
+              created_by: 'a@x.com',
+              created_at: 1,
+              updated_at: 1,
+            }),
             countByOrg: async () => 0,
             create: async () => undefined,
-            getById: async () => ({ id: 't1', org_id: 'org-1', slug: 'frontend', slug_ci: 'frontend', name: 'frontend', description: null, created_by: 'a@x.com', created_at: 1, updated_at: 1 }),
+            getById: async () => ({
+              id: 't1',
+              org_id: 'org-1',
+              slug: 'frontend',
+              slug_ci: 'frontend',
+              name: 'frontend',
+              description: null,
+              created_by: 'a@x.com',
+              created_at: 1,
+              updated_at: 1,
+            }),
           }) as never,
         teamMemberDAO: async () =>
           ({
-            get: async (_t: string, email: string) => (email === 'tadmin@x.com' ? { role: 'admin', team_id: 't1', user_email: email, joined_at: 1 } : null),
+            get: async (_t: string, email: string) =>
+              email === 'tadmin@x.com' ? { role: 'admin', team_id: 't1', user_email: email, joined_at: 1 } : null,
             listByTeam: async () => [],
             upsert: vi.fn(async () => undefined),
           }) as never,
@@ -141,12 +189,14 @@ describe('PermissionService team grants', () => {
       organizationDAO: async () => ({ getById: async () => ({ id: 'org-1', username: 'acme' }) }) as never,
       organizationMemberDAO: async () =>
         ({
-          get: async (_o: string, email: string) => (email === 'owner@x.com' ? { role: 'owner' } : email === 'member@x.com' ? { role: 'member' } : null),
+          get: async (_o: string, email: string) =>
+            email === 'owner@x.com' ? { role: 'owner' } : email === 'member@x.com' ? { role: 'member' } : null,
         }) as never,
       repoCollaboratorDAO: async () => ({ get: async () => null }) as never,
       teamDAO: async () =>
         ({
-          getById: async (id: string) => (id === 't1' ? { id: 't1', org_id: 'org-1' } : id === 't2' ? { id: 't2', org_id: 'other-org' } : null),
+          getById: async (id: string) =>
+            id === 't1' ? { id: 't1', org_id: 'org-1' } : id === 't2' ? { id: 't2', org_id: 'other-org' } : null,
         }) as never,
       teamMemberDAO: async () =>
         ({
@@ -180,7 +230,8 @@ describe('AuditService scoping', () => {
     const queryOrgAudit = vi.fn(async () => ({ logs: [], nextCursor: null }));
     const svc = new AuditService({ DB: {} } as never, {
       auditLogDAO: async () => ({ query: async () => ({ logs: [], nextCursor: null }), queryOrgAudit }) as never,
-      organizationDAO: async () => ({ getByUsernameCi: async (ci: string) => (ci === 'acme' ? { id: 'org-1', username: 'acme' } : null) }) as never,
+      organizationDAO: async () =>
+        ({ getByUsernameCi: async (ci: string) => (ci === 'acme' ? { id: 'org-1', username: 'acme' } : null) }) as never,
       organizationMemberDAO: async () =>
         ({
           get: async (_o: string, email: string) => (email === 'owner@x.com' ? { role: 'owner' } : { role: 'member' }),
@@ -196,10 +247,30 @@ describe('AuditService scoping', () => {
     const query = vi.fn(async () => ({ logs: [], nextCursor: null }));
     const svc = new AuditService({ DB: {} } as never, {
       auditLogDAO: async () => ({ query, queryOrgAudit: async () => ({ logs: [], nextCursor: null }) }) as never,
-      observers: { notifyAll: async () => { throw new Error('sink down'); } } as never,
+      observers: {
+        notifyAll: async () => {
+          throw new Error('sink down');
+        },
+      } as never,
     });
     await svc.queryMine('Bob@X.com', { action: 'PUSH' }, 10, 'c');
     expect(query).toHaveBeenCalledWith({ action: 'PUSH', userEmail: 'bob@x.com' }, 10, 'c');
-    await expect(svc.record({ logId: 'l', timestamp: 1, userEmail: 'u', action: 'a', method: 'GET', path: '/p', statusCode: 200, resource: null, detail: null, ipAddress: null, userAgent: null, orgId: null, repoId: null })).resolves.toBeUndefined();
+    await expect(
+      svc.record({
+        logId: 'l',
+        timestamp: 1,
+        userEmail: 'u',
+        action: 'a',
+        method: 'GET',
+        path: '/p',
+        statusCode: 200,
+        resource: null,
+        detail: null,
+        ipAddress: null,
+        userAgent: null,
+        orgId: null,
+        repoId: null,
+      }),
+    ).resolves.toBeUndefined();
   });
 });

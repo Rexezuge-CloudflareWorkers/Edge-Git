@@ -112,7 +112,12 @@ export function IssueDetailView({
   if (!Number.isSafeInteger(issueNumber)) {
     return (
       <div>
-        <RepoHeader repo={repoData} activeTab="issues" showSettings={false} onTabChange={(id: RepoTab) => navigate(`/${owner}/${repo}${id === 'code' ? '' : `?tab=${id}`}`)} />
+        <RepoHeader
+          repo={repoData}
+          activeTab="issues"
+          showSettings={false}
+          onTabChange={(id: RepoTab) => navigate(`/${owner}/${repo}${id === 'code' ? '' : `?tab=${id}`}`)}
+        />
         <AppPage>
           <Card>
             <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('issues.issueNotFound', 'Issue Not Found.')}</h1>
@@ -124,7 +129,12 @@ export function IssueDetailView({
 
   return (
     <div>
-      <RepoHeader repo={repoData} activeTab="issues" showSettings={false} onTabChange={(id: RepoTab) => navigate(`/${owner}/${repo}${id === 'code' ? '' : `?tab=${id}`}`)} />
+      <RepoHeader
+        repo={repoData}
+        activeTab="issues"
+        showSettings={false}
+        onTabChange={(id: RepoTab) => navigate(`/${owner}/${repo}${id === 'code' ? '' : `?tab=${id}`}`)}
+      />
       <AppPage>
         <IssueDetail
           owner={owner}

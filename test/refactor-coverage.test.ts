@@ -59,7 +59,7 @@ describe('Identity value objects', () => {
     const full = RepoFullName.parse('my-org', 'my-repo.git');
     expect(full.toString()).toBe('my-org/my-repo');
     expect(full.ownerCi()).toBe('my-org');
-    expect(RepoFullName.tryParse('bad owner!', 'x') ).toBeNull();
+    expect(RepoFullName.tryParse('bad owner!', 'x')).toBeNull();
     expect(() => RepoFullName.parse('', '')).toThrow();
   });
 });
@@ -112,7 +112,13 @@ describe('RequestScope helpers', () => {
 
   it('sets and gets scope plus service context', () => {
     const store = new Map<string, unknown>();
-    const c = { get: (k: string) => store.get(k), set: (k: string, v: unknown) => { store.set(k, v); }, env: { DB: {} } };
+    const c = {
+      get: (k: string) => store.get(k),
+      set: (k: string, v: unknown) => {
+        store.set(k, v);
+      },
+      env: { DB: {} },
+    };
     expect(() => getRequestScope(c as never)).toThrow();
     expect(() => getServiceContext(c as never)).toThrow();
     const scope = new Container();
@@ -201,7 +207,12 @@ describe('RepoVisibilityService', () => {
     ] as never;
     const svc = new RepoVisibilityService({
       repositoryDAO: async () =>
-        ({ listByOwnerEmail: async () => rows, listByOwner: async () => [], listByOrgId: async () => [], getById: async () => null }) as never,
+        ({
+          listByOwnerEmail: async () => rows,
+          listByOwner: async () => [],
+          listByOrgId: async () => [],
+          getById: async () => null,
+        }) as never,
       organizationDAO: async () => ({ getById: async () => null }) as never,
       organizationMemberDAO: async () => ({ listOrgsByUser: async () => [] }) as never,
       repoCollaboratorDAO: async () => ({ listByUser: async () => [] }) as never,
@@ -216,9 +227,17 @@ describe('RepoVisibilityService', () => {
 describe('scopeMiddleware', () => {
   it('installs a single scope per request', async () => {
     const store = new Map<string, unknown>();
-    const c = { get: (k: string) => store.get(k), set: (k: string, v: unknown) => { store.set(k, v); }, env: { DB: {} } };
+    const c = {
+      get: (k: string) => store.get(k),
+      set: (k: string, v: unknown) => {
+        store.set(k, v);
+      },
+      env: { DB: {} },
+    };
     let nextCalled = false;
-    await scopeMiddleware(c as never, async () => { nextCalled = true; });
+    await scopeMiddleware(c as never, async () => {
+      nextCalled = true;
+    });
     expect(nextCalled).toBe(true);
     expect(getRequestScope(c as never)).toBeInstanceOf(Container);
     expect(vi.fn()).toBeDefined();

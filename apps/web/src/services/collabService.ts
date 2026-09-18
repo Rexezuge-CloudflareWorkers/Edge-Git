@@ -31,7 +31,11 @@ export async function listLabels(owner: string, repo: string): Promise<Label[]> 
   }
 }
 
-export async function createLabel(owner: string, repo: string, input: { name: string; color?: string; description?: string }): Promise<{ id: string }> {
+export async function createLabel(
+  owner: string,
+  repo: string,
+  input: { name: string; color?: string; description?: string },
+): Promise<{ id: string }> {
   return apiPost<{ id: string }>(`${base(owner, repo)}/labels`, input);
 }
 
@@ -57,9 +61,15 @@ export async function setIssueLabels(owner: string, repo: string, number: number
   await apiPut(`${base(owner, repo)}/issues/${number}/labels`, { labelIds });
 }
 
-export async function getPullMeta(owner: string, repo: string, number: number): Promise<{ labels: Label[]; assignees: string[]; reviewers: Array<{ user_email: string; status: string }> }> {
+export async function getPullMeta(
+  owner: string,
+  repo: string,
+  number: number,
+): Promise<{ labels: Label[]; assignees: string[]; reviewers: Array<{ user_email: string; status: string }> }> {
   try {
-    const data = await apiGet<{ labels?: Label[]; assignees?: string[]; reviewers?: Array<{ user_email: string; status: string }> }>(`${base(owner, repo)}/pulls/${number}/meta`);
+    const data = await apiGet<{ labels?: Label[]; assignees?: string[]; reviewers?: Array<{ user_email: string; status: string }> }>(
+      `${base(owner, repo)}/pulls/${number}/meta`,
+    );
     return { labels: data.labels ?? [], assignees: data.assignees ?? [], reviewers: data.reviewers ?? [] };
   } catch {
     return { labels: [], assignees: [], reviewers: [] };
@@ -82,8 +92,17 @@ export async function getCodeowners(owner: string, repo: string, number: number)
   }
 }
 
-export async function previewSync(owner: string, repo: string, params: { upstreamOwner: string; upstreamRepo: string; upstreamBranch?: string; branch?: string }): Promise<{ preview: { alreadyMerged: boolean; canFastForward: boolean } | null }> {
-  const q = new URLSearchParams({ upstreamOwner: params.upstreamOwner, upstreamRepo: params.upstreamRepo, upstreamBranch: params.upstreamBranch ?? 'main', branch: params.branch ?? 'main' });
+export async function previewSync(
+  owner: string,
+  repo: string,
+  params: { upstreamOwner: string; upstreamRepo: string; upstreamBranch?: string; branch?: string },
+): Promise<{ preview: { alreadyMerged: boolean; canFastForward: boolean } | null }> {
+  const q = new URLSearchParams({
+    upstreamOwner: params.upstreamOwner,
+    upstreamRepo: params.upstreamRepo,
+    upstreamBranch: params.upstreamBranch ?? 'main',
+    branch: params.branch ?? 'main',
+  });
   try {
     return await apiGet(`${base(owner, repo)}/sync-preview?${q.toString()}`);
   } catch {
@@ -91,24 +110,40 @@ export async function previewSync(owner: string, repo: string, params: { upstrea
   }
 }
 
-export async function syncFork(owner: string, repo: string, input: { upstreamOwner: string; upstreamRepo: string; upstreamBranch?: string; branch?: string }): Promise<unknown> {
+export async function syncFork(
+  owner: string,
+  repo: string,
+  input: { upstreamOwner: string; upstreamRepo: string; upstreamBranch?: string; branch?: string },
+): Promise<unknown> {
   return apiPost(`${base(owner, repo)}/sync`, input);
 }
 
-export async function getBlame(owner: string, repo: string, path: string, ref?: string, isAuthed?: boolean | null): Promise<{ lines: Array<{ line: number; commitOid: string; author: string; content: string }> } | null> {
+export async function getBlame(
+  owner: string,
+  repo: string,
+  path: string,
+  ref?: string,
+  isAuthed?: boolean | null,
+): Promise<{ lines: Array<{ line: number; commitOid: string; author: string; content: string }> } | null> {
   const q = new URLSearchParams({ path, ...(ref && { ref }) });
   const authedPath = `${base(owner, repo)}/blame?${q.toString()}`;
   const publicPath = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/blame?${q.toString()}`;
   try {
     if (isAuthed === false) {
-      const data = await apiGet<{ blame?: { lines: Array<{ line: number; commitOid: string; author: string; content: string }> } }>(publicPath);
+      const data = await apiGet<{ blame?: { lines: Array<{ line: number; commitOid: string; author: string; content: string }> } }>(
+        publicPath,
+      );
       return data.blame ? { lines: data.blame.lines } : null;
     }
     try {
-      const data = await apiGet<{ blame?: { lines: Array<{ line: number; commitOid: string; author: string; content: string }> } }>(authedPath);
+      const data = await apiGet<{ blame?: { lines: Array<{ line: number; commitOid: string; author: string; content: string }> } }>(
+        authedPath,
+      );
       return data.blame ? { lines: data.blame.lines } : null;
     } catch {
-      const data = await apiGet<{ blame?: { lines: Array<{ line: number; commitOid: string; author: string; content: string }> } }>(publicPath);
+      const data = await apiGet<{ blame?: { lines: Array<{ line: number; commitOid: string; author: string; content: string }> } }>(
+        publicPath,
+      );
       return data.blame ? { lines: data.blame.lines } : null;
     }
   } catch {

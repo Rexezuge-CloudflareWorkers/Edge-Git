@@ -103,7 +103,9 @@ export function BlobView({
           {blame.map((l) => (
             <li key={l.line} className="flex gap-3 whitespace-pre-wrap break-words">
               <span className="w-8 shrink-0 text-[var(--color-text-muted)]">{l.line}</span>
-              <span className="w-24 shrink-0 truncate text-[var(--color-accent)]" title={l.commitOid}>{l.commitOid.slice(0, 7)} {l.author}</span>
+              <span className="w-24 shrink-0 truncate text-[var(--color-accent)]" title={l.commitOid}>
+                {l.commitOid.slice(0, 7)} {l.author}
+              </span>
               <span className="flex-1 text-[var(--color-text-primary)]">{l.content}</span>
             </li>
           ))}

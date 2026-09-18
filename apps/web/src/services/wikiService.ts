@@ -20,15 +20,32 @@ async function tryAuthedFirst<T>(authedPath: string, publicPath: string, isAuthe
 
 export async function listWikiPages(owner: string, repo: string, q?: string, opts?: { isAuthed?: boolean | null }): Promise<WikiPage[]> {
   const suffix = q ? `?q=${encodeURIComponent(q)}` : '';
-  const data = await tryAuthedFirst<{ pages?: WikiPage[] }>(`${authedBase(owner, repo)}/wiki${suffix}`, `${publicBase(owner, repo)}/wiki${suffix}`, opts?.isAuthed);
+  const data = await tryAuthedFirst<{ pages?: WikiPage[] }>(
+    `${authedBase(owner, repo)}/wiki${suffix}`,
+    `${publicBase(owner, repo)}/wiki${suffix}`,
+    opts?.isAuthed,
+  );
   return data.pages ?? [];
 }
 
-export async function loadWikiPage(owner: string, repo: string, slug: string, opts?: { isAuthed?: boolean | null }): Promise<{ page: WikiPage }> {
-  return tryAuthedFirst(`${authedBase(owner, repo)}/wiki/${encodeURIComponent(slug)}`, `${publicBase(owner, repo)}/wiki/${encodeURIComponent(slug)}`, opts?.isAuthed);
+export async function loadWikiPage(
+  owner: string,
+  repo: string,
+  slug: string,
+  opts?: { isAuthed?: boolean | null },
+): Promise<{ page: WikiPage }> {
+  return tryAuthedFirst(
+    `${authedBase(owner, repo)}/wiki/${encodeURIComponent(slug)}`,
+    `${publicBase(owner, repo)}/wiki/${encodeURIComponent(slug)}`,
+    opts?.isAuthed,
+  );
 }
 
-export async function createWikiPage(owner: string, repo: string, input: { slug: string; title: string; body?: string }): Promise<{ page: WikiPage }> {
+export async function createWikiPage(
+  owner: string,
+  repo: string,
+  input: { slug: string; title: string; body?: string },
+): Promise<{ page: WikiPage }> {
   return apiPost(`${authedBase(owner, repo)}/wiki`, input);
 }
 
@@ -59,6 +76,10 @@ export async function loadWikiRevisions(owner: string, repo: string, slug: strin
   return data.revisions ?? [];
 }
 
-export async function saveWikiPage(owner: string, repo: string, input: { slug: string; title: string; body?: string }): Promise<{ page: WikiPage }> {
+export async function saveWikiPage(
+  owner: string,
+  repo: string,
+  input: { slug: string; title: string; body?: string },
+): Promise<{ page: WikiPage }> {
   return apiPost(`${authedBase(owner, repo)}/wiki`, input);
 }

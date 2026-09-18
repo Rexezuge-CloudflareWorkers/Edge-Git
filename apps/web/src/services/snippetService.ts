@@ -25,7 +25,11 @@ export async function loadSnippet(id: string): Promise<SnippetDetail> {
   return apiGet<SnippetDetail>(`/snippets/${encodeURIComponent(id)}`);
 }
 
-export async function createSnippet(input: { title?: string; visibility?: 'public' | 'secret'; files: Array<{ filename: string; body: string }> }): Promise<SnippetDetail> {
+export async function createSnippet(input: {
+  title?: string;
+  visibility?: 'public' | 'secret';
+  files: Array<{ filename: string; body: string }>;
+}): Promise<SnippetDetail> {
   return apiPost<SnippetDetail>('/user/snippets', input);
 }
 

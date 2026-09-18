@@ -20,9 +20,12 @@ async function run(script: string, overrides: Partial<Parameters<typeof runCusto
 
 describe('CustomJsSandbox', () => {
   it('runs a passing check with files, env, and logs', async () => {
-    const result = await run('function main(ctx) { ctx.log("n=" + ctx.listFiles().length); return { conclusion: "success", title: "Lint Ok", summary: "env=" + ctx.env.LEVEL + " readme=" + ctx.readFile("README.md") }; }', {
-      env: { LEVEL: 'strict' },
-    });
+    const result = await run(
+      'function main(ctx) { ctx.log("n=" + ctx.listFiles().length); return { conclusion: "success", title: "Lint Ok", summary: "env=" + ctx.env.LEVEL + " readme=" + ctx.readFile("README.md") }; }',
+      {
+        env: { LEVEL: 'strict' },
+      },
+    );
     expect(result.conclusion).toBe('success');
     expect(result.title).toBe('Lint Ok');
     expect(result.summary).toContain('env=strict');
@@ -44,7 +47,9 @@ describe('CustomJsSandbox', () => {
   });
 
   it('blocks fetches outside allowHosts', async () => {
-    const result = await run('function main(ctx) { const r = ctx.fetch("https://example.com/x"); return { conclusion: "success", summary: String(r.status) }; }');
+    const result = await run(
+      'function main(ctx) { const r = ctx.fetch("https://example.com/x"); return { conclusion: "success", summary: String(r.status) }; }',
+    );
     expect(result.conclusion).toBe('failure');
     expect(result.summary).toContain('not in allowHosts');
   });
@@ -83,7 +88,9 @@ describe('CustomJsSandbox', () => {
   });
 
   it('caps output lengths', async () => {
-    const result = await run(`function main(ctx) { return { conclusion: "success", title: "${'t'.repeat(500)}", summary: "${'s'.repeat(5000)}" }; }`);
+    const result = await run(
+      `function main(ctx) { return { conclusion: "success", title: "${'t'.repeat(500)}", summary: "${'s'.repeat(5000)}" }; }`,
+    );
     expect(result.title).toHaveLength(200);
     expect(result.summary.length).toBeLessThanOrEqual(2000);
   });

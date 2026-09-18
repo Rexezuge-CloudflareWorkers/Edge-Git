@@ -136,7 +136,12 @@ export function TokensTab({ showNotice }: { showNotice: (type: 'success' | 'erro
         <form onSubmit={submit} className="space-y-3">
           <div className="flex gap-3 flex-wrap">
             <div className="flex-1 min-w-48">
-              <Input placeholder={t('tokens.tokenNamePlaceholder', 'Token Name (e.g. laptop)')} value={name} onChange={(e) => setName(e.target.value)} required />
+              <Input
+                placeholder={t('tokens.tokenNamePlaceholder', 'Token Name (e.g. laptop)')}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
             </div>
             <div className="w-32">
               <Input
@@ -166,7 +171,9 @@ export function TokensTab({ showNotice }: { showNotice: (type: 'success' | 'erro
                 </label>
               ))}
             </div>
-            <p className="mt-1 text-xs text-[var(--color-text-muted)]">{t('tokens.scopesHint', 'Fetch Needs repo:read. Push Needs repo:write. Admin Covers Both.')}</p>
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+              {t('tokens.scopesHint', 'Fetch Needs repo:read. Push Needs repo:write. Admin Covers Both.')}
+            </p>
           </fieldset>
           <fieldset>
             <Label>{t('tokens.repoGrants', 'Restrict To Repositories (Optional)')}</Label>
@@ -177,7 +184,11 @@ export function TokensTab({ showNotice }: { showNotice: (type: 'success' | 'erro
               <div className="w-36">
                 <Input placeholder={t('tokens.grantRepo', 'Repository')} value={grantRepo} onChange={(e) => setGrantRepo(e.target.value)} />
               </div>
-              <Select aria-label={t('tokens.grantScope', 'Grant Scope')} value={grantScope} onChange={(e) => setGrantScope(e.target.value as TokenScope)}>
+              <Select
+                aria-label={t('tokens.grantScope', 'Grant Scope')}
+                value={grantScope}
+                onChange={(e) => setGrantScope(e.target.value as TokenScope)}
+              >
                 {ALL_SCOPES.map((scope) => (
                   <option key={scope} value={scope}>
                     {scope}
@@ -202,7 +213,9 @@ export function TokensTab({ showNotice }: { showNotice: (type: 'success' | 'erro
                 ))}
               </ul>
             )}
-            <p className="mt-1 text-xs text-[var(--color-text-muted)]">{t('tokens.grantsHint', 'Empty Means All Repositories You Can See.')}</p>
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+              {t('tokens.grantsHint', 'Empty Means All Repositories You Can See.')}
+            </p>
           </fieldset>
         </form>
         {lastCreated && (
@@ -226,7 +239,10 @@ export function TokensTab({ showNotice }: { showNotice: (type: 'success' | 'erro
                 <p className="text-xs text-[var(--color-text-muted)]">{formatExpiryTimestamp(token.expiresAt)}</p>
                 <p className="mt-1 flex gap-1.5 flex-wrap">
                   {(token.scopes ?? []).map((scope) => (
-                    <span key={scope} className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-[var(--color-surface)] text-[var(--color-text-secondary)]">
+                    <span
+                      key={scope}
+                      className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-[var(--color-surface)] text-[var(--color-text-secondary)]"
+                    >
                       {scope}
                     </span>
                   ))}
@@ -234,7 +250,10 @@ export function TokensTab({ showNotice }: { showNotice: (type: 'success' | 'erro
                 {(token.repoGrants ?? []).length > 0 && (
                   <p className="mt-1 flex gap-1.5 flex-wrap">
                     {(token.repoGrants ?? []).map((grant) => (
-                      <span key={grant.fullName} className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-[var(--color-surface)] text-[var(--color-text-secondary)]">
+                      <span
+                        key={grant.fullName}
+                        className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-[var(--color-surface)] text-[var(--color-text-secondary)]"
+                      >
                         {grant.fullName}:{grant.scope}
                       </span>
                     ))}
@@ -252,7 +271,9 @@ export function TokensTab({ showNotice }: { showNotice: (type: 'success' | 'erro
             </li>
           ))}
         </ul>
-        {tokens.length === 0 && !loading && <p className="text-sm text-[var(--color-text-muted)] mt-4">{t('tokens.noTokens', 'No Tokens Yet.')}</p>}
+        {tokens.length === 0 && !loading && (
+          <p className="text-sm text-[var(--color-text-muted)] mt-4">{t('tokens.noTokens', 'No Tokens Yet.')}</p>
+        )}
       </Card>
 
       {revoking && (

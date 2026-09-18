@@ -39,12 +39,18 @@ describe('collab surfaces lifecycle on real D1', () => {
     expect(boardBody.columns.map((c) => c.title)).toEqual(['Todo', 'In Progress', 'Done']);
 
     const firstColumn = boardBody.columns[0];
-    const card = await json('POST', `/user/repos/${OWNER}/${REPO}/projects/1/cards`, { columnId: firstColumn.id, kind: 'note', noteTitle: 'Ship It' });
+    const card = await json('POST', `/user/repos/${OWNER}/${REPO}/projects/1/cards`, {
+      columnId: firstColumn.id,
+      kind: 'note',
+      noteTitle: 'Ship It',
+    });
     expect(card.status).toBe(201);
 
     const secondColumn = boardBody.columns[1];
     const cardBody = (await card.json()) as { card: { id: string } };
-    const moved = await json('PATCH', `/user/repos/${OWNER}/${REPO}/projects/1/cards/${cardBody.card.id}/move`, { toColumnId: secondColumn.id });
+    const moved = await json('PATCH', `/user/repos/${OWNER}/${REPO}/projects/1/cards/${cardBody.card.id}/move`, {
+      toColumnId: secondColumn.id,
+    });
     expect(moved.status).toBe(200);
     expect(await moved.json()).toMatchObject({ card: { columnId: secondColumn.id } });
 
@@ -63,7 +69,11 @@ describe('collab surfaces lifecycle on real D1', () => {
     const catsBody = (await cats.json()) as { categories: Array<{ slug: string }> };
     expect(catsBody.categories.map((c) => c.slug).sort()).toEqual(['announcements', 'general', 'ideas', 'qa']);
 
-    const created = await json('POST', `/user/repos/${OWNER}/${REPO}/discussions`, { title: 'Hello World', body: 'First post', categorySlug: 'general' });
+    const created = await json('POST', `/user/repos/${OWNER}/${REPO}/discussions`, {
+      title: 'Hello World',
+      body: 'First post',
+      categorySlug: 'general',
+    });
     expect(created.status).toBe(201);
     expect(await created.json()).toMatchObject({ discussion: { number: 1 } });
 
@@ -117,7 +127,11 @@ describe('collab surfaces lifecycle on real D1', () => {
   });
 
   it('runs the snippet lifecycle with secret visibility', async () => {
-    const created = await json('POST', '/user/snippets', { title: 'Hello', visibility: 'public', files: [{ filename: 'hello.txt', body: 'hi' }] });
+    const created = await json('POST', '/user/snippets', {
+      title: 'Hello',
+      visibility: 'public',
+      files: [{ filename: 'hello.txt', body: 'hi' }],
+    });
     expect(created.status).toBe(201);
     const createdBody = (await created.json()) as { snippet: { id: string; visibility: string } };
     expect(createdBody.snippet.visibility).toBe('public');

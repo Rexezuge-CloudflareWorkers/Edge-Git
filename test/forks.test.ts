@@ -22,7 +22,9 @@ function createForkFakeDb() {
       first<T>(): Promise<T | null> {
         if (q.includes('FROM repositories WHERE lower(owner)')) {
           const row = state.repos.find(
-            (r) => String(r.owner).toLowerCase() === String(params[0]).toLowerCase() && String(r.name).toLowerCase() === String(params[1]).toLowerCase(),
+            (r) =>
+              String(r.owner).toLowerCase() === String(params[0]).toLowerCase() &&
+              String(r.name).toLowerCase() === String(params[1]).toLowerCase(),
           );
           return Promise.resolve((row ?? null) as T | null);
         }
@@ -47,14 +49,18 @@ function createForkFakeDb() {
           return Promise.resolve((row ?? null) as T | null);
         }
         if (q.includes('FROM repo_collaborators WHERE repo_id = ? AND lower(user_email)')) {
-          const row = state.collabs.find((c) => c.repo_id === params[0] && String(c.user_email).toLowerCase() === String(params[1]).toLowerCase());
+          const row = state.collabs.find(
+            (c) => c.repo_id === params[0] && String(c.user_email).toLowerCase() === String(params[1]).toLowerCase(),
+          );
           return Promise.resolve((row ?? null) as T | null);
         }
         return Promise.resolve(null);
       },
       all<T>(): Promise<{ results: T[] }> {
         if (q.includes('FROM repositories WHERE lower(owner_email)')) {
-          return Promise.resolve({ results: state.repos.filter((r) => String(r.owner_email).toLowerCase() === String(params[0]).toLowerCase()) as T[] });
+          return Promise.resolve({
+            results: state.repos.filter((r) => String(r.owner_email).toLowerCase() === String(params[0]).toLowerCase()) as T[],
+          });
         }
         if (q.includes('FROM repositories WHERE forked_from_repo_id = ?')) {
           const rows = state.repos
@@ -89,9 +95,8 @@ function createForkFakeDb() {
           const [id, owner_email, owner, name, description, is_private, created_at, updated_at] = params as Array<string | number | null>;
           const row: Record<string, unknown> = { id, owner_email, owner, name, description, is_private, created_at, updated_at };
           if (params.length > 8) {
-            const [, , , , , , , , owner_type, owner_ci, name_ci, owner_user_email, org_id, forked_from_repo_id, forked_from_full_name] = params as Array<
-              string | number | null
-            >;
+            const [, , , , , , , , owner_type, owner_ci, name_ci, owner_user_email, org_id, forked_from_repo_id, forked_from_full_name] =
+              params as Array<string | number | null>;
             Object.assign(row, { owner_type, owner_ci, name_ci, owner_user_email, org_id, forked_from_repo_id, forked_from_full_name });
           }
           state.repos.push(row);
@@ -107,11 +112,41 @@ function createForkFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO pull_requests')) {
-          const [id, repository_id, full_name, number, title, body, status, base_branch, head_branch, base_oid, head_oid, merge_base_oid, creator_email, created_at, updated_at] =
-            params as Array<string | number | null>;
+          const [
+            id,
+            repository_id,
+            full_name,
+            number,
+            title,
+            body,
+            status,
+            base_branch,
+            head_branch,
+            base_oid,
+            head_oid,
+            merge_base_oid,
+            creator_email,
+            created_at,
+            updated_at,
+          ] = params as Array<string | number | null>;
           const row: Record<string, unknown> = {
-            id, repository_id, full_name, number, title, body, status, base_branch, head_branch, base_oid, head_oid,
-            merge_base_oid, creator_email, merged_by: null, merged_at: null, created_at, updated_at,
+            id,
+            repository_id,
+            full_name,
+            number,
+            title,
+            body,
+            status,
+            base_branch,
+            head_branch,
+            base_oid,
+            head_oid,
+            merge_base_oid,
+            creator_email,
+            merged_by: null,
+            merged_at: null,
+            created_at,
+            updated_at,
             head_repository_id: params.length > 15 ? params[15] : null,
             head_full_name: params.length > 16 ? params[16] : null,
           };
@@ -214,7 +249,11 @@ function createGitHarness() {
         return Promise.resolve();
       },
       listRefs: () => Promise.resolve({ refs: s.refs, symbolicHead: null }),
-      getBranches: () => Promise.resolve({ branches: s.refs.filter((r) => r.ref.startsWith('refs/heads/')).map((r) => r.ref.replace('refs/heads/', '')), currentBranch: 'main' }),
+      getBranches: () =>
+        Promise.resolve({
+          branches: s.refs.filter((r) => r.ref.startsWith('refs/heads/')).map((r) => r.ref.replace('refs/heads/', '')),
+          currentBranch: 'main',
+        }),
       resolveRef: (ref: string) => Promise.resolve(s.refs.find((r) => r.ref === ref)?.oid ?? null),
       hasObject: (oid: string) => Promise.resolve(s.objects.has(oid)),
       exportPack: (wants: string[]) => {
@@ -269,7 +308,11 @@ function createGitHarness() {
 function createEnv(db: D1Queryable, harness: ReturnType<typeof createGitHarness>, email: string) {
   return {
     DB: db,
-    REPO: { getByName: (name: string) => harness.stubFor(name), get: (name: string) => harness.stubFor(name), idFromName: (n: string) => n },
+    REPO: {
+      getByName: (name: string) => harness.stubFor(name),
+      get: (name: string) => harness.stubFor(name),
+      idFromName: (n: string) => n,
+    },
     ENVIRONMENT: 'development',
     DEV_AUTH_EMAIL: email,
   };
@@ -313,7 +356,14 @@ describe('ForkService', () => {
   it('forces private forks of private sources and hides invisible sources', async () => {
     const db = createForkFakeDb();
     seedBase(db);
-    seedRepo(db, { id: 'r9', owner_email: 'alice@example.com', owner: 'alice', name: 'secret', owner_user_email: 'alice@example.com', is_private: 1 });
+    seedRepo(db, {
+      id: 'r9',
+      owner_email: 'alice@example.com',
+      owner: 'alice',
+      name: 'secret',
+      owner_user_email: 'alice@example.com',
+      is_private: 1,
+    });
     const svc = new ForkService({ DB: db });
     const fork = await svc.createForkRow('alice@example.com', 'alice', 'secret', { owner: 'alice', name: 'secret-fork', isPrivate: false });
     expect(fork.isPrivate).toBe(true);
@@ -346,7 +396,12 @@ describe('Fork API routes', () => {
       body: JSON.stringify({ owner: 'bob', name: 'demo-fork' }),
     });
     expect(res.status).toBe(201);
-    await expect(res.json()).resolves.toMatchObject({ owner: 'bob', name: 'demo-fork', fullName: 'bob/demo-fork', forkedFrom: 'alice/demo' });
+    await expect(res.json()).resolves.toMatchObject({
+      owner: 'bob',
+      name: 'demo-fork',
+      fullName: 'bob/demo-fork',
+      forkedFrom: 'alice/demo',
+    });
 
     // Target DO received the branch refs and objects.
     const target = harness.stubFor('bob/demo-fork');
@@ -354,8 +409,14 @@ describe('Fork API routes', () => {
     await expect(target.hasObject(OID_A)).resolves.toBe(true);
 
     // Fork listing exposes the fork with a visible count.
-    await expect(call(bob, '/repos/alice/demo/forks').then((r) => r.json())).resolves.toMatchObject({ count: 1, forks: [{ fullName: 'bob/demo-fork' }] });
-    await expect(call(bob, '/repos/bob/demo-fork').then((r) => r.json())).resolves.toMatchObject({ forkedFrom: 'alice/demo', forksCount: 0 });
+    await expect(call(bob, '/repos/alice/demo/forks').then((r) => r.json())).resolves.toMatchObject({
+      count: 1,
+      forks: [{ fullName: 'bob/demo-fork' }],
+    });
+    await expect(call(bob, '/repos/bob/demo-fork').then((r) => r.json())).resolves.toMatchObject({
+      forkedFrom: 'alice/demo',
+      forksCount: 0,
+    });
   });
 
   it('rejects unknown sources and rolls back failed copies', async () => {
@@ -368,20 +429,38 @@ describe('Fork API routes', () => {
 
     // Empty source (no refs) still forks the D1 row.
     harness.seed('alice/demo', { refs: [], objects: [] });
-    expect((await call(bob, '/user/repos/alice/demo/forks', { method: 'POST', headers: json, body: JSON.stringify({ name: 'empty-fork' }) })).status).toBe(201);
+    expect(
+      (await call(bob, '/user/repos/alice/demo/forks', { method: 'POST', headers: json, body: JSON.stringify({ name: 'empty-fork' }) }))
+        .status,
+    ).toBe(201);
     expect(db.repos.some((r) => r.name === 'empty-fork')).toBe(true);
   });
 
   it('hides private forks from unauthorized viewers', async () => {
     const db = createForkFakeDb();
     seedBase(db);
-    seedRepo(db, { id: 'r9', owner_email: 'alice@example.com', owner: 'alice', name: 'secret', owner_user_email: 'alice@example.com', is_private: 1 });
+    seedRepo(db, {
+      id: 'r9',
+      owner_email: 'alice@example.com',
+      owner: 'alice',
+      name: 'secret',
+      owner_user_email: 'alice@example.com',
+      is_private: 1,
+    });
     const harness = createGitHarness();
     harness.seed('alice/secret', { refs: [{ ref: 'refs/heads/main', oid: OID_A }], objects: [OID_A] });
     const alice = createEnv(db, harness, 'alice@example.com');
     const bob = createEnv(db, harness, 'bob@example.com');
 
-    expect((await call(alice, '/user/repos/alice/secret/forks', { method: 'POST', headers: json, body: JSON.stringify({ name: 'secret-fork' }) })).status).toBe(201);
+    expect(
+      (
+        await call(alice, '/user/repos/alice/secret/forks', {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ name: 'secret-fork' }),
+        })
+      ).status,
+    ).toBe(201);
     // Bob cannot see the private source at all, hence no forks either.
     expect((await call(bob, '/repos/alice/secret/forks')).status).toBe(404);
     // Bob cannot see the private fork in the owner's other listings.
@@ -393,7 +472,15 @@ describe('Fork API routes', () => {
 describe('Cross-fork pull requests', () => {
   function seedForkWorld(db: ReturnType<typeof createForkFakeDb>, harness: ReturnType<typeof createGitHarness>) {
     seedBase(db);
-    seedRepo(db, { id: 'r2', owner_email: 'bob@example.com', owner: 'bob', name: 'demo', owner_user_email: 'bob@example.com', forked_from_repo_id: 'r1', forked_from_full_name: 'alice/demo' });
+    seedRepo(db, {
+      id: 'r2',
+      owner_email: 'bob@example.com',
+      owner: 'bob',
+      name: 'demo',
+      owner_user_email: 'bob@example.com',
+      forked_from_repo_id: 'r1',
+      forked_from_full_name: 'alice/demo',
+    });
     harness.seed('alice/demo', { refs: [{ ref: 'refs/heads/main', oid: OID_A }], objects: [OID_A] });
     harness.seed('bob/demo', { refs: [{ ref: 'refs/heads/main', oid: OID_B }], objects: [OID_B] });
   }
@@ -423,10 +510,22 @@ describe('Cross-fork pull requests', () => {
     const bob = createEnv(db, harness, 'bob@example.com');
 
     expect(
-      (await call(bob, '/user/repos/alice/demo/pulls', { method: 'POST', headers: json, body: JSON.stringify({ title: 'X', baseBranch: 'main', headBranch: 'main', headOwner: 'bob' }) })).status,
+      (
+        await call(bob, '/user/repos/alice/demo/pulls', {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ title: 'X', baseBranch: 'main', headBranch: 'main', headOwner: 'bob' }),
+        })
+      ).status,
     ).toBe(400);
     expect(
-      (await call(bob, '/user/repos/alice/demo/pulls', { method: 'POST', headers: json, body: JSON.stringify({ title: 'X', baseBranch: 'main', headBranch: 'main', headOwner: 'mallory', headRepo: 'demo' }) })).status,
+      (
+        await call(bob, '/user/repos/alice/demo/pulls', {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ title: 'X', baseBranch: 'main', headBranch: 'main', headOwner: 'mallory', headRepo: 'demo' }),
+        })
+      ).status,
     ).toBe(404);
   });
 
@@ -437,9 +536,17 @@ describe('Cross-fork pull requests', () => {
     const bob = createEnv(db, harness, 'bob@example.com');
 
     expect(
-      (await call(bob, '/user/repos/alice/demo/pulls', { method: 'POST', headers: json, body: JSON.stringify({ title: 'From Fork', baseBranch: 'main', headBranch: 'main', headOwner: 'bob', headRepo: 'demo' }) })).status,
+      (
+        await call(bob, '/user/repos/alice/demo/pulls', {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ title: 'From Fork', baseBranch: 'main', headBranch: 'main', headOwner: 'bob', headRepo: 'demo' }),
+        })
+      ).status,
     ).toBe(201);
-    await expect(call(bob, '/repos/alice/demo/pulls/1/preview').then((r) => r.json())).resolves.toMatchObject({ preview: { headOid: OID_B } });
+    await expect(call(bob, '/repos/alice/demo/pulls/1/preview').then((r) => r.json())).resolves.toMatchObject({
+      preview: { headOid: OID_B },
+    });
     await expect(call(bob, '/repos/alice/demo/pulls/1/diff').then((r) => r.json())).resolves.toMatchObject({ diff: { truncated: false } });
 
     // Privatize the fork: anonymous preview/diff must not leak it.
@@ -461,14 +568,36 @@ describe('Cross-fork pull requests', () => {
     const alice = createEnv(db, harness, 'alice@example.com');
 
     expect(
-      (await call(bob, '/user/repos/alice/demo/pulls', { method: 'POST', headers: json, body: JSON.stringify({ title: 'From Fork', baseBranch: 'main', headBranch: 'feat', headOwner: 'bob', headRepo: 'demo' }) })).status,
+      (
+        await call(bob, '/user/repos/alice/demo/pulls', {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ title: 'From Fork', baseBranch: 'main', headBranch: 'feat', headOwner: 'bob', headRepo: 'demo' }),
+        })
+      ).status,
     ).toBe(400); // bob/demo has no feat branch
-    harness.seed('bob/demo', { refs: [{ ref: 'refs/heads/main', oid: OID_B }, { ref: 'refs/heads/feat', oid: OID_B }], objects: [OID_B] });
+    harness.seed('bob/demo', {
+      refs: [
+        { ref: 'refs/heads/main', oid: OID_B },
+        { ref: 'refs/heads/feat', oid: OID_B },
+      ],
+      objects: [OID_B],
+    });
     expect(
-      (await call(bob, '/user/repos/alice/demo/pulls', { method: 'POST', headers: json, body: JSON.stringify({ title: 'From Fork', baseBranch: 'main', headBranch: 'feat', headOwner: 'bob', headRepo: 'demo' }) })).status,
+      (
+        await call(bob, '/user/repos/alice/demo/pulls', {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ title: 'From Fork', baseBranch: 'main', headBranch: 'feat', headOwner: 'bob', headRepo: 'demo' }),
+        })
+      ).status,
     ).toBe(201);
 
-    const merged = await call(alice, '/user/repos/alice/demo/pulls/1/merge', { method: 'POST', headers: json, body: JSON.stringify({ deleteHead: true }) });
+    const merged = await call(alice, '/user/repos/alice/demo/pulls/1/merge', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ deleteHead: true }),
+    });
     expect(merged.status).toBe(200);
     await expect(merged.json()).resolves.toMatchObject({ pull: { status: 'merged' }, merge: { type: 'fast-forward' } });
     expect(harness.deletedBranches).toContainEqual({ repo: 'bob/demo', branch: 'feat' });
@@ -487,11 +616,21 @@ describe('Cross-fork pull requests', () => {
     const carol = createEnv(db, harness, 'carol@example.com');
 
     expect(
-      (await call(bob, '/user/repos/alice/demo/pulls', { method: 'POST', headers: json, body: JSON.stringify({ title: 'From Fork', baseBranch: 'main', headBranch: 'main', headOwner: 'bob', headRepo: 'demo' }) })).status,
+      (
+        await call(bob, '/user/repos/alice/demo/pulls', {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ title: 'From Fork', baseBranch: 'main', headBranch: 'main', headOwner: 'bob', headRepo: 'demo' }),
+        })
+      ).status,
     ).toBe(201);
     // Carol can merge into the base but may not delete branches in bob's fork:
     // the merge proceeds and reports deletedHead: false.
-    const res = await call(carol, '/user/repos/alice/demo/pulls/1/merge', { method: 'POST', headers: json, body: JSON.stringify({ deleteHead: true }) });
+    const res = await call(carol, '/user/repos/alice/demo/pulls/1/merge', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ deleteHead: true }),
+    });
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ pull: { status: 'merged' }, merge: { deletedHead: false } });
     expect(harness.deletedBranches).toHaveLength(0);

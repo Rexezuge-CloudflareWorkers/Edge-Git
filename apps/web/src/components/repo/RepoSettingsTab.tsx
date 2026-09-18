@@ -61,7 +61,10 @@ export function RepoSettingsTab({
       setDefaultBranchName(updated.defaultBranch);
       showNotice('success', t('branches.defaultUpdated', 'Default Branch Updated.'));
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToUpdateDefaultBranch', 'Failed To Update Default Branch.'));
+      showNotice(
+        'error',
+        error instanceof Error ? error.message : t('errors.failedToUpdateDefaultBranch', 'Failed To Update Default Branch.'),
+      );
     } finally {
       setSavingDefault(false);
     }
@@ -158,7 +161,12 @@ export function RepoSettingsTab({
           <CardTitle>{t('branches.defaultBranch', 'Default Branch')}</CardTitle>
         </CardHeader>
         <div className="flex items-center gap-2 flex-wrap">
-          <Select aria-label={t('branches.defaultBranch', 'Default Branch')} value={defaultBranch} onChange={(e) => setDefaultBranchName(e.target.value)} disabled={branches.length === 0}>
+          <Select
+            aria-label={t('branches.defaultBranch', 'Default Branch')}
+            value={defaultBranch}
+            onChange={(e) => setDefaultBranchName(e.target.value)}
+            disabled={branches.length === 0}
+          >
             {branches.map((b) => (
               <option key={b} value={b}>
                 {b}

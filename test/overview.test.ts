@@ -32,9 +32,7 @@ describe('ReadModelService.getOverview', () => {
     expect(overview.branches).toEqual(['main']);
     expect(overview.currentBranch).toBe('main');
     expect(overview.resolvedRef).toBe('a'.repeat(40));
-    expect(overview.tags).toEqual([
-      { name: 'v1.0.0', ref: 'refs/tags/v1.0.0', oid: 'b'.repeat(40), peeledOid: null, type: 'lightweight' },
-    ]);
+    expect(overview.tags).toEqual([{ name: 'v1.0.0', ref: 'refs/tags/v1.0.0', oid: 'b'.repeat(40), peeledOid: null, type: 'lightweight' }]);
     expect(overview.tree).toEqual([
       { path: 'README.md', type: 'blob', mode: '100644', oid: 'd'.repeat(40), lastCommit: null },
       { path: 'src', type: 'tree', mode: '040000', oid: 'e'.repeat(40), lastCommit: null },

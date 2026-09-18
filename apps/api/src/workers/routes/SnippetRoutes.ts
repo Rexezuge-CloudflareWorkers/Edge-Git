@@ -23,7 +23,9 @@ function registerSnippetPublicRoutes(app: SnippetApp): void {
       // their identity via Access/PAT (best-effort, never throws).
       let viewerEmail: string | null = null;
       try {
-        viewerEmail = await createRequestScope(c.env).get(Tokens.AccessAuthService).getAuthenticatedUserEmail(c.req.raw, c.executionCtx as never);
+        viewerEmail = await createRequestScope(c.env)
+          .get(Tokens.AccessAuthService)
+          .getAuthenticatedUserEmail(c.req.raw, c.executionCtx as never);
       } catch {
         viewerEmail = null;
       }
@@ -41,7 +43,9 @@ function registerSnippetPublicRoutes(app: SnippetApp): void {
       if (!user) return c.json({ error: 'Not found' }, 404);
       let viewerEmail: string | null = null;
       try {
-        viewerEmail = await createRequestScope(c.env).get(Tokens.AccessAuthService).getAuthenticatedUserEmail(c.req.raw, c.executionCtx as never);
+        viewerEmail = await createRequestScope(c.env)
+          .get(Tokens.AccessAuthService)
+          .getAuthenticatedUserEmail(c.req.raw, c.executionCtx as never);
       } catch {
         viewerEmail = null;
       }
@@ -69,7 +73,9 @@ function registerSnippetUserRoutes(app: SnippetApp): void {
     const body = (await c.req.json().catch(() => ({}))) as { title?: unknown; visibility?: unknown; files?: unknown };
     try {
       const scope = createRequestScope(c.env);
-      const result = await scope.get(Tokens.SnippetService).createSnippet(email, { title: body.title, visibility: body.visibility, files: body.files });
+      const result = await scope
+        .get(Tokens.SnippetService)
+        .createSnippet(email, { title: body.title, visibility: body.visibility, files: body.files });
       // Snippets are user-scoped: no repo_events row, only a webhook ping for
       // hooks parity (repositoryId empty is skipped by enqueue, best-effort).
       void emitWebhookEvent(c.env, {

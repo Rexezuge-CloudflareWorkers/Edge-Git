@@ -24,7 +24,7 @@ function toMetadata(row: CheckRunRow): CheckRunMetadata {
     repositoryId: row.repository_id,
     headSha: row.head_sha,
     context: row.context,
-    status: (row.status === 'in_progress' || row.status === 'completed' ? row.status : 'queued'),
+    status: row.status === 'in_progress' || row.status === 'completed' ? row.status : 'queued',
     conclusion: (row.conclusion ?? null) as CheckConclusion | null,
     detailsUrl: row.details_url,
     outputTitle: row.output_title,

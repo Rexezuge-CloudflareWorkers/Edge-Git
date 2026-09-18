@@ -29,18 +29,7 @@ export class ErrorWithCode extends Error {
   }
 }
 
-const KNOWN_CODES = new Set([
-  'ENOENT',
-  'ENOTDIR',
-  'EISDIR',
-  'EEXIST',
-  'EPERM',
-  'EACCES',
-  'EINVAL',
-  'EBUSY',
-  'ENOSPC',
-  'ENOTEMPTY',
-]);
+const KNOWN_CODES = new Set(['ENOENT', 'ENOTDIR', 'EISDIR', 'EEXIST', 'EPERM', 'EACCES', 'EINVAL', 'EBUSY', 'ENOSPC', 'ENOTEMPTY']);
 
 export class ErrorNormalizer {
   ensureErrCode(error: Error): ErrorWithCode {

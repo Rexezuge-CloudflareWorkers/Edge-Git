@@ -133,7 +133,11 @@ export function PullThreads({
                         {thread.author_email} · {formatTimestamp(thread.created_at)}
                       </span>
                       {canWrite && (
-                        <button type="button" onClick={() => void toggleResolve(thread)} className="ml-auto text-xs text-[var(--color-accent)] hover:underline">
+                        <button
+                          type="button"
+                          onClick={() => void toggleResolve(thread)}
+                          className="ml-auto text-xs text-[var(--color-accent)] hover:underline"
+                        >
                           {thread.status === 'resolved' ? t('pulls.reopenThread', 'Reopen') : t('pulls.resolveThread', 'Resolve')}
                         </button>
                       )}
@@ -153,18 +157,35 @@ export function PullThreads({
                     {canWrite &&
                       (replyFor === thread.id ? (
                         <div className="mt-2 space-y-2">
-                          <Textarea placeholder={t('pulls.replyPlaceholder', 'Write A Reply…')} value={replyBody} onChange={(e) => setReplyBody(e.target.value)} rows={2} />
+                          <Textarea
+                            placeholder={t('pulls.replyPlaceholder', 'Write A Reply…')}
+                            value={replyBody}
+                            onChange={(e) => setReplyBody(e.target.value)}
+                            rows={2}
+                          />
                           <div className="flex gap-2">
                             <Button type="button" variant="secondary" size="sm" onClick={() => void submitReply(thread.id)}>
                               {t('pulls.reply', 'Reply')}
                             </Button>
-                            <Button type="button" variant="secondary" size="sm" onClick={() => { setReplyFor(null); setReplyBody(''); }}>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => {
+                                setReplyFor(null);
+                                setReplyBody('');
+                              }}
+                            >
                               {t('common.cancel', 'Cancel')}
                             </Button>
                           </div>
                         </div>
                       ) : (
-                        <button type="button" onClick={() => setReplyFor(thread.id)} className="mt-2 text-xs text-[var(--color-accent)] hover:underline">
+                        <button
+                          type="button"
+                          onClick={() => setReplyFor(thread.id)}
+                          className="mt-2 text-xs text-[var(--color-accent)] hover:underline"
+                        >
                           {t('pulls.reply', 'Reply')}
                         </button>
                       ))}
@@ -178,14 +199,29 @@ export function PullThreads({
       {canWrite && (
         <form onSubmit={submit} className="mt-4 space-y-2">
           <div className="flex gap-2 flex-wrap">
-            <Input placeholder={t('pulls.threadPathPlaceholder', 'File Path (e.g. src/app.ts)')} value={path} onChange={(e) => setPath(e.target.value)} required />
-            <Input placeholder={t('pulls.threadLinePlaceholder', 'Line (Optional)')} value={line} onChange={(e) => setLine(e.target.value)} inputMode="numeric" />
+            <Input
+              placeholder={t('pulls.threadPathPlaceholder', 'File Path (e.g. src/app.ts)')}
+              value={path}
+              onChange={(e) => setPath(e.target.value)}
+              required
+            />
+            <Input
+              placeholder={t('pulls.threadLinePlaceholder', 'Line (Optional)')}
+              value={line}
+              onChange={(e) => setLine(e.target.value)}
+              inputMode="numeric"
+            />
             <Select value={side} onChange={(e) => setSide(e.target.value as 'old' | 'new')} aria-label="Side">
               <option value="new">new</option>
               <option value="old">old</option>
             </Select>
           </div>
-          <Textarea placeholder={t('pulls.threadBodyPlaceholder', 'Comment On This Line…')} value={body} onChange={(e) => setBody(e.target.value)} rows={2} />
+          <Textarea
+            placeholder={t('pulls.threadBodyPlaceholder', 'Comment On This Line…')}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={2}
+          />
           <Button type="submit" variant="secondary" size="sm" loading={saving} disabled={!path.trim() || !body.trim()}>
             {t('pulls.addInlineComment', 'Add Inline Comment')}
           </Button>

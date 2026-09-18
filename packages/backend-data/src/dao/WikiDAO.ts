@@ -100,7 +100,9 @@ class WikiDAO extends BaseDAO {
     await this.withRetry(
       () =>
         this.database
-          .prepare('UPDATE wiki_pages SET title = ?, body = ?, revision = ?, updated_by = ?, updated_at = ? WHERE id = ? AND repository_id = ?')
+          .prepare(
+            'UPDATE wiki_pages SET title = ?, body = ?, revision = ?, updated_by = ?, updated_at = ? WHERE id = ? AND repository_id = ?',
+          )
           .bind(nextTitle, nextBody, nextRevision, authorEmail, now, id, repositoryId)
           .run(),
       'update wiki page',
@@ -119,7 +121,11 @@ class WikiDAO extends BaseDAO {
   }
 
   public async deletePage(id: string, repositoryId: string): Promise<void> {
-    await this.database.prepare('DELETE FROM wiki_revisions WHERE page_id = ?').bind(id).run().catch(() => undefined);
+    await this.database
+      .prepare('DELETE FROM wiki_revisions WHERE page_id = ?')
+      .bind(id)
+      .run()
+      .catch(() => undefined);
     await this.withRetry(
       () => this.database.prepare('DELETE FROM wiki_pages WHERE id = ? AND repository_id = ?').bind(id, repositoryId).run(),
       'delete wiki page',
@@ -138,7 +144,9 @@ class WikiDAO extends BaseDAO {
   public async searchByRepo(repositoryId: string, term: string, limit: number): Promise<WikiPageRow[]> {
     const pattern = `%${term.replaceAll(/[%_]/g, '').toLowerCase()}%`;
     const result = await this.database
-      .prepare('SELECT * FROM wiki_pages WHERE repository_id = ? AND (lower(title) LIKE ? OR lower(body) LIKE ?) ORDER BY updated_at DESC LIMIT ?')
+      .prepare(
+        'SELECT * FROM wiki_pages WHERE repository_id = ? AND (lower(title) LIKE ? OR lower(body) LIKE ?) ORDER BY updated_at DESC LIMIT ?',
+      )
       .bind(repositoryId, pattern, pattern, limit)
       .all<WikiPageRow>()
       .catch(() => ({ results: [] }));

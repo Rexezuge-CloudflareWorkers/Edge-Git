@@ -19,7 +19,9 @@ class TeamRepoGrantDAO extends BaseDAO {
     await this.withRetry(
       () =>
         this.database
-          .prepare('INSERT INTO team_repo_grants (team_id, repo_id, role, granted_by, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(team_id, repo_id) DO UPDATE SET role = excluded.role')
+          .prepare(
+            'INSERT INTO team_repo_grants (team_id, repo_id, role, granted_by, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(team_id, repo_id) DO UPDATE SET role = excluded.role',
+          )
           .bind(teamId, repoId, role, grantedBy, now)
           .run(),
       'upsert team repo grant',
@@ -50,7 +52,10 @@ class TeamRepoGrantDAO extends BaseDAO {
   }
 
   public async countByTeam(teamId: string): Promise<number> {
-    const row = await this.database.prepare('SELECT COUNT(*) AS n FROM team_repo_grants WHERE team_id = ?').bind(teamId).first<{ n: number }>();
+    const row = await this.database
+      .prepare('SELECT COUNT(*) AS n FROM team_repo_grants WHERE team_id = ?')
+      .bind(teamId)
+      .first<{ n: number }>();
     return row?.n ?? 0;
   }
 
@@ -62,11 +67,17 @@ class TeamRepoGrantDAO extends BaseDAO {
   }
 
   public async deleteByTeam(teamId: string): Promise<void> {
-    await this.withRetry(() => this.database.prepare('DELETE FROM team_repo_grants WHERE team_id = ?').bind(teamId).run(), 'delete grants by team');
+    await this.withRetry(
+      () => this.database.prepare('DELETE FROM team_repo_grants WHERE team_id = ?').bind(teamId).run(),
+      'delete grants by team',
+    );
   }
 
   public async deleteByRepo(repoId: string): Promise<void> {
-    await this.withRetry(() => this.database.prepare('DELETE FROM team_repo_grants WHERE repo_id = ?').bind(repoId).run(), 'delete grants by repo');
+    await this.withRetry(
+      () => this.database.prepare('DELETE FROM team_repo_grants WHERE repo_id = ?').bind(repoId).run(),
+      'delete grants by repo',
+    );
   }
 }
 

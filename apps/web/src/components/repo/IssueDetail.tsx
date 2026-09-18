@@ -59,7 +59,12 @@ export function IssueDetail({
     }
   }, [owner, repo, number, authOpt]);
 
-  const { status: liveStatus, viewers, typing, sendTyping } = useRealtimeSubscription({
+  const {
+    status: liveStatus,
+    viewers,
+    typing,
+    sendTyping,
+  } = useRealtimeSubscription({
     enabled: useAuthed && status === 'ready',
     ticket: { kind: 'repo', owner, repo, channels: [issueChannel(number), 'presence'] },
     onEvent: (event) => {
@@ -95,9 +100,7 @@ export function IssueDetail({
       }
       let commentsRes;
       try {
-        commentsRes = await fetchUpgraded(commentsStateRef.current, `${key}/comments`, () =>
-          listComments(owner, repo, number, authOpt),
-        );
+        commentsRes = await fetchUpgraded(commentsStateRef.current, `${key}/comments`, () => listComments(owner, repo, number, authOpt));
       } catch (error) {
         if (!cancelled) {
           showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadComments', 'Failed To Load Comments.'));
@@ -124,9 +127,7 @@ export function IssueDetail({
   if (status === 'missing' || !issue) {
     return (
       <Card>
-        <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">
-          {t('issues.issueNotFound', 'Issue Not Found.')}
-        </h1>
+        <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('issues.issueNotFound', 'Issue Not Found.')}</h1>
       </Card>
     );
   }

@@ -100,18 +100,20 @@ for (const [tag, bundle] of bundles) {
     return a.length !== b.length || a.some((ph, i) => ph !== b[i]);
   });
   for (const key of phMismatches.slice(0, 10)) {
-    fail(`${tag}: placeholder mismatch at ${key} (en=${JSON.stringify(placeholdersOf(enByKey.get(key)))} vs ${tag}=${JSON.stringify(placeholdersOf(byKey.get(key)))})`);
+    fail(
+      `${tag}: placeholder mismatch at ${key} (en=${JSON.stringify(placeholdersOf(enByKey.get(key)))} vs ${tag}=${JSON.stringify(placeholdersOf(byKey.get(key)))})`,
+    );
   }
 
-  const orderDrift =
-    keys.length !== enKeys.length || keys.some((key, index) => key !== enKeys[index]);
+  const orderDrift = keys.length !== enKeys.length || keys.some((key, index) => key !== enKeys[index]);
   if (orderDrift) {
     warn(`${tag}: key order differs from en (warn-only)`);
   }
 
-  const status =
-    missingCount === 0 && extraCount === 0 && empty.length === 0 && phMismatches.length === 0 ? 'OK' : 'FAIL';
-  console.log(`${tag}: keys=${keys.length} missing=${missingCount} extra=${extraCount} empty=${empty.length} ph_mismatch=${phMismatches.length} [${status}]`);
+  const status = missingCount === 0 && extraCount === 0 && empty.length === 0 && phMismatches.length === 0 ? 'OK' : 'FAIL';
+  console.log(
+    `${tag}: keys=${keys.length} missing=${missingCount} extra=${extraCount} empty=${empty.length} ph_mismatch=${phMismatches.length} [${status}]`,
+  );
 }
 
 console.log(failed ? 'FAILURES PRESENT' : 'ALL OK');

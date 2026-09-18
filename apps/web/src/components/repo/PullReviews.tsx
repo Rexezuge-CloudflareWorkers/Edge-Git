@@ -45,9 +45,11 @@ export function PullReviews({
   useEffect(() => {
     if (!useAuthed) return;
     let cancelled = false;
-    void getCodeowners(owner, repo, number).then((res) => {
-      if (!cancelled) setCodeowners(res.owners ?? []);
-    }).catch(() => undefined);
+    void getCodeowners(owner, repo, number)
+      .then((res) => {
+        if (!cancelled) setCodeowners(res.owners ?? []);
+      })
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
@@ -86,13 +88,18 @@ export function PullReviews({
           <p className="text-xs text-[var(--color-text-muted)]">
             {t('pulls.suggestedReviewers', 'Suggested Reviewers: {{owners}}', { owners: codeowners.join(', ') })}
           </p>
-            {canWrite && isOpen && (
-              <button
-                type="button"
-                onClick={() => {
-                  void requestReviewers(owner, repo, number, codeowners)
+          {canWrite && isOpen && (
+            <button
+              type="button"
+              onClick={() => {
+                void requestReviewers(owner, repo, number, codeowners)
                   .then(() => showNotice('success', t('pulls.reviewRequested', 'Review Requested.')))
-                  .catch((error) => showNotice('error', error instanceof Error ? error.message : t('errors.failedToRequestReview', 'Failed To Request Review.')));
+                  .catch((error) =>
+                    showNotice(
+                      'error',
+                      error instanceof Error ? error.message : t('errors.failedToRequestReview', 'Failed To Request Review.'),
+                    ),
+                  );
               }}
               className="text-xs text-[var(--color-accent)] hover:underline"
             >
@@ -111,7 +118,12 @@ export function PullReviews({
                 setReviewerInput('');
                 showNotice('success', t('pulls.reviewRequested', 'Review Requested.'));
               })
-              .catch((error) => showNotice('error', error instanceof Error ? error.message : t('errors.failedToRequestReview', 'Failed To Request Review.')));
+              .catch((error) =>
+                showNotice(
+                  'error',
+                  error instanceof Error ? error.message : t('errors.failedToRequestReview', 'Failed To Request Review.'),
+                ),
+              );
           }}
           className="mb-3 flex gap-2"
         >
@@ -133,7 +145,9 @@ export function PullReviews({
           {reviews.map((r) => (
             <li key={r.id} className="py-3 first:pt-0 last:pb-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant={r.state === 'approved' ? 'success' : r.state === 'changes_requested' ? 'error' : 'neutral'}>{r.state}</Badge>
+                <Badge variant={r.state === 'approved' ? 'success' : r.state === 'changes_requested' ? 'error' : 'neutral'}>
+                  {r.state}
+                </Badge>
                 {r.dismissed === 1 && <Badge variant="neutral">{t('pulls.dismissed', 'Dismissed')}</Badge>}
                 <span className="text-xs text-[var(--color-text-muted)]">
                   {r.author_email} · {formatTimestamp(r.created_at)}
@@ -144,7 +158,12 @@ export function PullReviews({
                     onClick={() => {
                       void dismissPullReview(owner, repo, number, r.id)
                         .then(() => void refresh())
-                        .catch((error) => showNotice('error', error instanceof Error ? error.message : t('errors.failedToDismissReview', 'Failed To Dismiss Review.')));
+                        .catch((error) =>
+                          showNotice(
+                            'error',
+                            error instanceof Error ? error.message : t('errors.failedToDismissReview', 'Failed To Dismiss Review.'),
+                          ),
+                        );
                     }}
                     className="ml-auto text-xs text-[var(--color-accent)] hover:underline"
                   >
@@ -168,7 +187,12 @@ export function PullReviews({
             <option value="changes_requested">changes_requested</option>
             <option value="commented">commented</option>
           </Select>
-          <Textarea placeholder={t('pulls.reviewPlaceholder', 'Review Notes (Optional)')} value={reviewBody} onChange={(e) => setReviewBody(e.target.value)} rows={2} />
+          <Textarea
+            placeholder={t('pulls.reviewPlaceholder', 'Review Notes (Optional)')}
+            value={reviewBody}
+            onChange={(e) => setReviewBody(e.target.value)}
+            rows={2}
+          />
           <Button type="submit" variant="secondary" size="sm" loading={reviewing}>
             {t('pulls.submitReview', 'Submit Review')}
           </Button>

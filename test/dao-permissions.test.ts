@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { NamespaceDAO, OrganizationDAO, OrganizationMemberDAO, RepoCollaboratorDAO, RepositoryDAO, UserDAO } from '@edge-git/backend-data/dao';
+import {
+  NamespaceDAO,
+  OrganizationDAO,
+  OrganizationMemberDAO,
+  RepoCollaboratorDAO,
+  RepositoryDAO,
+  UserDAO,
+} from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 
 function createPermFakeDb() {
@@ -27,7 +34,8 @@ function createPermFakeDb() {
         }
         if (q.includes('FROM organization_members WHERE org_id = ? AND') && q.includes('user_email')) {
           return Promise.resolve(
-            (state.members.find((m) => m.org_id === params[0] && String(m.user_email).toLowerCase() === String(params[1]).toLowerCase()) ?? null) as T | null,
+            (state.members.find((m) => m.org_id === params[0] && String(m.user_email).toLowerCase() === String(params[1]).toLowerCase()) ??
+              null) as T | null,
           );
         }
         if (q.includes('COUNT(*) AS n FROM organization_members')) {
@@ -36,23 +44,25 @@ function createPermFakeDb() {
         }
         if (q.includes('FROM repo_collaborators WHERE repo_id = ? AND') && q.includes('user_email')) {
           return Promise.resolve(
-            (state.collabs.find((c) => c.repo_id === params[0] && String(c.user_email).toLowerCase() === String(params[1]).toLowerCase()) ?? null) as T | null,
+            (state.collabs.find((c) => c.repo_id === params[0] && String(c.user_email).toLowerCase() === String(params[1]).toLowerCase()) ??
+              null) as T | null,
           );
         }
         if (q.includes('FROM users WHERE email = ?') || q.includes('FROM users WHERE lower(email)')) {
-          return Promise.resolve((state.users.find((u) => String(u.email).toLowerCase() === String(params[0]).toLowerCase()) ?? null) as T | null);
+          return Promise.resolve(
+            (state.users.find((u) => String(u.email).toLowerCase() === String(params[0]).toLowerCase()) ?? null) as T | null,
+          );
         }
         if (q.includes('FROM users WHERE lower(username) = ?')) {
-          return Promise.resolve(
-            (state.users.find((u) => (u.username as string)?.toLowerCase() === params[0]) ?? null) as T | null,
-          );
+          return Promise.resolve((state.users.find((u) => (u.username as string)?.toLowerCase() === params[0]) ?? null) as T | null);
         }
         if (q.includes('FROM repositories WHERE id = ?')) {
           return Promise.resolve((state.repos.find((r) => r.id === params[0]) ?? null) as T | null);
         }
         if (q.includes('FROM repositories WHERE lower(owner) = ? AND lower(name) = ?')) {
           return Promise.resolve(
-            (state.repos.find((r) => (r.owner as string).toLowerCase() === params[0] && (r.name as string).toLowerCase() === params[1]) ?? null) as T | null,
+            (state.repos.find((r) => (r.owner as string).toLowerCase() === params[0] && (r.name as string).toLowerCase() === params[1]) ??
+              null) as T | null,
           );
         }
         if (q.includes('FROM repositories WHERE owner = ? AND name = ?')) {
@@ -103,7 +113,8 @@ function createPermFakeDb() {
         if (q.startsWith('INSERT INTO namespaces')) {
           const [username_ci, kind, user_email, org_id, created_at] = params as Array<string | number | null>;
           if (q.includes('OR IGNORE')) {
-            if (!state.namespaces.some((n) => n.username_ci === username_ci)) state.namespaces.push({ username_ci, kind, user_email, org_id, created_at });
+            if (!state.namespaces.some((n) => n.username_ci === username_ci))
+              state.namespaces.push({ username_ci, kind, user_email, org_id, created_at });
           } else {
             state.namespaces.push({ username_ci, kind, user_email, org_id, created_at });
           }
@@ -146,7 +157,12 @@ function createPermFakeDb() {
         if (q.startsWith('DELETE FROM organization_members WHERE org_id = ? AND') && q.includes('user_email')) {
           if (params.length >= 3) {
             state.members = state.members.filter(
-              (m) => !(m.org_id === params[0] && String(m.user_email).toLowerCase() === String(params[1]).toLowerCase() && m.user_email !== params[2]),
+              (m) =>
+                !(
+                  m.org_id === params[0] &&
+                  String(m.user_email).toLowerCase() === String(params[1]).toLowerCase() &&
+                  m.user_email !== params[2]
+                ),
             );
           } else {
             state.members = state.members.filter(
@@ -176,7 +192,12 @@ function createPermFakeDb() {
         if (q.startsWith('DELETE FROM repo_collaborators WHERE repo_id = ? AND') && q.includes('user_email')) {
           if (params.length >= 3) {
             state.collabs = state.collabs.filter(
-              (c) => !(c.repo_id === params[0] && String(c.user_email).toLowerCase() === String(params[1]).toLowerCase() && c.user_email !== params[2]),
+              (c) =>
+                !(
+                  c.repo_id === params[0] &&
+                  String(c.user_email).toLowerCase() === String(params[1]).toLowerCase() &&
+                  c.user_email !== params[2]
+                ),
             );
           } else {
             state.collabs = state.collabs.filter(
@@ -211,9 +232,36 @@ function createPermFakeDb() {
         }
         if (q.startsWith('INSERT INTO repositories')) {
           if (q.includes('owner_type')) {
-            const [id, owner_email, owner, name, description, is_private, created_at, updated_at, owner_type, owner_ci, name_ci, owner_user_email, org_id] =
-              params as Array<string | number | null>;
-            state.repos.push({ id, owner_email, owner, name, description, is_private, created_at, updated_at, owner_type, owner_ci, name_ci, owner_user_email, org_id });
+            const [
+              id,
+              owner_email,
+              owner,
+              name,
+              description,
+              is_private,
+              created_at,
+              updated_at,
+              owner_type,
+              owner_ci,
+              name_ci,
+              owner_user_email,
+              org_id,
+            ] = params as Array<string | number | null>;
+            state.repos.push({
+              id,
+              owner_email,
+              owner,
+              name,
+              description,
+              is_private,
+              created_at,
+              updated_at,
+              owner_type,
+              owner_ci,
+              name_ci,
+              owner_user_email,
+              org_id,
+            });
           } else {
             const [id, owner_email, owner, name, description, is_private, created_at, updated_at] = params as Array<string | number | null>;
             state.repos.push({ id, owner_email, owner, name, description, is_private, created_at, updated_at });
@@ -222,7 +270,10 @@ function createPermFakeDb() {
         }
         if (q.startsWith('UPDATE repositories SET owner')) {
           for (const r of state.repos) {
-            if ((r.owner as string).toLowerCase() === (params[params.length - 1] as string).toLowerCase?.() || r.owner === params[params.length - 1]) {
+            if (
+              (r.owner as string).toLowerCase() === (params[params.length - 1] as string).toLowerCase?.() ||
+              r.owner === params[params.length - 1]
+            ) {
               r.owner = params[0];
               if (params.length === 3) r.owner_ci = params[1];
             }
@@ -333,7 +384,17 @@ describe('RepositoryDAO permissions columns', () => {
   it('creates with owner columns, lists by org/collab, renames owner', async () => {
     const { db } = createPermFakeDb();
     const dao = new RepositoryDAO(db);
-    await dao.create({ id: 'r1', ownerEmail: 'a@x.co', owner: 'acme', name: 'api', description: null, isPrivate: true, now: 1, ownerType: 'org', orgId: 'o1' });
+    await dao.create({
+      id: 'r1',
+      ownerEmail: 'a@x.co',
+      owner: 'acme',
+      name: 'api',
+      description: null,
+      isPrivate: true,
+      now: 1,
+      ownerType: 'org',
+      orgId: 'o1',
+    });
     await expect(dao.getByOwnerAndName('ACME', 'API')).resolves.toMatchObject({ id: 'r1' });
     await expect(dao.listByOrgId('o1')).resolves.toHaveLength(1);
     await expect(dao.listByCollaboratorEmail('nobody@x.co')).resolves.toHaveLength(0);

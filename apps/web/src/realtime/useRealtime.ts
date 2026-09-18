@@ -5,9 +5,7 @@ import { fetchInboxTicket, fetchRepoTicket, realtimeWsUrl } from '../services/re
 import type { RealtimeTicket } from '../services/realtimeService';
 
 export type RealtimeStatus = 'live' | 'connecting' | 'offline';
-export type TicketRequest =
-  | { kind: 'repo'; owner: string; repo: string; channels: string[] }
-  | { kind: 'inbox' };
+export type TicketRequest = { kind: 'repo'; owner: string; repo: string; channels: string[] } | { kind: 'inbox' };
 
 const BACKOFF_MS = [1000, 2000, 5000, 15_000, 30_000];
 const FALLBACK_RETRY_MS = 30_000;
@@ -202,11 +200,12 @@ function createCallbacks(
 // Shared live-update subscription. Fetches a fresh single-use ticket per
 // (re)connect, reconnects with backoff, and degrades to `offline` (callers
 // keep their existing polling/manual refresh) when tickets or sockets fail.
-export function useRealtimeSubscription(options: {
-  enabled: boolean;
-  ticket: TicketRequest;
-  onEvent: (event: RealtimeEnvelope) => void;
-}): { status: RealtimeStatus; viewers: string[]; typing: string[]; sendTyping: (channel: string) => void } {
+export function useRealtimeSubscription(options: { enabled: boolean; ticket: TicketRequest; onEvent: (event: RealtimeEnvelope) => void }): {
+  status: RealtimeStatus;
+  viewers: string[];
+  typing: string[];
+  sendTyping: (channel: string) => void;
+} {
   const { enabled, ticket } = options;
   const [status, setStatus] = useState<RealtimeStatus>('offline');
   const [viewers, setViewers] = useState<string[]>([]);

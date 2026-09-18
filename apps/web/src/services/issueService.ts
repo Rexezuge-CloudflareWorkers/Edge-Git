@@ -31,7 +31,11 @@ export async function listIssues(owner: string, repo: string, opts?: ReadOpts & 
   if (opts?.label) q.set('label', opts.label);
   if (opts?.assignee) q.set('assignee', opts.assignee);
   const suffix = q.toString() ? `?${q.toString()}` : '';
-  const data = await tryAuthedFirst<{ issues?: Issue[] }>(`${authedBase(owner, repo)}${suffix}`, `${publicBase(owner, repo)}${suffix}`, opts?.isAuthed);
+  const data = await tryAuthedFirst<{ issues?: Issue[] }>(
+    `${authedBase(owner, repo)}${suffix}`,
+    `${publicBase(owner, repo)}${suffix}`,
+    opts?.isAuthed,
+  );
   return data.issues ?? [];
 }
 
@@ -57,7 +61,9 @@ function unwrapIssue(data: Issue | { issue?: Issue }): Issue {
 }
 
 export async function getIssue(owner: string, repo: string, number: number, opts?: ReadOpts): Promise<Issue> {
-  return unwrapIssue(await tryAuthedFirst<Issue | { issue?: Issue }>(authedIssue(owner, repo, number), publicIssue(owner, repo, number), opts?.isAuthed));
+  return unwrapIssue(
+    await tryAuthedFirst<Issue | { issue?: Issue }>(authedIssue(owner, repo, number), publicIssue(owner, repo, number), opts?.isAuthed),
+  );
 }
 
 export async function listComments(owner: string, repo: string, number: number, opts?: ReadOpts): Promise<Comment[]> {

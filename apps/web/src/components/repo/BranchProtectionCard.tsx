@@ -38,7 +38,8 @@ export function BranchProtectionCard({
         const list = await listRules(owner, repo);
         if (!cancelled) setRules(list);
       } catch (error) {
-        if (!cancelled) showNotice('error', error instanceof Error ? error.message : t('rules.failedToLoad', 'Failed To Load Protection Rules.'));
+        if (!cancelled)
+          showNotice('error', error instanceof Error ? error.message : t('rules.failedToLoad', 'Failed To Load Protection Rules.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -113,7 +114,12 @@ export function BranchProtectionCard({
       <form onSubmit={submit} className="space-y-3">
         <div className="flex gap-3 flex-wrap">
           <div className="flex-1 min-w-40">
-            <Input placeholder={t('rules.patternPlaceholder', 'Pattern (e.g. main, release/*)')} value={pattern} onChange={(e) => setPattern(e.target.value)} required />
+            <Input
+              placeholder={t('rules.patternPlaceholder', 'Pattern (e.g. main, release/*)')}
+              value={pattern}
+              onChange={(e) => setPattern(e.target.value)}
+              required
+            />
           </div>
           <div className="w-28">
             <Input
@@ -138,15 +144,30 @@ export function BranchProtectionCard({
         </div>
         <div className="flex gap-4 flex-wrap">
           <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)] cursor-pointer">
-            <input type="checkbox" checked={requirePr} onChange={(e) => setRequirePr(e.target.checked)} className="h-4 w-4 accent-[var(--color-accent)]" />
+            <input
+              type="checkbox"
+              checked={requirePr}
+              onChange={(e) => setRequirePr(e.target.checked)}
+              className="h-4 w-4 accent-[var(--color-accent)]"
+            />
             {t('rules.requirePr', 'Require Pull Request')}
           </label>
           <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)] cursor-pointer">
-            <input type="checkbox" checked={blockForcePush} onChange={(e) => setBlockForcePush(e.target.checked)} className="h-4 w-4 accent-[var(--color-accent)]" />
+            <input
+              type="checkbox"
+              checked={blockForcePush}
+              onChange={(e) => setBlockForcePush(e.target.checked)}
+              className="h-4 w-4 accent-[var(--color-accent)]"
+            />
             {t('rules.blockForcePush', 'Block Force Push')}
           </label>
           <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)] cursor-pointer">
-            <input type="checkbox" checked={blockDeletion} onChange={(e) => setBlockDeletion(e.target.checked)} className="h-4 w-4 accent-[var(--color-accent)]" />
+            <input
+              type="checkbox"
+              checked={blockDeletion}
+              onChange={(e) => setBlockDeletion(e.target.checked)}
+              className="h-4 w-4 accent-[var(--color-accent)]"
+            />
             {t('rules.blockDeletion', 'Block Deletion')}
           </label>
         </div>
@@ -158,8 +179,7 @@ export function BranchProtectionCard({
               <p className="font-medium font-mono text-[var(--color-text-primary)] truncate">{rule.pattern}</p>
               <p className="text-xs text-[var(--color-text-muted)]">
                 {rule.requirePr ? t('rules.prRequired', 'PR Required') : t('rules.directPushOk', 'Direct Push Allowed')}
-                {rule.requiredApprovals > 0 &&
-                  ` · ${t('rules.approvals', '{{count}} Approvals', { count: rule.requiredApprovals })}`}
+                {rule.requiredApprovals > 0 && ` · ${t('rules.approvals', '{{count}} Approvals', { count: rule.requiredApprovals })}`}
                 {rule.blockForcePush && ` · ${t('rules.noForcePush', 'No Force Push')}`}
                 {rule.blockDeletion && ` · ${t('rules.noDelete', 'No Delete')}`}
                 {rule.requireStatusChecks.length > 0 &&
@@ -172,8 +192,12 @@ export function BranchProtectionCard({
           </li>
         ))}
       </ul>
-      {rules.length === 0 && !loading && <p className="text-sm text-[var(--color-text-muted)] mt-4">{t('rules.noRules', 'No Protection Rules Yet.')}</p>}
-      <p className="mt-3 text-xs text-[var(--color-text-muted)]">{t('rules.adminNote', 'Rules Apply To Everyone Including Admins. Delete A Rule To Push Directly.')}</p>
+      {rules.length === 0 && !loading && (
+        <p className="text-sm text-[var(--color-text-muted)] mt-4">{t('rules.noRules', 'No Protection Rules Yet.')}</p>
+      )}
+      <p className="mt-3 text-xs text-[var(--color-text-muted)]">
+        {t('rules.adminNote', 'Rules Apply To Everyone Including Admins. Delete A Rule To Push Directly.')}
+      </p>
 
       {removing && (
         <ConfirmDeleteModal

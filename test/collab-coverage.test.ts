@@ -59,7 +59,9 @@ function createFullFakeDb() {
     return {
       first<T>(): Promise<T | null> {
         if (q.includes('FROM repositories WHERE lower(owner)')) {
-          const row = state.repos.find((r) => String(r.owner).toLowerCase() === P(0).toLowerCase() && String(r.name).toLowerCase() === P(1).toLowerCase());
+          const row = state.repos.find(
+            (r) => String(r.owner).toLowerCase() === P(0).toLowerCase() && String(r.name).toLowerCase() === P(1).toLowerCase(),
+          );
           return Promise.resolve((row ?? null) as T | null);
         }
         if (q.includes('FROM repositories WHERE owner = ? AND name = ?')) {
@@ -145,10 +147,14 @@ function createFullFakeDb() {
           return Promise.resolve({ results: state.labels.filter((l) => ids.has(l.id as string)) as T[] });
         }
         if (q.includes('FROM issue_assignees WHERE issue_id = ?')) {
-          return Promise.resolve({ results: state.issueAssignees.filter((a) => a.issue_id === params[0]).map((a) => ({ email: a.user_email })) as T[] });
+          return Promise.resolve({
+            results: state.issueAssignees.filter((a) => a.issue_id === params[0]).map((a) => ({ email: a.user_email })) as T[],
+          });
         }
         if (q.includes('FROM pull_assignees WHERE pull_request_id = ?')) {
-          return Promise.resolve({ results: state.pullAssignees.filter((a) => a.pull_request_id === params[0]).map((a) => ({ email: a.user_email })) as T[] });
+          return Promise.resolve({
+            results: state.pullAssignees.filter((a) => a.pull_request_id === params[0]).map((a) => ({ email: a.user_email })) as T[],
+          });
         }
         if (q.includes('FROM pull_reviewers WHERE pull_request_id = ?')) {
           return Promise.resolve({ results: state.reviewers.filter((r) => r.pull_request_id === params[0]) as T[] });
@@ -163,7 +169,8 @@ function createFullFakeDb() {
         }
         if (q.startsWith('UPDATE users SET username')) {
           const row = state.users.find((u) => u.email === params[params.length - 1]);
-          if (row && (row.username === null || row.username === undefined || q.includes('username = ?,'))) row.username = params[0] as string;
+          if (row && (row.username === null || row.username === undefined || q.includes('username = ?,')))
+            row.username = params[0] as string;
           return Promise.resolve({ success: true });
         }
         if (q.startsWith('INSERT INTO namespaces') || q.startsWith('INSERT OR IGNORE INTO namespaces')) {
@@ -172,8 +179,22 @@ function createFullFakeDb() {
           return Promise.resolve({ success: true });
         }
         if (q.startsWith('INSERT INTO issues')) {
-          const [id, repository_id, full_name, number, title, body, status, creator_email, created_at, updated_at] = params as Array<string | number | null>;
-          state.issues.push({ id, repository_id, full_name, number, title, body, status, creator_email, created_at, updated_at, milestone_id: null });
+          const [id, repository_id, full_name, number, title, body, status, creator_email, created_at, updated_at] = params as Array<
+            string | number | null
+          >;
+          state.issues.push({
+            id,
+            repository_id,
+            full_name,
+            number,
+            title,
+            body,
+            status,
+            creator_email,
+            created_at,
+            updated_at,
+            milestone_id: null,
+          });
           return Promise.resolve({ success: true });
         }
         if (q.startsWith('UPDATE issues SET status = ?')) {
@@ -194,9 +215,42 @@ function createFullFakeDb() {
           return Promise.resolve({ success: true });
         }
         if (q.startsWith('INSERT INTO pull_requests')) {
-          const [id, repository_id, full_name, number, title, body, status, base_branch, head_branch, base_oid, head_oid, merge_base_oid, creator_email] =
-            params as Array<string | number | null>;
-          state.pulls.push({ id, repository_id, full_name, number, title, body, status, base_branch, head_branch, base_oid, head_oid, merge_base_oid, creator_email, merged_by: null, merged_at: null, created_at: 1, updated_at: 2, is_draft: 0, milestone_id: null });
+          const [
+            id,
+            repository_id,
+            full_name,
+            number,
+            title,
+            body,
+            status,
+            base_branch,
+            head_branch,
+            base_oid,
+            head_oid,
+            merge_base_oid,
+            creator_email,
+          ] = params as Array<string | number | null>;
+          state.pulls.push({
+            id,
+            repository_id,
+            full_name,
+            number,
+            title,
+            body,
+            status,
+            base_branch,
+            head_branch,
+            base_oid,
+            head_oid,
+            merge_base_oid,
+            creator_email,
+            merged_by: null,
+            merged_at: null,
+            created_at: 1,
+            updated_at: 2,
+            is_draft: 0,
+            milestone_id: null,
+          });
           return Promise.resolve({ success: true });
         }
         if (q.startsWith('UPDATE pull_requests SET status = ?') && q.includes('merged_by')) {
@@ -281,7 +335,8 @@ function createFullFakeDb() {
           return Promise.resolve({ success: true });
         }
         if (q.startsWith('INSERT OR IGNORE INTO issue_labels')) {
-          if (!state.issueLabels.some((il) => il.issue_id === params[0] && il.label_id === params[1])) state.issueLabels.push({ issue_id: params[0] as string, label_id: params[1] as string });
+          if (!state.issueLabels.some((il) => il.issue_id === params[0] && il.label_id === params[1]))
+            state.issueLabels.push({ issue_id: params[0] as string, label_id: params[1] as string });
           return Promise.resolve({ success: true });
         }
         if (q.startsWith('DELETE FROM issue_assignees WHERE issue_id = ?')) {
@@ -289,7 +344,8 @@ function createFullFakeDb() {
           return Promise.resolve({ success: true });
         }
         if (q.startsWith('INSERT OR IGNORE INTO issue_assignees')) {
-          if (!state.issueAssignees.some((a) => a.issue_id === params[0] && a.user_email === params[1])) state.issueAssignees.push({ issue_id: params[0] as string, user_email: params[1] as string });
+          if (!state.issueAssignees.some((a) => a.issue_id === params[0] && a.user_email === params[1]))
+            state.issueAssignees.push({ issue_id: params[0] as string, user_email: params[1] as string });
           return Promise.resolve({ success: true });
         }
         if (q.startsWith('DELETE FROM pull_labels WHERE pull_request_id = ?')) {
@@ -297,7 +353,8 @@ function createFullFakeDb() {
           return Promise.resolve({ success: true });
         }
         if (q.startsWith('INSERT OR IGNORE INTO pull_labels')) {
-          if (!state.pullLabels.some((pl) => pl.pull_request_id === params[0] && pl.label_id === params[1])) state.pullLabels.push({ pull_request_id: params[0] as string, label_id: params[1] as string });
+          if (!state.pullLabels.some((pl) => pl.pull_request_id === params[0] && pl.label_id === params[1]))
+            state.pullLabels.push({ pull_request_id: params[0] as string, label_id: params[1] as string });
           return Promise.resolve({ success: true });
         }
         if (q.startsWith('DELETE FROM pull_assignees WHERE pull_request_id = ?')) {
@@ -305,12 +362,14 @@ function createFullFakeDb() {
           return Promise.resolve({ success: true });
         }
         if (q.startsWith('INSERT OR IGNORE INTO pull_assignees')) {
-          if (!state.pullAssignees.some((a) => a.pull_request_id === params[0] && a.user_email === params[1])) state.pullAssignees.push({ pull_request_id: params[0] as string, user_email: params[1] as string });
+          if (!state.pullAssignees.some((a) => a.pull_request_id === params[0] && a.user_email === params[1]))
+            state.pullAssignees.push({ pull_request_id: params[0] as string, user_email: params[1] as string });
           return Promise.resolve({ success: true });
         }
         if (q.startsWith('INSERT OR IGNORE INTO pull_reviewers')) {
           const [pull_request_id, user_email, created_at] = params as Array<string | number>;
-          if (!state.reviewers.some((r) => r.pull_request_id === pull_request_id && r.user_email === user_email)) state.reviewers.push({ pull_request_id, user_email, status: 'pending', created_at });
+          if (!state.reviewers.some((r) => r.pull_request_id === pull_request_id && r.user_email === user_email))
+            state.reviewers.push({ pull_request_id, user_email, status: 'pending', created_at });
           return Promise.resolve({ success: true });
         }
         if (q.startsWith('DELETE FROM pull_reviewers WHERE pull_request_id = ?')) {
@@ -332,10 +391,51 @@ function createFullFakeDb() {
 }
 
 function seedRepo(db: D1Queryable & CollabState) {
-  db.repos.push({ id: 'r1', owner_email: 'alice@example.com', owner: 'alice', name: 'demo', description: null, is_private: 0, created_at: 1, updated_at: 2 });
+  db.repos.push({
+    id: 'r1',
+    owner_email: 'alice@example.com',
+    owner: 'alice',
+    name: 'demo',
+    description: null,
+    is_private: 0,
+    created_at: 1,
+    updated_at: 2,
+  });
   db.users.push({ email: 'alice@example.com', created_at: 1, username: 'alice' });
-  db.issues.push({ id: 'iss-1', repository_id: 'r1', full_name: 'alice/demo', number: 1, title: 'Bug', body: null, status: 'open', creator_email: 'alice@example.com', created_at: 1, updated_at: 1, milestone_id: null });
-  db.pulls.push({ id: 'pr-1', repository_id: 'r1', full_name: 'alice/demo', number: 1, title: 'Feat', body: null, status: 'open', base_branch: 'main', head_branch: 'feat', base_oid: OID_A, head_oid: OID_B, merge_base_oid: OID_A, creator_email: 'alice@example.com', merged_by: null, merged_at: null, created_at: 1, updated_at: 1, is_draft: 0, milestone_id: null });
+  db.issues.push({
+    id: 'iss-1',
+    repository_id: 'r1',
+    full_name: 'alice/demo',
+    number: 1,
+    title: 'Bug',
+    body: null,
+    status: 'open',
+    creator_email: 'alice@example.com',
+    created_at: 1,
+    updated_at: 1,
+    milestone_id: null,
+  });
+  db.pulls.push({
+    id: 'pr-1',
+    repository_id: 'r1',
+    full_name: 'alice/demo',
+    number: 1,
+    title: 'Feat',
+    body: null,
+    status: 'open',
+    base_branch: 'main',
+    head_branch: 'feat',
+    base_oid: OID_A,
+    head_oid: OID_B,
+    merge_base_oid: OID_A,
+    creator_email: 'alice@example.com',
+    merged_by: null,
+    merged_at: null,
+    created_at: 1,
+    updated_at: 1,
+    is_draft: 0,
+    milestone_id: null,
+  });
 }
 
 describe('CollaborationDAO full coverage', () => {
@@ -407,7 +507,12 @@ describe('CollaborationService full coverage', () => {
     await expect(svc.setIssueLabels('iss-1', 'r1', 'nope')).rejects.toThrow('array');
     await svc.setIssueAssignees('iss-1', ['Bob@Example.com', 'bob@example.com']);
     await expect(svc.setIssueAssignees('iss-1', 'nope')).rejects.toThrow('array');
-    await expect(svc.setIssueAssignees('iss-1', Array.from({ length: 11 }, (_, i) => `u${i}@x.com`))).rejects.toThrow('at most');
+    await expect(
+      svc.setIssueAssignees(
+        'iss-1',
+        Array.from({ length: 11 }, (_, i) => `u${i}@x.com`),
+      ),
+    ).rejects.toThrow('at most');
     await expect(svc.setIssueAssignees('iss-1', [''])).rejects.toThrow('non-empty');
     await expect(svc.setIssueAssignees('iss-1', ['has space'])).rejects.toThrow();
     await svc.setIssueMilestone('iss-1', 'r1', milestoneId);
@@ -422,7 +527,12 @@ describe('CollaborationService full coverage', () => {
     await svc.setPullMilestone('pr-1', 'r1', null);
     expect((await svc.getPullMeta('pr-1')).labels).toHaveLength(1);
     await svc.requestReviewers('pr-1', ['dave@example.com']);
-    await expect(svc.requestReviewers('pr-1', Array.from({ length: 11 }, (_, i) => `r${i}@x.com`))).rejects.toThrow('at most');
+    await expect(
+      svc.requestReviewers(
+        'pr-1',
+        Array.from({ length: 11 }, (_, i) => `r${i}@x.com`),
+      ),
+    ).rejects.toThrow('at most');
     await expect(svc.requestReviewers('pr-1', ['bad reviewer!'])).rejects.toThrow();
     expect(await svc.listReviewers('pr-1')).toHaveLength(1);
     await svc.syncReviewerStatus('pr-1', 'dave@example.com', 'approved');
@@ -456,20 +566,25 @@ describe('Collab API routes', () => {
 
   function createStub(overrides: Record<string, (...args: never[]) => Promise<unknown>> = {}) {
     const calls: Array<{ method: string; args: unknown }> = [];
-    const record = (method: string) => async (...args: never[]) => {
-      calls.push({ method, args });
-      return (overrides[method] as ((...a: never[]) => Promise<unknown>) | undefined)?.(...args) ?? defaults[method]();
-    };
+    const record =
+      (method: string) =>
+      async (...args: never[]) => {
+        calls.push({ method, args });
+        return (overrides[method] as ((...a: never[]) => Promise<unknown>) | undefined)?.(...args) ?? defaults[method]();
+      };
     const defaults: Record<string, () => Promise<unknown>> = {
       setFullName: () => Promise.resolve(),
       ensureRepoInitialized: () => Promise.resolve(),
-      getMergePreview: () => Promise.resolve({ baseOid: OID_A, headOid: OID_B, mergeBase: OID_A, alreadyMerged: false, canFastForward: true }),
+      getMergePreview: () =>
+        Promise.resolve({ baseOid: OID_A, headOid: OID_B, mergeBase: OID_A, alreadyMerged: false, canFastForward: true }),
       getPullDiff: () => Promise.resolve({ mergeBase: OID_A, truncated: false, changes: [{ type: 'add', path: 'f.txt' }] }),
       mergePull: () => Promise.resolve({ type: 'fast-forward', commitOid: OID_B }),
       getBlob: () => Promise.resolve(null),
-      getBlame: () => Promise.resolve({ oid: OID_A, lines: [{ line: 1, commitOid: OID_A, author: 'a@x.com', content: 'hi' }], truncated: false }),
+      getBlame: () =>
+        Promise.resolve({ oid: OID_A, lines: [{ line: 1, commitOid: OID_A, author: 'a@x.com', content: 'hi' }], truncated: false }),
       resolveRef: () => Promise.resolve(OID_B),
-      getMergePreviewByOids: () => Promise.resolve({ baseOid: OID_A, headOid: OID_B, mergeBase: OID_A, alreadyMerged: false, canFastForward: true }),
+      getMergePreviewByOids: () =>
+        Promise.resolve({ baseOid: OID_A, headOid: OID_B, mergeBase: OID_A, alreadyMerged: false, canFastForward: true }),
       exportPack: () => Promise.resolve({ oids: [], pack: null }),
       importPack: () => Promise.resolve({ importedRefs: [] }),
     };
@@ -479,7 +594,12 @@ describe('Collab API routes', () => {
   }
 
   function createEnv(db: D1Queryable, stub: unknown) {
-    return { DB: db, REPO: { getByName: () => stub, get: () => stub, idFromName: (n: string) => n }, ENVIRONMENT: 'development', DEV_AUTH_EMAIL: 'alice@example.com' };
+    return {
+      DB: db,
+      REPO: { getByName: () => stub, get: () => stub, idFromName: (n: string) => n },
+      ENVIRONMENT: 'development',
+      DEV_AUTH_EMAIL: 'alice@example.com',
+    };
   }
 
   async function call(env: unknown, path: string, init?: RequestInit): Promise<{ status: number; body: unknown }> {
@@ -497,18 +617,44 @@ describe('Collab API routes', () => {
     expect((await call(env, '/repos/alice/demo/labels')).status).toBe(200);
     expect((await call(env, '/repos/alice/demo/milestones')).status).toBe(200);
     expect((await call(env, '/user/repos/alice/demo/labels')).status).toBe(200);
-    const created = await call(env, '/user/repos/alice/demo/labels', { method: 'POST', headers: json, body: JSON.stringify({ name: 'bug', color: 'ff0000' }) });
+    const created = await call(env, '/user/repos/alice/demo/labels', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ name: 'bug', color: 'ff0000' }),
+    });
     expect(created.status).toBe(201);
-    expect((await call(env, '/user/repos/alice/demo/labels', { method: 'POST', headers: json, body: JSON.stringify({ name: 'bug' }) })).status).toBe(400);
+    expect(
+      (await call(env, '/user/repos/alice/demo/labels', { method: 'POST', headers: json, body: JSON.stringify({ name: 'bug' }) })).status,
+    ).toBe(400);
     const labelId = (created.body as { id: string }).id;
     expect((await call(env, `/user/repos/alice/demo/labels/${labelId}`, { method: 'DELETE' })).status).toBe(200);
     expect((await call(env, '/user/repos/alice/demo/labels/nope', { method: 'DELETE' })).status).toBe(404);
-    const milestone = await call(env, '/user/repos/alice/demo/milestones', { method: 'POST', headers: json, body: JSON.stringify({ title: 'v1' }) });
+    const milestone = await call(env, '/user/repos/alice/demo/milestones', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ title: 'v1' }),
+    });
     expect(milestone.status).toBe(201);
     expect((await call(env, '/user/repos/alice/demo/milestones', { method: 'POST', headers: json, body: '{}' })).status).toBe(400);
     const milestoneId = (milestone.body as { id: string }).id;
-    expect((await call(env, `/user/repos/alice/demo/milestones/${milestoneId}`, { method: 'PATCH', headers: json, body: JSON.stringify({ status: 'bogus' }) })).status).toBe(400);
-    expect((await call(env, `/user/repos/alice/demo/milestones/${milestoneId}`, { method: 'PATCH', headers: json, body: JSON.stringify({ status: 'closed' }) })).status).toBe(200);
+    expect(
+      (
+        await call(env, `/user/repos/alice/demo/milestones/${milestoneId}`, {
+          method: 'PATCH',
+          headers: json,
+          body: JSON.stringify({ status: 'bogus' }),
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await call(env, `/user/repos/alice/demo/milestones/${milestoneId}`, {
+          method: 'PATCH',
+          headers: json,
+          body: JSON.stringify({ status: 'closed' }),
+        })
+      ).status,
+    ).toBe(200);
     expect((await call(env, `/user/repos/alice/demo/milestones/${milestoneId}`, { method: 'DELETE' })).status).toBe(200);
   });
 
@@ -517,19 +663,59 @@ describe('Collab API routes', () => {
     seedRepo(db);
     const { stub } = createStub();
     const env = createEnv(db, stub);
-    const label = (await call(env, '/user/repos/alice/demo/labels', { method: 'POST', headers: json, body: JSON.stringify({ name: 'bug' }) })).body as { id: string };
-    const milestone = (await call(env, '/user/repos/alice/demo/milestones', { method: 'POST', headers: json, body: JSON.stringify({ title: 'v1' }) })).body as { id: string };
+    const label = (
+      await call(env, '/user/repos/alice/demo/labels', { method: 'POST', headers: json, body: JSON.stringify({ name: 'bug' }) })
+    ).body as { id: string };
+    const milestone = (
+      await call(env, '/user/repos/alice/demo/milestones', { method: 'POST', headers: json, body: JSON.stringify({ title: 'v1' }) })
+    ).body as { id: string };
     expect((await call(env, '/user/repos/alice/demo/issues/1/meta')).status).toBe(200);
-    expect((await call(env, '/user/repos/alice/demo/issues/1/labels', { method: 'PUT', headers: json, body: JSON.stringify({ labelIds: [label.id] }) })).status).toBe(200);
-    expect((await call(env, '/user/repos/alice/demo/issues/1/assignees', { method: 'PUT', headers: json, body: JSON.stringify({ assignees: ['bob@example.com'] }) })).status).toBe(200);
-    expect((await call(env, '/user/repos/alice/demo/issues/1/milestone', { method: 'PUT', headers: json, body: JSON.stringify({ milestoneId: milestone.id }) })).status).toBe(200);
-    expect((await call(env, '/user/repos/alice/demo/issues/1/labels', { method: 'PUT', headers: json, body: JSON.stringify({ labelIds: ['nope'] }) })).status).toBe(400);
+    expect(
+      (
+        await call(env, '/user/repos/alice/demo/issues/1/labels', {
+          method: 'PUT',
+          headers: json,
+          body: JSON.stringify({ labelIds: [label.id] }),
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await call(env, '/user/repos/alice/demo/issues/1/assignees', {
+          method: 'PUT',
+          headers: json,
+          body: JSON.stringify({ assignees: ['bob@example.com'] }),
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await call(env, '/user/repos/alice/demo/issues/1/milestone', {
+          method: 'PUT',
+          headers: json,
+          body: JSON.stringify({ milestoneId: milestone.id }),
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await call(env, '/user/repos/alice/demo/issues/1/labels', {
+          method: 'PUT',
+          headers: json,
+          body: JSON.stringify({ labelIds: ['nope'] }),
+        })
+      ).status,
+    ).toBe(400);
     const filtered = await call(env, '/repos/alice/demo/issues?label=bug');
     expect(filtered.status).toBe(200);
     expect((filtered.body as { issues: unknown[] }).issues).toHaveLength(1);
     expect(((await call(env, '/repos/alice/demo/issues?label=nope')).body as { issues: unknown[] }).issues).toHaveLength(0);
-    expect(((await call(env, '/user/repos/alice/demo/issues?assignee=bob@example.com')).body as { issues: unknown[] }).issues).toHaveLength(1);
-    expect(((await call(env, `/user/repos/alice/demo/issues?milestone=${milestone.id}`)).body as { issues: unknown[] }).issues).toHaveLength(1);
+    expect(((await call(env, '/user/repos/alice/demo/issues?assignee=bob@example.com')).body as { issues: unknown[] }).issues).toHaveLength(
+      1,
+    );
+    expect(
+      ((await call(env, `/user/repos/alice/demo/issues?milestone=${milestone.id}`)).body as { issues: unknown[] }).issues,
+    ).toHaveLength(1);
   });
 
   it('triages pulls, requests reviewers, toggles drafts, and suggests codeowners', async () => {
@@ -537,20 +723,89 @@ describe('Collab API routes', () => {
     seedRepo(db);
     const { stub } = createStub();
     const env = createEnv(db, stub);
-    const label = (await call(env, '/user/repos/alice/demo/labels', { method: 'POST', headers: json, body: JSON.stringify({ name: 'bug' }) })).body as { id: string };
+    const label = (
+      await call(env, '/user/repos/alice/demo/labels', { method: 'POST', headers: json, body: JSON.stringify({ name: 'bug' }) })
+    ).body as { id: string };
     expect((await call(env, '/user/repos/alice/demo/pulls/1/meta')).status).toBe(200);
-    expect((await call(env, '/user/repos/alice/demo/pulls/1/labels', { method: 'PUT', headers: json, body: JSON.stringify({ labelIds: [label.id] }) })).status).toBe(200);
-    expect((await call(env, '/user/repos/alice/demo/pulls/1/assignees', { method: 'PUT', headers: json, body: JSON.stringify({ assignees: ['c@x.com'] }) })).status).toBe(200);
-    expect((await call(env, '/user/repos/alice/demo/pulls/1/milestone', { method: 'PUT', headers: json, body: JSON.stringify({ milestoneId: null }) })).status).toBe(200);
-    expect((await call(env, '/user/repos/alice/demo/pulls/1/labels', { method: 'PUT', headers: json, body: JSON.stringify({ labelIds: ['nope'] }) })).status).toBe(400);
+    expect(
+      (
+        await call(env, '/user/repos/alice/demo/pulls/1/labels', {
+          method: 'PUT',
+          headers: json,
+          body: JSON.stringify({ labelIds: [label.id] }),
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await call(env, '/user/repos/alice/demo/pulls/1/assignees', {
+          method: 'PUT',
+          headers: json,
+          body: JSON.stringify({ assignees: ['c@x.com'] }),
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await call(env, '/user/repos/alice/demo/pulls/1/milestone', {
+          method: 'PUT',
+          headers: json,
+          body: JSON.stringify({ milestoneId: null }),
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await call(env, '/user/repos/alice/demo/pulls/1/labels', {
+          method: 'PUT',
+          headers: json,
+          body: JSON.stringify({ labelIds: ['nope'] }),
+        })
+      ).status,
+    ).toBe(400);
     expect((await call(env, '/user/repos/alice/demo/pulls?label=bug')).status).toBe(200);
-    expect((await call(env, '/user/repos/alice/demo/pulls/1/reviewers', { method: 'POST', headers: json, body: JSON.stringify({ reviewers: [] }) })).status).toBe(400);
-    expect((await call(env, '/user/repos/alice/demo/pulls/1/reviewers', { method: 'POST', headers: json, body: JSON.stringify({ reviewers: ['dave@example.com'] }) })).status).toBe(201);
+    expect(
+      (
+        await call(env, '/user/repos/alice/demo/pulls/1/reviewers', {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ reviewers: [] }),
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await call(env, '/user/repos/alice/demo/pulls/1/reviewers', {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ reviewers: ['dave@example.com'] }),
+        })
+      ).status,
+    ).toBe(201);
     expect((await call(env, '/user/repos/alice/demo/pulls/1/reviewers')).status).toBe(200);
     expect((await call(env, '/user/repos/alice/demo/pulls/1/reviewers/dave%40example.com', { method: 'DELETE' })).status).toBe(200);
-    expect((await call(env, '/user/repos/alice/demo/pulls/1/draft', { method: 'PATCH', headers: json, body: JSON.stringify({ isDraft: 'yes' }) })).status).toBe(400);
-    expect((await call(env, '/user/repos/alice/demo/pulls/1/draft', { method: 'PATCH', headers: json, body: JSON.stringify({ isDraft: true }) })).status).toBe(200);
-    expect((await call(env, '/user/repos/alice/demo/pulls/1/draft', { method: 'PATCH', headers: json, body: JSON.stringify({ isDraft: false }) })).status).toBe(200);
+    expect(
+      (
+        await call(env, '/user/repos/alice/demo/pulls/1/draft', {
+          method: 'PATCH',
+          headers: json,
+          body: JSON.stringify({ isDraft: 'yes' }),
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (await call(env, '/user/repos/alice/demo/pulls/1/draft', { method: 'PATCH', headers: json, body: JSON.stringify({ isDraft: true }) }))
+        .status,
+    ).toBe(200);
+    expect(
+      (
+        await call(env, '/user/repos/alice/demo/pulls/1/draft', {
+          method: 'PATCH',
+          headers: json,
+          body: JSON.stringify({ isDraft: false }),
+        })
+      ).status,
+    ).toBe(200);
     expect((await call(env, '/user/repos/alice/demo/pulls/1/codeowners')).status).toBe(200);
   });
 
@@ -574,12 +829,28 @@ describe('Collab API routes', () => {
     const { stub } = createStub();
     const env = createEnv(db, stub);
     expect((await call(env, '/user/repos/alice/demo/sync-preview')).status).toBe(400);
-    expect((await call(env, '/user/repos/alice/demo/sync-preview?upstreamOwner=alice&upstreamRepo=demo&upstreamBranch=main&branch=main')).status).toBe(200);
+    expect(
+      (await call(env, '/user/repos/alice/demo/sync-preview?upstreamOwner=alice&upstreamRepo=demo&upstreamBranch=main&branch=main')).status,
+    ).toBe(200);
     expect((await call(env, '/user/repos/alice/demo/sync', { method: 'POST', headers: json, body: '{}' })).status).toBe(400);
-    const synced = await call(env, '/user/repos/alice/demo/sync', { method: 'POST', headers: json, body: JSON.stringify({ upstreamOwner: 'alice', upstreamRepo: 'demo' }) });
+    const synced = await call(env, '/user/repos/alice/demo/sync', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ upstreamOwner: 'alice', upstreamRepo: 'demo' }),
+    });
     expect(synced.status).toBe(200);
-    const { stub: conflictStub } = createStub({ mergePull: () => Promise.resolve({ type: 'conflict', conflicts: ['f.txt'], reason: null }) });
-    expect((await call(createEnv(db, conflictStub), '/user/repos/alice/demo/sync', { method: 'POST', headers: json, body: JSON.stringify({ upstreamOwner: 'alice', upstreamRepo: 'demo' }) })).status).toBe(409);
+    const { stub: conflictStub } = createStub({
+      mergePull: () => Promise.resolve({ type: 'conflict', conflicts: ['f.txt'], reason: null }),
+    });
+    expect(
+      (
+        await call(createEnv(db, conflictStub), '/user/repos/alice/demo/sync', {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ upstreamOwner: 'alice', upstreamRepo: 'demo' }),
+        })
+      ).status,
+    ).toBe(409);
   });
 
   it('serves blame and gates merges by draft and strategy', async () => {
@@ -590,12 +861,30 @@ describe('Collab API routes', () => {
     expect((await call(env, '/repos/alice/demo/blame')).status).toBe(400);
     expect((await call(env, '/repos/alice/demo/blame?path=f.txt')).status).toBe(200);
     expect((await call(env, '/user/repos/alice/demo/blame?path=f.txt')).status).toBe(200);
-    const draftPull = await call(env, '/user/repos/alice/demo/pulls', { method: 'POST', headers: json, body: JSON.stringify({ title: 'Drafted', baseBranch: 'main', headBranch: 'draft-feat', isDraft: true }) });
+    const draftPull = await call(env, '/user/repos/alice/demo/pulls', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ title: 'Drafted', baseBranch: 'main', headBranch: 'draft-feat', isDraft: true }),
+    });
     expect(draftPull.status).toBe(201);
     const draftNumber = (draftPull.body as { number: number }).number;
-    expect((await call(env, `/user/repos/alice/demo/pulls/${draftNumber}/merge`, { method: 'POST', headers: json, body: '{}' })).status).toBe(409);
-    expect((await call(env, `/user/repos/alice/demo/pulls/${draftNumber}/draft`, { method: 'PATCH', headers: json, body: JSON.stringify({ isDraft: false }) })).status).toBe(200);
-    const merged = await call(env, '/user/repos/alice/demo/pulls/1/merge', { method: 'POST', headers: json, body: JSON.stringify({ strategy: 'squash' }) });
+    expect(
+      (await call(env, `/user/repos/alice/demo/pulls/${draftNumber}/merge`, { method: 'POST', headers: json, body: '{}' })).status,
+    ).toBe(409);
+    expect(
+      (
+        await call(env, `/user/repos/alice/demo/pulls/${draftNumber}/draft`, {
+          method: 'PATCH',
+          headers: json,
+          body: JSON.stringify({ isDraft: false }),
+        })
+      ).status,
+    ).toBe(200);
+    const merged = await call(env, '/user/repos/alice/demo/pulls/1/merge', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ strategy: 'squash' }),
+    });
     expect(merged.status).toBe(200);
     expect(calls.some((c) => c.method === 'mergePull' && (c.args[0] as { strategy?: string }).strategy === 'squash')).toBe(true);
   });
@@ -632,7 +921,12 @@ describe('MergeService squash and rebase', () => {
     await writeAndCommit(dir, 'feat2.txt', 'more\n', 'feat two');
     await git.checkout({ fs, dir, ref: 'main' });
     const svc = new MergeService(fs as never, gitdir);
-    const outcome = (await svc.squashMerge({ baseBranch: 'main', headOid, author: { name: 't', email: 't@x.com' }, message: 'Squashed' })) as { type: string; commitOid: string };
+    const outcome = (await svc.squashMerge({
+      baseBranch: 'main',
+      headOid,
+      author: { name: 't', email: 't@x.com' },
+      message: 'Squashed',
+    })) as { type: string; commitOid: string };
     expect(outcome.type).toBe('fast-forward');
     const baseOid = await git.resolveRef({ fs, dir, ref: 'main' });
     expect(outcome.commitOid).toBe(baseOid);
@@ -646,10 +940,18 @@ describe('MergeService squash and rebase', () => {
     const { gitdir } = await makeRepo();
     const svc = new MergeService(fs as never, gitdir);
     const mainOid = await svc.resolveRef('refs/heads/main');
-    await expect(svc.squashMerge({ baseBranch: 'main', headOid: mainOid as string, author: { name: 't', email: 't@x.com' } })).resolves.toMatchObject({ type: 'already-merged' });
-    await expect(svc.squashMerge({ baseBranch: '../x', headOid: OID_A, author: { name: 't', email: 't@x.com' } })).rejects.toThrow(/invalid base branch/);
-    await expect(svc.squashMerge({ baseBranch: 'main', headOid: 'short', author: { name: 't', email: 't@x.com' } })).rejects.toThrow(/invalid head oid/);
-    await expect(svc.squashMerge({ baseBranch: 'nope', headOid: OID_A, author: { name: 't', email: 't@x.com' } })).rejects.toThrow(/base branch not found/);
+    await expect(
+      svc.squashMerge({ baseBranch: 'main', headOid: mainOid as string, author: { name: 't', email: 't@x.com' } }),
+    ).resolves.toMatchObject({ type: 'already-merged' });
+    await expect(svc.squashMerge({ baseBranch: '../x', headOid: OID_A, author: { name: 't', email: 't@x.com' } })).rejects.toThrow(
+      /invalid base branch/,
+    );
+    await expect(svc.squashMerge({ baseBranch: 'main', headOid: 'short', author: { name: 't', email: 't@x.com' } })).rejects.toThrow(
+      /invalid head oid/,
+    );
+    await expect(svc.squashMerge({ baseBranch: 'nope', headOid: OID_A, author: { name: 't', email: 't@x.com' } })).rejects.toThrow(
+      /base branch not found/,
+    );
   });
 
   it('rebase fast-forwards strictly-ahead heads', async () => {
@@ -658,7 +960,10 @@ describe('MergeService squash and rebase', () => {
     const headOid = await writeAndCommit(dir, 'feat.txt', 'feat\n', 'feat');
     await git.checkout({ fs, dir, ref: 'main' });
     const svc = new MergeService(fs as never, gitdir);
-    await expect(svc.rebaseMerge({ baseBranch: 'main', headOid, author: { name: 't', email: 't@x.com' } })).resolves.toMatchObject({ type: 'fast-forward', commitOid: headOid });
+    await expect(svc.rebaseMerge({ baseBranch: 'main', headOid, author: { name: 't', email: 't@x.com' } })).resolves.toMatchObject({
+      type: 'fast-forward',
+      commitOid: headOid,
+    });
   });
 
   it('replays a single divergent commit and conflicts on multi-commit heads', async () => {
@@ -668,7 +973,10 @@ describe('MergeService squash and rebase', () => {
     await git.checkout({ fs, dir, ref: 'main' });
     await writeAndCommit(dir, 'main.txt', 'main\n', 'main work');
     const svc = new MergeService(fs as never, gitdir);
-    const replayed = (await svc.rebaseMerge({ baseBranch: 'main', headOid, author: { name: 't', email: 't@x.com' } })) as { type: string; commitOid: string };
+    const replayed = (await svc.rebaseMerge({ baseBranch: 'main', headOid, author: { name: 't', email: 't@x.com' } })) as {
+      type: string;
+      commitOid: string;
+    };
     expect(replayed.type).toBe('fast-forward');
     expect(replayed.commitOid).not.toBe(headOid);
     await git.branch({ fs, dir, ref: 'feat2', checkout: true });
@@ -676,11 +984,19 @@ describe('MergeService squash and rebase', () => {
     const multiOid = await writeAndCommit(dir, 'b.txt', 'b\n', 'two');
     await git.checkout({ fs, dir, ref: 'main' });
     await writeAndCommit(dir, 'main2.txt', 'main again\n', 'main diverges');
-    await expect(svc.rebaseMerge({ baseBranch: 'main', headOid: multiOid, author: { name: 't', email: 't@x.com' } })).resolves.toMatchObject({ type: 'conflict' });
-    await expect(svc.rebaseMerge({ baseBranch: '../x', headOid: OID_A, author: { name: 't', email: 't@x.com' } })).rejects.toThrow(/invalid base branch/);
-    await expect(svc.rebaseMerge({ baseBranch: 'main', headOid: 'short', author: { name: 't', email: 't@x.com' } })).rejects.toThrow(/invalid head oid/);
+    await expect(
+      svc.rebaseMerge({ baseBranch: 'main', headOid: multiOid, author: { name: 't', email: 't@x.com' } }),
+    ).resolves.toMatchObject({ type: 'conflict' });
+    await expect(svc.rebaseMerge({ baseBranch: '../x', headOid: OID_A, author: { name: 't', email: 't@x.com' } })).rejects.toThrow(
+      /invalid base branch/,
+    );
+    await expect(svc.rebaseMerge({ baseBranch: 'main', headOid: 'short', author: { name: 't', email: 't@x.com' } })).rejects.toThrow(
+      /invalid head oid/,
+    );
     const mainOid = await svc.resolveRef('refs/heads/main');
-    await expect(svc.rebaseMerge({ baseBranch: 'main', headOid: mainOid as string, author: { name: 't', email: 't@x.com' } })).resolves.toMatchObject({ type: 'already-merged' });
+    await expect(
+      svc.rebaseMerge({ baseBranch: 'main', headOid: mainOid as string, author: { name: 't', email: 't@x.com' } }),
+    ).resolves.toMatchObject({ type: 'already-merged' });
   });
 });
 
@@ -709,7 +1025,11 @@ describe('HistoryService blame and GitService wrappers', () => {
   it('attributes lines to commits and returns null for unknown refs', async () => {
     const { gitdir, tip } = await makeBlameRepo();
     const svc = new HistoryService(fs as never, gitdir);
-    const blame = (await svc.getBlame(tip, 'notes.txt')) as { oid: string; lines: Array<{ line: number; commitOid: string; content: string }>; truncated: boolean } | null;
+    const blame = (await svc.getBlame(tip, 'notes.txt')) as {
+      oid: string;
+      lines: Array<{ line: number; commitOid: string; content: string }>;
+      truncated: boolean;
+    } | null;
     expect(blame).not.toBeNull();
     expect(blame?.lines).toHaveLength(4);
     expect(blame?.truncated).toBe(false);

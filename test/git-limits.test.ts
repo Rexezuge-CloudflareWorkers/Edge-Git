@@ -5,12 +5,7 @@ import * as git from 'isomorphic-git';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config/ConfigurationManager';
 import { AppConfiguration } from '@edge-git/backend-runtime/config/AppConfiguration';
-import {
-  buildFetchErrorResponse,
-  parseFetchRequest,
-  validateFetchRequestCounts,
-  validateReceivePackCounts,
-} from '@edge-git/git-protocol';
+import { buildFetchErrorResponse, parseFetchRequest, validateFetchRequestCounts, validateReceivePackCounts } from '@edge-git/git-protocol';
 // NOTE: relative import bypasses packages/git-service/src/index.ts, which
 // re-exports the `dofs` runtime (unparsable in the node test env).
 import { GitService, PackLimitError } from '../packages/git-service/src/GitService';

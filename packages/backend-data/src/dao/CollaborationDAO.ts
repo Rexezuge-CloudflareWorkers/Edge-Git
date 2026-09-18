@@ -52,10 +52,7 @@ class CollaborationDAO extends BaseDAO {
   }
 
   public async listLabels(repositoryId: string): Promise<LabelRow[]> {
-    const result = await this.database
-      .prepare(CollaborationQueries.listLabels())
-      .bind(repositoryId)
-      .all<LabelRow>();
+    const result = await this.database.prepare(CollaborationQueries.listLabels()).bind(repositoryId).all<LabelRow>();
     return result.results ?? [];
   }
 
@@ -101,10 +98,7 @@ class CollaborationDAO extends BaseDAO {
   }
 
   public async listMilestones(repositoryId: string): Promise<MilestoneRow[]> {
-    const result = await this.database
-      .prepare(CollaborationQueries.listMilestones())
-      .bind(repositoryId)
-      .all<MilestoneRow>();
+    const result = await this.database.prepare(CollaborationQueries.listMilestones()).bind(repositoryId).all<MilestoneRow>();
     return result.results ?? [];
   }
 

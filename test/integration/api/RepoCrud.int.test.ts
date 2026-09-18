@@ -43,10 +43,7 @@ describe('repo CRUD on real D1', () => {
   });
 
   it('updates the description as owner', async () => {
-    const res = await api(
-      `/user/repos/${OWNER}/${REPO}`,
-      json({ method: 'PATCH', body: JSON.stringify({ description: 'Updated' }) }),
-    );
+    const res = await api(`/user/repos/${OWNER}/${REPO}`, json({ method: 'PATCH', body: JSON.stringify({ description: 'Updated' }) }));
     expect(res.status).toBe(200);
     const body = (await res.json()) as { description: string };
     expect(body.description).toBe('Updated');

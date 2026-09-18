@@ -170,7 +170,9 @@ function registerProjectUserRoutes(app: ProjectApp): void {
     if (number === null) return c.json({ error: 'Invalid project number' }, 400);
     const body = (await c.req.json().catch(() => ({}))) as { title?: unknown };
     try {
-      const column = await createRequestScope(c.env).get(Tokens.ProjectService).createColumn(row.id, number, body as { title: unknown });
+      const column = await createRequestScope(c.env)
+        .get(Tokens.ProjectService)
+        .createColumn(row.id, number, body as { title: unknown });
       return c.json({ column }, 201);
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'Failed to create column' }, toServiceStatus(error));
@@ -235,7 +237,14 @@ function registerProjectUserRoutes(app: ProjectApp): void {
     }
     const number = parseProjectNumber(c.req.param('number'));
     if (number === null) return c.json({ error: 'Invalid project number' }, 400);
-    const body = (await c.req.json().catch(() => ({}))) as { columnId: unknown; kind?: unknown; noteTitle?: unknown; noteBody?: unknown; issueId?: unknown; pullRequestId?: unknown };
+    const body = (await c.req.json().catch(() => ({}))) as {
+      columnId: unknown;
+      kind?: unknown;
+      noteTitle?: unknown;
+      noteBody?: unknown;
+      issueId?: unknown;
+      pullRequestId?: unknown;
+    };
     try {
       const card = await createRequestScope(c.env).get(Tokens.ProjectService).createCard(row.id, number, body, email);
       return c.json({ card }, 201);
@@ -281,7 +290,9 @@ function registerProjectUserRoutes(app: ProjectApp): void {
     if (number === null) return c.json({ error: 'Invalid project number' }, 400);
     const body = (await c.req.json().catch(() => ({}))) as { archived?: unknown };
     try {
-      const card = await createRequestScope(c.env).get(Tokens.ProjectService).setCardArchived(row.id, number, c.req.param('cardId'), body.archived);
+      const card = await createRequestScope(c.env)
+        .get(Tokens.ProjectService)
+        .setCardArchived(row.id, number, c.req.param('cardId'), body.archived);
       return c.json({ card });
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'Failed to update card' }, toServiceStatus(error));

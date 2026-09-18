@@ -25,7 +25,10 @@ interface OpenCrossForkInput {
   body: string | null;
 }
 
-async function openCrossForkPull(env: Env, input: OpenCrossForkInput): Promise<{ status: 201 | 400 | 403 | 404 | 413 | 500; body: unknown }> {
+async function openCrossForkPull(
+  env: Env,
+  input: OpenCrossForkInput,
+): Promise<{ status: 201 | 400 | 403 | 404 | 413 | 500; body: unknown }> {
   const headRow = await requireVisibleRepo(env, input.headOwner, input.headRepo, input.email);
   if (!headRow) return { status: 404, body: { error: 'Not found' } };
   const headFullName = `${headRow.owner}/${headRow.name}`;
@@ -39,22 +42,20 @@ async function openCrossForkPull(env: Env, input: OpenCrossForkInput): Promise<{
   if (!preview.preview?.baseOid || !preview.preview?.headOid) return { status: 400, body: { error: 'base or head branch not found' } };
   try {
     const scope = createRequestScope(env);
-    const created = await scope
-      .get(Tokens.PullRequestService)
-      .createPull({
-        repositoryId: input.rowId,
-        fullName: input.fullName,
-        title: input.title,
-        body: input.body,
-        baseBranch: input.baseBranch,
-        headBranch: input.headBranch,
-        baseOid: preview.preview.baseOid,
-        headOid: preview.preview.headOid,
-        mergeBaseOid: preview.preview.mergeBase ?? null,
-        creatorEmail: input.email,
-        headRepositoryId: headRow.id,
-        headFullName,
-      });
+    const created = await scope.get(Tokens.PullRequestService).createPull({
+      repositoryId: input.rowId,
+      fullName: input.fullName,
+      title: input.title,
+      body: input.body,
+      baseBranch: input.baseBranch,
+      headBranch: input.headBranch,
+      baseOid: preview.preview.baseOid,
+      headOid: preview.preview.headOid,
+      mergeBaseOid: preview.preview.mergeBase ?? null,
+      creatorEmail: input.email,
+      headRepositoryId: headRow.id,
+      headFullName,
+    });
     // CODEOWNERS auto-request: best-effort, never fails PR creation.
     try {
       const suggested = await suggestCodeownerHandles(env, input.fullName, {
@@ -108,7 +109,10 @@ interface MergeCrossForkInput {
   strategy: 'merge' | 'squash' | 'rebase';
 }
 
-async function mergeCrossForkPull(env: Env, input: MergeCrossForkInput): Promise<{ status: 200 | 400 | 403 | 404 | 409 | 413 | 500; body: unknown }> {
+async function mergeCrossForkPull(
+  env: Env,
+  input: MergeCrossForkInput,
+): Promise<{ status: 200 | 400 | 403 | 404 | 409 | 413 | 500; body: unknown }> {
   const permission = input.scope.get(Tokens.PermissionService);
   const headRole = await permission.getRole(input.email, input.headRow).catch(() => null);
   if (!headRole) return { status: 404, body: { error: 'Not found' } };
@@ -170,7 +174,9 @@ async function mergeCrossForkPull(env: Env, input: MergeCrossForkInput): Promise
     outcome = { ...outcome, deletedHead: false };
   }
   try {
-    const merged = await input.scope.get(Tokens.PullRequestService).markMerged({ repositoryId: input.rowId, number: input.number, mergedBy: input.email, commitOid: outcome.commitOid ?? headOid });
+    const merged = await input.scope
+      .get(Tokens.PullRequestService)
+      .markMerged({ repositoryId: input.rowId, number: input.number, mergedBy: input.email, commitOid: outcome.commitOid ?? headOid });
     await recordAndNotify(env, {
       repositoryId: input.rowId,
       fullName: input.fullName,
@@ -226,7 +232,10 @@ function registerUserPullMergeRoutes(app: PullApp): void {
     // CODEOWNERS enforcement is best-effort: when owners resolve for the
     // changed paths, one non-creator owner approval is required; when the
     // CODEOWNERS file or diff is unreadable there is no owner quorum.
-    const rule = await scope.get(Tokens.BranchProtectionService).matchForRepo(row.id, pull.base_branch).catch(() => null);
+    const rule = await scope
+      .get(Tokens.BranchProtectionService)
+      .matchForRepo(row.id, pull.base_branch)
+      .catch(() => null);
     const fullName = `${owner}/${repoName}`;
     const codeownerEmails = await suggestCodeownerHandles(c.env, fullName, {
       baseBranch: pull.base_branch,
@@ -235,7 +244,12 @@ function registerUserPullMergeRoutes(app: PullApp): void {
     })
       .then((suggested) => resolveCodeownerEmails(c.env, suggested.owners, pull.creator_email))
       .catch(() => [] as string[]);
-    const gate = BranchProtectionService.checkMergeBlocked({ rule, reviews, creatorEmail: pull.creator_email, codeowners: { owners: codeownerEmails } });
+    const gate = BranchProtectionService.checkMergeBlocked({
+      rule,
+      reviews,
+      creatorEmail: pull.creator_email,
+      codeowners: { owners: codeownerEmails },
+    });
     if (gate.blocked) return c.json({ error: gate.reason ?? 'pull request is blocked by branch protection' }, 409);
     // Required status checks: every context listed on the matched rule must
     // report a passing conclusion (success/neutral/skipped) on the merge head
@@ -244,17 +258,35 @@ function registerUserPullMergeRoutes(app: PullApp): void {
     const requiredContexts = rule?.requireStatusChecks ?? [];
     if (requiredContexts.length > 0) {
       const headSha = pull.head_oid ?? null;
-      if (!headSha) return c.json({ error: 'required status checks are pending: head commit unknown', requiredChecks: requiredContexts, state: 'pending' }, 409);
-      const runs = await scope.get(Tokens.CheckService).listForSha(row.id, headSha).then((r) => r.runs).catch(() => []);
+      if (!headSha)
+        return c.json(
+          { error: 'required status checks are pending: head commit unknown', requiredChecks: requiredContexts, state: 'pending' },
+          409,
+        );
+      const runs = await scope
+        .get(Tokens.CheckService)
+        .listForSha(row.id, headSha)
+        .then((r) => r.runs)
+        .catch(() => []);
       const checkGate = CheckService.checkRequiredContexts({
         requiredContexts,
         runs: runs.map((r) => ({ context: r.context, status: r.status, conclusion: r.conclusion })),
       });
       if (checkGate.blocked) {
-        const detail = checkGate.failing.length > 0
-          ? `failing checks: ${checkGate.failing.join(', ')}`
-          : `pending checks: ${checkGate.pending.join(', ')}`;
-        return c.json({ error: `required status checks not satisfied (${detail})`, requiredChecks: requiredContexts, state: checkGate.state, pending: checkGate.pending, failing: checkGate.failing }, 409);
+        const detail =
+          checkGate.failing.length > 0
+            ? `failing checks: ${checkGate.failing.join(', ')}`
+            : `pending checks: ${checkGate.pending.join(', ')}`;
+        return c.json(
+          {
+            error: `required status checks not satisfied (${detail})`,
+            requiredChecks: requiredContexts,
+            state: checkGate.state,
+            pending: checkGate.pending,
+            failing: checkGate.failing,
+          },
+          409,
+        );
       }
     }
     const body = (await c.req.json().catch(() => ({}))) as { message?: string; deleteHead?: boolean; strategy?: string };
@@ -264,7 +296,19 @@ function registerUserPullMergeRoutes(app: PullApp): void {
     const strategy = body.strategy === 'squash' || body.strategy === 'rebase' ? body.strategy : 'merge';
     const head = await resolveHeadRepo(c.env, pull);
     if (head) {
-      const result = await mergeCrossForkPull(c.env, { email, scope, rowId: row.id, number, pull, fullName, headFullName: head.fullName, headRow: head.row, message, deleteHead, strategy });
+      const result = await mergeCrossForkPull(c.env, {
+        email,
+        scope,
+        rowId: row.id,
+        number,
+        pull,
+        fullName,
+        headFullName: head.fullName,
+        headRow: head.row,
+        message,
+        deleteHead,
+        strategy,
+      });
       return c.json(result.body, result.status);
     }
     // Refresh oids from git truth (branches may have moved since PR creation).
@@ -311,7 +355,9 @@ function registerUserPullMergeRoutes(app: PullApp): void {
       return c.json({ error: 'merge conflicts', conflicts: outcome.conflicts ?? [], reason: outcome.reason ?? null }, 409);
     }
     try {
-      const merged = await scope.get(Tokens.PullRequestService).markMerged({ repositoryId: row.id, number, mergedBy: email, commitOid: outcome.commitOid ?? headOid });
+      const merged = await scope
+        .get(Tokens.PullRequestService)
+        .markMerged({ repositoryId: row.id, number, mergedBy: email, commitOid: outcome.commitOid ?? headOid });
       await recordAndNotify(c.env, {
         repositoryId: row.id,
         fullName,

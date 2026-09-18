@@ -220,7 +220,6 @@ class UserService {
     }
     return { email: normalized, username: handle };
   }
-
 }
 
 export { UserService };

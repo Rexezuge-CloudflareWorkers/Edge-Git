@@ -174,10 +174,25 @@ export function RepoView({
           />
         )}
         {visibleTab === 'pulls' && (
-          <PullsTab owner={owner} repo={repo} repoMeta={repoData} canWrite={authorized ?? false} showNotice={showNotice} onCountChange={setPullCount} authorized={authorized} />
+          <PullsTab
+            owner={owner}
+            repo={repo}
+            repoMeta={repoData}
+            canWrite={authorized ?? false}
+            showNotice={showNotice}
+            onCountChange={setPullCount}
+            authorized={authorized}
+          />
         )}
         {visibleTab === 'issues' && (
-          <IssuesTab owner={owner} repo={repo} canWrite={authorized ?? false} showNotice={showNotice} onCountChange={setIssueCount} authorized={authorized} />
+          <IssuesTab
+            owner={owner}
+            repo={repo}
+            canWrite={authorized ?? false}
+            showNotice={showNotice}
+            onCountChange={setIssueCount}
+            authorized={authorized}
+          />
         )}
         {visibleTab === 'projects' && (
           <ProjectsTab owner={owner} repo={repo} canWrite={authorized ?? false} showNotice={showNotice} authorized={authorized} />
@@ -186,10 +201,23 @@ export function RepoView({
           <DiscussionsTab owner={owner} repo={repo} canWrite={authorized ?? false} showNotice={showNotice} authorized={authorized} />
         )}
         {visibleTab === 'wiki' && (
-          <WikiTab owner={owner} repo={repo} canWrite={repoData.viewerRole === 'admin' || repoData.viewerRole === 'write'} showNotice={showNotice} authorized={authorized} />
+          <WikiTab
+            owner={owner}
+            repo={repo}
+            canWrite={repoData.viewerRole === 'admin' || repoData.viewerRole === 'write'}
+            showNotice={showNotice}
+            authorized={authorized}
+          />
         )}
         {visibleTab === 'releases' && (
-          <ReleasesTab owner={owner} repo={repo} canWrite={authorized ?? false} showNotice={showNotice} onCountChange={setReleaseCount} authorized={authorized} />
+          <ReleasesTab
+            owner={owner}
+            repo={repo}
+            canWrite={authorized ?? false}
+            showNotice={showNotice}
+            onCountChange={setReleaseCount}
+            authorized={authorized}
+          />
         )}
         {visibleTab === 'activity' && <ActivityTab owner={owner} repo={repo} showNotice={showNotice} authorized={authorized} />}
         {visibleTab === 'settings' && (

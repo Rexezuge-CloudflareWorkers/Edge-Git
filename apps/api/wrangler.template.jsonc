@@ -12,59 +12,59 @@
       "enabled": true,
       "head_sampling_rate": 1,
       "invocation_logs": true,
-      "persist": true
-    }
+      "persist": true,
+    },
   },
   "routes": [],
   "placement": {
-    "mode": "off"
+    "mode": "off",
   },
   "assets": {
-    "directory": "./apps/web/dist/"
+    "directory": "./apps/web/dist/",
   },
   "durable_objects": {
     "bindings": [
       {
         "name": "REPO",
-        "class_name": "RepoWorker"
+        "class_name": "RepoWorker",
       },
       {
         "name": "CRON_TASKS",
-        "class_name": "CronTasksWorker"
+        "class_name": "CronTasksWorker",
       },
       {
         "name": "CHECK_RUNNER",
-        "class_name": "CheckRunnerWorker"
+        "class_name": "CheckRunnerWorker",
       },
       {
         "name": "REALTIME",
-        "class_name": "RealtimeWorker"
-      }
-    ]
+        "class_name": "RealtimeWorker",
+      },
+    ],
   },
   "migrations": [
     {
       "tag": "v1000000000",
-      "new_sqlite_classes": ["RepoWorker", "CronTasksWorker"]
+      "new_sqlite_classes": ["RepoWorker", "CronTasksWorker"],
     },
     {
       "tag": "v1000000001",
-      "new_sqlite_classes": ["CheckRunnerWorker"]
+      "new_sqlite_classes": ["CheckRunnerWorker"],
     },
     {
       "tag": "v1000000002",
-      "new_sqlite_classes": ["RealtimeWorker"]
-    }
+      "new_sqlite_classes": ["RealtimeWorker"],
+    },
   ],
   "d1_databases": [
     {
       "binding": "DB",
       "database_id": "00000000-0000-0000-0000-000000000000",
-      "database_name": "edge-git-db"
-    }
+      "database_name": "edge-git-db",
+    },
   ],
   "triggers": {
-    "crons": ["*/10 * * * *"]
+    "crons": ["*/10 * * * *"],
   },
   "vars": {
     "ENVIRONMENT": "production",
@@ -117,6 +117,6 @@
     "REALTIME_ENABLED": "false",
     "REALTIME_TICKET_TTL_SECONDS": "30",
     "REALTIME_MAX_CONN_PER_REPO_SHARD": "100",
-    "REALTIME_MAX_CONN_PER_INBOX_SHARD": "1000"
-  }
+    "REALTIME_MAX_CONN_PER_INBOX_SHARD": "1000",
+  },
 }

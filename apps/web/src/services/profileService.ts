@@ -24,8 +24,12 @@ export async function createOrg(input: { username: string }): Promise<OrgSummary
   return apiPost<OrgSummary>('/user/orgs', input);
 }
 
-export async function loadOrgAuthed(org: string): Promise<{ id?: string; username: string; members: OrgMember[]; viewerRole: 'owner' | 'member' | null }> {
-  const data = await apiGet<{ id?: string; username: string; members?: OrgMember[]; viewerRole?: 'owner' | 'member' | null }>(`/user/orgs/${encodeURIComponent(org)}`);
+export async function loadOrgAuthed(
+  org: string,
+): Promise<{ id?: string; username: string; members: OrgMember[]; viewerRole: 'owner' | 'member' | null }> {
+  const data = await apiGet<{ id?: string; username: string; members?: OrgMember[]; viewerRole?: 'owner' | 'member' | null }>(
+    `/user/orgs/${encodeURIComponent(org)}`,
+  );
   return { id: data.id, username: data.username, members: data.members ?? [], viewerRole: data.viewerRole ?? null };
 }
 
@@ -42,7 +46,10 @@ export async function listOrgMembers(org: string): Promise<OrgMember[]> {
   return data.members ?? [];
 }
 
-export async function inviteOrgMember(org: string, target: { username?: string; email?: string; role?: 'owner' | 'member' }): Promise<{ ok: boolean }> {
+export async function inviteOrgMember(
+  org: string,
+  target: { username?: string; email?: string; role?: 'owner' | 'member' },
+): Promise<{ ok: boolean }> {
   return apiPost(`/user/orgs/${encodeURIComponent(org)}/members`, target);
 }
 

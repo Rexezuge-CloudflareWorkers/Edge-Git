@@ -19,11 +19,7 @@ export function PageHeaderCard({
   return (
     <Card className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 py-4">
       <div className="flex items-center gap-3 min-w-0">
-        {icon && (
-          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--color-surface-3)] shrink-0">
-            {icon}
-          </div>
-        )}
+        {icon && <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--color-surface-3)] shrink-0">{icon}</div>}
         <div className="min-w-0">
           <h1 className="text-xl font-semibold text-[var(--color-text-primary)] truncate">{title}</h1>
           {description && <div className="text-sm text-[var(--color-text-muted)] truncate">{description}</div>}

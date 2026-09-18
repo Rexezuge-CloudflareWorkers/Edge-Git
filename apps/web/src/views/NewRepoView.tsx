@@ -65,50 +65,48 @@ export function NewRepoView({
 
   return (
     <div>
-      <ContextBar
-        crumb={<span className="text-xl font-semibold text-[var(--color-text-primary)] truncate">New Repository</span>}
-      />
+      <ContextBar crumb={<span className="text-xl font-semibold text-[var(--color-text-primary)] truncate">New Repository</span>} />
       <AppPage variant="narrow">
-      <Card>
-        <CardHeader>
-          <CardTitle>New Repository</CardTitle>
-        </CardHeader>
-        <form onSubmit={submit} className="space-y-4">
-          <div>
-            <Label className="mb-1.5">Owner</Label>
-            <Select value={owner} onChange={(e) => setOwner(e.target.value)} className="w-full">
-              {owners.map((o) => (
-                <option key={o} value={o}>
-                  {o}
-                </option>
-              ))}
-            </Select>
-            <p className="text-xs text-[var(--color-text-muted)] mt-1">
-              {t('repos.ownerHint', 'Personal Or Organization You Belong To. Manage Organizations From The Dashboard New Menu.')}
-            </p>
-          </div>
-          <div>
-            <Label className="mb-1.5">Repository Name</Label>
-            <Input placeholder="my-project" value={name} onChange={(e) => setName(e.target.value)} required />
-          </div>
-          <div>
-            <Label className="mb-1.5">Description</Label>
-            <Textarea
-              placeholder="What does this repository contain?"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-            />
-          </div>
-          <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
-            <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
-            Private repository
-          </label>
-          <Button type="submit" variant="primary" loading={saving}>
-            Create Repository
-          </Button>
-        </form>
-      </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>New Repository</CardTitle>
+          </CardHeader>
+          <form onSubmit={submit} className="space-y-4">
+            <div>
+              <Label className="mb-1.5">Owner</Label>
+              <Select value={owner} onChange={(e) => setOwner(e.target.value)} className="w-full">
+                {owners.map((o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ))}
+              </Select>
+              <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                {t('repos.ownerHint', 'Personal Or Organization You Belong To. Manage Organizations From The Dashboard New Menu.')}
+              </p>
+            </div>
+            <div>
+              <Label className="mb-1.5">Repository Name</Label>
+              <Input placeholder="my-project" value={name} onChange={(e) => setName(e.target.value)} required />
+            </div>
+            <div>
+              <Label className="mb-1.5">Description</Label>
+              <Textarea
+                placeholder="What does this repository contain?"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
+              <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
+              Private repository
+            </label>
+            <Button type="submit" variant="primary" loading={saving}>
+              Create Repository
+            </Button>
+          </form>
+        </Card>
       </AppPage>
     </div>
   );

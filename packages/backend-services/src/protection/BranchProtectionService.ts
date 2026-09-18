@@ -66,7 +66,11 @@ class BranchProtectionService {
     let best: BranchProtectionRuleMetadata | null = null;
     for (const rule of rules) {
       if (!matchesPattern(rule.pattern, branch)) continue;
-      if (!best || rule.pattern.length > best.pattern.length || (rule.pattern.length === best.pattern.length && rule.pattern < best.pattern)) {
+      if (
+        !best ||
+        rule.pattern.length > best.pattern.length ||
+        (rule.pattern.length === best.pattern.length && rule.pattern < best.pattern)
+      ) {
         best = rule;
       }
     }

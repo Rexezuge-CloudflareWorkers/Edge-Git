@@ -92,11 +92,7 @@ export function buildReportStatus(results: RefUpdateResult[], unpackOk: boolean)
   });
 }
 
-export function validateReceivePackCounts(
-  commandCount: number,
-  packfileLength: number,
-  limits: ReceiveCountLimits,
-): string | null {
+export function validateReceivePackCounts(commandCount: number, packfileLength: number, limits: ReceiveCountLimits): string | null {
   if (commandCount > limits.maxCommands) {
     return `too many ref updates: ${commandCount} > ${limits.maxCommands}`;
   }
@@ -133,7 +129,5 @@ function isValidRefName(ref: string): boolean {
     if (code === 0x7f || code === 0x5c || code <= 0x20) return false;
     if ('~^:?*[]@{'.includes(ch)) return false;
   }
-  return ref
-    .split('/')
-    .every((seg) => seg.length > 0 && seg !== '.' && seg !== '..' && seg !== '@' && REF_SEGMENT_RE.test(seg));
+  return ref.split('/').every((seg) => seg.length > 0 && seg !== '.' && seg !== '..' && seg !== '@' && REF_SEGMENT_RE.test(seg));
 }

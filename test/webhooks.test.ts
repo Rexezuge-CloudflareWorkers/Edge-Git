@@ -55,7 +55,11 @@ function createWebhookFakeDb() {
         if (q.includes('FROM organizations')) return Promise.resolve(null);
         if (q.includes('FROM repo_collaborators')) return Promise.resolve(null);
         if (q.includes('FROM repositories WHERE lower(owner)')) {
-          const row = state.repos.find((r) => String(r.owner).toLowerCase() === String(params[0]).toLowerCase() && String(r.name).toLowerCase() === String(params[1]).toLowerCase());
+          const row = state.repos.find(
+            (r) =>
+              String(r.owner).toLowerCase() === String(params[0]).toLowerCase() &&
+              String(r.name).toLowerCase() === String(params[1]).toLowerCase(),
+          );
           return Promise.resolve((row ?? null) as T | null);
         }
         if (q.includes('FROM repositories WHERE owner = ? AND name = ?')) {
@@ -136,9 +140,8 @@ function createWebhookFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO repo_webhooks')) {
-          const [id, repository_id, full_name, url, url_prefix, secret, secret_suffix, events, creator_email, created_at, updated_at] = params as Array<
-            string | number
-          >;
+          const [id, repository_id, full_name, url, url_prefix, secret, secret_suffix, events, creator_email, created_at, updated_at] =
+            params as Array<string | number>;
           state.hooks.push({
             id,
             repository_id,
@@ -208,7 +211,9 @@ function createWebhookFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO webhook_deliveries')) {
-          const [id, hook_id, repository_id, event, event_id, payload, next_retry_at, created_at, updated_at] = params as Array<string | number | null>;
+          const [id, hook_id, repository_id, event, event_id, payload, next_retry_at, created_at, updated_at] = params as Array<
+            string | number | null
+          >;
           state.deliveries.push({
             id,
             hook_id,
@@ -325,7 +330,26 @@ function json(method: string, body: unknown): RequestInit {
 
 describe('webhook event helpers', () => {
   it('lists the supported webhook events', () => {
-    expect([...WEBHOOK_EVENTS]).toEqual(['push', 'repository', 'issues', 'issue_comment', 'pull_request', 'pull_request_review', 'fork', 'star', 'watch', 'release', 'project', 'discussion', 'discussion_comment', 'wiki', 'snippet', 'check_run', 'check_suite', 'ping']);
+    expect([...WEBHOOK_EVENTS]).toEqual([
+      'push',
+      'repository',
+      'issues',
+      'issue_comment',
+      'pull_request',
+      'pull_request_review',
+      'fork',
+      'star',
+      'watch',
+      'release',
+      'project',
+      'discussion',
+      'discussion_comment',
+      'wiki',
+      'snippet',
+      'check_run',
+      'check_suite',
+      'ping',
+    ]);
   });
 
   it('normalizes event subscriptions', () => {
@@ -506,9 +530,14 @@ describe('WebhookService', () => {
   it('creates hooks with a one-time secret and masked lists', async () => {
     const dao = stubDao();
     const svc = service(dao);
-    const { hook, secret } = await svc.createHook({ repositoryId: 'repo-1', fullName: 'alice/demo', url: 'https://hooks.example.com/x', creatorEmail: 'alice@example.com' });
+    const { hook, secret } = await svc.createHook({
+      repositoryId: 'repo-1',
+      fullName: 'alice/demo',
+      url: 'https://hooks.example.com/x',
+      creatorEmail: 'alice@example.com',
+    });
     expect(secret.length).toBeGreaterThanOrEqual(16);
-    expect(hook.urlMasked).toBe('https://hooks.example.com/x'.slice(0, 30) + (('https://hooks.example.com/x'.length > 30) ? '...' : ''));
+    expect(hook.urlMasked).toBe('https://hooks.example.com/x'.slice(0, 30) + ('https://hooks.example.com/x'.length > 30 ? '...' : ''));
     expect(hook.hasSecret).toBe(true);
     expect(hook.events).toEqual(['push']);
     expect(dao.create).toHaveBeenCalledOnce();
@@ -532,14 +561,22 @@ describe('WebhookService', () => {
 
   it('rejects invalid input and enforces the per-repo cap', async () => {
     const svc = service(stubDao());
-    await expect(svc.createHook({ repositoryId: 'r', fullName: 'a/b', url: 'http://127.0.0.1/x', creatorEmail: 'a@x.com' })).rejects.toThrow();
-    await expect(svc.createHook({ repositoryId: 'r', fullName: 'a/b', url: 'https://ok.example.com/', events: ['nope'], creatorEmail: 'a@x.com' })).rejects.toThrow();
-    await expect(svc.createHook({ repositoryId: 'r', fullName: 'a/b', url: 'https://ok.example.com/', events: [], creatorEmail: 'a@x.com' })).rejects.toThrow();
+    await expect(
+      svc.createHook({ repositoryId: 'r', fullName: 'a/b', url: 'http://127.0.0.1/x', creatorEmail: 'a@x.com' }),
+    ).rejects.toThrow();
+    await expect(
+      svc.createHook({ repositoryId: 'r', fullName: 'a/b', url: 'https://ok.example.com/', events: ['nope'], creatorEmail: 'a@x.com' }),
+    ).rejects.toThrow();
+    await expect(
+      svc.createHook({ repositoryId: 'r', fullName: 'a/b', url: 'https://ok.example.com/', events: [], creatorEmail: 'a@x.com' }),
+    ).rejects.toThrow();
     await expect(
       svc.createHook({ repositoryId: 'r', fullName: 'a/b', url: 'https://ok.example.com/', secret: 'short', creatorEmail: 'a@x.com' }),
     ).rejects.toThrow();
     const capped = service(stubDao({ countByRepo: vi.fn().mockResolvedValue(10) }));
-    await expect(capped.createHook({ repositoryId: 'r', fullName: 'a/b', url: 'https://ok.example.com/', creatorEmail: 'a@x.com' })).rejects.toThrow(/Maximum 10/);
+    await expect(
+      capped.createHook({ repositoryId: 'r', fullName: 'a/b', url: 'https://ok.example.com/', creatorEmail: 'a@x.com' }),
+    ).rejects.toThrow(/Maximum 10/);
   });
 
   it('reads, updates, rotates, and deletes with 404s', async () => {
@@ -605,12 +642,30 @@ describe('WebhookDeliveryService', () => {
     ...overrides,
   });
 
-  function deliveryService(deps: { hooks?: unknown[]; postJson?: (url: string, init: { headers: Record<string, string>; body: string; timeoutMs: number }) => Promise<{ httpStatus: number | null; error: string | null }> }) {
+  function deliveryService(deps: {
+    hooks?: unknown[];
+    postJson?: (
+      url: string,
+      init: { headers: Record<string, string>; body: string; timeoutMs: number },
+    ) => Promise<{ httpStatus: number | null; error: string | null }>;
+  }) {
     const deliveries: Array<Record<string, unknown>> = [];
-    const webhookDAO = { listByRepo: vi.fn().mockResolvedValue(deps.hooks ?? []), getById: vi.fn(async (id: string) => (deps.hooks as Array<{ id: string }> | undefined)?.find((h) => h.id === id) ?? null), getByIdAndRepo: vi.fn() };
+    const webhookDAO = {
+      listByRepo: vi.fn().mockResolvedValue(deps.hooks ?? []),
+      getById: vi.fn(async (id: string) => (deps.hooks as Array<{ id: string }> | undefined)?.find((h) => h.id === id) ?? null),
+      getByIdAndRepo: vi.fn(),
+    };
     const deliveryDAO = {
       enqueue: vi.fn(async (input: Record<string, unknown>) => {
-        deliveries.push({ ...input, status: 'pending', attempts: 0, last_http_status: null, last_error: null, created_at: input.now, updated_at: input.now });
+        deliveries.push({
+          ...input,
+          status: 'pending',
+          attempts: 0,
+          last_http_status: null,
+          last_error: null,
+          created_at: input.now,
+          updated_at: input.now,
+        });
       }),
       listDue: vi.fn().mockResolvedValue([]),
       claim: vi.fn().mockResolvedValue(true),
@@ -632,7 +687,12 @@ describe('WebhookDeliveryService', () => {
     const { svc, deliveryDAO } = deliveryService({
       hooks: [hookRow(), hookRow({ id: 'h2', is_active: 0 }), hookRow({ id: 'h3', events: JSON.stringify(['star']) })],
     });
-    const { enqueued } = await svc.enqueueForEvent({ repositoryId: 'repo-1', fullName: 'alice/demo', event: 'push', actorEmail: 'alice@example.com' });
+    const { enqueued } = await svc.enqueueForEvent({
+      repositoryId: 'repo-1',
+      fullName: 'alice/demo',
+      event: 'push',
+      actorEmail: 'alice@example.com',
+    });
     expect(enqueued).toBe(1);
     expect(deliveryDAO.enqueue).toHaveBeenCalledOnce();
     const broken = new WebhookDeliveryService({ DB: {} } as never, {
@@ -640,7 +700,9 @@ describe('WebhookDeliveryService', () => {
         throw new Error('legacy DB without webhooks table');
       },
     });
-    await expect(broken.enqueueForEvent({ repositoryId: 'r', fullName: 'a/b', event: 'push', actorEmail: 'a@x.com' })).resolves.toEqual({ enqueued: 0 });
+    await expect(broken.enqueueForEvent({ repositoryId: 'r', fullName: 'a/b', event: 'push', actorEmail: 'a@x.com' })).resolves.toEqual({
+      enqueued: 0,
+    });
   });
 
   it('marks HTTP success and resets hook failures', async () => {
@@ -652,8 +714,16 @@ describe('WebhookDeliveryService', () => {
         return { httpStatus: 200, error: null };
       },
     });
-    (deliveryDAO.listDue as ReturnType<typeof vi.fn>).mockResolvedValue([{ id: 'd1', hook_id: 'h1', event: 'push', payload: '{"event":"push"}', attempts: 0 }]);
-    (deliveryDAO.getById as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'd1', hook_id: 'h1', event: 'push', payload: '{"event":"push"}', attempts: 0 });
+    (deliveryDAO.listDue as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { id: 'd1', hook_id: 'h1', event: 'push', payload: '{"event":"push"}', attempts: 0 },
+    ]);
+    (deliveryDAO.getById as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: 'd1',
+      hook_id: 'h1',
+      event: 'push',
+      payload: '{"event":"push"}',
+      attempts: 0,
+    });
     webhookDAO.getById = vi.fn().mockResolvedValue(hookRow());
     const recordOutcome = vi.fn().mockResolvedValue(undefined);
     (webhookDAO as unknown as Record<string, unknown>).recordDeliveryOutcome = recordOutcome;
@@ -768,7 +838,15 @@ describe('webhook composition and cron', () => {
       now: 100,
     });
     const deliveryDao = new WebhookDeliveryDAO(db);
-    await deliveryDao.enqueue({ id: 'd1', hookId: 'h1', repositoryId: 'repo-1', event: 'push', payload: '{"event":"push"}', nextRetryAt: 100, now: 100 });
+    await deliveryDao.enqueue({
+      id: 'd1',
+      hookId: 'h1',
+      repositoryId: 'repo-1',
+      event: 'push',
+      payload: '{"event":"push"}',
+      nextRetryAt: 100,
+      now: 100,
+    });
     const posts: Array<{ url: string; init: RequestInit }> = [];
     vi.stubGlobal(
       'fetch',
@@ -794,20 +872,29 @@ describe('webhook HTTP routes', () => {
     const { db, state } = createWebhookFakeDb();
     seedRepo(state);
 
-    const created = await callRoute(db, '/user/repos/alice/demo/hooks', json('POST', { url: 'https://hooks.example.com/edge', events: ['push', 'issues'] }));
+    const created = await callRoute(
+      db,
+      '/user/repos/alice/demo/hooks',
+      json('POST', { url: 'https://hooks.example.com/edge', events: ['push', 'issues'] }),
+    );
     expect(created.status).toBe(201);
     const createdBody = (await created.json()) as { hook: { id: string; urlMasked: string; hasSecret: boolean }; secret: string };
     expect(createdBody.secret.length).toBeGreaterThanOrEqual(16);
     expect(createdBody.hook.hasSecret).toBe(true);
     const hookId = createdBody.hook.id;
 
-    const listed = (await (await callRoute(db, '/user/repos/alice/demo/hooks')).json()) as { hooks: Array<{ id: string; secret?: string }>; events: string[] };
+    const listed = (await (await callRoute(db, '/user/repos/alice/demo/hooks')).json()) as {
+      hooks: Array<{ id: string; secret?: string }>;
+      events: string[];
+    };
     expect(listed.hooks).toHaveLength(1);
     expect(listed.hooks[0].secret).toBeUndefined();
     expect(listed.events).toContain('ping');
 
     expect((await callRoute(db, '/user/repos/alice/demo/hooks', json('POST', { url: 'http://127.0.0.1/x' }))).status).toBe(400);
-    expect((await callRoute(db, '/user/repos/alice/demo/hooks', json('POST', { url: 'https://hooks.example.com/y', events: ['bogus'] }))).status).toBe(400);
+    expect(
+      (await callRoute(db, '/user/repos/alice/demo/hooks', json('POST', { url: 'https://hooks.example.com/y', events: ['bogus'] }))).status,
+    ).toBe(400);
     expect((await callRoute(db, '/user/repos/alice/demo/hooks', json('POST', {}))).status).toBe(400);
 
     const fetched = await callRoute(db, `/user/repos/alice/demo/hooks/${hookId}`);
@@ -816,7 +903,10 @@ describe('webhook HTTP routes', () => {
 
     const patched = await callRoute(db, `/user/repos/alice/demo/hooks/${hookId}`, json('PATCH', { events: ['star'], isActive: false }));
     expect(patched.status).toBe(200);
-    expect(((await patched.json()) as { hook: { events: string[]; isActive: boolean } }).hook).toMatchObject({ events: ['star'], isActive: false });
+    expect(((await patched.json()) as { hook: { events: string[]; isActive: boolean } }).hook).toMatchObject({
+      events: ['star'],
+      isActive: false,
+    });
 
     const rotated = await callRoute(db, `/user/repos/alice/demo/hooks/${hookId}/rotate-secret`, { method: 'POST' });
     expect(rotated.status).toBe(200);
@@ -846,7 +936,9 @@ describe('webhook HTTP routes', () => {
     };
     expect(deliveries.deliveries.map((d) => d.id)).toContain(testedBody.delivery.id);
 
-    const redelivered = await callRoute(db, `/user/repos/alice/demo/hooks/${hookId}/deliveries/${testedBody.delivery.id}/redeliver`, { method: 'POST' });
+    const redelivered = await callRoute(db, `/user/repos/alice/demo/hooks/${hookId}/deliveries/${testedBody.delivery.id}/redeliver`, {
+      method: 'POST',
+    });
     expect(redelivered.status).toBe(200);
 
     const removed = await callRoute(db, `/user/repos/alice/demo/hooks/${hookId}`, { method: 'DELETE' });
@@ -874,7 +966,11 @@ describe('webhook HTTP routes', () => {
   it('enqueues webhook deliveries when issues are created', async () => {
     const { db, state } = createWebhookFakeDb();
     seedRepo(state);
-    const created = await callRoute(db, '/user/repos/alice/demo/hooks', json('POST', { url: 'https://hooks.example.com/edge', events: ['issues'] }));
+    const created = await callRoute(
+      db,
+      '/user/repos/alice/demo/hooks',
+      json('POST', { url: 'https://hooks.example.com/edge', events: ['issues'] }),
+    );
     expect(created.status).toBe(201);
     const issue = await callRoute(db, '/user/repos/alice/demo/issues', json('POST', { title: 'Webhook E2E' }));
     expect(issue.status).toBe(201);

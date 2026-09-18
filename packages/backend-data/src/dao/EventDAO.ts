@@ -80,7 +80,11 @@ class EventDAO extends BaseDAO {
     );
   }
 
-  public async listByRepo(repositoryId: string, limit = 50, cursor?: string): Promise<{ events: RepoEventRow[]; nextCursor: string | null }> {
+  public async listByRepo(
+    repositoryId: string,
+    limit = 50,
+    cursor?: string,
+  ): Promise<{ events: RepoEventRow[]; nextCursor: string | null }> {
     const decoded = this.decodeCursor<{ created_at: number; id: string }>(cursor);
     const pageSize = limit + 1;
     const result =
@@ -90,7 +94,9 @@ class EventDAO extends BaseDAO {
             .bind(repositoryId, pageSize)
             .all<RepoEventRow>()
         : await this.database
-            .prepare('SELECT * FROM repo_events WHERE repository_id = ? AND (created_at < ? OR (created_at = ? AND id < ?)) ORDER BY created_at DESC, id DESC LIMIT ?')
+            .prepare(
+              'SELECT * FROM repo_events WHERE repository_id = ? AND (created_at < ? OR (created_at = ? AND id < ?)) ORDER BY created_at DESC, id DESC LIMIT ?',
+            )
             .bind(repositoryId, decoded.created_at, decoded.created_at, decoded.id, pageSize)
             .all<RepoEventRow>();
     const rows = result.results ?? [];
@@ -101,7 +107,10 @@ class EventDAO extends BaseDAO {
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {
-    await this.withRetry(() => this.database.prepare('DELETE FROM repo_events WHERE repository_id = ?').bind(repositoryId).run(), 'delete events by repo');
+    await this.withRetry(
+      () => this.database.prepare('DELETE FROM repo_events WHERE repository_id = ?').bind(repositoryId).run(),
+      'delete events by repo',
+    );
   }
 
   public async pruneOlderThan(cutoff: number, limit: number): Promise<number> {

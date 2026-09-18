@@ -51,7 +51,15 @@ function registerUserPullRoutes(app: PullApp): void {
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return c.json({ error: 'Not found' }, 404);
-    const body = (await c.req.json().catch(() => ({}))) as { title?: string; body?: string; baseBranch?: string; headBranch?: string; headOwner?: string; headRepo?: string; isDraft?: boolean };
+    const body = (await c.req.json().catch(() => ({}))) as {
+      title?: string;
+      body?: string;
+      baseBranch?: string;
+      headBranch?: string;
+      headOwner?: string;
+      headRepo?: string;
+      isDraft?: boolean;
+    };
     if (!body.title?.trim()) return c.json({ error: 'title is required' }, 400);
     if (!body.baseBranch?.trim() || !body.headBranch?.trim()) return c.json({ error: 'baseBranch and headBranch are required' }, 400);
     if (!PullRequestService.isValidBranchName(body.baseBranch.trim()) || !PullRequestService.isValidBranchName(body.headBranch.trim())) {
@@ -66,7 +74,17 @@ function registerUserPullRoutes(app: PullApp): void {
     const sameRepo = headOwnerRaw === '' || `${headOwnerRaw}/${headRepoRaw}`.toLowerCase() === fullName.toLowerCase();
     if (sameRepo && baseBranch === headBranch) return c.json({ error: 'baseBranch and headBranch must differ' }, 400);
     if (!sameRepo) {
-      const result = await openCrossForkPull(c.env, { email, rowId: row.id, fullName, baseBranch, headBranch, headOwner: headOwnerRaw, headRepo: headRepoRaw, title: body.title, body: body.body ?? null });
+      const result = await openCrossForkPull(c.env, {
+        email,
+        rowId: row.id,
+        fullName,
+        baseBranch,
+        headBranch,
+        headOwner: headOwnerRaw,
+        headRepo: headRepoRaw,
+        title: body.title,
+        body: body.body ?? null,
+      });
       return c.json(result.body, result.status);
     }
     let preview: MergePreviewShape | null = null;
@@ -81,21 +99,19 @@ function registerUserPullRoutes(app: PullApp): void {
     if (!preview?.baseOid || !preview?.headOid) return c.json({ error: 'base or head branch not found' }, 400);
     try {
       const scope = createRequestScope(c.env);
-      const created = await scope
-        .get(Tokens.PullRequestService)
-        .createPull({
-          repositoryId: row.id,
-          fullName,
-          title: body.title,
-          body: body.body ?? null,
-          baseBranch,
-          headBranch,
-          baseOid: preview.baseOid,
-          headOid: preview.headOid,
-          mergeBaseOid: preview.mergeBase ?? null,
-          creatorEmail: email,
-          isDraft: body.isDraft === true,
-        });
+      const created = await scope.get(Tokens.PullRequestService).createPull({
+        repositoryId: row.id,
+        fullName,
+        title: body.title,
+        body: body.body ?? null,
+        baseBranch,
+        headBranch,
+        baseOid: preview.baseOid,
+        headOid: preview.headOid,
+        mergeBaseOid: preview.mergeBase ?? null,
+        creatorEmail: email,
+        isDraft: body.isDraft === true,
+      });
       // CODEOWNERS auto-request: best-effort reviewer seeding from the
       // owners of the changed paths; never fails PR creation.
       try {
@@ -278,7 +294,10 @@ function registerUserPullRoutes(app: PullApp): void {
       });
       try {
         const status = body.state === 'approved' ? 'approved' : body.state === 'changes_requested' ? 'changes_requested' : 'pending';
-        await scope.get(Tokens.CollaborationService).syncReviewerStatus(pull.id, email, status).catch(() => undefined);
+        await scope
+          .get(Tokens.CollaborationService)
+          .syncReviewerStatus(pull.id, email, status)
+          .catch(() => undefined);
       } catch {
         // best-effort reviewer status sync
       }
@@ -314,7 +333,10 @@ function registerUserPullRoutes(app: PullApp): void {
       const fullName = `${owner}/${repoName}`;
       const head = await resolveHeadRepo(c.env, pull);
       if (head) {
-        const headRole = await createRequestScope(c.env).get(Tokens.PermissionService).getRole(email, head.row).catch(() => null);
+        const headRole = await createRequestScope(c.env)
+          .get(Tokens.PermissionService)
+          .getRole(email, head.row)
+          .catch(() => null);
         if (!headRole) return c.json({ error: 'Not found' }, 404);
         try {
           await ensureHeadObjects(c.env, fullName, head.fullName, pull.head_oid);
@@ -343,7 +365,10 @@ function registerUserPullRoutes(app: PullApp): void {
       const fullName = `${owner}/${repoName}`;
       const head = await resolveHeadRepo(c.env, pull);
       if (head) {
-        const headRole = await createRequestScope(c.env).get(Tokens.PermissionService).getRole(email, head.row).catch(() => null);
+        const headRole = await createRequestScope(c.env)
+          .get(Tokens.PermissionService)
+          .getRole(email, head.row)
+          .catch(() => null);
         if (!headRole) return c.json({ error: 'Not found' }, 404);
         try {
           const { preview } = await getCrossRepoPreview(c.env, fullName, pull.base_branch, head.fullName, pull.head_branch);
@@ -362,8 +387,6 @@ function registerUserPullRoutes(app: PullApp): void {
       return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
     }
   });
-
-
 }
 
 export { registerUserPullRoutes };

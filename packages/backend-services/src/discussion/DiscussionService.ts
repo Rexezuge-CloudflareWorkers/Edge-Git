@@ -20,7 +20,15 @@ const MAX_BODY = 20_000;
 const MAX_COMMENT_BODY = 10_000;
 const SLUG_RE = /^[a-z0-9-]{1,50}$/;
 
-function toCategoryMetadata(row: { id: string; repository_id: string; slug: string; title: string; description: string | null; kind: string; created_at: number }): DiscussionCategoryMetadata {
+function toCategoryMetadata(row: {
+  id: string;
+  repository_id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  kind: string;
+  created_at: number;
+}): DiscussionCategoryMetadata {
   return {
     id: row.id,
     repositoryId: row.repository_id,
@@ -185,7 +193,8 @@ class DiscussionService {
   }
 
   public async setStatus(repositoryId: string, number: number, status: unknown): Promise<DiscussionMetadata> {
-    if (status !== 'open' && status !== 'locked' && status !== 'answered') throw new BadRequestError('status must be open, locked, or answered');
+    if (status !== 'open' && status !== 'locked' && status !== 'answered')
+      throw new BadRequestError('status must be open, locked, or answered');
     const dao = await this.deps.discussionDAO();
     const row = await dao.getByNumber(repositoryId, number);
     if (!row) throw new NotFoundError('Discussion not found');
@@ -203,7 +212,12 @@ class DiscussionService {
     return { id: row.id };
   }
 
-  public async addComment(repositoryId: string, number: number, input: { body: unknown }, authorEmail: string): Promise<DiscussionCommentMetadata> {
+  public async addComment(
+    repositoryId: string,
+    number: number,
+    input: { body: unknown },
+    authorEmail: string,
+  ): Promise<DiscussionCommentMetadata> {
     if (typeof input.body !== 'string' || !input.body.trim()) throw new BadRequestError('body is required');
     const body = input.body.slice(0, MAX_COMMENT_BODY);
     const dao = await this.deps.discussionDAO();
@@ -218,7 +232,12 @@ class DiscussionService {
     return toCommentMetadata(created);
   }
 
-  public async updateComment(repositoryId: string, number: number, commentId: string, input: { body: unknown }): Promise<DiscussionCommentMetadata> {
+  public async updateComment(
+    repositoryId: string,
+    number: number,
+    commentId: string,
+    input: { body: unknown },
+  ): Promise<DiscussionCommentMetadata> {
     if (typeof input.body !== 'string' || !input.body.trim()) throw new BadRequestError('body is required');
     const dao = await this.deps.discussionDAO();
     const row = await dao.getByNumber(repositoryId, number);

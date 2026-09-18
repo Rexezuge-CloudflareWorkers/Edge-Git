@@ -83,7 +83,10 @@ function registerPullRoutes(app: PullApp): void {
         if (head) {
           // A private fork's diff must not leak through a public base repo.
           const viewerEmail = await resolvePublicViewer(c as never);
-          const headRole = await createRequestScope(c.env).get(Tokens.PermissionService).getRole(viewerEmail, head.row).catch(() => null);
+          const headRole = await createRequestScope(c.env)
+            .get(Tokens.PermissionService)
+            .getRole(viewerEmail, head.row)
+            .catch(() => null);
           if (!headRole) return c.json({ error: 'Not found' }, 404);
           try {
             await ensureHeadObjects(c.env, fullName, head.fullName, pull.head_oid);
@@ -109,7 +112,10 @@ function registerPullRoutes(app: PullApp): void {
         const head = await resolveHeadRepo(c.env, pull);
         if (head) {
           const viewerEmail = await resolvePublicViewer(c as never);
-          const headRole = await createRequestScope(c.env).get(Tokens.PermissionService).getRole(viewerEmail, head.row).catch(() => null);
+          const headRole = await createRequestScope(c.env)
+            .get(Tokens.PermissionService)
+            .getRole(viewerEmail, head.row)
+            .catch(() => null);
           if (!headRole) return c.json({ error: 'Not found' }, 404);
           try {
             const { preview } = await getCrossRepoPreview(c.env, fullName, pull.base_branch, head.fullName, pull.head_branch);

@@ -2,8 +2,7 @@ import { useTranslation } from 'react-i18next';
 
 export function NoticeBar({ notice }: { notice: { type: 'success' | 'error'; text: string } }) {
   const { t } = useTranslation();
-  const statusLabel =
-    notice.type === 'success' ? t('common.success', 'Success') : t('common.error', 'Error');
+  const statusLabel = notice.type === 'success' ? t('common.success', 'Success') : t('common.error', 'Error');
   return (
     <div
       role="status"

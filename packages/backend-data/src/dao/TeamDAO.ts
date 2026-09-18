@@ -33,7 +33,17 @@ class TeamDAO extends BaseDAO {
           .prepare(
             'INSERT INTO teams (id, org_id, slug, slug_ci, name, description, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
           )
-          .bind(input.id, input.orgId, input.slug, input.slug.toLowerCase(), input.name, input.description ?? null, input.createdBy, input.now, input.now)
+          .bind(
+            input.id,
+            input.orgId,
+            input.slug,
+            input.slug.toLowerCase(),
+            input.name,
+            input.description ?? null,
+            input.createdBy,
+            input.now,
+            input.now,
+          )
           .run(),
       'create team',
     );

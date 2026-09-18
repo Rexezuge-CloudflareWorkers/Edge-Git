@@ -115,7 +115,9 @@ function createRunnerDb(seed: Partial<RunnerDb> = {}): D1Queryable & { data: Run
       },
     };
   }
-  return { prepare: (query: string) => ({ bind: (...params: unknown[]) => statement(query, params) }), data } as unknown as D1Queryable & { data: RunnerDb };
+  return { prepare: (query: string) => ({ bind: (...params: unknown[]) => statement(query, params) }), data } as unknown as D1Queryable & {
+    data: RunnerDb;
+  };
 }
 
 describe('fetchRemotePack', () => {
@@ -126,17 +128,40 @@ describe('fetchRemotePack', () => {
   });
 
   it('surfaces HTTP and protocol failures', async () => {
-    const notFound = { get: async () => ({ status: 404, contentType: null, body: new Uint8Array() }), post: async () => ({ status: 200, body: new Uint8Array() }) };
-    await expect(fetchRemotePack(notFound, 'https://github.com/o/r', { maxRefs: 100, maxPackBytes: 1024, timeoutMs: 5000 })).rejects.toThrow(/advertise failed/);
-    const notGit = { get: async () => ({ status: 200, contentType: 'text/html', body: new TextEncoder().encode('<html>') }), post: async () => ({ status: 200, body: new Uint8Array() }) };
-    await expect(fetchRemotePack(notGit, 'https://github.com/o/r', { maxRefs: 100, maxPackBytes: 1024, timeoutMs: 5000 })).rejects.toThrow(/Smart HTTP/);
+    const notFound = {
+      get: async () => ({ status: 404, contentType: null, body: new Uint8Array() }),
+      post: async () => ({ status: 200, body: new Uint8Array() }),
+    };
+    await expect(
+      fetchRemotePack(notFound, 'https://github.com/o/r', { maxRefs: 100, maxPackBytes: 1024, timeoutMs: 5000 }),
+    ).rejects.toThrow(/advertise failed/);
+    const notGit = {
+      get: async () => ({ status: 200, contentType: 'text/html', body: new TextEncoder().encode('<html>') }),
+      post: async () => ({ status: 200, body: new Uint8Array() }),
+    };
+    await expect(fetchRemotePack(notGit, 'https://github.com/o/r', { maxRefs: 100, maxPackBytes: 1024, timeoutMs: 5000 })).rejects.toThrow(
+      /Smart HTTP/,
+    );
   });
 });
 
 describe('runImportJob', () => {
   it('imports into empty repos and records completion', async () => {
     const db = createRunnerDb({
-      imports: [{ id: 'j1', repository_id: 'r1', source_url: 'https://github.com/o/r', status: 'pending', error: null, refs_json: null, imported_refs: 0, created_by: 'a@b.c', created_at: 0, updated_at: 0 }],
+      imports: [
+        {
+          id: 'j1',
+          repository_id: 'r1',
+          source_url: 'https://github.com/o/r',
+          status: 'pending',
+          error: null,
+          refs_json: null,
+          imported_refs: 0,
+          created_by: 'a@b.c',
+          created_at: 0,
+          updated_at: 0,
+        },
+      ],
     });
     const importPack = vi.fn(async () => ({ importedRefs: ['refs/heads/main'] }));
     const stub = { listRefs: async () => ({ refs: [], symbolicHead: null }), importPack };
@@ -156,7 +181,20 @@ describe('runImportJob', () => {
 
   it('indexes the remote pack on success', async () => {
     const db = createRunnerDb({
-      imports: [{ id: 'j3', repository_id: 'r1', source_url: 'https://github.com/o/r', status: 'pending', error: null, refs_json: null, imported_refs: 0, created_by: 'a@b.c', created_at: 0, updated_at: 0 }],
+      imports: [
+        {
+          id: 'j3',
+          repository_id: 'r1',
+          source_url: 'https://github.com/o/r',
+          status: 'pending',
+          error: null,
+          refs_json: null,
+          imported_refs: 0,
+          created_by: 'a@b.c',
+          created_at: 0,
+          updated_at: 0,
+        },
+      ],
     });
     const importPack = vi.fn(async () => ({ importedRefs: ['refs/heads/main', 'refs/heads/feature', 'refs/tags/v1'] }));
     const stub = { listRefs: async () => ({ refs: [], symbolicHead: null }), importPack };
@@ -164,7 +202,10 @@ describe('runImportJob', () => {
     const realFetch = globalThis.fetch;
     globalThis.fetch = (async (url: string) => {
       if (String(url).includes('/info/refs')) {
-        return new Response(advertisement() as unknown as BodyInit, { status: 200, headers: { 'Content-Type': 'application/x-git-upload-pack-advertisement' } });
+        return new Response(advertisement() as unknown as BodyInit, {
+          status: 200,
+          headers: { 'Content-Type': 'application/x-git-upload-pack-advertisement' },
+        });
       }
       return new Response(packResponse() as unknown as BodyInit, { status: 200 });
     }) as typeof fetch;
@@ -178,8 +219,22 @@ describe('runImportJob', () => {
     expect(db.data.imports[0].imported_refs).toBe(3);
   });
 
-  it('refuses non-empty repos without fetching', async () => {    const db = createRunnerDb({
-      imports: [{ id: 'j2', repository_id: 'r1', source_url: 'https://github.com/o/r', status: 'pending', error: null, refs_json: null, imported_refs: 0, created_by: 'a@b.c', created_at: 0, updated_at: 0 }],
+  it('refuses non-empty repos without fetching', async () => {
+    const db = createRunnerDb({
+      imports: [
+        {
+          id: 'j2',
+          repository_id: 'r1',
+          source_url: 'https://github.com/o/r',
+          status: 'pending',
+          error: null,
+          refs_json: null,
+          imported_refs: 0,
+          created_by: 'a@b.c',
+          created_at: 0,
+          updated_at: 0,
+        },
+      ],
     });
     const importPack = vi.fn();
     const stub = { listRefs: async () => ({ refs: [{ ref: 'refs/heads/main', oid: OLD }], symbolicHead: 'refs/heads/main' }), importPack };
@@ -192,7 +247,14 @@ describe('runImportJob', () => {
 
   it('ignores unknown jobs', async () => {
     const db = createRunnerDb();
-    const env = { DB: db, REPO: { getByName: () => { throw new Error('must not be called'); } } } as unknown as Env;
+    const env = {
+      DB: db,
+      REPO: {
+        getByName: () => {
+          throw new Error('must not be called');
+        },
+      },
+    } as unknown as Env;
     await expect(runImportJob(env, 'alice/empty', 'missing')).resolves.toBeUndefined();
   });
 });
@@ -205,7 +267,21 @@ describe('runMirrorSync', () => {
   it('fast-forwards heads, creates tags, and skips diverged branches', async () => {
     const db = createRunnerDb({
       repos: [{ id: 'r1', owner: 'alice', name: 'demo' }],
-      mirrors: [{ repository_id: 'r1', source_url: 'https://github.com/o/r', interval_minutes: 60, enabled: 1, last_run_at: null, last_status: null, last_error: null, consecutive_failures: 0, created_by: 'a@b.c', created_at: 0, updated_at: 0 }],
+      mirrors: [
+        {
+          repository_id: 'r1',
+          source_url: 'https://github.com/o/r',
+          interval_minutes: 60,
+          enabled: 1,
+          last_run_at: null,
+          last_status: null,
+          last_error: null,
+          consecutive_failures: 0,
+          created_by: 'a@b.c',
+          created_at: 0,
+          updated_at: 0,
+        },
+      ],
     });
     // Local state: main behind, stale diverged branch, existing tag pinned.
     const local = [
@@ -243,7 +319,10 @@ describe('runMirrorSync', () => {
     globalThis.fetch = (async (url: string, init?: RequestInit) => {
       const target = String(url);
       if (target.includes('/info/refs')) {
-        return new Response(ad as unknown as BodyInit, { status: 200, headers: { 'Content-Type': 'application/x-git-upload-pack-advertisement' } });
+        return new Response(ad as unknown as BodyInit, {
+          status: 200,
+          headers: { 'Content-Type': 'application/x-git-upload-pack-advertisement' },
+        });
       }
       expect(target).toContain('/git-upload-pack');
       expect((init?.method ?? 'GET').toUpperCase()).toBe('POST');
@@ -269,7 +348,21 @@ describe('runMirrorSync', () => {
 
   it('cleans up mirrors whose repo is gone and skips disabled ones', async () => {
     const db = createRunnerDb({
-      mirrors: [{ repository_id: 'gone', source_url: 'https://github.com/o/r', interval_minutes: 60, enabled: 1, last_run_at: null, last_status: null, last_error: null, consecutive_failures: 0, created_by: 'a@b.c', created_at: 0, updated_at: 0 }],
+      mirrors: [
+        {
+          repository_id: 'gone',
+          source_url: 'https://github.com/o/r',
+          interval_minutes: 60,
+          enabled: 1,
+          last_run_at: null,
+          last_status: null,
+          last_error: null,
+          consecutive_failures: 0,
+          created_by: 'a@b.c',
+          created_at: 0,
+          updated_at: 0,
+        },
+      ],
     });
     const env = mirrorEnv(db, {});
     await runMirrorSync(env, 'gone');
@@ -277,9 +370,27 @@ describe('runMirrorSync', () => {
 
     const db2 = createRunnerDb({
       repos: [{ id: 'r1', owner: 'alice', name: 'demo' }],
-      mirrors: [{ repository_id: 'r1', source_url: 'https://github.com/o/r', interval_minutes: 60, enabled: 0, last_run_at: null, last_status: null, last_error: null, consecutive_failures: 0, created_by: 'a@b.c', created_at: 0, updated_at: 0 }],
+      mirrors: [
+        {
+          repository_id: 'r1',
+          source_url: 'https://github.com/o/r',
+          interval_minutes: 60,
+          enabled: 0,
+          last_run_at: null,
+          last_status: null,
+          last_error: null,
+          consecutive_failures: 0,
+          created_by: 'a@b.c',
+          created_at: 0,
+          updated_at: 0,
+        },
+      ],
     });
-    const stub = { listRefs: () => { throw new Error('must not be called'); } };
+    const stub = {
+      listRefs: () => {
+        throw new Error('must not be called');
+      },
+    };
     await runMirrorSync(mirrorEnv(db2, stub), 'r1');
     expect(db2.data.mirrors[0].last_status).toBeNull();
   });
@@ -287,7 +398,21 @@ describe('runMirrorSync', () => {
   it('records failures without throwing', async () => {
     const db = createRunnerDb({
       repos: [{ id: 'r1', owner: 'alice', name: 'demo' }],
-      mirrors: [{ repository_id: 'r1', source_url: 'https://github.com/o/r', interval_minutes: 60, enabled: 1, last_run_at: null, last_status: null, last_error: null, consecutive_failures: 0, created_by: 'a@b.c', created_at: 0, updated_at: 0 }],
+      mirrors: [
+        {
+          repository_id: 'r1',
+          source_url: 'https://github.com/o/r',
+          interval_minutes: 60,
+          enabled: 1,
+          last_run_at: null,
+          last_status: null,
+          last_error: null,
+          consecutive_failures: 0,
+          created_by: 'a@b.c',
+          created_at: 0,
+          updated_at: 0,
+        },
+      ],
     });
     const stub = {
       listRefs: async () => ({ refs: [], symbolicHead: null }),

@@ -67,7 +67,9 @@ describe('RealtimeWorker tickets', () => {
     const { worker } = makeWorker('repo:alice/demo');
     await expect(worker.issueTicket({ shard: 'bogus', channels: ['activity'] })).resolves.toMatchObject({ error: expect.any(String) });
     await expect(worker.issueTicket({ shard: 'repo:alice/demo', channels: [] })).resolves.toMatchObject({ error: expect.any(String) });
-    await expect(worker.issueTicket({ shard: 'repo:bob/other', channels: ['activity'] })).resolves.toMatchObject({ error: expect.any(String) });
+    await expect(worker.issueTicket({ shard: 'repo:bob/other', channels: ['activity'] })).resolves.toMatchObject({
+      error: expect.any(String),
+    });
   });
 
   it('mints single-use ticket records with TTL metadata', async () => {

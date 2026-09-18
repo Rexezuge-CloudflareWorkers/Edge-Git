@@ -99,7 +99,12 @@ export function CommitsView({
 
   return (
     <div>
-      <RepoHeader repo={repoData} activeTab="code" showSettings={false} onTabChange={(id: RepoTab) => navigate(`/${owner}/${repo}${id === 'code' ? '' : `?tab=${id}`}`)} />
+      <RepoHeader
+        repo={repoData}
+        activeTab="code"
+        showSettings={false}
+        onTabChange={(id: RepoTab) => navigate(`/${owner}/${repo}${id === 'code' ? '' : `?tab=${id}`}`)}
+      />
       <AppPage>
         <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('commits.history', 'Commit History')}</h1>
         <Card className="p-0 overflow-hidden">

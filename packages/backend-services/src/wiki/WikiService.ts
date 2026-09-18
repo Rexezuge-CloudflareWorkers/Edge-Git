@@ -153,7 +153,13 @@ class WikiService {
     // Optimistic-concurrency conflicts stay plain Errors with a
     // `revision conflict` prefix; routes map them to 409 (same pattern as
     // the git DO's 409 statuses — no ConflictError class exists).
-    const updated = await dao.updatePage(row.id, repositoryId, { title, body, expectedRevision }, authorEmail.toLowerCase(), TimestampUtil.getCurrentUnixTimestampInSeconds());
+    const updated = await dao.updatePage(
+      row.id,
+      repositoryId,
+      { title, body, expectedRevision },
+      authorEmail.toLowerCase(),
+      TimestampUtil.getCurrentUnixTimestampInSeconds(),
+    );
     return toMetadata(updated);
   }
 
@@ -170,7 +176,14 @@ class WikiService {
     const row = await dao.getBySlug(repositoryId, normalizeSlug(slug));
     if (!row) throw new NotFoundError('Wiki page not found');
     const rows = await dao.listRevisions(row.id).catch(() => []);
-    return rows.map((r) => ({ id: r.id, pageId: r.page_id, revision: r.revision, body: r.body, authorEmail: r.author_email, createdAt: r.created_at }));
+    return rows.map((r) => ({
+      id: r.id,
+      pageId: r.page_id,
+      revision: r.revision,
+      body: r.body,
+      authorEmail: r.author_email,
+      createdAt: r.created_at,
+    }));
   }
 
   public async searchPages(repositoryId: string, term: string, limit = 20): Promise<WikiPageMetadata[]> {
