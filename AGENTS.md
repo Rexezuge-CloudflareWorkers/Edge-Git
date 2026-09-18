@@ -2,13 +2,13 @@
 
 Edge-Git: Cloudflare Workers git server (`@edge-git/monorepo`, `pnpm@11.2.2`).
 
-- **Git core**: `packages/git-protocol` (pkt-line, v2 upload/v0 receive builders/parsers), `packages/git-service` (`GitService` + `IsoGitFs` over `dofs` + `isomorphic-git`).
-- **Storage**: `apps/background` `RepoWorker` DO (one per repo, `getByName(fullName)`, 5GB, `/repo` bare) + `CronTasksWorker` (`*/10 * * * *`, token prune); D1 `migrations/0001_squash.sql` + `migrations/0002_permissions.sql` (usernames, orgs, collaborators).
+- **Git core**: `packages/git-protocol` (pkt-line, v2 upload/v0 receive builders/parsers), `packages/git-service` (`GitService` facade + `IsoGitFs` over `dofs` via `DofsFsAdapter.createDofsFs` + `GitCache` mixin + `isomorphic-git`).
+- **Storage**: `apps/background` `RepoWorker` facade (one per repo, `getByName(fullName)`, 5GB, `/repo` bare; lifecycle in `RepoLifecycle`, reads in `RepoReadRpc`) + `CronTasksWorker` (`*/10 * * * *`, token prune); D1 `migrations/0001_squash.sql` + `migrations/0002_permissions.sql` (usernames, orgs, collaborators).
 - **Auth**: `/user/*` Cloudflare Access (`AccessAuthService`: DEMO→DEV→JWT→`ctx.access` fallback; never trust `Cf-Access-Authenticated-User-Email`); email login, globally-unique mutable username (`user ↔ org` single namespace); git anon (public fetch) + PAT Basic/Bearer (`TokenService`, sha256 `edge-git-pat:` prefix, `MAX_TOKENS_PER_USER=5`, inherits repo/org permissions).
 - **API**: `apps/api` Hono+Chanfana `EdgeGitWorker` (`/:owner/:repo/info/refs|git-upload-pack|git-receive-pack` + `/user/me|repos|orgs|tokens|issues` + `/users/:username` + `/health`, `/docs`); permissions `admin|write|read` (org `owner|member`, owner+member may create org repos); `apps/api/src/index.ts` re-exports DOs for bindings.
 - **Web**: `apps/web` Vite SPA, build embeds `dist/index.html` → `apps/api/src/generated/spa-shell.ts`.
-- **Composition**: per-request `createRequestScope(env)` from `@edge-git/backend-services/composition` (`scope.get(Tokens.X)` is the standard; the old `*Factory` shims were removed); `Container` + `createServiceContext` + `AppConfiguration` in `@edge-git/backend-runtime/di+config` are the DI foundation. See `docs/agents/runtime/AGENTS.md`.
-- **i18n**: backend strings in `packages/shared/src/i18n` (`en`, `zh-CN`) + web i18next (`SUPPORTED_LANGUAGES` 12 tags, `en`+`zh-CN` bundles shipped); English UI text uses Title Case. See `apps/web/AGENTS.md`.
+- **Composition**: single scope per request via `scopeMiddleware` (`getScope(c).get(Tokens.X)`; `createRequestScope(env)` is the composition root, table-driven DAO wiring + single `PermissionService` binding); `Container` + `createServiceContext` + `AppConfiguration` + `memoizeAsync`/`NullLogger`/`FixedClock` in `@edge-git/backend-runtime/di+config` are the DI foundation. See `docs/agents/runtime/AGENTS.md`.
+- **i18n**: backend strings in `packages/shared/src/i18n` (`en`, `zh-CN`, wired via `BaseRoute.toErrorResponse`) + web i18next (`SUPPORTED_LANGUAGES` 12 tags, `en`+`zh-CN` bundles shipped, single `canonicalizeLanguageTag` in `i18n.ts` + `repoTypes/pullTypes` split from `types.ts`); English UI text uses Title Case. See `apps/web/AGENTS.md`.
 
 ## Commands
 

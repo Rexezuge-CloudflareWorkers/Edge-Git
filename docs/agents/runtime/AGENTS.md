@@ -29,6 +29,7 @@ Add new env vars in `ConfigurationDefaults.ts` (+ `ConfigurationManager` getter 
 
 ## Dependency injection (`packages/backend-runtime/src/di/` + `config/`)
 
-- `AppConfiguration` — injectable instance view over env parsing (one method per setting); `ConfigurationManager` statics remain as thin facade. Prefer injecting `AppConfiguration` in new services; mock via constructor deps.
-- `Container` — minimal Factory + Singleton DI (`bind`/`bindValue`/`get`/`resolve`/`createChild`). `createRequestScope(env)` in `backend-services/composition` is the standard composition root (`scope.get(Tokens.X)`); the old `*Factory` shims were removed.
+- `AppConfiguration` — injectable instance view over env parsing (one method per setting, incl. `getMaxFileBytes`); `ConfigurationManager` statics remain as thin facade. Prefer injecting `AppConfiguration` in new services; mock via constructor deps.
+- `Container` — minimal Factory + Singleton DI (`bind`/`bindValue`/`get`/`resolve`/`createChild`). `createRequestScope(env)` in `backend-services/composition` is the standard composition root (table-driven lazy DAO wiring + single `PermissionService` binding; `scope.get(Tokens.X)`); the old `*Factory` shims were removed. `scopeMiddleware` installs a single scope per request (`getScope(c)`; `getRequestScope` fallback creates a fresh scope for helpers/tests).
 - `createServiceContext(env, overrides?)` — single request-scoped `{ env, logger, clock }`; prefer extending `ServiceContext` over new `*Env` interfaces; never reintroduce `as` env casts.
+- Helpers: `memoizeAsync` (composition-root memoization), `NullLogger`/`FixedClock` (test doubles), `setRequestScope/getRequestScope/getServiceContext` (request plumbing).

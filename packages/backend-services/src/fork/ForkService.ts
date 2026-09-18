@@ -9,6 +9,7 @@ import {
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
+import { EmailAddress } from '@edge-git/shared/utils';
 import { PermissionService } from '../permission/PermissionService';
 import { RepoService } from '../repo/RepoService';
 
@@ -24,6 +25,7 @@ interface ForkServiceDeps {
   organizationMemberDAO?: () => Promise<OrganizationMemberDAO>;
   repoCollaboratorDAO?: () => Promise<RepoCollaboratorDAO>;
   namespaceDAO?: () => Promise<NamespaceDAO>;
+  permissionService?: () => Promise<PermissionService>;
 }
 
 /**
@@ -39,6 +41,17 @@ class ForkService {
     private readonly env: ForkServiceEnv,
     deps: ForkServiceDeps = {},
   ) {
+    const permissionService =
+      deps.permissionService ??
+      ((): Promise<PermissionService> =>
+        Promise.resolve(
+          new PermissionService(this.env, {
+            organizationDAO: deps.organizationDAO ?? (() => Promise.resolve(new OrganizationDAO(env.DB))),
+            organizationMemberDAO: deps.organizationMemberDAO ?? (() => Promise.resolve(new OrganizationMemberDAO(env.DB))),
+            repoCollaboratorDAO: deps.repoCollaboratorDAO ?? (() => Promise.resolve(new RepoCollaboratorDAO(env.DB))),
+            namespaceDAO: deps.namespaceDAO ?? (() => Promise.resolve(new NamespaceDAO(env.DB))),
+          }),
+        ));
     this.deps = {
       repositoryDAO: () => Promise.resolve(new RepositoryDAO(env.DB)),
       userDAO: () => Promise.resolve(new UserDAO(env.DB)),
@@ -46,6 +59,7 @@ class ForkService {
       organizationMemberDAO: () => Promise.resolve(new OrganizationMemberDAO(env.DB)),
       repoCollaboratorDAO: () => Promise.resolve(new RepoCollaboratorDAO(env.DB)),
       namespaceDAO: () => Promise.resolve(new NamespaceDAO(env.DB)),
+      permissionService,
       ...deps,
     };
   }
@@ -58,27 +72,24 @@ class ForkService {
       organizationMemberDAO: this.deps.organizationMemberDAO,
       repoCollaboratorDAO: this.deps.repoCollaboratorDAO,
       namespaceDAO: this.deps.namespaceDAO,
+      permissionService: this.deps.permissionService,
     });
   }
 
-  private permissionService(): PermissionService {
-    return new PermissionService(this.env, {
-      organizationDAO: this.deps.organizationDAO,
-      organizationMemberDAO: this.deps.organizationMemberDAO,
-      repoCollaboratorDAO: this.deps.repoCollaboratorDAO,
-      namespaceDAO: this.deps.namespaceDAO,
-    });
+  private permission(): Promise<PermissionService> {
+    return this.deps.permissionService();
   }
 
   private async resolveDefaultOwner(userEmail: string): Promise<string> {
+    const normalized = EmailAddress.normalize(userEmail);
     try {
       const userDao = await this.deps.userDAO();
-      const user = await userDao.getByEmail(userEmail.toLowerCase());
+      const user = await userDao.getByEmail(normalized);
       if (user?.username) return user.username;
     } catch {
       // ignore — fall back to email prefix below
     }
-    return userEmail.split('@', 1)[0];
+    return normalized.split('@', 1)[0] ?? normalized;
   }
 
   /**
@@ -95,7 +106,8 @@ class ForkService {
     const dao = await this.deps.repositoryDAO();
     const source = await dao.getByOwnerAndName(sourceOwner, sourceName);
     if (!source) throw new NotFoundError('Repository not found');
-    const role = await this.permissionService().getRole(forkerEmail, source);
+    const permission = await this.permission();
+    const role = await permission.getRole(forkerEmail, source);
     if (!role) throw new NotFoundError('Repository not found');
 
     const destOwner = (dest.owner ?? '').trim() || (await this.resolveDefaultOwner(forkerEmail));

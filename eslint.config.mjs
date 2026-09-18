@@ -249,7 +249,10 @@ export default tseslint.config(
       }],
     },
   },
-  // Layer 5: apps/api — route through backend-services, not directly to git-service
+  // Layer 5: apps/api — route through backend-services, not directly to git-service.
+  // Exception: apps/api/src/index.ts re-exports RepoWorker/CronTasksWorker/etc.
+  // from @edge-git/background for DO bindings (mirrors Otter's api→background
+  // binding exception); no other api→background value imports are used.
   {
     files: ['apps/api/**/*.{ts,js}'],
     rules: {

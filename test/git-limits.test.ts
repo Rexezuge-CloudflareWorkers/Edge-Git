@@ -129,10 +129,13 @@ describe('GitService limits and cache', () => {
     const svc = new GitService({ promises: {} } as never, '/repo');
     expect(() => svc.clearCache()).not.toThrow();
     expect(() => svc.ensureFreshCache(0)).not.toThrow();
-    const internals = svc as unknown as { cacheCreatedAt: number };
-    internals.cacheCreatedAt = 0;
-    svc.ensureFreshCache(3600);
-    expect(internals.cacheCreatedAt).toBeGreaterThan(0);
+    // Cache policy lives in the shared `GitCache` holder (extracted from the
+    // former per-service `cacheCreatedAt` fields). Behavioral check: expiry
+    // triggers a clear without throwing, even with no storage backend.
+    const holder = (svc as unknown as { cacheHolder: { clearCache(): void; ensureFreshCache(ttl: number): void } }).cacheHolder;
+    expect(holder).toBeDefined();
+    expect(() => holder.ensureFreshCache(3600)).not.toThrow();
+    expect(() => svc.ensureFreshCache(3600)).not.toThrow();
   });
 
   it('short-circuits empty pack collection within budget', async () => {

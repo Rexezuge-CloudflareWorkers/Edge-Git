@@ -1,5 +1,6 @@
 import type { IsoGitFs } from './IsoGitFs';
 import type { RefUpdateResult } from '@edge-git/git-protocol';
+import { GitCache } from './GitCache';
 import { RefService } from './RefService';
 import { ObjectReader } from './ObjectReader';
 import { PackCollector } from './PackCollector';
@@ -22,8 +23,7 @@ export class GitService {
   private readonly merger: MergeService;
   private readonly writer: WriteService;
 
-  private cache: object = {};
-  private cacheCreatedAt = Date.now();
+  private readonly cacheHolder = new GitCache();
 
   constructor(fs: PromiseFsClient, gitdir: string) {
     this.fs = fs;
@@ -37,8 +37,7 @@ export class GitService {
   }
 
   public clearCache(): void {
-    this.cache = {};
-    this.cacheCreatedAt = Date.now();
+    this.cacheHolder.clearCache();
     this.objects.clearCache();
     this.packs.clearCache();
     this.history.clearCache();
@@ -46,9 +45,13 @@ export class GitService {
   }
 
   public ensureFreshCache(ttlSeconds: number): void {
-    if (!Number.isFinite(ttlSeconds) || ttlSeconds <= 0) return;
-    if (Date.now() - this.cacheCreatedAt > ttlSeconds * 1000) {
-      this.clearCache();
+    const before = this.cacheHolder.getCache();
+    this.cacheHolder.ensureFreshCache(ttlSeconds);
+    if (this.cacheHolder.getCache() !== before) {
+      this.objects.clearCache();
+      this.packs.clearCache();
+      this.history.clearCache();
+      this.merger.clearCache();
     }
   }
 

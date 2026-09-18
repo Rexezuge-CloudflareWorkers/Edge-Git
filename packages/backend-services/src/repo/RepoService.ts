@@ -26,19 +26,17 @@ import {
 import type { RepositoryRow, RepoRole } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError, ForbiddenError, NotFoundError } from '@edge-git/backend-errors';
-import { ConfigurationManager } from '@edge-git/backend-runtime/config';
+import { AppConfiguration } from '@edge-git/backend-runtime/config';
 import { isReservedNamespaceName } from '@edge-git/shared/constants';
-import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
+import { EmailAddress, RepoFullName, TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 import { PermissionService } from '../permission/PermissionService';
 import { cleanupRepoSidecars } from './repoCleanup';
+import { RepoVisibilityService } from './RepoVisibilityService';
 
 interface RepoServiceEnv {
   DB: D1Queryable;
   MAX_REPOS_PER_USER?: string;
 }
-
-const OWNER_RE = /^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$/i;
-const REPO_RE = /^[\w.-]{1,100}$/i;
 
 interface RepoServiceDeps {
   repositoryDAO?: () => Promise<RepositoryDAO>;
@@ -64,15 +62,29 @@ interface RepoServiceDeps {
   deployKeyDAO?: () => Promise<DeployKeyDAO>;
   tokenGrantDAO?: () => Promise<TokenRepoGrantDAO>;
   securitySettingsDAO?: () => Promise<SecuritySettingsDAO>;
+  permissionService?: () => Promise<PermissionService>;
+  config?: AppConfiguration;
 }
 
 class RepoService {
   private readonly deps: Required<RepoServiceDeps>;
+  private readonly visibility: RepoVisibilityService;
 
   constructor(
     private readonly env: RepoServiceEnv,
     deps: RepoServiceDeps = {},
   ) {
+    const permissionService =
+      deps.permissionService ??
+      ((): Promise<PermissionService> =>
+        Promise.resolve(
+          new PermissionService(this.env, {
+            organizationDAO: deps.organizationDAO ?? (() => Promise.resolve(new OrganizationDAO(env.DB))),
+            organizationMemberDAO: deps.organizationMemberDAO ?? (() => Promise.resolve(new OrganizationMemberDAO(env.DB))),
+            repoCollaboratorDAO: deps.repoCollaboratorDAO ?? (() => Promise.resolve(new RepoCollaboratorDAO(env.DB))),
+            namespaceDAO: deps.namespaceDAO ?? (() => Promise.resolve(new NamespaceDAO(env.DB))),
+          }),
+        ));
     this.deps = {
       repositoryDAO: () => Promise.resolve(new RepositoryDAO(env.DB)),
       issueDAO: () => Promise.resolve(new IssueDAO(env.DB)),
@@ -97,50 +109,56 @@ class RepoService {
       deployKeyDAO: () => Promise.resolve(new DeployKeyDAO(env.DB)),
       tokenGrantDAO: () => Promise.resolve(new TokenRepoGrantDAO(env.DB)),
       securitySettingsDAO: () => Promise.resolve(new SecuritySettingsDAO(env.DB)),
+      permissionService,
+      config: AppConfiguration.fromEnv(env),
       ...deps,
     };
+    this.visibility = new RepoVisibilityService({
+      repositoryDAO: this.deps.repositoryDAO,
+      organizationDAO: this.deps.organizationDAO,
+      organizationMemberDAO: this.deps.organizationMemberDAO,
+      repoCollaboratorDAO: this.deps.repoCollaboratorDAO,
+      permissionService: this.deps.permissionService,
+    });
   }
 
   public static normalizeOwner(owner: string): string {
-    return owner.trim();
+    return RepoFullName.normalizeOwner(owner);
   }
 
   public static normalizeRepo(name: string): string {
-    const n = name.trim();
-    return n.endsWith('.git') ? n.slice(0, -4) : n;
+    return RepoFullName.normalizeRepo(name);
   }
 
   public static validateNames(owner: string, name: string): void {
-    if (!OWNER_RE.test(owner) || !REPO_RE.test(name)) {
+    try {
+      RepoFullName.parse(owner, name);
+    } catch {
       throw new BadRequestError('Invalid owner or repository name');
     }
-    if (isReservedNamespaceName(owner)) {
+    if (isReservedNamespaceName(owner.trim())) {
       throw new BadRequestError('Username is reserved');
     }
   }
 
-  private permissionService(): PermissionService {
-    return new PermissionService(this.env, {
-      organizationDAO: this.deps.organizationDAO,
-      organizationMemberDAO: this.deps.organizationMemberDAO,
-      repoCollaboratorDAO: this.deps.repoCollaboratorDAO,
-      namespaceDAO: this.deps.namespaceDAO,
-    });
+  private async permission(): Promise<PermissionService> {
+    return this.deps.permissionService();
   }
 
   public async getRole(viewerEmail: string | null, repo: RepositoryRow | null): Promise<RepoRole | null> {
-    return this.permissionService().getRole(viewerEmail, repo);
+    return this.visibility.getRole(viewerEmail, repo);
   }
 
   private async resolveCallerUsernameCi(userEmail: string): Promise<string | null> {
+    const normalized = EmailAddress.normalize(userEmail);
     try {
       const userDao = await this.deps.userDAO();
-      const user = await userDao.getByEmail(userEmail.toLowerCase());
+      const user = await userDao.getByEmail(normalized);
       if (user?.username) return user.username.toLowerCase();
     } catch {
       // ignore — fall back to email prefix below
     }
-    const prefix = userEmail.split('@', 1)[0].toLowerCase();
+    const prefix = normalized.split('@', 1)[0]?.toLowerCase() ?? '';
     return prefix || null;
   }
 
@@ -160,14 +178,14 @@ class RepoService {
       throw new BadRequestError('Repository already exists');
     }
     const owned = await dao.listByOwnerEmail(userEmail, 1000).catch(() => []);
-    const max = ConfigurationManager.repo.getMaxPerUser(this.env);
+    const max = this.deps.config.getMaxReposPerUser();
     if (owned.length >= max) {
       throw new BadRequestError(`Maximum ${max} repositories per user`);
     }
 
     const ownerCi = normalizedOwner.toLowerCase();
     const callerCi = await this.resolveCallerUsernameCi(userEmail);
-    const callerEmail = userEmail.toLowerCase();
+    const callerEmail = EmailAddress.normalize(userEmail);
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const id = UUIDUtil.getRandomUUID();
 
@@ -249,62 +267,7 @@ class RepoService {
   }
 
   public async listVisibleForUser(userEmail: string, limit = 100): Promise<RepositoryRow[]> {
-    const dao = await this.deps.repositoryDAO();
-    const seen = new Map<string, RepositoryRow>();
-    const pushAll = (rows: RepositoryRow[]): void => {
-      for (const row of rows) {
-        if (!seen.has(row.id)) seen.set(row.id, row);
-      }
-    };
-    pushAll(await dao.listByOwnerEmail(userEmail, limit).catch(() => []));
-    try {
-      const usernameCi = await this.resolveCallerUsernameCi(userEmail);
-      if (usernameCi) {
-        // Username-indexed listing catches renames where owner_email stayed stale.
-        const byOwner = await dao.listByOwner(usernameCi, limit).catch(() => []);
-        pushAll(byOwner);
-      }
-    } catch {
-      // ignore
-    }
-    // Org repos where the user is a member/owner.
-    try {
-      const memberDAO = await this.deps.organizationMemberDAO();
-      const orgDao = await this.deps.organizationDAO();
-      const memberships = await memberDAO.listOrgsByUser(userEmail).catch(() => []);
-      for (const m of memberships.slice(0, 50)) {
-        const rows = await dao.listByOrgId(m.org_id, limit).catch(() => []);
-        pushAll(rows);
-        // Legacy org repos without org_id backfill: include by owner username.
-        try {
-          const org = await orgDao.getById(m.org_id);
-          if (org) pushAll(await dao.listByOwner(org.username, limit).catch(() => []));
-        } catch {
-          // ignore
-        }
-      }
-    } catch {
-      // ignore
-    }
-    // Explicit collaborator grants.
-    try {
-      const collabDAO = await this.deps.repoCollaboratorDAO();
-      const grants = await collabDAO.listByUser(userEmail, 500).catch(() => []);
-      for (const g of grants.slice(0, 200)) {
-        const repo = await dao.getById(g.repo_id).catch(() => null);
-        if (repo) pushAll([repo]);
-      }
-    } catch {
-      // ignore
-    }
-    // Filter to actually-visible (drops private org repos the member cannot see).
-    const visible: RepositoryRow[] = [];
-    for (const repo of seen.values()) {
-      const role = await this.getRole(userEmail, repo).catch(() => null);
-      if (role) visible.push(repo);
-    }
-    visible.sort((a, b) => b.updated_at - a.updated_at);
-    return visible.slice(0, limit);
+    return this.visibility.listVisibleForUser(userEmail, (email) => this.resolveCallerUsernameCi(email), limit);
   }
 
   public async requireRole(
@@ -313,19 +276,7 @@ class RepoService {
     viewerEmail: string | null,
     minimum: RepoRole,
   ): Promise<{ repo: RepositoryRow; role: RepoRole }> {
-    const dao = await this.deps.repositoryDAO();
-    const repo = await dao.getByOwnerAndName(owner, name);
-    if (!repo) throw new NotFoundError('Repository not found');
-    const role = await this.getRole(viewerEmail, repo);
-    if (!role) {
-      // Private repos hide existence; public repos report forbidden for write/admin needs.
-      if (repo.is_private === 1) throw new NotFoundError('Repository not found');
-      throw new ForbiddenError('Only the repository owner can perform this action');
-    }
-    if (!PermissionService.meets(role, minimum)) {
-      throw new ForbiddenError('Only the repository owner can perform this action');
-    }
-    return { repo, role };
+    return this.visibility.requireRole(owner, name, viewerEmail, minimum);
   }
 
   public async requireOwner(owner: string, name: string, userEmail: string): Promise<RepositoryRow> {

@@ -11,8 +11,8 @@ import {
 import type { OrganizationRow, RepoRole, TeamMemberRole, TeamRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError, ForbiddenError, NotFoundError } from '@edge-git/backend-errors';
-import { ConfigurationManager } from '@edge-git/backend-runtime/config';
-import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
+import { AppConfiguration } from '@edge-git/backend-runtime/config';
+import { EmailAddress, TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 
 interface TeamServiceEnv {
   DB: D1Queryable;
@@ -30,6 +30,7 @@ interface TeamServiceDeps {
   userDAO?: () => Promise<UserDAO>;
   repositoryDAO?: () => Promise<RepositoryDAO>;
   repoCollaboratorDAO?: () => Promise<RepoCollaboratorDAO>;
+  config?: AppConfiguration;
 }
 
 const TEAM_SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$/i;
@@ -50,6 +51,7 @@ class TeamService {
       userDAO: () => Promise.resolve(new UserDAO(env.DB)),
       repositoryDAO: () => Promise.resolve(new RepositoryDAO(env.DB)),
       repoCollaboratorDAO: () => Promise.resolve(new RepoCollaboratorDAO(env.DB)),
+      config: AppConfiguration.fromEnv(env),
       ...deps,
     };
   }
@@ -62,14 +64,14 @@ class TeamService {
 
   private async requireOrg(username: string): Promise<OrganizationRow> {
     const dao = await this.deps.organizationDAO();
-    const org = await dao.getByUsernameCi(username.toLowerCase());
+    const org = await dao.getByUsernameCi(EmailAddress.normalize(username));
     if (!org) throw new NotFoundError('Organization not found');
     return org;
   }
 
   private async orgRole(orgId: string, userEmail: string): Promise<'owner' | 'member' | null> {
     const dao = await this.deps.organizationMemberDAO();
-    const row = await dao.get(orgId, userEmail.toLowerCase());
+    const row = await dao.get(orgId, EmailAddress.normalize(userEmail));
     return row?.role ?? null;
   }
 
@@ -107,11 +109,11 @@ class TeamService {
 
   public async resolveEmail(usernameOrEmail: string): Promise<string> {
     const raw = usernameOrEmail.trim();
-    if (raw.includes('@')) return raw.toLowerCase();
+    if (raw.includes('@')) return EmailAddress.normalize(raw);
     const userDAO = await this.deps.userDAO();
-    const user = await userDAO.getByUsernameCi(raw.toLowerCase());
+    const user = await userDAO.getByUsernameCi(EmailAddress.normalize(raw));
     if (!user) throw new NotFoundError('User not found');
-    return user.email.toLowerCase();
+    return EmailAddress.normalize(user.email);
   }
 
   public async createTeam(orgUsername: string, actorEmail: string, input: { slug: string; name?: string; description?: string | null }): Promise<TeamRow> {
@@ -123,7 +125,7 @@ class TeamService {
     const existing = await dao.getByOrgAndSlug(org.id, slug.toLowerCase()).catch(() => null);
     if (existing) throw new BadRequestError('Team already exists');
     const count = await dao.countByOrg(org.id).catch(() => 0);
-    const max = ConfigurationManager.teams.getMaxPerOrg(this.env);
+    const max = this.deps.config.getMaxTeamsPerOrg();
     if (count >= max) throw new BadRequestError(`Maximum of ${max} teams reached`);
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const id = UUIDUtil.getRandomUUID();
@@ -184,7 +186,7 @@ class TeamService {
     const existing = await memberDAO.get(team.id, targetEmail).catch(() => null);
     if (!existing) {
       const count = await memberDAO.listByTeam(team.id, 10_000).then((rows) => rows.length).catch(() => 0);
-      const max = ConfigurationManager.teams.getMaxMembers(this.env);
+      const max = this.deps.config.getMaxTeamMembers();
       if (count >= max) throw new BadRequestError(`Maximum of ${max} team members reached`);
     }
     await memberDAO.upsert(team.id, targetEmail, role, TimestampUtil.getCurrentUnixTimestampInSeconds());
@@ -261,7 +263,7 @@ class TeamService {
     const existing = await grantDAO.get(team.id, repoId).catch(() => null);
     if (!existing) {
       const count = await grantDAO.countByTeam(team.id).catch(() => 0);
-      const max = ConfigurationManager.teams.getMaxGrants(this.env);
+      const max = this.deps.config.getMaxTeamGrants();
       if (count >= max) throw new BadRequestError(`Maximum of ${max} repository grants reached`);
     }
     await grantDAO.upsert(team.id, repoId, role, actorEmail.toLowerCase(), TimestampUtil.getCurrentUnixTimestampInSeconds());

@@ -25,6 +25,7 @@ export { SearchDAO } from './SearchDAO';
 export type { CodeHit, SearchOptions } from './SearchDAO';
 export { CollaborationDAO } from './CollaborationDAO';
 export type { LabelRow, MilestoneRow, PullReviewerRow } from './CollaborationDAO';
+export { CollaborationQueries, DEFAULT_PRUNE_BATCH_SIZE, computeUnixCutoffSeconds, computeDateCutoffIso, pruneInBatches } from './CollaborationQueries';
 export { StarDAO } from './StarDAO';
 export { WatchDAO } from './WatchDAO';
 export { EventDAO } from './EventDAO';

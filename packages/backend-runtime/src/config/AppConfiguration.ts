@@ -23,6 +23,7 @@ import {
   DEFAULT_MAX_FETCH_BODY_BYTES,
   DEFAULT_MAX_FETCH_HAVES,
   DEFAULT_MAX_FETCH_WANTS,
+  DEFAULT_MAX_FILE_BYTES,
   DEFAULT_MAX_FILES_PER_SNIPPET,
   DEFAULT_MAX_HOOKS_PER_REPO,
   DEFAULT_MAX_IMPORT_BYTES,
@@ -124,6 +125,10 @@ class AppConfiguration {
 
   public getMaxMergeDiffFiles(): number {
     return EnvParser.positiveInt(this.env, 'MAX_MERGE_DIFF_FILES', DEFAULT_MAX_MERGE_DIFF_FILES);
+  }
+
+  public getMaxFileBytes(): number {
+    return EnvParser.positiveInt(this.env, 'MAX_FILE_BYTES', DEFAULT_MAX_FILE_BYTES);
   }
 
   public getMaxRulesPerRepo(): number {

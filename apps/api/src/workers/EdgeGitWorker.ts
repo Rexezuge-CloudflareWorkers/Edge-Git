@@ -3,6 +3,7 @@ import { fromHono } from 'chanfana';
 import type { HonoOpenAPIRouterType } from 'chanfana';
 import { Hono } from 'hono';
 import { MiddlewareHandlers } from '@/middleware';
+import { scopeMiddleware } from '@/middleware/scopeMiddleware';
 import { RESERVED_NAMESPACE_NAMES } from '@edge-git/shared/constants';
 import { SPA_HTML } from '@/generated/spa-shell';
 import { registerGitRoutes } from './routes/GitRoutes';
@@ -60,6 +61,10 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     app.get('/user', (c) => c.redirect('/user/' + new URL(c.req.url).search));
     app.get('/health', (c) => c.json({ ok: true, service: 'edge-git' }));
 
+    // Single-scope-per-request composition root (Otter pattern). Installed
+    // first so every handler resolves via `getScope(c)` instead of minting
+    // N containers per request.
+    app.use('*', scopeMiddleware);
     // Immediate webhook dispatch runs after mutating handlers via
     // `waitUntil` (cron retries the rest). Registered before the routes so
     // Hono executes the middleware first.

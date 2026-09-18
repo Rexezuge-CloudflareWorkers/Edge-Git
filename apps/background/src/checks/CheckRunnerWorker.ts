@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { CheckRunDAO } from '@edge-git/backend-data/dao';
+import type { CheckRunDAO } from '@edge-git/backend-data/dao';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { parseCodeowners } from '@edge-git/backend-services/collab';
 import { isBuiltInCheckContext, parseRequiredGlobs, runCodeownersStep, runDiffLimitStep, runRequiredFilesStep, runSecretScanStep } from '@edge-git/backend-services/checks';
@@ -90,7 +90,8 @@ class CheckRunnerWorker extends DurableObject<Env> {
   }
 
   private async processItem(item: PendingItem): Promise<void> {
-    const dao = new CheckRunDAO(this.env.DB);
+    // Composition root (never `new XDAO(env.DB)` inline per AGENTS).
+    const dao = await createRequestScope(this.env as never).get(Tokens.CheckRunDAO)();
     const fullName = await this.resolveFullName(item.repositoryId);
     const repoStub = this.env.REPO.getByName(fullName ?? item.repositoryId) as unknown as RepoStubShape;
     // Definitions load once per batch; absent means every custom context in

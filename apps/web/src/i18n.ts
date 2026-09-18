@@ -36,6 +36,13 @@ function canonicalizeTag(tag: string): string {
   return [language, ...rest].join('-');
 }
 
+// Single canonicalizer for BCP 47-ish tags (`en_us` → `en-US`).
+// `lib/locale.ts` delegates here so normalization lives in one place (Otter
+// single-source pattern); previously the same 10-line body was duplicated.
+export function canonicalizeLanguageTag(tag: string): string {
+  return canonicalizeTag(tag);
+}
+
 export function normalizeLanguage(tag: string | null | undefined): SupportedLanguage {
   if (!tag || typeof tag !== 'string') return 'en';
   const canonical = canonicalizeTag(tag);

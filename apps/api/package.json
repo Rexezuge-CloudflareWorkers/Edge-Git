@@ -13,7 +13,6 @@
     "@edge-git/backend-services": "workspace:*",
     "@edge-git/background": "workspace:*",
     "@edge-git/git-protocol": "workspace:*",
-    "@edge-git/git-service": "workspace:*",
     "@edge-git/shared": "workspace:*",
     "chanfana": "3.4.0",
     "hono": "4.13.7",

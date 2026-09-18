@@ -2,7 +2,7 @@ import { IssueDAO, RepositoryDAO, SearchDAO } from '@edge-git/backend-data/dao';
 import type { CodeHit, DiscussionRow, IssueRow, PullRequestRow, RepositoryRow, SnippetRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError } from '@edge-git/backend-errors';
-import { TimestampUtil } from '@edge-git/shared/utils';
+import { EmailAddress, TimestampUtil } from '@edge-git/shared/utils';
 import { PermissionService } from '../permission/PermissionService';
 
 interface SearchServiceEnv {
@@ -76,18 +76,30 @@ class SearchService {
 
   private permissionServiceSync(): PermissionService {
     // Fast path for visibility checks when deps use default construction.
+    // Injected `permissionService` thunk is preferred; this fallback only
+    // exists for legacy direct `new SearchService(env)` call sites.
     return new PermissionService(this.env);
+  }
+
+  private static normalizeViewer(viewerEmail: string | null): string | null {
+    if (!viewerEmail) return null;
+    try {
+      return EmailAddress.normalize(viewerEmail);
+    } catch {
+      return viewerEmail;
+    }
   }
 
   public async searchRepos(query: string, viewerEmail: string | null, limit = 20): Promise<RepositoryRow[]> {
     const q = SearchService.sanitizeQuery(query);
+    const viewer = SearchService.normalizeViewer(viewerEmail);
     const dao = await this.deps.searchDAO();
     // Over-fetch candidates, then filter private rows via PermissionService.
     const candidates = await dao.searchRepos(q, { limit: Math.min(limit * 3, MAX_LIMIT) });
     const permission = await this.deps.permissionService().catch(() => this.permissionServiceSync());
     const visible: RepositoryRow[] = [];
     for (const row of candidates) {
-      const role = await permission.getRole(viewerEmail, row).catch(() => null);
+      const role = await permission.getRole(viewer, row).catch(() => null);
       if (role) visible.push(row);
       if (visible.length >= limit) break;
     }
@@ -100,6 +112,7 @@ class SearchService {
     opts: { limit?: number; repoId?: string } = {},
   ): Promise<IssueRow[]> {
     const q = SearchService.sanitizeQuery(query);
+    const viewer = SearchService.normalizeViewer(viewerEmail);
     const limit = SearchService.clampLimit(opts.limit ?? 20);
     const dao = await this.deps.searchDAO();
     const candidates = await dao.searchIssues(q, { limit: Math.min(limit * 3, MAX_LIMIT), repoId: opts.repoId });
@@ -114,7 +127,7 @@ class SearchService {
         repoCache.set(issue.repository_id, repo ?? null);
       }
       if (!repo) continue;
-      const role = await permission.getRole(viewerEmail, repo).catch(() => null);
+      const role = await permission.getRole(viewer, repo).catch(() => null);
       if (role) visible.push(issue);
       if (visible.length >= limit) break;
     }
@@ -127,6 +140,7 @@ class SearchService {
     opts: { limit?: number; repoId?: string } = {},
   ): Promise<PullRequestRow[]> {
     const q = SearchService.sanitizeQuery(query);
+    const viewer = SearchService.normalizeViewer(viewerEmail);
     const limit = SearchService.clampLimit(opts.limit ?? 20);
     const dao = await this.deps.searchDAO();
     const candidates = await dao.searchPulls(q, { limit: Math.min(limit * 3, MAX_LIMIT), repoId: opts.repoId });
@@ -141,7 +155,7 @@ class SearchService {
         repoCache.set(pull.repository_id, repo ?? null);
       }
       if (!repo) continue;
-      const role = await permission.getRole(viewerEmail, repo).catch(() => null);
+      const role = await permission.getRole(viewer, repo).catch(() => null);
       if (role) visible.push(pull);
       if (visible.length >= limit) break;
     }
@@ -154,6 +168,7 @@ class SearchService {
     opts: { limit?: number; repoId?: string } = {},
   ): Promise<Array<CodeHit & { snippet: string }>> {
     const q = SearchService.sanitizeQuery(query);
+    const viewer = SearchService.normalizeViewer(viewerEmail);
     const limit = SearchService.clampLimit(opts.limit ?? 20);
     const dao = await this.deps.searchDAO();
     const candidates = await dao.searchCode(q, { limit: Math.min(limit * 3, MAX_LIMIT), repoId: opts.repoId });
@@ -169,7 +184,7 @@ class SearchService {
         repoCache.set(hit.repo_id, repo ?? null);
       }
       if (!repo) continue;
-      const role = await permission.getRole(viewerEmail, repo).catch(() => null);
+      const role = await permission.getRole(viewer, repo).catch(() => null);
       if (!role) continue;
       visible.push({ ...hit, snippet: SearchService.buildSnippet(hit.content, firstToken) });
       if (visible.length >= limit) break;
@@ -209,6 +224,7 @@ class SearchService {
     opts: { limit?: number; repoId?: string } = {},
   ): Promise<DiscussionRow[]> {
     const q = SearchService.sanitizeQuery(query);
+    const viewer = SearchService.normalizeViewer(viewerEmail);
     const limit = SearchService.clampLimit(opts.limit ?? 20);
     const dao = await this.deps.searchDAO();
     const candidates = await dao.searchDiscussions(q, { limit: Math.min(limit * 3, MAX_LIMIT), repoId: opts.repoId });
@@ -223,7 +239,7 @@ class SearchService {
         repoCache.set(discussion.repository_id, repo ?? null);
       }
       if (!repo) continue;
-      const role = await permission.getRole(viewerEmail, repo).catch(() => null);
+      const role = await permission.getRole(viewer, repo).catch(() => null);
       if (role) visible.push(discussion);
       if (visible.length >= limit) break;
     }
