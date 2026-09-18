@@ -131,6 +131,14 @@ function toServiceStatus(error: unknown): 400 | 403 | 404 | 500 {
   return toMappedStatus(error);
 }
 
+// Mask internal details on 500: callers must use this instead of echoing
+// `error.message` directly, otherwise D1/DO internals leak to clients.
+function toSafeErrorMessage(error: unknown, fallback: string): string {
+  const status = toServiceStatus(error);
+  if (status === 500) return fallback;
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
 export {
   toRepoJson,
   requireVisibleRepo,
@@ -139,5 +147,6 @@ export {
   withPublicRepo,
   withVisibleRepo,
   toServiceStatus,
+  toSafeErrorMessage,
   getScope,
 };

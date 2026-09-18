@@ -1,15 +1,14 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
+import { parsePositiveInt } from '@edge-git/shared/validation';
 import { recordAndNotify } from './SocialEmit';
-import { requireVisibleRepo, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 
 type DiscussionApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
-function parseNumber(raw: string): number | null {
-  const n = Number(raw);
-  if (!Number.isSafeInteger(n) || n < 1) return null;
-  return n;
+function parseNumber(raw: string | undefined): number | null {
+  return parsePositiveInt(raw ?? null);
 }
 
 function registerDiscussionPublicRoutes(app: DiscussionApp): void {
@@ -46,7 +45,7 @@ function registerDiscussionPublicRoutes(app: DiscussionApp): void {
         const result = await createRequestScope(c.env).get(Tokens.DiscussionService).getDiscussionWithComments(row.id, number);
         return c.json(result);
       } catch (error) {
-        return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+        return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
       }
     });
   });
@@ -100,7 +99,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
       });
       return c.json({ discussion }, 201);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to create discussion' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to create discussion') }, toServiceStatus(error));
     }
   });
 
@@ -114,7 +113,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
       const result = await createRequestScope(c.env).get(Tokens.DiscussionService).getDiscussionWithComments(row.id, number);
       return c.json(result);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -161,7 +160,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
       }
       return c.json({ discussion });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to update discussion' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to update discussion') }, toServiceStatus(error));
     }
   });
 
@@ -185,7 +184,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
       await scope.get(Tokens.DiscussionService).deleteDiscussion(row.id, number);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -213,7 +212,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
       });
       return c.json({ comment }, 201);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to add comment' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to add comment') }, toServiceStatus(error));
     }
   });
 
@@ -236,7 +235,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
       await scope.get(Tokens.DiscussionService).deleteComment(row.id, number, c.req.param('commentId'));
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 }

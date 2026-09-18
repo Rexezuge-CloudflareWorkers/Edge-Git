@@ -1,12 +1,13 @@
 import type { Hono } from 'hono';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { getRepoStub } from '../repoStub';
-import { requireVisibleRepo, toServiceStatus } from './PublicViewerResolver';
+import { requireVisibleRepo, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
-import { branchNameSchema } from '@edge-git/shared/validation';
+import { branchNameSchema, decodeBase64Strict, sanitizeCommitMessage } from '@edge-git/shared/validation';
 import { scanBytes } from '@edge-git/backend-services/security';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
+import { readJsonBody } from './BodyParser';
 
 type RepoApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -93,16 +94,7 @@ async function resolveAuthorName(env: Env, email: string): Promise<string> {
 }
 
 function decodeBase64(input: string): Uint8Array | null {
-  try {
-    const clean = input.replaceAll(/\s/g, '');
-    if (clean.length % 4 === 1 || !/^[a-z0-9+/]*={0,2}$/i.test(clean)) return null;
-    const binary = atob(clean);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.codePointAt(i) ?? 0;
-    return bytes;
-  } catch {
-    return null;
-  }
+  return decodeBase64Strict(input);
 }
 
 function isSafeFilePath(path: string): boolean {
@@ -150,13 +142,14 @@ function registerFileWriteRoutes(app: RepoApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    const body = (await c.req.json().catch(() => ({}))) as {
+    const { malformed, body } = await readJsonBody<{
       branch?: string;
       path?: string;
       contentBase64?: string;
       message?: string;
       expectedOid?: string | null;
-    };
+    }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     const branch = (body.branch ?? '').trim();
     if (!branch) return c.json({ error: 'branch is required' }, 400);
     if (!branchNameSchema.safeParse(branch).success) return c.json({ error: 'Invalid branch name' }, 400);
@@ -183,8 +176,7 @@ function registerFileWriteRoutes(app: RepoApp): void {
       const secret = await checkSecretContent(c.env, gate.repo.id, content);
       if (secret && 'blocked' in secret) return c.json({ error: secret.blocked.error }, 403);
       const secretWarning = secret && 'warning' in secret ? secret.warning : 0;
-      const rawMessage = typeof body.message === 'string' ? body.message.trim() : '';
-      const message = (rawMessage || `Update ${filePath}`).slice(0, 1000);
+      const message = sanitizeCommitMessage(body.message, `Update ${filePath}`);
       const result = (await getRepoStub(c.env, `${owner}/${repoName}`).commitFile({
         branch,
         path: filePath,
@@ -202,7 +194,7 @@ function registerFileWriteRoutes(app: RepoApp): void {
         c.header('X-EdgeGit-Secret-Warning', `${secretWarning} possible secret(s) detected; rotate any exposed credentials`);
       return c.json(out, status);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to save file' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to save file') }, toServiceStatus(error));
     }
   });
 
@@ -226,8 +218,7 @@ function registerFileWriteRoutes(app: RepoApp): void {
       if (!gate.ok) return c.json({ error: gate.status === 404 ? 'Not found' : 'Forbidden' }, gate.status);
       const blocked = await checkProtectedBranch(c.env, gate.repo.id, branch);
       if (blocked) return c.json({ error: blocked.error }, 403);
-      const rawMessage = (params.get('message') ?? '').trim();
-      const message = (rawMessage || `Delete ${filePath}`).slice(0, 1000);
+      const message = sanitizeCommitMessage(params.get('message'), `Delete ${filePath}`);
       const result = (await getRepoStub(c.env, `${owner}/${repoName}`).commitFile({
         branch,
         path: filePath,
@@ -247,7 +238,7 @@ function registerFileWriteRoutes(app: RepoApp): void {
       }
       return c.json(out, status);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to delete file' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to delete file') }, toServiceStatus(error));
     }
   });
 }

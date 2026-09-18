@@ -1,15 +1,14 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
+import { parsePositiveInt } from '@edge-git/shared/validation';
 import { recordAndNotify } from './SocialEmit';
-import { requireVisibleRepo, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 
 type ProjectApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
-function parseProjectNumber(raw: string): number | null {
-  const n = Number(raw);
-  if (!Number.isSafeInteger(n) || n < 1) return null;
-  return n;
+function parseProjectNumber(raw: string | undefined): number | null {
+  return parsePositiveInt(raw ?? null);
 }
 
 function registerProjectPublicRoutes(app: ProjectApp): void {
@@ -32,7 +31,7 @@ function registerProjectPublicRoutes(app: ProjectApp): void {
         const board = await createRequestScope(c.env).get(Tokens.ProjectService).getProjectBoard(row.id, number);
         return c.json(board);
       } catch (error) {
-        return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+        return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
       }
     });
   });
@@ -78,7 +77,7 @@ function registerProjectUserRoutes(app: ProjectApp): void {
       });
       return c.json({ project }, 201);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to create project' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to create project') }, toServiceStatus(error));
     }
   });
 
@@ -92,7 +91,7 @@ function registerProjectUserRoutes(app: ProjectApp): void {
       const board = await createRequestScope(c.env).get(Tokens.ProjectService).getProjectBoard(row.id, number);
       return c.json(board);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -130,7 +129,7 @@ function registerProjectUserRoutes(app: ProjectApp): void {
       }
       return c.json({ project });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to update project' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to update project') }, toServiceStatus(error));
     }
   });
 
@@ -151,7 +150,7 @@ function registerProjectUserRoutes(app: ProjectApp): void {
       await createRequestScope(c.env).get(Tokens.ProjectService).deleteProject(row.id, number);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -175,7 +174,7 @@ function registerProjectUserRoutes(app: ProjectApp): void {
         .createColumn(row.id, number, body as { title: unknown });
       return c.json({ column }, 201);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to create column' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to create column') }, toServiceStatus(error));
     }
   });
 
@@ -199,7 +198,7 @@ function registerProjectUserRoutes(app: ProjectApp): void {
         .renameColumn(row.id, number, c.req.param('columnId'), body as { title: unknown });
       return c.json({ column });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to rename column' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to rename column') }, toServiceStatus(error));
     }
   });
 
@@ -220,7 +219,7 @@ function registerProjectUserRoutes(app: ProjectApp): void {
       await createRequestScope(c.env).get(Tokens.ProjectService).deleteColumn(row.id, number, c.req.param('columnId'));
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -249,7 +248,7 @@ function registerProjectUserRoutes(app: ProjectApp): void {
       const card = await createRequestScope(c.env).get(Tokens.ProjectService).createCard(row.id, number, body, email);
       return c.json({ card }, 201);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to create card' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to create card') }, toServiceStatus(error));
     }
   });
 
@@ -271,7 +270,7 @@ function registerProjectUserRoutes(app: ProjectApp): void {
       const card = await createRequestScope(c.env).get(Tokens.ProjectService).moveCard(row.id, number, c.req.param('cardId'), body);
       return c.json({ card });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to move card' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to move card') }, toServiceStatus(error));
     }
   });
 
@@ -295,7 +294,7 @@ function registerProjectUserRoutes(app: ProjectApp): void {
         .setCardArchived(row.id, number, c.req.param('cardId'), body.archived);
       return c.json({ card });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to update card' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to update card') }, toServiceStatus(error));
     }
   });
 
@@ -316,7 +315,7 @@ function registerProjectUserRoutes(app: ProjectApp): void {
       await createRequestScope(c.env).get(Tokens.ProjectService).deleteCard(row.id, number, c.req.param('cardId'));
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 }

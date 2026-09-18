@@ -2,7 +2,7 @@ import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { SearchService } from '@edge-git/backend-services/search';
 import { RepoService } from '@edge-git/backend-services/repo';
-import { requireVisibleRepo, resolvePublicViewer, toRepoJson, toServiceStatus } from './PublicViewerResolver';
+import { requireVisibleRepo, resolvePublicViewer, toRepoJson, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import type { RequestContext } from '@/middleware';
 
 type SearchApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -17,7 +17,13 @@ function badQuery(c: { json: (body: unknown, status?: number) => Response }, mes
 function registerSearchRoutes(app: SearchApp): void {
   app.get('/search', async (c) => {
     const url = new URL(c.req.url);
-    const q = (url.searchParams.get('q') ?? '').trim();
+    const rawQ = (url.searchParams.get('q') ?? '').trim();
+    if (!rawQ) return badQuery(c, 'q is required');
+    if (rawQ.length > 200) return badQuery(c, 'q must be at most 200 characters');
+    const q = [...rawQ].filter((ch) => {
+      const code = ch.codePointAt(0) ?? 0;
+      return code > 0x1f && code !== 0x7f;
+    }).join('').trim();
     if (!q) return badQuery(c, 'q is required');
     const type = SearchService.parseType(url.searchParams.get('type'));
     const limit = SearchService.clampLimit(url.searchParams.get('limit'));
@@ -84,7 +90,7 @@ function registerSearchRoutes(app: SearchApp): void {
       const repos = await svc.searchRepos(q, viewerEmail, limit);
       return c.json({ type, query: q, repos: repos.map((r) => toRepoJson(r)) });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Search failed';
+      const message = toSafeErrorMessage(error, 'Search failed');
       if (message.includes('at least 2 characters') || message.includes('at most')) return badQuery(c, message);
       return c.json({ error: message }, toServiceStatus(error));
     }

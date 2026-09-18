@@ -11,7 +11,7 @@ import type { ReleaseAssetStore } from './ReleaseAssetStore';
 import type { RepoLifecycle } from './RepoLifecycle';
 import type { RepoReadRpc } from './RepoReadRpc';
 import { createRepoWorkerDeps } from './RepoWorkerFactory';
-import { PackLimitError } from '@edge-git/git-service';
+import { RepoFullName } from '@edge-git/shared/utils';
 
 // NOTE: intentionally still extends the real `DurableObject` rather than
 // `AbstractDurableObjectWorker` (see return notes): the abstract base does
@@ -89,6 +89,9 @@ class RepoWorker extends DurableObject<Env> {
 
   public async setFullName(fullName: string): Promise<void> {
     if (this.fullNameValue) return;
+    const [owner, ...rest] = fullName.split('/');
+    const name = rest.join('/');
+    if (!owner || !name || !RepoFullName.tryParse(owner, name)) throw new Error('Invalid repository full name');
     this.fullNameValue = fullName;
     await this.ctx.storage.put('fullName', fullName);
   }
@@ -115,7 +118,12 @@ class RepoWorker extends DurableObject<Env> {
 
     if (pathname === '/ensure' && request.method === 'POST') {
       const body = (await request.json().catch(() => ({}))) as { fullName?: string };
-      if (body.fullName) {
+      if (typeof body.fullName === 'string' && body.fullName) {
+        const [owner, ...rest] = body.fullName.split('/');
+        const name = rest.join('/');
+        if (!owner || !name || !RepoFullName.tryParse(owner, name)) {
+          return new Response('Invalid fullName', { status: 400 });
+        }
         await this.setFullName(body.fullName);
       }
       this.ensureDeviceSize();
@@ -312,4 +320,5 @@ class RepoWorker extends DurableObject<Env> {
   }
 }
 
-export { RepoWorker, PackLimitError };
+export { RepoWorker };
+export { PackLimitError } from '@edge-git/git-service';

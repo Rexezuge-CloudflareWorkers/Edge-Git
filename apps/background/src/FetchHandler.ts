@@ -186,7 +186,7 @@ class FetchHandler {
           if (error instanceof PackLimitError) {
             return buildFetchErrorResponse(error.message, 413);
           }
-          return buildFetchErrorResponse(`pack-objects failed: ${(error as Error).message}`, 500);
+          return buildFetchErrorResponse('pack-objects failed: internal error', 500);
         }
       }
 

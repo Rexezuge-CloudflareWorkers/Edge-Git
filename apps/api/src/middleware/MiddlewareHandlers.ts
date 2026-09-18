@@ -245,9 +245,10 @@ class MiddlewareHandlers {
     } catch (error: unknown) {
       if (error instanceof UnauthorizedError || error instanceof ForbiddenError) {
         const message = error instanceof Error ? error.message : 'Unauthorized';
-        return c.json({ error: message }, 401);
+        const status = error instanceof ForbiddenError ? 403 : 401;
+        return c.json({ error: message }, status as 401);
       }
-      return c.json({ error: 'Internal error' }, 401);
+      return c.json({ error: 'Internal error' }, 500);
     }
   }
 }
