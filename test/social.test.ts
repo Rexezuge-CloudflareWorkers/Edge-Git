@@ -334,7 +334,7 @@ describe('social services', () => {
     });
     // creator has no role → skipped; watcher + mentioned notified; actor excluded.
     expect(inserted.sort()).toEqual(['mentioned@example.com', 'watcher@example.com']);
-    expect(result).toEqual({ notified: 2 });
+    expect(result).toEqual({ notified: 2, recipients: ['watcher@example.com', 'mentioned@example.com'] });
   });
 });
 

@@ -63,6 +63,7 @@ import type { StarService } from '../social/StarService';
 import type { WatchService } from '../social/WatchService';
 import type { CollaborationService } from '../collab/CollaborationService';
 import type { ReleaseService } from '../release/ReleaseService';
+import type { RealtimeService } from '../realtime/RealtimeService';
 import type { SearchDAO } from '@edge-git/backend-data/dao';
 
 // Central token registry for the per-request composition root
@@ -142,6 +143,7 @@ const Tokens = {
   WebhookDeliveryService: Symbol('WebhookDeliveryService') as Token<WebhookDeliveryService>,
   CollaborationService: Symbol('CollaborationService') as Token<CollaborationService>,
   ReleaseService: Symbol('ReleaseService') as Token<ReleaseService>,
+  RealtimeService: Symbol('RealtimeService') as Token<RealtimeService>,
   ProjectService: Symbol('ProjectService') as Token<ProjectService>,
   DiscussionService: Symbol('DiscussionService') as Token<DiscussionService>,
   WikiService: Symbol('WikiService') as Token<WikiService>,

@@ -722,5 +722,10 @@
     "userAgent": "用户代理",
     "empty": "暂无审计记录。",
     "failedToLoad": "加载审计日志失败。"
+  },
+  "realtime": {
+    "live": "实时",
+    "viewingCount": "{{count}} 人正在查看",
+    "typing": "{{names}} 正在输入…"
   }
 }

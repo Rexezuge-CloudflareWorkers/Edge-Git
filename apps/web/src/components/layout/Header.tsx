@@ -5,6 +5,7 @@ import { Bell, GitBranch, Plus } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { LanguageSelector } from '../shared/LanguageSelector';
 import { getUnreadCount } from '../../services/notificationService';
+import { useRealtimeSubscription } from '../../realtime/useRealtime';
 
 export function Header({
   userEmail,
@@ -44,6 +45,18 @@ export function Header({
       clearInterval(timer);
     };
   }, [userEmail]);
+
+  // Live inbox: any notification event refreshes the count immediately; the
+  // 60s poll above stays as the fallback when sockets are unavailable.
+  useRealtimeSubscription({
+    enabled: userEmail !== null,
+    ticket: { kind: 'inbox' },
+    onEvent: () => {
+      void getUnreadCount()
+        .then((count) => setUnread(count))
+        .catch(() => undefined);
+    },
+  });
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--color-border)] bg-[var(--color-surface-base)]/95 backdrop-blur">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4">

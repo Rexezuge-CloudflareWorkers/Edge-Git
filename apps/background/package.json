@@ -9,6 +9,8 @@
     "./RepoWorker": "./src/RepoWorker.ts",
     "./CronTasksWorker": "./src/CronTasksWorker.ts",
     "./CheckRunnerWorker": "./src/checks/CheckRunnerWorker.ts",
+    "./RealtimeWorker": "./src/realtime/RealtimeWorker.ts",
+    "./realtime/*": "./src/realtime/*.ts",
     "./checks/*": "./src/checks/*.ts",
     "./PushHandler": "./src/PushHandler.ts",
     "./scheduled": "./src/scheduled/index.ts",

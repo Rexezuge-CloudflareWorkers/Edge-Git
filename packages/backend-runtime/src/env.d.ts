@@ -7,6 +7,8 @@ declare global {
     DB: any;
     REPO: any;
     CRON_TASKS: any;
+    CHECK_RUNNER: any;
+    REALTIME: any;
     DEBUG_MODE?: string;
     DEV_AUTH_EMAIL?: string;
     DEMO_MODE?: string;
@@ -32,6 +34,10 @@ declare global {
     MAX_TEAMS_PER_ORG?: string;
     MAX_TEAM_MEMBERS?: string;
     MAX_TEAM_GRANTS?: string;
+    REALTIME_ENABLED?: string;
+    REALTIME_TICKET_TTL_SECONDS?: string;
+    REALTIME_MAX_CONN_PER_REPO_SHARD?: string;
+    REALTIME_MAX_CONN_PER_INBOX_SHARD?: string;
   }
 
   type CloudflareEnv = Env;

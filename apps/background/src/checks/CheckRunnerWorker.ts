@@ -11,6 +11,7 @@ import { createLogger } from '@edge-git/backend-runtime/logger';
 import { decodeBlobToText, loadCheckDefinition, loadCheckScript } from './CheckDefinition';
 import type { CustomCheckDefinition, LoadedDefinition } from './CheckDefinition';
 import { runCustomCheckScript } from './CustomJsSandbox';
+import { publishCheckLive } from './CheckLivePublish';
 
 const logger = createLogger('CheckRunner');
 
@@ -366,6 +367,7 @@ class CheckRunnerWorker extends DurableObject<Env> {
         extra: { check_run_id: runId, context, conclusion, title },
       })
       .catch(() => undefined);
+    await publishCheckLive(this.env, fullName, item, { runId, context, conclusion, title }).catch(() => undefined);
   }
 }
 

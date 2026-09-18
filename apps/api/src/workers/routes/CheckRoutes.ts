@@ -2,7 +2,7 @@ import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { getCheckRunnerStub } from '../checkStub';
-import { emitWebhookEvent } from './SocialEmit';
+import { emitWebhookEvent, publishCheckUpdate } from './SocialEmit';
 import { requireVisibleRepo, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 
 type CheckApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -132,6 +132,14 @@ function registerCheckUserRoutes(app: CheckApp): void {
         action: 'created',
         extra: { check_run_id: run.id, context: run.context, status: run.status },
       });
+      await publishCheckUpdate(c.env, {
+        fullName,
+        headSha: run.headSha,
+        context: run.context,
+        status: run.status,
+        actorEmail: email,
+        checkId: run.id,
+      });
       return c.json({ check: toCheckJson(run) }, 201);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to report check';
@@ -185,6 +193,15 @@ function registerCheckUserRoutes(app: CheckApp): void {
           extra: { check_run_id: run.id, context: run.context, status: run.status, conclusion: run.conclusion },
         });
       }
+      await publishCheckUpdate(c.env, {
+        fullName: `${row.owner}/${row.name}`,
+        headSha: run.headSha,
+        context: run.context,
+        status: run.status,
+        conclusion: run.conclusion,
+        actorEmail: email,
+        checkId: run.id,
+      });
       return c.json({ check: toCheckJson(run) });
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : 'Failed to update check' }, toServiceStatus(error));

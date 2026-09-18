@@ -46,6 +46,10 @@ import {
   DEFAULT_MAX_TOKEN_REPO_GRANTS,
   DEFAULT_MAX_WIKI_BODY_BYTES,
   DEFAULT_MAX_WIKI_PAGES_PER_REPO,
+  DEFAULT_REALTIME_ENABLED,
+  DEFAULT_REALTIME_MAX_CONN_PER_INBOX_SHARD,
+  DEFAULT_REALTIME_MAX_CONN_PER_REPO_SHARD,
+  DEFAULT_REALTIME_TICKET_TTL_SECONDS,
   DEFAULT_SITE_URL,
   DEFAULT_WEBHOOK_DELIVERY_RETENTION_DAYS,
   DEFAULT_WEBHOOK_MAX_ATTEMPTS,
@@ -280,6 +284,22 @@ class AppConfiguration {
 
   public isDemoMode(): boolean {
     return EnvParser.boolean(this.env, 'DEMO_MODE', 'false');
+  }
+
+  public isRealtimeEnabled(): boolean {
+    return EnvParser.boolean(this.env, 'REALTIME_ENABLED', DEFAULT_REALTIME_ENABLED);
+  }
+
+  public getRealtimeTicketTtlSeconds(): number {
+    return EnvParser.positiveInt(this.env, 'REALTIME_TICKET_TTL_SECONDS', DEFAULT_REALTIME_TICKET_TTL_SECONDS);
+  }
+
+  public getRealtimeMaxConnPerRepoShard(): number {
+    return EnvParser.positiveInt(this.env, 'REALTIME_MAX_CONN_PER_REPO_SHARD', DEFAULT_REALTIME_MAX_CONN_PER_REPO_SHARD);
+  }
+
+  public getRealtimeMaxConnPerInboxShard(): number {
+    return EnvParser.positiveInt(this.env, 'REALTIME_MAX_CONN_PER_INBOX_SHARD', DEFAULT_REALTIME_MAX_CONN_PER_INBOX_SHARD);
   }
 }
 

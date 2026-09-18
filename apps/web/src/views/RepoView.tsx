@@ -175,7 +175,7 @@ export function RepoView({
         {visibleTab === 'releases' && (
           <ReleasesTab owner={owner} repo={repo} canWrite={authorized ?? false} showNotice={showNotice} onCountChange={setReleaseCount} authorized={authorized} />
         )}
-        {visibleTab === 'activity' && <ActivityTab owner={owner} repo={repo} showNotice={showNotice} />}
+        {visibleTab === 'activity' && <ActivityTab owner={owner} repo={repo} showNotice={showNotice} authorized={authorized} />}
         {visibleTab === 'settings' && (
           <RepoSettingsTab
             key={`${repoData.description ?? ''}:${repoData.isPrivate}`}

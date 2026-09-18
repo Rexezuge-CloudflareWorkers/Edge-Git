@@ -722,5 +722,10 @@
     "userAgent": "User Agent",
     "empty": "No Audit Entries Yet.",
     "failedToLoad": "Failed To Load Audit Log."
+  },
+  "realtime": {
+    "live": "Live",
+    "viewingCount": "{{count}} Viewing",
+    "typing": "{{names}} Typing…"
   }
 }

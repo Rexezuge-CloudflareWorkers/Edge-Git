@@ -57,6 +57,7 @@ const RESERVED_NAMESPACE_NAMES_LIST: readonly string[] = [
   'assets',
   'static',
   'public',
+  'realtime',
   'dashboard',
   'home',
   'profile',

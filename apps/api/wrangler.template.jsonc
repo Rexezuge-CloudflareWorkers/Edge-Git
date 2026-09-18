@@ -35,6 +35,10 @@
       {
         "name": "CHECK_RUNNER",
         "class_name": "CheckRunnerWorker"
+      },
+      {
+        "name": "REALTIME",
+        "class_name": "RealtimeWorker"
       }
     ]
   },
@@ -46,6 +50,10 @@
     {
       "tag": "v1000000001",
       "new_sqlite_classes": ["CheckRunnerWorker"]
+    },
+    {
+      "tag": "v1000000002",
+      "new_sqlite_classes": ["RealtimeWorker"]
     }
   ],
   "d1_databases": [
@@ -104,6 +112,10 @@
     "CHECK_CUSTOMJS_MAX_CPU_MS": "5000",
     "CHECK_CUSTOMJS_MAX_SCRIPT_BYTES": "65536",
     "CHECK_CUSTOMJS_MAX_FETCHES": "5",
-    "CHECK_CUSTOMJS_MEMORY_MB": "16"
+    "CHECK_CUSTOMJS_MEMORY_MB": "16",
+    "REALTIME_ENABLED": "false",
+    "REALTIME_TICKET_TTL_SECONDS": "30",
+    "REALTIME_MAX_CONN_PER_REPO_SHARD": "100",
+    "REALTIME_MAX_CONN_PER_INBOX_SHARD": "1000"
   }
 }

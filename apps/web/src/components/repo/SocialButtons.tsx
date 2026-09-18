@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Eye, Star } from 'lucide-react';
 import { getStarState, getWatchState, starRepo, unstarRepo, unwatchRepo, watchRepo } from '../../services/socialService';
+import { useRealtimeSubscription } from '../../realtime/useRealtime';
 import { cn } from '../../lib/utils';
 
 export function SocialButtons({
@@ -41,6 +42,25 @@ export function SocialButtons({
       cancelled = true;
     };
   }, [owner, repo]);
+
+  const refreshCounts = useCallback(async () => {
+    try {
+      const [stars, watches] = await Promise.all([getStarState(owner, repo), getWatchState(owner, repo)]);
+      setStarsCount(stars.starsCount ?? stars.count ?? 0);
+      setWatchersCount(watches.watchersCount ?? watches.count ?? 0);
+    } catch {
+      // best-effort
+    }
+  }, [owner, repo]);
+
+  // Live star/watch counts for signed-in viewers.
+  useRealtimeSubscription({
+    enabled: authorized === true,
+    ticket: { kind: 'repo', owner, repo, channels: ['activity'] },
+    onEvent: (event) => {
+      if (event.type === 'repo.starred' || event.type === 'repo.watching') void refreshCounts();
+    },
+  });
 
   const requireAuth = (): boolean => {
     if (authorized !== true) {

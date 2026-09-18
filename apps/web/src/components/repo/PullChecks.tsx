@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import type { CheckRun } from '../../types';
 import { listChecks } from '../../services/checkService';
 import type { CheckCombinedState } from '../../services/checkService';
+import { checksChannel } from '../../realtime/protocol';
+import { useRealtimeSubscription } from '../../realtime/useRealtime';
 import { Badge } from '../ui/Badge';
 import { RefreshButton } from '../shared/RefreshButton';
 
@@ -18,7 +20,7 @@ function labelFor(run: CheckRun): string {
   return run.conclusion ?? run.status;
 }
 
-export function PullChecks({ owner, repo, headOid }: { owner: string; repo: string; headOid: string | null }) {
+export function PullChecks({ owner, repo, headOid, authorized }: { owner: string; repo: string; headOid: string | null; authorized?: boolean | null }) {
   const { t } = useTranslation();
   const [runs, setRuns] = useState<CheckRun[]>([]);
   const [state, setState] = useState<CheckCombinedState>('pending');
@@ -47,6 +49,20 @@ export function PullChecks({ owner, repo, headOid }: { owner: string; repo: stri
       cancelled = true;
     };
   }, [owner, repo, headOid, reloadKey]);
+
+  // Live check updates: any `check_run` event on this SHA refetches the list,
+  // so the badge flips without a manual refresh. Signed-in viewers only
+  // (ticket issuance requires auth); everyone else keeps the button.
+  const channel = headOid ? checksChannel(headOid) : null;
+  useRealtimeSubscription({
+    enabled: channel !== null && authorized === true,
+    ticket: { kind: 'repo', owner, repo, channels: channel ? [channel] : [] },
+    onEvent: (event) => {
+      if (event.type !== 'check_run.updated' && event.type !== 'check_run.queued') return;
+      setLoading(true);
+      setReloadKey((k) => k + 1);
+    },
+  });
 
   if (!headOid) return null;
 
