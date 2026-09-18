@@ -143,6 +143,9 @@ class RepoWorker extends DurableObject<Env> {
 
   public async deleteRepo(): Promise<void> {
     await this.lifecycle.deleteRepo();
+    // The name binding is gone from storage: drop the in-memory guard too so
+    // a later recreate of the same name re-persists it via `setFullName`.
+    this.fullNameValue = undefined;
   }
 
   public async ensureRepoInitialized(): Promise<void> {

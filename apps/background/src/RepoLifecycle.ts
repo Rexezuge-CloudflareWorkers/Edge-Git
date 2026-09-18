@@ -33,7 +33,20 @@ class RepoLifecycle {
   }
 
   public async deleteRepo(): Promise<void> {
-    await this.ctx.storage.deleteAll();
+    // Targeted purge: remove repo content + release assets + name binding but
+    // preserve the dofs schema tables (`dofs_files/dofs_chunks/dofs_meta`).
+    // `ctx.storage.deleteAll()` also drops those tables while the warm DO
+    // isolate (reused via `REPO.getByName(fullName)`) keeps its `Fs` instance,
+    // whose schema bootstrap runs only once in the constructor — a later
+    // recreate of the same name then fails with `no such table: dofs_files`.
+    for (const path of ['/repo', '/release-assets']) {
+      try {
+        await this.isoGitFs.promises.rmdir(path, { recursive: true });
+      } catch {
+        // Best-effort: path may not exist (never pushed / no assets).
+      }
+    }
+    await this.ctx.storage.delete('fullName');
   }
 
   public async ensureRepoInitialized(): Promise<void> {
