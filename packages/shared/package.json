@@ -14,7 +14,9 @@
     "./realtime": "./src/realtime/index.ts",
     "./realtime/*": "./src/realtime/*.ts",
     "./utils": "./src/utils/index.ts",
-    "./utils/*": "./src/utils/*.ts"
+    "./utils/*": "./src/utils/*.ts",
+    "./validation": "./src/validation/index.ts",
+    "./validation/*": "./src/validation/*.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

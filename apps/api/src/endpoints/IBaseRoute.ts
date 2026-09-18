@@ -25,7 +25,7 @@ abstract class BaseRoute {
     }
   }
 
-  public static toErrorResponse(_c: HonoContext, error: unknown): Response {
+  public static toErrorResponse(c: HonoContext, error: unknown): Response {
     if (error instanceof ServiceError) {
       const code = error.getErrorCode();
       const body = {
@@ -36,8 +36,20 @@ abstract class BaseRoute {
     }
     // Untyped errors are masked as 500; log the cause server-side only.
     console.error('Unhandled route error', error instanceof Error ? error.message : error);
-    const strings = getBackendStrings('en');
-    return Response.json({ error: 'InternalError', message: strings.common.forbidden }, { status: 500 });
+    const locale = this.resolveLocale(c);
+    const strings = getBackendStrings(locale);
+    return Response.json({ error: 'InternalError', message: strings.common.internalError }, { status: 500 });
+  }
+
+  private static resolveLocale(c: HonoContext): string {
+    try {
+      const header = c.req.header('Accept-Language');
+      if (!header) return 'en';
+      const first = header.split(',', 1)[0]?.split(';', 1)[0]?.trim();
+      return first && first.length > 0 ? first : 'en';
+    } catch {
+      return 'en';
+    }
   }
 
   protected json(c: HonoContext, data: unknown, status = 200): Response {

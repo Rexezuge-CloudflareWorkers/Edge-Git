@@ -45,3 +45,22 @@ export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
 export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
   return apiPost<T>(path, body, 'PUT');
 }
+
+export { buildQuery };
+
+export function unwrapList<T>(data: Record<string, T[] | undefined>, key: string): T[] {
+  return data[key] ?? [];
+}
+
+export async function apiAuthedFirst<T>(authedPath: string, publicPath: string, isAuthed?: boolean | null): Promise<T> {
+  // Anonymous viewers hit Cloudflare Access on /user/* (302 → cross-origin
+  // login HTML → CORS failure). Skip the wasted authed attempt entirely.
+  if (isAuthed === false) {
+    return apiGet<T>(publicPath);
+  }
+  try {
+    return await apiGet<T>(authedPath);
+  } catch {
+    return apiGet<T>(publicPath);
+  }
+}

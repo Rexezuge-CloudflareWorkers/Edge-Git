@@ -1,4 +1,4 @@
-import type { TokenScope } from './types';
+export type TokenScope = 'repo:read' | 'repo:write' | 'admin';
 
 export interface TokenRepoGrant {
   tokenId: string;

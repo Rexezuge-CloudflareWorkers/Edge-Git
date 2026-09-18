@@ -2,6 +2,7 @@ import { Context, Next } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import type { AccessIdentityContext, AuthenticatedToken } from '@edge-git/backend-services/auth';
 import { coversScope } from '@edge-git/backend-services/auth';
+import { RoleRank } from '@edge-git/backend-services/permission';
 import { AuditService } from '@edge-git/backend-services/audit';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { getBasicCredentials, getBearerToken } from '@edge-git/git-protocol';
@@ -12,10 +13,16 @@ type RequestContext = Context<{ Bindings: Env; Variables: { AuthenticatedUserEma
 
 function getScope(c: RequestContext): ReturnType<typeof createRequestScope> {
   try {
-    return getRequestScope(c as never) as ReturnType<typeof createRequestScope>;
+    return getRequestScope(c as never);
   } catch {
-    return createRequestScope(c.env as never);
+    // Fallback preserves unit-test helpers that invoke handlers without
+    // `scopeMiddleware`. Production requests always have a scope installed.
+    return createRequestScope(c.env);
   }
+}
+
+function resolveScope(c: RequestContext): ReturnType<typeof createRequestScope> {
+  return getScope(c);
 }
 
 async function authenticateUserIdentity(c: RequestContext): Promise<string> {
@@ -137,9 +144,7 @@ async function gitAuthForRepo(
     }
     const role = await permission.getRole(userEmail, repo);
     if (!role) return unauthorizedGit();
-    const rank = role === 'admin' ? 3 : role === 'write' ? 2 : 1;
-    const need = minimum === 'write' ? 2 : 1;
-    if (rank < need) {
+    if (!RoleRank.meets(role, minimum)) {
       return new Response('Forbidden', { status: 403 });
     }
     try {
@@ -190,7 +195,9 @@ async function activityAuditHandler(c: RequestContext, next: Next): Promise<Resp
         email = 'unknown';
       }
       const event = AuditService.buildRequestEvent(c.req.raw, email, status);
-      const scope = createRequestScope(c.env);
+      // Reuse the per-request scope so audit uses the same memoized
+      // singletons (no second Secrets Store round-trip).
+      const scope = resolveScope(c);
       const record = scope.get(Tokens.AuditService).record(event);
       const waitUntil = (c.executionCtx as ExecutionContext | undefined)?.waitUntil?.bind(c.executionCtx);
       if (typeof waitUntil === 'function') {

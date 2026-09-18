@@ -1,28 +1,58 @@
 import type { GitService } from '@edge-git/git-service';
 import { PackLimitError } from '@edge-git/git-service';
 import type { IsoGitFs } from '@edge-git/git-service';
+import type { AppConfiguration } from '@edge-git/backend-runtime/config';
 import type { ReadModelService } from './ReadModelService';
 import type { ReleaseAssetStore } from './ReleaseAssetStore';
 
 type IsoGitFsClient = ReturnType<IsoGitFs['getPromiseFsClient']>;
+
+interface RepoReadRpcDeps {
+  git: GitService;
+  readModel: ReadModelService;
+  prepare: () => Promise<void>;
+  config: AppConfiguration;
+  isoGitFs?: IsoGitFsClient;
+  releaseAssets?: ReleaseAssetStore;
+  getLimits?: () => { maxObjects: number; maxPackBytes: number };
+}
 
 /**
  * Read-model RPC fan-out for `RepoWorker`.
  * Extracted from the 491 LOC `RepoWorker` god-file so the Durable Object keeps
  * only lifecycle + pack routing while all `getBranches/Tree/Blob/Commits`
  * passthroughs live here behind a single `prepare()` gate.
+ *
+ * Dependencies arrive as a named parameter object (plus injected
+ * `AppConfiguration`) instead of 7 positional args + `()=>config.get*`
+ * lambdas, so call sites read as `new RepoReadRpc({ git, readModel, ... })`.
  */
 class RepoReadRpc {
-  constructor(
-    private readonly git: GitService,
-    private readonly readModel: ReadModelService,
-    private readonly prepare: () => Promise<void>,
-    private readonly getMaxMergeDiffFiles: () => number,
-    private readonly getMaxFileBytes: () => number,
-    private readonly isoGitFs?: IsoGitFsClient,
-    private readonly releaseAssets?: ReleaseAssetStore,
-    private readonly getLimits?: () => { maxObjects: number; maxPackBytes: number },
-  ) {}
+  private readonly git: GitService;
+  private readonly readModel: ReadModelService;
+  private readonly prepare: () => Promise<void>;
+  private readonly config: AppConfiguration;
+  private readonly isoGitFs?: IsoGitFsClient;
+  private readonly releaseAssets?: ReleaseAssetStore;
+  private readonly getLimits?: () => { maxObjects: number; maxPackBytes: number };
+
+  constructor(deps: RepoReadRpcDeps) {
+    this.git = deps.git;
+    this.readModel = deps.readModel;
+    this.prepare = deps.prepare;
+    this.config = deps.config;
+    this.isoGitFs = deps.isoGitFs;
+    this.releaseAssets = deps.releaseAssets;
+    this.getLimits = deps.getLimits;
+  }
+
+  private getMaxMergeDiffFiles(): number {
+    return this.config.getMaxMergeDiffFiles();
+  }
+
+  private getMaxFileBytes(): number {
+    return this.config.getMaxFileBytes();
+  }
 
   public async listRefs(): Promise<{ refs: Array<{ ref: string; oid: string }>; symbolicHead: string | null }> {
     await this.prepare();
