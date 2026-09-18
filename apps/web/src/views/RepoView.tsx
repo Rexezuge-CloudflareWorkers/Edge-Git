@@ -12,7 +12,6 @@ import { PullsTab } from '../components/repo/PullsTab';
 import { ReleasesTab } from '../components/repo/ReleasesTab';
 import { WikiTab } from '../components/repo/WikiTab';
 import { RepoSettingsTab } from '../components/repo/RepoSettingsTab';
-import { SocialButtons } from '../components/repo/SocialButtons';
 import { Card } from '../components/ui/Card';
 import { AppPage } from '../components/layout/AppPage';
 import { LoadingSpinner } from '../components/layout/PageState';
@@ -158,7 +157,6 @@ export function RepoView({
         releaseCount={releaseCount}
         forkCount={repoData.forksCount}
         showSettings={canManage}
-        socialActions={<SocialButtons owner={owner} repo={repo} authorized={authorized} showNotice={showNotice} />}
         onTabChange={setTab}
       />
       <AppPage>

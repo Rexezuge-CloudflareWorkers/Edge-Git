@@ -16,6 +16,7 @@ import { Markdown } from '../shared/Markdown';
 import { RefreshButton } from '../shared/RefreshButton';
 import { CloneButton } from './CloneButton';
 import { ForkButton } from './ForkButton';
+import { StarButton, WatchButton, useSocialState } from './SocialButtons';
 import { ForkSyncButton } from './ForkSyncButton';
 import { BranchActions } from './BranchActions';
 import { BlobView } from './BlobView';
@@ -47,6 +48,7 @@ export function CodeTab({
   authorized?: boolean | null;
 }) {
   const { t } = useTranslation();
+  const social = useSocialState({ owner, repo, authorized, showNotice });
   const [params, setParams] = useSearchParams();
   const [branches, setBranches] = useState<string[]>([]);
   const [defaultBranch, setDefaultBranch] = useState<string | null>(null);
@@ -383,7 +385,19 @@ export function CodeTab({
         )}
         <div className="ml-auto flex items-center gap-2">
           <RefreshButton onRefresh={refresh} loading={loading} />
+          <WatchButton
+            watching={social.watching}
+            watchersCount={social.watchersCount}
+            disabled={social.busy !== null}
+            onToggle={() => void social.toggleWatch()}
+          />
           {canFork && <ForkButton owner={owner} repo={repo} defaultOwner={forkOwner} showNotice={showNotice} />}
+          <StarButton
+            starred={social.starred}
+            starsCount={social.starsCount}
+            disabled={social.busy !== null}
+            onToggle={() => void social.toggleStar()}
+          />
           <CloneButton owner={owner} repo={repo} />
         </div>
       </div>
