@@ -2,6 +2,7 @@ import { BadRequestError } from '@edge-git/backend-errors';
 import { PktLine } from './pkt';
 
 const MAX_URL_LENGTH = 2048;
+const MAX_REDIRECTS = 3;
 const OID_RE = /^[0-9a-f]{40}$/;
 const UPLOAD_PACK_ADVERTISEMENT = 'application/x-git-upload-pack-advertisement';
 const LOOPBACK_HOSTS = new Set(['::1', '0.0.0.0', '::']);
@@ -113,6 +114,26 @@ function normalizePublicGitUrl(raw: string): string {
   let href = parsed.href;
   while (href.length > 1 && href.endsWith('/')) href = href.slice(0, -1);
   return href;
+}
+
+/**
+ * Resolve + re-validate a redirect target against the original base. Every
+ * hop must pass the same SSRF guard (`normalizePublicGitUrl`); callers using
+ * manual-redirect fetch must loop with this (max MAX_REDIRECTS). DNS-rebind
+ * between validation and connect is NOT covered (no resolver in Workers) —
+ * documented, mitigated by https-only + short timeouts.
+ */
+function resolveRedirectUrl(base: string, location: string): string {
+  if (typeof location !== 'string' || location.trim().length === 0) {
+    throw new BadRequestError('remote returned an empty redirect');
+  }
+  let next: string;
+  try {
+    next = new URL(location, base).href;
+  } catch {
+    throw new BadRequestError('remote returned an invalid redirect');
+  }
+  return normalizePublicGitUrl(next);
 }
 
 function readPackets(body: Uint8Array): Uint8Array[] {
@@ -261,5 +282,5 @@ async function fetchRemotePack(
   return { refs, pack };
 }
 
-export { fetchRemotePack, parseUploadPackAdvertisement, buildUploadPackRequest, decodeUploadPackResponse, normalizePublicGitUrl };
+export { fetchRemotePack, parseUploadPackAdvertisement, buildUploadPackRequest, decodeUploadPackResponse, normalizePublicGitUrl, resolveRedirectUrl, MAX_REDIRECTS };
 export type { RemoteRef, RemotePack, RemoteGitFetcher };

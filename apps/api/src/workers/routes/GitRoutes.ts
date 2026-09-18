@@ -1,6 +1,7 @@
 import type { Hono } from 'hono';
 import { gitAuthForRepo } from '@/middleware';
 import { getRepoStub } from '../repoStub';
+import { RepoFullName } from '@edge-git/shared/utils';
 import {
   advertiseUploadPack,
   advertiseReceivePack,
@@ -26,6 +27,15 @@ function registerGitRoutes(app: GitApp): void {
     const owner = c.req.param('owner');
     const repoParam = c.req.param('repo');
     const repoName = RepoService.normalizeRepo(repoParam);
+    // Reject malformed owner/name before D1/DO sharding (weird names must
+    // never reach `REPO.getByName`). 401 (not 404/400) preserves the
+    // private-repo existence oracle guard.
+    if (!RepoFullName.tryParse(owner, repoName)) {
+      return new Response('Unauthorized', {
+        status: 401,
+        headers: { 'WWW-Authenticate': 'Basic realm="Edge-Git"' },
+      });
+    }
     const service = new URL(c.req.url).searchParams.get('service');
     if (service !== 'git-upload-pack' && service !== 'git-receive-pack') {
       return c.text('Invalid service', 400);
@@ -44,6 +54,12 @@ function registerGitRoutes(app: GitApp): void {
     const owner = c.req.param('owner');
     const repoParam = c.req.param('repo');
     const repoName = RepoService.normalizeRepo(repoParam);
+    if (!RepoFullName.tryParse(owner, repoName)) {
+      return new Response('Unauthorized', {
+        status: 401,
+        headers: { 'WWW-Authenticate': 'Basic realm="Edge-Git"' },
+      });
+    }
     const auth = await gitAuthForRepo(c as never, owner, repoName, 'git-upload-pack');
     if (auth instanceof Response) return auth;
     const maxFetchBodyBytes = ConfigurationManager.repo.getMaxFetchBodyBytes(c.env);
@@ -68,6 +84,12 @@ function registerGitRoutes(app: GitApp): void {
     const owner = c.req.param('owner');
     const repoParam = c.req.param('repo');
     const repoName = RepoService.normalizeRepo(repoParam);
+    if (!RepoFullName.tryParse(owner, repoName)) {
+      return new Response('Unauthorized', {
+        status: 401,
+        headers: { 'WWW-Authenticate': 'Basic realm="Edge-Git"' },
+      });
+    }
     const auth = await gitAuthForRepo(c as never, owner, repoName, 'git-receive-pack');
     if (auth instanceof Response) return auth;
     const maxPackBytes = ConfigurationManager.repo.getMaxPackBytes(c.env);

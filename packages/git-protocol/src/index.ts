@@ -25,6 +25,8 @@ export {
   buildUploadPackRequest,
   decodeUploadPackResponse,
   normalizePublicGitUrl,
+  resolveRedirectUrl,
+  MAX_REDIRECTS,
   getBasicCredentials,
   getBearerToken,
 } from './protocol';

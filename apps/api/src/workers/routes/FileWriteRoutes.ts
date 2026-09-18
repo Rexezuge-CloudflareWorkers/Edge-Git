@@ -4,6 +4,7 @@ import { getRepoStub } from '../repoStub';
 import { requireVisibleRepo, toServiceStatus } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
+import { branchNameSchema } from '@edge-git/shared/validation';
 import { scanBytes } from '@edge-git/backend-services/security';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 
@@ -158,6 +159,7 @@ function registerFileWriteRoutes(app: RepoApp): void {
     };
     const branch = (body.branch ?? '').trim();
     if (!branch) return c.json({ error: 'branch is required' }, 400);
+    if (!branchNameSchema.safeParse(branch).success) return c.json({ error: 'Invalid branch name' }, 400);
     const filePath = (body.path ?? '').trim();
     if (!filePath) return c.json({ error: 'path is required' }, 400);
     if (!isSafeFilePath(filePath)) return c.json({ error: 'path must be a safe relative file path' }, 400);
@@ -213,6 +215,7 @@ function registerFileWriteRoutes(app: RepoApp): void {
     const params = new URL(c.req.url).searchParams;
     const branch = (params.get('branch') ?? '').trim();
     if (!branch) return c.json({ error: 'branch query param is required' }, 400);
+    if (!branchNameSchema.safeParse(branch).success) return c.json({ error: 'Invalid branch name' }, 400);
     const filePath = (params.get('path') ?? '').trim();
     if (!filePath) return c.json({ error: 'path query param is required' }, 400);
     if (!isSafeFilePath(filePath)) return c.json({ error: 'path must be a safe relative file path' }, 400);

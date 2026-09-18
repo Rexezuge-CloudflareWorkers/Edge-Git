@@ -10,7 +10,30 @@ interface Bucket {
 const buckets = new Map<string, Bucket>();
 
 function clientIp(c: RateLimitContext): string {
-  return c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For')?.split(',', 1)[0]?.trim() ?? 'unknown';
+  // Trust order is deliberate: Cloudflare sets CF-Connecting-IP and it cannot
+  // be spoofed by clients; X-Forwarded-For is only a fallback for local dev
+  // and non-CF deployments (first entry, trimmed).
+  const cfIp = c.req.header('CF-Connecting-IP')?.trim();
+  if (cfIp) return cfIp;
+  const forwarded = c.req.header('X-Forwarded-For')?.split(',', 1)[0]?.trim();
+  return forwarded || 'unknown';
+}
+
+function getRateLimitBucketCountForTests(): number {
+  return buckets.size;
+}
+
+function evictOldestBucket(): void {
+  let oldestReset = Infinity;
+  for (const [, bucket] of buckets) {
+    oldestReset = Math.min(oldestReset, bucket.resetAt);
+  }
+  for (const [key, bucket] of buckets) {
+    if (bucket.resetAt === oldestReset) {
+      buckets.delete(key);
+      break;
+    }
+  }
 }
 
 function cleanup(now: number): void {
@@ -18,8 +41,14 @@ function cleanup(now: number): void {
   for (const [key, bucket] of buckets) {
     if (bucket.resetAt <= now) buckets.delete(key);
   }
-  // Hard cap so a single isolate cannot grow without bound.
-  if (buckets.size > 5000) buckets.clear();
+  // Hard cap so a single isolate cannot grow without bound. Evict oldest
+  // resetAt first (LRU-ish) instead of clearing everything, so an attacker
+  // flooding new keys cannot wipe out everyone else's buckets.
+  let overflow = buckets.size - 5000;
+  while (overflow > 0) {
+    evictOldestBucket();
+    overflow -= 1;
+  }
 }
 
 /**
@@ -66,4 +95,4 @@ function resetRateLimitForTests(): void {
   buckets.clear();
 }
 
-export { rateLimit, resetRateLimitForTests };
+export { rateLimit, resetRateLimitForTests, clientIp, getRateLimitBucketCountForTests };

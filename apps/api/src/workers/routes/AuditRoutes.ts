@@ -25,9 +25,15 @@ function parseAuditQuery(url: string): {
   if (action) out.action = action;
   if (repo) out.repo = repo;
   if (cursor) out.cursor = cursor;
-  const startTime = Number(params.get('startTime'));
-  const endTime = Number(params.get('endTime'));
-  const limit = Number(params.get('limit'));
+  // NOTE: `Number(null)` is 0, so missing params must stay unset — otherwise
+  // every unfiltered query would silently gain `timestamp <= 0` and match
+  // nothing (fail-closed the wrong way: empty audit trails).
+  const startRaw = params.get('startTime');
+  const endRaw = params.get('endTime');
+  const limitRaw = params.get('limit');
+  const startTime = startRaw === null ? NaN : Number(startRaw);
+  const endTime = endRaw === null ? NaN : Number(endRaw);
+  const limit = limitRaw === null ? NaN : Number(limitRaw);
   if (Number.isSafeInteger(startTime)) out.startTime = startTime;
   if (Number.isSafeInteger(endTime)) out.endTime = endTime;
   if (Number.isSafeInteger(limit)) out.limit = limit;
@@ -109,4 +115,4 @@ function registerAuditRoutes(app: AuditApp): void {
   });
 }
 
-export { registerAuditRoutes };
+export { registerAuditRoutes, parseAuditQuery };
