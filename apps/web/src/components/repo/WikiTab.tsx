@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { BookOpen } from 'lucide-react';
 import type { WikiPage, WikiRevision } from '../../types';
 import { createWikiPage, deleteWikiPage, listWikiPages, loadWikiPage, loadWikiRevisions, updateWikiPage } from '../../services/wikiService';
 import { isValidWikiSlug, normalizeWikiSlug, titleToSlug } from '../../lib/wikiSlug';
+import { readParam, writeParams } from '../../lib/urlParams';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Input, Textarea } from '../ui/Input';
@@ -24,8 +26,8 @@ export function WikiTab({
   authorized?: boolean | null;
 }) {
   const { t } = useTranslation();
+  const [params, setParams] = useSearchParams();
   const [pages, setPages] = useState<WikiPage[]>([]);
-  const [slug, setSlug] = useState<string | null>(null);
   const [page, setPage] = useState<WikiPage | null>(null);
   const [revisions, setRevisions] = useState<WikiRevision[]>([]);
   const [showHistory, setShowHistory] = useState(false);
@@ -35,8 +37,18 @@ export function WikiTab({
   const [slugInput, setSlugInput] = useState('');
   const [body, setBody] = useState('');
   const [saving, setSaving] = useState(false);
-  const [query, setQuery] = useState('');
+  // Search + open page are URL state (`?q=&page=`) with the URL as the single
+  // source of truth: typing and page opens write the query directly, so
+  // pasted links, Back, and keystrokes can never disagree.
   const [reloadKey, setReloadKey] = useState(0);
+  const query = readParam(params, 'q');
+  const slug = readParam(params, 'page') || null;
+  const setQuery = (next: string) => {
+    writeParams(setParams, params, { q: next.trim() });
+  };
+  const setSlug = (next: string | null) => {
+    writeParams(setParams, params, { page: next ?? '' });
+  };
 
   useEffect(() => {
     const authOpt = authorized === true ? { isAuthed: true as const } : { isAuthed: false as const };
@@ -57,25 +69,46 @@ export function WikiTab({
     setReloadKey((k) => k + 1);
   };
 
-  const openPage = async (nextSlug: string) => {
-    setSlug(nextSlug);
+  // Page navigation writes the URL only; the loader effect below performs
+  // the single async load for clicks, submits, and pasted links alike.
+  const selectPage = (nextSlug: string | null) => {
+    setPage(null);
     setEditing(false);
     setShowHistory(false);
-    const authOpt = authorized === true ? { isAuthed: true as const } : { isAuthed: false as const };
-    try {
-      const { page: loaded } = await loadWikiPage(owner, repo, nextSlug, authOpt);
-      setPage(loaded);
-      setTitle(loaded.title);
-      setBody(loaded.body);
-      setSlugInput(loaded.slug);
-    } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadWiki', 'Failed To Load Wiki.'));
-    }
+    setSlug(nextSlug);
   };
 
+  // Sole page loader: `slug` derives from the URL, so clicks, submits, and
+  // pasted links all converge here with no state syncing. Written as an
+  // effect-local `run()` like every other data loader in the codebase; all
+  // updates happen after the await.
+  useEffect(() => {
+    if (!slug) return;
+    const authOpt = authorized === true ? { isAuthed: true as const } : { isAuthed: false as const };
+    const target = slug;
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const { page: loaded } = await loadWikiPage(owner, repo, target, authOpt);
+        if (cancelled) return;
+        setPage(loaded);
+        setTitle(loaded.title);
+        setBody(loaded.body);
+        setSlugInput(loaded.slug);
+      } catch (error) {
+        if (cancelled) return;
+        showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadWiki', 'Failed To Load Wiki.'));
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug]);
+
   const startNew = () => {
-    setSlug(null);
-    setPage(null);
+    selectPage(null);
     setEditing(true);
     setTitle('');
     setBody('');
@@ -100,8 +133,7 @@ export function WikiTab({
         setPage(created);
         setSlug(created.slug);
         showNotice('success', t('wiki.pageCreated', 'Wiki Page Created.'));
-      }
-      setEditing(false);
+      }      setEditing(false);
       reload();
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
@@ -131,7 +163,7 @@ export function WikiTab({
           <ul className="divide-y divide-[var(--color-border)]">
             {pages.map((p) => (
               <li key={p.id} className="py-2 flex items-center gap-2">
-                <button type="button" onClick={() => void openPage(p.slug)} className={`text-left hover:underline ${slug === p.slug ? 'font-medium text-[var(--color-accent)]' : 'text-[var(--color-accent)]'}`}>
+                <button type="button" onClick={() => selectPage(p.slug)} className={`text-left hover:underline ${slug === p.slug ? 'font-medium text-[var(--color-accent)]' : 'text-[var(--color-accent)]'}`}>
                   {p.title}
                 </button>
                 <span className="text-xs text-[var(--color-text-muted)]">/{p.slug} · r{p.revision}</span>

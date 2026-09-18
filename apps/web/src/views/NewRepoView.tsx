@@ -6,6 +6,8 @@ import { listMyOrgs } from '../services/profileService';
 import { Button } from '../components/ui/Button';
 import { Card, CardHeader, CardTitle } from '../components/ui/Card';
 import { Input, Label, Select, Textarea } from '../components/ui/Input';
+import { ContextBar } from '../components/layout/ContextBar';
+import { AppPage } from '../components/layout/AppPage';
 
 export function NewRepoView({
   defaultOwner,
@@ -62,7 +64,11 @@ export function NewRepoView({
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-8">
+    <div>
+      <ContextBar
+        crumb={<span className="text-xl font-semibold text-[var(--color-text-primary)] truncate">New Repository</span>}
+      />
+      <AppPage variant="narrow">
       <Card>
         <CardHeader>
           <CardTitle>New Repository</CardTitle>
@@ -103,6 +109,7 @@ export function NewRepoView({
           </Button>
         </form>
       </Card>
+      </AppPage>
     </div>
   );
 }

@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { GitCommit } from '../types';
 import { loadCommits } from '../services/repoService';
 import { fetchUpgraded, useUpgradeFetchState } from '../lib/upgradeFetch';
 import { firstLine, formatTimestamp } from '../lib/format';
-import { RepoHeader } from '../components/repo/RepoHeader';
+import { readIntParam, writeParams } from '../lib/urlParams';
+import { RepoHeader, type RepoTab } from '../components/repo/RepoHeader';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { AppPage } from '../components/layout/AppPage';
+import { LoadingSpinner } from '../components/layout/PageState';
 import Unauthorized from '../components/layout/Unauthorized';
 import { useRepoData } from '../hooks/useRepoData';
 
@@ -24,8 +27,16 @@ export function CommitsView({
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { status, repoData } = useRepoData(owner, repo, authorized);
+  const [params, setParams] = useSearchParams();
   const [commits, setCommits] = useState<GitCommit[]>([]);
-  const [depth, setDepth] = useState(PAGE_DEPTH);
+  // List depth is URL state (`?depth=`) with the URL as the single source of
+  // truth: "Load More" writes the query directly, so pasted links, Back, and
+  // clicks can never disagree.
+  const depth = readIntParam(params, 'depth', PAGE_DEPTH, 1);
+  const setDepth = (next: number | ((d: number) => number)) => {
+    const value = typeof next === 'function' ? next(depth) : next;
+    writeParams(setParams, params, { depth: value === PAGE_DEPTH ? '' : String(value) });
+  };
   const [loading, setLoading] = useState(true);
   const [exhausted, setExhausted] = useState(false);
 
@@ -63,37 +74,33 @@ export function CommitsView({
   }, [owner, repo, depth, status, showNotice, t, useAuthed]);
 
   if (status === 'loading' && !repoData) {
-    return (
-      <div className="min-h-64 flex items-center justify-center">
-        <div className="h-10 w-10 rounded-full border-2 border-[var(--color-accent)] border-t-transparent animate-spin" />
-      </div>
-    );
+    return <LoadingSpinner label="Loading commits" />;
   }
 
   if (status === 'missing') {
     return (
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <AppPage>
         <Card>
           <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">
             {t('repos.repositoryNotFound', 'Repository Not Found')}
           </h1>
         </Card>
-      </div>
+      </AppPage>
     );
   }
 
   if (status === 'forbidden' || !repoData) {
     return (
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <AppPage>
         <Unauthorized message={t('repos.privateRepositoryMessage', 'This Repository Is Private. Sign In To View It.')} />
-      </div>
+      </AppPage>
     );
   }
 
   return (
     <div>
-      <RepoHeader repo={repoData} activeTab="code" showSettings={false} onTabChange={() => navigate(`/${owner}/${repo}`)} />
-      <div className="max-w-7xl mx-auto px-6 py-6 space-y-4">
+      <RepoHeader repo={repoData} activeTab="code" showSettings={false} onTabChange={(id: RepoTab) => navigate(`/${owner}/${repo}${id === 'code' ? '' : `?tab=${id}`}`)} />
+      <AppPage>
         <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('commits.history', 'Commit History')}</h1>
         <Card className="p-0 overflow-hidden">
           {!loading && commits.length === 0 ? (
@@ -128,7 +135,7 @@ export function CommitsView({
             {t('common.loadMore', 'Load More')}
           </Button>
         )}
-      </div>
+      </AppPage>
     </div>
   );
 }

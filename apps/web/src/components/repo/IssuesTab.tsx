@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { CircleDot } from 'lucide-react';
 import type { Issue } from '../../types';
 import { createIssue, listIssues } from '../../services/issueService';
 import { formatTimestamp } from '../../lib/format';
+import { readParam, writeParams } from '../../lib/urlParams';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Input, Textarea } from '../ui/Input';
@@ -33,6 +34,7 @@ export function IssuesTab({
   authorized?: boolean | null;
 }) {
   const { t } = useTranslation();
+  const [params, setParams] = useSearchParams();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState('');
@@ -40,7 +42,13 @@ export function IssuesTab({
   const [saving, setSaving] = useState(false);
 
   const [reloadKey, setReloadKey] = useState(0);
-  const [labelFilter, setLabelFilter] = useState('');
+  // Label filter is URL state (`?label=`) with the URL as the single source
+  // of truth: typing writes the query directly, so pasted links, Back, and
+  // keystrokes can never disagree. Drafts (title/body) stay local.
+  const labelFilter = readParam(params, 'label');
+  const setLabelFilter = (next: string) => {
+    writeParams(setParams, params, { label: next.trim() });
+  };
 
   useEffect(() => {
     const authOpt = authorized === true ? { isAuthed: true as const } : { isAuthed: false as const };

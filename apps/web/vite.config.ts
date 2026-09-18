@@ -2,10 +2,27 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
+import type { IncomingMessage } from 'node:http';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 
 const apiGeneratedDir = path.resolve(__dirname, '../../apps/api/src/generated');
 const apiSpaShellPath = path.resolve(apiGeneratedDir, 'spa-shell.ts');
+
+const apiTarget = 'http://localhost:8787';
+
+// `/search` and `/snippets` are both SPA routes and API prefixes. Document
+// navigations (Accept: text/html) must keep serving index.html; only data
+// fetches proxy to the worker. `/users` needs no bypass: no SPA route shares
+// the prefix (profiles live at `/:username`).
+function apiProxy({ spaFallback = false }: { spaFallback?: boolean } = {}) {
+  return {
+    target: apiTarget,
+    changeOrigin: true,
+    ...(spaFallback && {
+      bypass: (req: IncomingMessage) => (req.headers.accept?.includes('text/html') ? '/index.html' : undefined),
+    }),
+  };
+}
 
 export default defineConfig({
   plugins: [
@@ -30,14 +47,11 @@ export default defineConfig({
   ],
   server: {
     proxy: {
-      '/user': {
-        target: 'http://localhost:8787',
-        changeOrigin: true,
-      },
-      '/repos': {
-        target: 'http://localhost:8787',
-        changeOrigin: true,
-      },
+      '/user': apiProxy(),
+      '/users': apiProxy(),
+      '/repos': apiProxy(),
+      '/search': apiProxy({ spaFallback: true }),
+      '/snippets': apiProxy({ spaFallback: true }),
       '/realtime': {
         target: 'http://localhost:8787',
         changeOrigin: true,

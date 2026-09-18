@@ -19,8 +19,10 @@ function TopHeader({
   onLanguageChange: (lng: string) => void;
   languageDisabled: boolean;
 }) {
-  const isRepoPage = useMatch('/:owner/:repo') !== null;
-  if (isRepoPage) return null;
+  // The marketing/global header is root-only: every other route renders a
+  // contextual `ContextBar` instead, so the top anchor never moves pages.
+  const isRootPage = useMatch('/') !== null;
+  if (!isRootPage) return null;
   return (
     <Header
       userEmail={userEmail}

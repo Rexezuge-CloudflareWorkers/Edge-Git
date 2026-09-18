@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { GitBranch, Tag } from 'lucide-react';
 import type { GitCommit, OverviewResponse, Repo, TagInfo, TreeEntry } from '../../types';
 import { decodeBlobContent, loadBlob, loadOverview, loadTree } from '../../services/repoService';
 import { formatTimestamp } from '../../lib/format';
 import { formatDateLocale } from '../../lib/locale';
+import { readParam, writeParams } from '../../lib/urlParams';
 import { resolveSelectedRef, mergeEnrichedEntries } from './useCodeTabOverview';
 import { Card } from '../ui/Card';
 import { Select } from '../ui/Input';
@@ -46,17 +47,34 @@ export function CodeTab({
   authorized?: boolean | null;
 }) {
   const { t } = useTranslation();
+  const [params, setParams] = useSearchParams();
   const [branches, setBranches] = useState<string[]>([]);
   const [defaultBranch, setDefaultBranch] = useState<string | null>(null);
   const [tags, setTags] = useState<TagInfo[]>([]);
-  const [ref, setRef] = useState('');
-  const [path, setPath] = useState('');
+  // Branch / directory / open file are URL state (`?ref=&path=&blob=`) with
+  // the URL as the single source of truth: every navigation writes the query
+  // directly, so pasted links, Back, and clicks can never disagree. Blob
+  // bytes and edit drafts stay local (fetch cache, never shared).
+  const ref = readParam(params, 'ref');
+  const path = readParam(params, 'path');
+  const blobPath = readParam(params, 'blob') || null;
+  // Omitted keys keep their current value; `''`/`null` clears the key.
+  const navigateBrowser = (patch: { ref?: string; path?: string; blob?: string | null }) => {
+    writeParams(setParams, params, {
+      ref: patch.ref ?? ref,
+      path: patch.path ?? path,
+      blob: patch.blob === undefined ? (blobPath ?? '') : (patch.blob ?? ''),
+    });
+  };
   const [entries, setEntries] = useState<TreeEntry[]>([]);
   const [commits, setCommits] = useState<GitCommit[]>([]);
   const [loading, setLoading] = useState(true);
-  const [blobPath, setBlobPath] = useState<string | null>(null);
   const [blobText, setBlobText] = useState<string | null>(null);
   const [blobBinary, setBlobBinary] = useState(false);
+  // Which blob the byte cache belongs to; while a different file loads, the
+  // UI shows nothing rather than the previous file's content. Plain state
+  // (not a ref) so render may read it.
+  const [loadedBlob, setLoadedBlob] = useState<string | null>(null);
   const [readme, setReadme] = useState<{ path: string; text: string } | null>(null);
   // Edit/create targets are paths, not booleans, so navigating to another
   // ref, directory, or file hides the forms without a reset effect.
@@ -75,7 +93,14 @@ export function CodeTab({
   const isTagRef = ref.startsWith('refs/tags/');
   const editable = canWrite && !isTagRef && selectedRef !== '';
   const branchTip = commits[0]?.oid;
-  const editableFile = editable && !blobBinary && (blobText ?? '').length <= MAX_EDIT_CHARS;
+  // Bytes belong to `loadedBlob`; while a different file loads, show
+  // nothing rather than the previous file's content.
+  const blobSettled = loadedBlob === blobPath;
+  const visibleBlobText = blobSettled ? blobText : null;
+  const visibleBlobBinary = blobSettled ? blobBinary : false;
+  // Edit unlocks only once this file's bytes arrive: opening the editor on
+  // a blank buffer could save empty content over the real file.
+  const editableFile = editable && blobSettled && !visibleBlobBinary && (visibleBlobText ?? '').length <= MAX_EDIT_CHARS;
 
   // `true` only for signed-in viewers: `null` (resolving) and `false`
   // share the public path so null->false never refetches.
@@ -144,7 +169,9 @@ export function CodeTab({
         const tagRefs = new Set(overview.tags.map((tg) => tg.ref));
         const resolvedRef = resolveSelectedRef(ref, overview.branches, overview.currentBranch ?? overview.branches[0] ?? null, tagRefs);
         if (ref !== '' && resolvedRef !== ref) {
-          setRef(resolvedRef === 'HEAD' ? '' : resolvedRef);
+          // Unknown `?ref=` (e.g. a deleted branch in a pasted link) folds
+          // back to the default branch, and the URL follows.
+          navigateBrowser({ ref: resolvedRef === 'HEAD' ? '' : resolvedRef });
           return;
         }
         const effectiveRef = resolvedRef;
@@ -212,7 +239,7 @@ export function CodeTab({
   const afterChange = () => {
     setEditingPath(null);
     setCreateDir(null);
-    setBlobPath(null);
+    navigateBrowser({ blob: null });
     setBlobText(null);
     setBlobBinary(false);
     setReadme(null);
@@ -225,22 +252,47 @@ export function CodeTab({
     setReloadKey((k) => k + 1);
   };
 
-  const openBlob = async (entryPath: string) => {
+  const openBlob = (entryPath: string) => {
     const fullPath = path ? `${path}/${entryPath}` : entryPath;
-    try {
-      const authOpt = useAuthed ? { isAuthed: true as const } : { isAuthed: false as const };
-      const blob = await loadBlob(owner, repo, fullPath, selectedRef || undefined, authOpt);
-      if (!blob) {
-        showNotice('error', 'File Not Found.');
-        return;
-      }
-      setBlobPath(fullPath);
-      setBlobBinary(blob.isBinary);
-      setBlobText(blob.isBinary ? null : decodeBlobContent(blob));
-    } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : 'Failed To Load File.');
-    }
+    // Navigate only; the loader effect below performs the single fetch for
+    // clicks, Back/Forward, and pasted links alike.
+    setBlobBinary(false);
+    setBlobText(null);
+    setEditingPath(null);
+    navigateBrowser({ blob: fullPath });
   };
+
+  // Sole blob loader: `blobPath` derives from the URL, so clicks,
+  // Back/Forward, and pasted links all converge here with no state syncing.
+  // Written as an effect-local `run()` like every other data loader in the
+  // codebase; all updates happen after the await.
+  useEffect(() => {
+    if (!blobPath) return;
+    const authOpt = useAuthed ? { isAuthed: true as const } : { isAuthed: false as const };
+    const target = blobPath;
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const blob = await loadBlob(owner, repo, target, ref || selectedRef || undefined, authOpt);
+        if (cancelled) return;
+        if (!blob) {
+          showNotice('error', 'File Not Found.');
+          return;
+        }
+        setLoadedBlob(target);
+        setBlobBinary(blob.isBinary);
+        setBlobText(blob.isBinary ? null : decodeBlobContent(blob));
+      } catch (error) {
+        if (cancelled) return;
+        showNotice('error', error instanceof Error ? error.message : 'Failed To Load File.');
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blobPath]);
 
   const crumbs = path ? path.split('/') : [];
   const latestCommit = commits[0];
@@ -252,8 +304,7 @@ export function CodeTab({
           value={selectedRef}
           onChange={(e) => {
             setLoading(true);
-            setRef(e.target.value);
-            setBlobPath(null);
+            navigateBrowser({ ref: e.target.value, blob: null });
             setBlobText(null);
             setBlobBinary(false);
             setReadme(null);
@@ -273,9 +324,7 @@ export function CodeTab({
           value={ref.startsWith('refs/tags/') ? ref : ''}
           onChange={(tagRef) => {
             setLoading(true);
-            setRef(tagRef);
-            setPath('');
-            setBlobPath(null);
+            navigateBrowser({ ref: tagRef, path: '', blob: null });
             setBlobText(null);
             setBlobBinary(false);
             setReadme(null);
@@ -291,9 +340,7 @@ export function CodeTab({
             showNotice={showNotice}
             onChanged={(nextRef) => {
               setLoading(true);
-              setRef(nextRef);
-              setPath('');
-              setBlobPath(null);
+              navigateBrowser({ ref: nextRef, path: '', blob: null });
               setBlobText(null);
               setBlobBinary(false);
               setReadme(null);
@@ -306,7 +353,7 @@ export function CodeTab({
             size="sm"
             onClick={() => {
               setCreateDir((d) => (d === path ? null : path));
-              setBlobPath(null);
+              navigateBrowser({ blob: null });
               setBlobText(null);
               setBlobBinary(false);
               setEditingPath(null);
@@ -317,7 +364,7 @@ export function CodeTab({
         )}
         {path && (
           <nav className="text-sm text-[var(--color-text-secondary)]">
-            <button type="button" className="text-[var(--color-accent)] hover:underline" onClick={() => setPath('')}>
+            <button type="button" className="text-[var(--color-accent)] hover:underline" onClick={() => navigateBrowser({ path: '' })}>
               {repo}
             </button>
             {crumbs.map((c, i) => (
@@ -326,7 +373,7 @@ export function CodeTab({
                 <button
                   type="button"
                   className="text-[var(--color-accent)] hover:underline"
-                  onClick={() => setPath(crumbs.slice(0, i + 1).join('/'))}
+                  onClick={() => navigateBrowser({ path: crumbs.slice(0, i + 1).join('/') })}
                 >
                   {c}
                 </button>
@@ -349,8 +396,8 @@ export function CodeTab({
               repo={repo}
               branch={selectedRef}
               blobPath={blobPath}
-              blobText={blobText}
-              blobBinary={blobBinary}
+              blobText={visibleBlobText}
+              blobBinary={visibleBlobBinary}
               branchTip={branchTip}
               editing={editing}
               editableFile={editableFile}
@@ -359,7 +406,7 @@ export function CodeTab({
               onEdit={() => setEditingPath(blobPath)}
               onCancelEdit={() => setEditingPath(null)}
               onBack={() => {
-                setBlobPath(null);
+                navigateBrowser({ blob: null });
                 setBlobText(null);
                 setEditingPath(null);
               }}
@@ -382,7 +429,7 @@ export function CodeTab({
               onOpenBlob={openBlob}
               onNavigate={(dir) => {
                 setLoading(true);
-                setPath(dir);
+                navigateBrowser({ path: dir });
               }}
             />
           )}
@@ -459,9 +506,7 @@ export function CodeTab({
             tags={tags}
             onSelect={(tagRef) => {
               setLoading(true);
-              setRef(tagRef);
-              setPath('');
-              setBlobPath(null);
+              navigateBrowser({ ref: tagRef, path: '', blob: null });
               setBlobText(null);
               setBlobBinary(false);
               setReadme(null);

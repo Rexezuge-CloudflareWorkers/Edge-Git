@@ -5,9 +5,11 @@ import type { CommitDiffResult } from '../types';
 import { loadCommit } from '../services/repoService';
 import { fetchUpgraded, useUpgradeFetchState } from '../lib/upgradeFetch';
 import { firstLine, formatCommitDate } from '../lib/format';
-import { RepoHeader } from '../components/repo/RepoHeader';
+import { RepoHeader, type RepoTab } from '../components/repo/RepoHeader';
 import { DiffView } from '../components/repo/DiffView';
 import { Card } from '../components/ui/Card';
+import { AppPage } from '../components/layout/AppPage';
+import { LoadingSpinner } from '../components/layout/PageState';
 import Unauthorized from '../components/layout/Unauthorized';
 import { useRepoData } from '../hooks/useRepoData';
 
@@ -63,30 +65,26 @@ export function CommitView({
   }, [owner, repo, oid, status, showNotice, t, useAuthed]);
 
   if (status === 'loading' && !repoData) {
-    return (
-      <div className="min-h-64 flex items-center justify-center">
-        <div className="h-10 w-10 rounded-full border-2 border-[var(--color-accent)] border-t-transparent animate-spin" />
-      </div>
-    );
+    return <LoadingSpinner label="Loading repository" />;
   }
 
   if (status === 'missing') {
     return (
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <AppPage>
         <Card>
           <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">
             {t('repos.repositoryNotFound', 'Repository Not Found')}
           </h1>
         </Card>
-      </div>
+      </AppPage>
     );
   }
 
   if (status === 'forbidden' || !repoData) {
     return (
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <AppPage>
         <Unauthorized message={t('repos.privateRepositoryMessage', 'This Repository Is Private. Sign In To View It.')} />
-      </div>
+      </AppPage>
     );
   }
 
@@ -94,8 +92,8 @@ export function CommitView({
 
   return (
     <div>
-      <RepoHeader repo={repoData} activeTab="code" showSettings={false} onTabChange={() => navigate(`/${owner}/${repo}`)} />
-      <div className="max-w-7xl mx-auto px-6 py-6 space-y-4">
+      <RepoHeader repo={repoData} activeTab="code" showSettings={false} onTabChange={(id: RepoTab) => navigate(`/${owner}/${repo}${id === 'code' ? '' : `?tab=${id}`}`)} />
+      <AppPage>
         <Link className="text-sm text-[var(--color-accent)] hover:underline" to={`/${owner}/${repo}/commits`}>
           {t('commits.backToHistory', 'Back To History')}
         </Link>
@@ -124,7 +122,7 @@ export function CommitView({
             <DiffView files={diff.files} truncated={diff.truncated} />
           </>
         )}
-      </div>
+      </AppPage>
     </div>
   );
 }

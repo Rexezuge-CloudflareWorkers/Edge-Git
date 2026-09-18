@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { CurrentUser } from '../../types';
 import Unauthorized from './Unauthorized';
 import { Card } from '../ui/Card';
+import { AppPage } from './AppPage';
 import { LandingView } from '../../views/LandingView';
 import { DashboardView } from '../../views/DashboardView';
 import { NewRepoView } from '../../views/NewRepoView';
@@ -75,9 +76,9 @@ function SpaViewRouter({ user, setUser, authorized, showNotice, defaultOwner }: 
           user ? (
             <NewRepoView defaultOwner={defaultOwner} showNotice={showNotice} />
           ) : (
-            <div className="max-w-7xl mx-auto px-6 py-8">
+            <AppPage>
               <Unauthorized message={t('errors.signInToCreate', 'Sign In To Create Repositories.')} />
-            </div>
+            </AppPage>
           )
         }
       />
@@ -96,9 +97,9 @@ function SpaViewRouter({ user, setUser, authorized, showNotice, defaultOwner }: 
           user ? (
             <SettingsView user={user} setUser={setUser} showNotice={showNotice} />
           ) : (
-            <div className="max-w-7xl mx-auto px-6 py-8">
+            <AppPage>
               <Unauthorized message={t('errors.signInToManage', 'Sign In To Manage Settings.')} />
-            </div>
+            </AppPage>
           )
         }
       />
@@ -108,23 +109,23 @@ function SpaViewRouter({ user, setUser, authorized, showNotice, defaultOwner }: 
           user ? (
             <NotificationsView showNotice={showNotice} />
           ) : (
-            <div className="max-w-7xl mx-auto px-6 py-8">
+            <AppPage>
               <Unauthorized message={t('errors.signInToManage', 'Sign In To Manage Settings.')} />
-            </div>
+            </AppPage>
           )
         }
       />
       <Route
         path="*"
         element={
-          <div className="max-w-7xl mx-auto px-6 py-8">
+          <AppPage>
             <Card>
               <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('errors.pageNotFound', 'Page Not Found')}</h1>
               <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
                 {t('errors.pageNotFoundDescription', 'The Page You Requested Does Not Exist.')}
               </p>
             </Card>
-          </div>
+          </AppPage>
         }
       />
     </Routes>
