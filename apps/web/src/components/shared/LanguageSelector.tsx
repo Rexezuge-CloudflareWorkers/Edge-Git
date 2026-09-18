@@ -26,13 +26,13 @@ export function LanguageSelector({
   disabled?: boolean;
 }) {
   const { t, i18n } = useTranslation();
-  const unknownLabel = t('header.unknownLanguage', 'Unknown');
+  const unknownLabel = t('settings.unknownLanguage', 'Unknown');
   if (value === 'unknown') {
     return (
       <label className="flex items-center gap-2 text-sm text-[var(--color-text-muted)]">
-        <span className="sr-only">{t('header.selectLanguage', 'Select Language')}</span>
+        <span className="sr-only">{t('settings.selectLanguage', 'Select Language')}</span>
         <select
-          aria-label={t('header.selectLanguage', 'Select Language')}
+          aria-label={t('settings.selectLanguage', 'Select Language')}
           value="unknown"
           disabled
           onChange={(e) => onChange(e.target.value)}
@@ -46,9 +46,9 @@ export function LanguageSelector({
   const current = normalizeLanguage(value ?? i18n.resolvedLanguage ?? i18n.language);
   return (
     <label className="flex items-center gap-2 text-sm text-[var(--color-text-muted)]">
-      <span className="sr-only">{t('header.selectLanguage', 'Select Language')}</span>
+      <span className="sr-only">{t('settings.selectLanguage', 'Select Language')}</span>
       <select
-        aria-label={t('header.selectLanguage', 'Select Language')}
+        aria-label={t('settings.selectLanguage', 'Select Language')}
         value={current}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
