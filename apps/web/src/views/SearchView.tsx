@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Card } from '../components/ui/Card';
+import { ContextBar } from '../components/layout/ContextBar';
+import { SegmentedTabs } from '../components/layout/SegmentedTabs';
+import { AppPage } from '../components/layout/AppPage';
 import { searchCode, searchDiscussions, searchIssues, searchPulls, searchRepos, searchSnippets } from '../services/searchService';
 import type { CodeHit } from '../services/searchService';
 import type { Discussion, Issue, PullRequest, Repo, Snippet } from '../types';
@@ -70,33 +73,27 @@ export function SearchView({ showNotice }: { showNotice: (type: 'success' | 'err
     setParams(query ? { q: query, type: tab } : { type: tab });
   };
 
+  const searchTabs: Array<{ id: SearchTab; label: string }> = [
+    { id: 'repos', label: t('search.repos', 'Repositories') },
+    { id: 'issues', label: t('search.issues', 'Issues') },
+    { id: 'pulls', label: t('search.pulls', 'Pull Requests') },
+    { id: 'code', label: t('search.code', 'Code') },
+    { id: 'discussions', label: t('search.discussions', 'Discussions') },
+    { id: 'snippets', label: t('search.snippets', 'Snippets') },
+  ];
+
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
-      <div className="flex items-center gap-2 mb-4">
-        <button type="button" onClick={() => switchTab('repos')} className={type === 'repos' ? 'font-semibold' : ''}>
-          {t('search.repos', 'Repositories')}
-        </button>
-        <span aria-hidden="true">·</span>
-        <button type="button" onClick={() => switchTab('issues')} className={type === 'issues' ? 'font-semibold' : ''}>
-          {t('search.issues', 'Issues')}
-        </button>
-        <span aria-hidden="true">·</span>
-        <button type="button" onClick={() => switchTab('pulls')} className={type === 'pulls' ? 'font-semibold' : ''}>
-          {t('search.pulls', 'Pull Requests')}
-        </button>
-        <span aria-hidden="true">·</span>
-        <button type="button" onClick={() => switchTab('code')} className={type === 'code' ? 'font-semibold' : ''}>
-          {t('search.code', 'Code')}
-        </button>
-        <span aria-hidden="true">·</span>
-        <button type="button" onClick={() => switchTab('discussions')} className={type === 'discussions' ? 'font-semibold' : ''}>
-          {t('search.discussions', 'Discussions')}
-        </button>
-        <span aria-hidden="true">·</span>
-        <button type="button" onClick={() => switchTab('snippets')} className={type === 'snippets' ? 'font-semibold' : ''}>
-          {t('search.snippets', 'Snippets')}
-        </button>
-      </div>
+    <div>
+      <ContextBar
+        crumb={
+          <span className="text-xl font-semibold text-[var(--color-text-primary)] truncate">
+            {t('search.title', 'Search')}
+            {query && <span className="ml-2 text-sm font-normal text-[var(--color-text-muted)]">“{query}”</span>}
+          </span>
+        }
+      />
+      <AppPage>
+      <SegmentedTabs ariaLabel="Search categories" tabs={searchTabs} value={type} onChange={(id) => switchTab(id as SearchTab)} />
       {loading ? (
         <p className="text-sm text-[var(--color-text-secondary)]">{t('common.loading', 'Loading…')}</p>
       ) : query.length < 2 ? (
@@ -204,6 +201,7 @@ export function SearchView({ showNotice }: { showNotice: (type: 'success' | 'err
           )}
         </div>
       )}
+      </AppPage>
     </div>
   );
 }

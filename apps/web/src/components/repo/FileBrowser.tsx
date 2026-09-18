@@ -35,7 +35,7 @@ export function FileBrowser({
   branchTip?: string;
   showNotice: (type: 'success' | 'error', text: string) => void;
   onSaved: () => void;
-  onOpenBlob: (entryPath: string) => Promise<void>;
+  onOpenBlob: (entryPath: string) => void | Promise<void>;
   onNavigate: (dir: string) => void;
 }) {
   const { t } = useTranslation();

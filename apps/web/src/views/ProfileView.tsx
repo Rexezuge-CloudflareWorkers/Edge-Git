@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Building2, UserRound } from 'lucide-react';
 import type { OrgMember, OrgSummary, Repo, UserOrOrgProfile } from '../types';
@@ -11,25 +11,41 @@ import { OrgSettingsCard } from '../components/org/OrgSettingsCard';
 import { OrgMembersManager } from '../components/org/OrgMembersManager';
 import { OrgTeamsManager } from '../components/org/OrgTeamsManager';
 import { OrgAuditLogCard } from '../components/org/OrgAuditLogCard';
-import { cn } from '../lib/utils';
+import { ContextBar } from '../components/layout/ContextBar';
+import { SegmentedTabs } from '../components/layout/SegmentedTabs';
+import { LoadingSpinner } from '../components/layout/PageState';
+import { parseEnumParam, writeParams } from '../lib/urlParams';
 
 type ProfileTab = 'repositories' | 'organizations' | 'people' | 'manage';
+const PROFILE_TABS = ['repositories', 'organizations', 'people', 'manage'] as const;
 
 export function ProfileView({ showNotice }: { showNotice: (type: 'success' | 'error', text: string) => void }) {
   const { username = '' } = useParams<{ username: string }>();
   const { t } = useTranslation();
+  const [params, setParams] = useSearchParams();
   const [profile, setProfile] = useState<UserOrOrgProfile | null>(null);
   const [repos, setRepos] = useState<Repo[]>([]);
   const [orgs, setOrgs] = useState<OrgSummary[]>([]);
   const [members, setMembers] = useState<OrgMember[] | null>(null);
   const [authedViewerRole, setAuthedViewerRole] = useState<'owner' | 'member' | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'missing'>('loading');
-  const [tab, setTab] = useState<ProfileTab>('repositories');
+  // Profile section is URL state (`?tab=`) so pasted links restore the view.
+  const tab = parseEnumParam<ProfileTab>(params.get('tab'), PROFILE_TABS, 'repositories');
+  const setTab = (next: ProfileTab) => {
+    writeParams(setParams, params, { tab: next === 'repositories' ? '' : next });
+  };
+  // Switching profiles drops the previous section selection.
+  const prevUsernameRef = useRef(username);
+  useEffect(() => {
+    if (prevUsernameRef.current === username) return;
+    prevUsernameRef.current = username;
+    writeParams(setParams, params, { tab: '' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [username]);
 
   useEffect(() => {
     let cancelled = false;
-    const run = async () => {
-      if (!cancelled) setStatus('loading');
+    const run = async () => {      if (!cancelled) setStatus('loading');
       try {
         const data = await loadProfile(username);
         if (cancelled) return;
@@ -43,7 +59,8 @@ export function ProfileView({ showNotice }: { showNotice: (type: 'success' | 'er
         setOrgs(orgRows);
         setMembers(null);
         setAuthedViewerRole(null);
-        setTab('repositories');
+        // Section stays URL-owned (`?tab=`): out-of-range tabs fall back via
+        // `visibleTab`, and profile switches reset explicitly above.
         if (data.type === 'org') {
           // Public `/users/:username` cannot resolve the viewer when the request
           // is anonymous at the edge (no Access assertion on public routes), so
@@ -71,11 +88,7 @@ export function ProfileView({ showNotice }: { showNotice: (type: 'success' | 'er
   }, [username]);
 
   if (status === 'loading') {
-    return (
-      <div className="min-h-64 flex items-center justify-center">
-        <div className="h-10 w-10 rounded-full border-2 border-[var(--color-accent)] border-t-transparent animate-spin" />
-      </div>
-    );
+    return <LoadingSpinner label="Loading profile" />;
   }
 
   if (status === 'missing' || !profile) {
@@ -102,7 +115,18 @@ export function ProfileView({ showNotice }: { showNotice: (type: 'success' | 'er
   const visibleTab: ProfileTab = tabs.includes(tab) ? tab : 'repositories';
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8 space-y-4">
+    <div>
+      <ContextBar
+        crumb={
+          <span className="text-xl font-semibold text-[var(--color-text-primary)] truncate">
+            {profile.username}
+            <span className="ml-2 text-xs font-normal text-[var(--color-text-muted)]">
+              {isOrg ? t('profile.organization', 'Organization') : t('profile.user', 'User')}
+            </span>
+          </span>
+        }
+      />
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-4">
       <Card className="flex items-center gap-4">
         <div className="flex items-center justify-center w-12 h-12 rounded-full bg-[var(--color-surface-3)] shrink-0">
           {isOrg ? (
@@ -130,29 +154,22 @@ export function ProfileView({ showNotice }: { showNotice: (type: 'success' | 'er
         </div>
       </Card>
 
-      <div className="flex items-center gap-1 rounded-lg bg-[var(--color-surface-2)] p-1 w-fit">
-        {tabs.map((key) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setTab(key)}
-            className={cn(
-              'px-3.5 py-1.5 rounded-md text-sm transition-colors duration-150',
-              visibleTab === key
-                ? 'bg-[var(--color-surface-1)] text-[var(--color-text-primary)]'
-                : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]',
-            )}
-          >
-            {key === 'repositories'
+      <SegmentedTabs
+        ariaLabel="Profile sections"
+        tabs={tabs.map((key) => ({
+          id: key,
+          label:
+            key === 'repositories'
               ? t('profile.repositories', 'Repositories')
               : key === 'organizations'
                 ? t('profile.organizations', 'Organizations')
                 : key === 'people'
                   ? t('profile.people', 'People')
-                  : t('profile.manage', 'Manage')}
-          </button>
-        ))}
-      </div>
+                  : t('profile.manage', 'Manage'),
+        }))}
+        value={visibleTab}
+        onChange={(id) => setTab(id as ProfileTab)}
+      />
 
       {visibleTab === 'repositories' && (
         <Card>
@@ -240,6 +257,7 @@ export function ProfileView({ showNotice }: { showNotice: (type: 'success' | 'er
           <OrgSettingsCard org={{ username: profile.username }} showNotice={showNotice} />
         </div>
       )}
+      </div>
     </div>
   );
 }

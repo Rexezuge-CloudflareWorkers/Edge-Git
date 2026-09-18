@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { StickyNote } from 'lucide-react';
 import type { Snippet, SnippetFile } from '../types';
@@ -7,6 +8,13 @@ import { Button } from '../components/ui/Button';
 import { Card, CardHeader, CardTitle } from '../components/ui/Card';
 import { Input, Textarea } from '../components/ui/Input';
 import { RefreshButton } from '../components/shared/RefreshButton';
+import { ContextBar } from '../components/layout/ContextBar';
+import { SegmentedTabs } from '../components/layout/SegmentedTabs';
+import { AppPage } from '../components/layout/AppPage';
+import { parseEnumParam, readParam, writeParams } from '../lib/urlParams';
+
+const SNIPPET_TABS = ['public', 'mine'] as const;
+type SnippetTab = (typeof SNIPPET_TABS)[number];
 
 export function SnippetsView({
   showNotice,
@@ -16,9 +24,20 @@ export function SnippetsView({
   authorized?: boolean | null;
 }) {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<'public' | 'mine'>('public');
+  const [params, setParams] = useSearchParams();
+  // Scope + open snippet are URL state (`?tab=&id=`) so views are shareable.
+  const tab = parseEnumParam<SnippetTab>(params.get('tab'), SNIPPET_TABS, 'public');
+  const setTab = (next: SnippetTab) => {
+    writeParams(setParams, params, { tab: next === 'public' ? '' : next, id: '' });
+  };
+  // Scope + open snippet are URL state (`?tab=&id=`) with the URL as the
+  // single source of truth: selection writes the query directly, so pasted
+  // links, Back, and clicks can never disagree. Drafts stay local.
   const [snippets, setSnippets] = useState<Snippet[]>([]);
-  const [selected, setSelected] = useState<string | null>(null);
+  const selected = readParam(params, 'id') || null;
+  const setSelected = (next: string | null) => {
+    writeParams(setParams, params, { id: next ?? '' });
+  };
   const [files, setFiles] = useState<SnippetFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState('');
@@ -53,15 +72,37 @@ export function SnippetsView({
     setReloadKey((k) => k + 1);
   };
 
-  const openSnippet = async (id: string) => {
+  // Snippet navigation writes the URL only; the loader effect below performs
+  // the single async load for clicks, submits, and pasted links alike.
+  const selectSnippet = (id: string | null) => {
+    setFiles([]);
     setSelected(id);
-    try {
-      const detail = await loadSnippet(id);
-      setFiles(detail.files);
-    } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadSnippets', 'Failed To Load Snippets.'));
-    }
   };
+
+  // Sole snippet loader: `selected` derives from the URL, so clicks,
+  // submits, and pasted links all converge here with no state syncing.
+  // Written as an effect-local `run()` like every other data loader in the
+  // codebase; all updates happen after the await.
+  useEffect(() => {
+    if (!selected) return;
+    const target = selected;
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const detail = await loadSnippet(target);
+        if (cancelled) return;
+        setFiles(detail.files);
+      } catch (error) {
+        if (cancelled) return;
+        showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadSnippets', 'Failed To Load Snippets.'));
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,7 +116,6 @@ export function SnippetsView({
       showNotice('success', t('snippets.snippetCreated', 'Snippet Created.'));
       reload();
       setSelected(created.snippet.id);
-      setFiles(created.files);
     } catch (error) {
       showNotice('error', error instanceof Error ? error.message : t('errors.failedToCreateSnippet', 'Failed To Create Snippet.'));
     } finally {
@@ -84,11 +124,20 @@ export function SnippetsView({
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-6 space-y-4">
-      <div className="flex gap-2">
-        <Button size="sm" variant={tab === 'public' ? 'primary' : undefined} onClick={() => setTab('public')}>{t('snippets.public', 'Public')}</Button>
-        {signedIn && <Button size="sm" variant={tab === 'mine' ? 'primary' : undefined} onClick={() => setTab('mine')}>{t('snippets.mine', 'Mine')}</Button>}
-      </div>
+    <div>
+      <ContextBar
+        crumb={<span className="text-xl font-semibold text-[var(--color-text-primary)] truncate">{t('snippets.title', 'Snippets')}</span>}
+      />
+      <AppPage>
+      <SegmentedTabs
+        ariaLabel="Snippet scope"
+        tabs={[
+          { id: 'public', label: t('snippets.public', 'Public') },
+          ...(signedIn ? [{ id: 'mine', label: t('snippets.mine', 'Mine') }] : []),
+        ]}
+        value={tab}
+        onChange={(id) => setTab(id as SnippetTab)}
+      />
 
       {signedIn && (
         <Card>
@@ -124,7 +173,7 @@ export function SnippetsView({
           <ul className="divide-y divide-[var(--color-border)]">
             {snippets.map((s) => (
               <li key={s.id} className="py-2 flex items-center gap-2 flex-wrap">
-                <button type="button" onClick={() => void openSnippet(s.id)} className="text-left text-[var(--color-accent)] hover:underline">
+                <button type="button" onClick={() => selectSnippet(s.id)} className="text-left text-[var(--color-accent)] hover:underline">
                   {s.title || s.id.slice(0, 8)}
                 </button>
                 <span className="text-xs text-[var(--color-text-muted)]">{s.visibility} · {s.ownerEmail}</span>
@@ -157,6 +206,7 @@ export function SnippetsView({
           ))}
         </Card>
       )}
+      </AppPage>
     </div>
   );
 }

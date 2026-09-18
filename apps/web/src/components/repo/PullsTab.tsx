@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { GitPullRequest } from 'lucide-react';
 import type { PullRequest, Repo } from '../../types';
@@ -7,6 +7,7 @@ import { createPull, listPulls } from '../../services/pullService';
 import { loadBranches } from '../../services/repoService';
 import { listForks } from '../../services/forkService';
 import { formatTimestamp } from '../../lib/format';
+import { readParam, writeParams } from '../../lib/urlParams';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Input, Select, Textarea } from '../ui/Input';
@@ -54,6 +55,7 @@ export function PullsTab({
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const currentFull = `${owner}/${repo}`;
   const [pulls, setPulls] = useState<PullRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,8 +69,17 @@ export function PullsTab({
   const [saving, setSaving] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [crossBranches, setCrossBranches] = useState<string[]>([]);
-  const [labelFilter, setLabelFilter] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
+  // List filters are URL state (`?label=&q=`) with the URL as the single
+  // source of truth: typing writes the query directly. Drafts
+  // (title/body/base/head) stay local by design.
+  const labelFilter = readParam(params, 'label');
+  const searchQuery = readParam(params, 'q');
+  const setLabelFilter = (next: string) => {
+    writeParams(setParams, params, { label: next.trim() });
+  };
+  const setSearchQuery = (next: string) => {
+    writeParams(setParams, params, { q: next.trim() });
+  };
   const [isDraft, setIsDraft] = useState(false);
 
   const isCrossRepo = headRepo.toLowerCase() !== currentFull.toLowerCase();

@@ -7,6 +7,9 @@ import { listMyRepos } from '../services/repoService';
 import { listWatchedRepos } from '../services/socialService';
 import { Button } from '../components/ui/Button';
 import { Card, CardHeader, CardTitle } from '../components/ui/Card';
+import { AppPage } from '../components/layout/AppPage';
+import { PageHeaderCard } from '../components/layout/PageHeaderCard';
+import { EmptyState } from '../components/layout/PageState';
 import { VisibilityBadge } from '../components/ui/Badge';
 import { ReadOnlyField } from '../components/shared/ReadOnlyField';
 import { RefreshButton } from '../components/shared/RefreshButton';
@@ -61,46 +64,48 @@ export function DashboardView({ showNotice }: { showNotice: (type: 'success' | '
   }, [newOpen]);
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8 space-y-4">
-      <Card className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 py-4">
-        <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">{t('dashboard.title', 'Dashboard')}</h1>
-        <div className="flex flex-wrap items-center gap-3">
-          <RefreshButton onRefresh={refresh} loading={loading} />
-          <div className="relative" ref={menuRef}>
-            <Button variant="primary" size="sm" onClick={() => setNewOpen((v) => !v)} aria-haspopup="menu" aria-expanded={newOpen}>
-              <Plus className="h-3.5 w-3.5" />
-              {t('dashboard.new', 'New')}
-              <ChevronDown className="h-3.5 w-3.5" />
-            </Button>
-            {newOpen && (
-              <div role="menu" className="absolute right-0 mt-2 w-52 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-1)] p-1.5 shadow-xl z-30">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="w-full text-left px-3 py-2 rounded-lg text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-3)]"
-                  onClick={() => {
-                    setNewOpen(false);
-                    void navigate('/new');
-                  }}
-                >
-                  {t('dashboard.newRepository', 'New Repository')}
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="w-full text-left px-3 py-2 rounded-lg text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-3)]"
-                  onClick={() => {
-                    setNewOpen(false);
-                    setOrgModal(true);
-                  }}
-                >
-                  {t('orgs.newOrg', 'New Organization')}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </Card>
+    <AppPage>
+      <PageHeaderCard
+        title={t('dashboard.title', 'Dashboard')}
+        actions={
+          <>
+            <RefreshButton onRefresh={refresh} loading={loading} />
+            <div className="relative" ref={menuRef}>
+              <Button variant="primary" size="sm" onClick={() => setNewOpen((v) => !v)} aria-haspopup="menu" aria-expanded={newOpen}>
+                <Plus className="h-3.5 w-3.5" />
+                {t('dashboard.new', 'New')}
+                <ChevronDown className="h-3.5 w-3.5" />
+              </Button>
+              {newOpen && (
+                <div role="menu" className="absolute right-0 mt-2 w-52 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-1)] p-1.5 shadow-xl z-30">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="w-full text-left px-3 py-2 rounded-lg text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-3)]"
+                    onClick={() => {
+                      setNewOpen(false);
+                      void navigate('/new');
+                    }}
+                  >
+                    {t('dashboard.newRepository', 'New Repository')}
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="w-full text-left px-3 py-2 rounded-lg text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-3)]"
+                    onClick={() => {
+                      setNewOpen(false);
+                      setOrgModal(true);
+                    }}
+                  >
+                    {t('orgs.newOrg', 'New Organization')}
+                  </button>
+                </div>
+              )}
+            </div>
+          </>
+        }
+      />
 
       <Card>
         <CardHeader>
@@ -122,10 +127,10 @@ export function DashboardView({ showNotice }: { showNotice: (type: 'success' | '
           <span className="text-sm text-[var(--color-text-muted)]">{repos.length}</span>
         </CardHeader>
         {!loading && repos.length === 0 ? (
-          <div className="text-center text-[var(--color-text-muted)] py-10 text-sm">
-            <BookMarked className="h-6 w-6 mx-auto mb-3 text-[var(--color-text-muted)]" />
-            No Repositories Yet. Create One To Get Started.
-          </div>
+          <EmptyState
+            icon={<BookMarked className="h-6 w-6 text-[var(--color-text-muted)]" />}
+            message="No Repositories Yet. Create One To Get Started."
+          />
         ) : (
           <ul className="divide-y divide-[var(--color-border)]">
             {repos.map((r) => (
@@ -173,6 +178,6 @@ export function DashboardView({ showNotice }: { showNotice: (type: 'success' | '
           }}
         />
       )}
-    </div>
+    </AppPage>
   );
 }

@@ -3,7 +3,9 @@ import { UserRound } from 'lucide-react';
 import type { CurrentUser } from '../types';
 import { ProfileSettingsCard } from '../components/settings/ProfileSettingsCard';
 import { TokensTab } from '../components/settings/TokensTab';
-import { Card } from '../components/ui/Card';
+import { ContextBar } from '../components/layout/ContextBar';
+import { AppPage } from '../components/layout/AppPage';
+import { PageHeaderCard } from '../components/layout/PageHeaderCard';
 
 export function SettingsView({
   user,
@@ -16,20 +18,21 @@ export function SettingsView({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8 space-y-4">
-      <Card className="flex items-center gap-3 py-4">
-        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--color-surface-3)]">
-          <UserRound className="h-5 w-5 text-[var(--color-text-secondary)]" />
-        </div>
-        <div className="min-w-0">
-          <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">{t('settings.userSettings', 'User Settings')}</h1>
-          <p className="text-sm text-[var(--color-text-muted)] truncate">{user.email}</p>
-        </div>
-      </Card>
+    <div>
+      <ContextBar
+        crumb={<span className="text-xl font-semibold text-[var(--color-text-primary)] truncate">{t('settings.userSettings', 'User Settings')}</span>}
+      />
+      <AppPage>
+        <PageHeaderCard
+          icon={<UserRound className="h-5 w-5 text-[var(--color-text-secondary)]" />}
+          title={t('settings.userSettings', 'User Settings')}
+          description={user.email}
+        />
 
-      <ProfileSettingsCard user={user} setUser={setUser} showNotice={showNotice} />
+        <ProfileSettingsCard user={user} setUser={setUser} showNotice={showNotice} />
 
-      <TokensTab showNotice={showNotice} />
+        <TokensTab showNotice={showNotice} />
+      </AppPage>
     </div>
   );
 }

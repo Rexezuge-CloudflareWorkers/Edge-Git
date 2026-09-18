@@ -3,9 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { Repo } from '../types';
 import { loadRepoAuthed, loadRepoPublic } from '../services/repoService';
-import { RepoHeader } from '../components/repo/RepoHeader';
+import { RepoHeader, type RepoTab } from '../components/repo/RepoHeader';
 import { IssueDetail } from '../components/repo/IssueDetail';
 import { Card } from '../components/ui/Card';
+import { AppPage } from '../components/layout/AppPage';
+import { LoadingSpinner } from '../components/layout/PageState';
 import Unauthorized from '../components/layout/Unauthorized';
 
 export function IssueDetailView({
@@ -78,16 +80,12 @@ export function IssueDetailView({
   }, [authorized, status, repoData, owner, repo]);
 
   if (status === 'loading' && !repoData) {
-    return (
-      <div className="min-h-64 flex items-center justify-center">
-        <div className="h-10 w-10 rounded-full border-2 border-[var(--color-accent)] border-t-transparent animate-spin" />
-      </div>
-    );
+    return <LoadingSpinner label="Loading repository" />;
   }
 
   if (status === 'missing') {
     return (
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <AppPage>
         <Card>
           <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">
             {t('repos.repositoryNotFound', 'Repository Not Found')}
@@ -99,35 +97,35 @@ export function IssueDetailView({
             })}
           </p>
         </Card>
-      </div>
+      </AppPage>
     );
   }
 
   if (status === 'forbidden' || !repoData) {
     return (
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <AppPage>
         <Unauthorized message={t('repos.privateRepositoryMessage', 'This Repository Is Private. Sign In To View It.')} />
-      </div>
+      </AppPage>
     );
   }
 
   if (!Number.isSafeInteger(issueNumber)) {
     return (
       <div>
-        <RepoHeader repo={repoData} activeTab="issues" showSettings={false} onTabChange={() => navigate(`/${owner}/${repo}`)} />
-        <div className="max-w-7xl mx-auto px-6 py-6">
+        <RepoHeader repo={repoData} activeTab="issues" showSettings={false} onTabChange={(id: RepoTab) => navigate(`/${owner}/${repo}${id === 'code' ? '' : `?tab=${id}`}`)} />
+        <AppPage>
           <Card>
             <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('issues.issueNotFound', 'Issue Not Found.')}</h1>
           </Card>
-        </div>
+        </AppPage>
       </div>
     );
   }
 
   return (
     <div>
-      <RepoHeader repo={repoData} activeTab="issues" showSettings={false} onTabChange={() => navigate(`/${owner}/${repo}`)} />
-      <div className="max-w-7xl mx-auto px-6 py-6">
+      <RepoHeader repo={repoData} activeTab="issues" showSettings={false} onTabChange={(id: RepoTab) => navigate(`/${owner}/${repo}${id === 'code' ? '' : `?tab=${id}`}`)} />
+      <AppPage>
         <IssueDetail
           owner={owner}
           repo={repo}
@@ -137,7 +135,7 @@ export function IssueDetailView({
           showNotice={showNotice}
           authorized={authorized}
         />
-      </div>
+      </AppPage>
     </div>
   );
 }

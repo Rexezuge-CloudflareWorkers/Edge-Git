@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type { Repo } from '../types';
 import { loadRepoAuthed, loadRepoPublic } from '../services/repoService';
 import { RepoHeader, type RepoTab } from '../components/repo/RepoHeader';
@@ -14,7 +14,15 @@ import { WikiTab } from '../components/repo/WikiTab';
 import { RepoSettingsTab } from '../components/repo/RepoSettingsTab';
 import { SocialButtons } from '../components/repo/SocialButtons';
 import { Card } from '../components/ui/Card';
+import { AppPage } from '../components/layout/AppPage';
+import { LoadingSpinner } from '../components/layout/PageState';
+import { parseEnumParam, writeParams } from '../lib/urlParams';
 import Unauthorized from '../components/layout/Unauthorized';
+
+const REPO_TABS = ['code', 'pulls', 'issues', 'projects', 'discussions', 'wiki', 'releases', 'activity', 'settings'] as const;
+// Params owned by individual tabs; cleared when switching tabs or repos so
+// pasted URLs never leak stale branch/file/filter state into a new context.
+const TAB_LOCAL_PARAMS = ['ref', 'path', 'blob', 'label', 'q', 'category', 'discussion'];
 
 export function RepoView({
   authorized,
@@ -27,9 +35,23 @@ export function RepoView({
 }) {
   const { owner = '', repo = '' } = useParams<{ owner: string; repo: string }>();
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const [repoData, setRepoData] = useState<Repo | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'missing' | 'forbidden'>('loading');
-  const [tab, setTab] = useState<RepoTab>('code');
+  const tab = parseEnumParam<RepoTab>(params.get('tab'), REPO_TABS, 'code');
+  const setTab = (next: RepoTab) => {
+    writeParams(setParams, params, { tab: next === 'code' ? '' : next, ...Object.fromEntries(TAB_LOCAL_PARAMS.map((k) => [k, ''])) });
+  };
+  // Navigating owner/repo keeps `tab` (deliberate) but drops tab-local
+  // branch/file/filter params from the previous repository.
+  const repoKey = `${owner}/${repo}`;
+  const prevRepoKeyRef = useRef(repoKey);
+  useEffect(() => {
+    if (prevRepoKeyRef.current === repoKey) return;
+    prevRepoKeyRef.current = repoKey;
+    writeParams(setParams, params, Object.fromEntries(TAB_LOCAL_PARAMS.map((k) => [k, ''])));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repoKey]);
   const [issueCount, setIssueCount] = useState<number | undefined>(undefined);
   const [pullCount, setPullCount] = useState<number | undefined>(undefined);
   const [releaseCount, setReleaseCount] = useState<number | undefined>(undefined);
@@ -99,31 +121,27 @@ export function RepoView({
   }, [authorized, status, repoData, owner, repo]);
 
   if (status === 'loading' && !repoData) {
-    return (
-      <div className="min-h-64 flex items-center justify-center">
-        <div className="h-10 w-10 rounded-full border-2 border-[var(--color-accent)] border-t-transparent animate-spin" />
-      </div>
-    );
+    return <LoadingSpinner label="Loading repository" />;
   }
 
   if (status === 'missing') {
     return (
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <AppPage>
         <Card>
           <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">Repository Not Found</h1>
           <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
             {owner}/{repo} does not exist or you do not have access to it.
           </p>
         </Card>
-      </div>
+      </AppPage>
     );
   }
 
   if (status === 'forbidden' || !repoData) {
     return (
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <AppPage>
         <Unauthorized message="This Repository Is Private. Sign In To View It." />
-      </div>
+      </AppPage>
     );
   }
 
@@ -143,7 +161,7 @@ export function RepoView({
         socialActions={<SocialButtons owner={owner} repo={repo} authorized={authorized} showNotice={showNotice} />}
         onTabChange={setTab}
       />
-      <div className="max-w-7xl mx-auto px-6 py-6">
+      <AppPage>
         {visibleTab === 'code' && (
           <CodeTab
             key={`${owner}/${repo}`}
@@ -187,7 +205,7 @@ export function RepoView({
             onDeleted={() => navigate('/')}
           />
         )}
-      </div>
+      </AppPage>
     </div>
   );
 }

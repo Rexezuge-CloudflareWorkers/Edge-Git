@@ -1,6 +1,7 @@
 import { GitBranch, Lock, Zap } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { AppPage } from '../components/layout/AppPage';
 import { ZERO_TRUST_AUTHENTICATION_PATH } from '../lib/constants';
 
 function signIn() {
@@ -9,7 +10,7 @@ function signIn() {
 
 export function LandingView() {
   return (
-    <div className="max-w-7xl mx-auto px-6 py-16">
+    <AppPage variant="hero">
       <div className="text-center max-w-2xl mx-auto animate-fade-in-up">
         <h1 className="text-4xl font-semibold tracking-tight text-[var(--color-text-primary)]">
           Self-Hosted Git on <span className="text-[var(--color-accent)]">Cloudflare Workers</span>
@@ -42,6 +43,6 @@ export function LandingView() {
           <p className="text-sm text-[var(--color-text-secondary)]">Personal access tokens for Git; Cloudflare Access for the web UI.</p>
         </Card>
       </div>
-    </div>
+    </AppPage>
   );
 }

@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MessagesSquare } from 'lucide-react';
 import type { Discussion, DiscussionCategory, DiscussionComment } from '../../types';
 import { addDiscussionComment, createDiscussion, deleteDiscussion, deleteDiscussionComment, listDiscussionCategories, listDiscussions, loadDiscussion, updateDiscussion } from '../../services/discussionService';
 import { formatTimestamp } from '../../lib/format';
+import { readIntParam, readParam, writeParams } from '../../lib/urlParams';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Input, Textarea } from '../ui/Input';
@@ -24,10 +26,22 @@ export function DiscussionsTab({
   authorized?: boolean | null;
 }) {
   const { t } = useTranslation();
+  const [params, setParams] = useSearchParams();
   const [categories, setCategories] = useState<DiscussionCategory[]>([]);
   const [discussions, setDiscussions] = useState<Discussion[]>([]);
-  const [category, setCategory] = useState<string>('');
-  const [selected, setSelected] = useState<number | null>(null);
+  // Category + open discussion are URL state (`?category=&discussion=`) with
+  // the URL as the single source of truth: selection writes the query
+  // directly, so pasted links, Back, and clicks can never disagree. Drafts
+  // (title/body/comment) stay local by design.
+  const category = readParam(params, 'category');
+  const selectedRaw = readIntParam(params, 'discussion', -1, 1);
+  const selected = selectedRaw < 0 ? null : selectedRaw;
+  const setCategory = (next: string) => {
+    writeParams(setParams, params, { category: next });
+  };
+  const setSelected = (next: number | null) => {
+    writeParams(setParams, params, { discussion: next === null ? '' : String(next) });
+  };
   const [detail, setDetail] = useState<{ discussion: Discussion; comments: DiscussionComment[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState('');
