@@ -23,9 +23,9 @@ describe('rate-limit hardening', () => {
     expect(clientIp(c as never)).toBe('1.2.3.4');
   });
 
-  it('falls back to first X-Forwarded-For entry trimmed', () => {
+  it('does NOT trust spoofable X-Forwarded-For (fail-closed grouping)', () => {
     const c = makeCtx({ 'X-Forwarded-For': ' 5.6.7.8, 1.1.1.1' });
-    expect(clientIp(c as never)).toBe('5.6.7.8');
+    expect(clientIp(c as never)).toBe('unknown');
   });
 
   it('returns unknown with no ip headers', () => {

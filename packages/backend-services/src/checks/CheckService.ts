@@ -5,6 +5,7 @@ import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import type { CheckCombinedState, CheckConclusion, CheckRunMetadata, CheckRunStatus } from '@edge-git/shared';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 import { isBuiltInCheckContext } from './CheckSteps';
+import { validateWebhookUrl } from '../webhook/WebhookEvents';
 
 export type { BuiltInCheckContext } from './CheckSteps';
 export { BUILT_IN_CHECK_CONTEXTS, isBuiltInCheckContext } from './CheckSteps';
@@ -60,6 +61,15 @@ function normalizeDetailsUrl(raw: unknown): string | null {
     throw new BadRequestError('detailsUrl must be a valid absolute URL');
   }
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') throw new BadRequestError('detailsUrl must use http or https');
+  // Display-only today (never fetched server-side), but apply the same
+  // literal-IP SSRF guard as webhooks so a future fetch cannot turn this
+  // into metadata/loopback access. DNS-rebind remains documented best-effort.
+  try {
+    validateWebhookUrl(url);
+  } catch (error) {
+    if (error instanceof BadRequestError) throw error;
+    throw new BadRequestError('detailsUrl must not target a private or reserved address');
+  }
   return url;
 }
 

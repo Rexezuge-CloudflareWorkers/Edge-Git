@@ -82,7 +82,12 @@ describe('sensitive path matching', () => {
     expect(isSensitiveJsonPath('/user/tokens/abc/rotate')).toBe(true);
     expect(isSensitiveJsonPath('/user/realtime/ticket')).toBe(true);
     expect(isSensitiveJsonPath('/user/realtime/inbox-ticket')).toBe(true);
-    expect(isSensitiveJsonPath('/user/tokens-evil')).toBe(false);
+    // BREAKING: all /user/* is no-store by default (collaborators/orgs/
+    // notifications leak fix), so even odd suffixes are sensitive.
+    expect(isSensitiveJsonPath('/user/tokens-evil')).toBe(true);
+    expect(isSensitiveJsonPath('/user/collaborators')).toBe(true);
+    expect(isSensitiveJsonPath('/user/orgs/acme')).toBe(true);
+    expect(isSensitiveJsonPath('/user/notifications')).toBe(true);
     expect(isSensitiveJsonPath('/search?q=tokens')).toBe(false);
     expect(SECURITY_HEADERS['Cross-Origin-Embedder-Policy']).toBe('require-corp');
     expect(SECURITY_HEADERS['Origin-Agent-Cluster']).toBe('?1');

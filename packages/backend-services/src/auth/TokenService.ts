@@ -171,6 +171,19 @@ class TokenService {
     const tokenHash = await TokenService.hashToken(token);
     const prefix = tokenPrefixOf(token);
     await dao.create(tokenId, normalized, tokenHash, trimmedName, expiresAt, now, effectiveScopes, prefix);
+    // Post-create single-flight: two concurrent creates can both pass the
+    // pre-check. If we lost the race and exceeded the cap, roll back our own
+    // token so MAX_TOKENS_PER_USER holds under concurrency.
+    try {
+      const after = await dao.getByUserEmail(normalized);
+      if (after.length > maxTokens) {
+        await dao.delete(tokenId, normalized).catch(() => undefined);
+        throw new BadRequestError(`Maximum ${maxTokens} tokens allowed per user`);
+      }
+    } catch (error) {
+      if (error instanceof BadRequestError) throw error;
+      // Count lookup failure must not fail the mint itself.
+    }
     if (resolvedGrants.length > 0) {
       const grantDAO = await this.deps.tokenGrantDAO();
       try {
@@ -248,7 +261,7 @@ class TokenService {
 
   public async deleteToken(tokenId: string, userEmail: string): Promise<void> {
     const dao = await this.deps.tokenDAO();
-    const deleted = await dao.delete(tokenId, userEmail);
+    const deleted = await dao.delete(tokenId, userEmail.toLowerCase());
     if (!deleted) throw new NotFoundError('Token not found');
     await this.deps.tokenGrantDAO().then((d) => d.deleteByToken(tokenId).catch(() => undefined));
   }

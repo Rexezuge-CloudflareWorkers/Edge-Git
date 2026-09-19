@@ -11,12 +11,13 @@ const buckets = new Map<string, Bucket>();
 
 function clientIp(c: RateLimitContext): string {
   // Trust order is deliberate: Cloudflare sets CF-Connecting-IP and it cannot
-  // be spoofed by clients; X-Forwarded-For is only a fallback for local dev
-  // and non-CF deployments (first entry, trimmed).
+  // be spoofed by clients. X-Forwarded-For is NOT trusted by default because
+  // it is client-controlled and lets attackers rotate buckets at will.
+  // Local dev without CF headers shares the `unknown` bucket (fail-closed
+  // grouping rather than per-spoofed-IP isolation).
   const cfIp = c.req.header('CF-Connecting-IP')?.trim();
   if (cfIp) return cfIp;
-  const forwarded = c.req.header('X-Forwarded-For')?.split(',', 1)[0]?.trim();
-  return forwarded || 'unknown';
+  return 'unknown';
 }
 
 function getRateLimitBucketCountForTests(): number {
@@ -55,7 +56,9 @@ function cleanup(now: number): void {
  * Minimal in-memory token-bucket guard for abuse-prone mutating endpoints.
  * Per-isolate only (Workers have no shared memory); the cron sweeper and DO
  * single-flight remain the cross-isolate backstop. Never throws — failures
- * fail open so limiting can never 500 a legitimate request.
+ * fail open so limiting can never 500 a legitimate request. IP grouping is
+ * fail-closed: without a trusted CF-Connecting-IP all callers share the
+ * `unknown` bucket instead of getting per-spoofed-header isolation.
  */
 function rateLimit(opts: {
   windowMs: number;
