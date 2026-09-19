@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { splitSql } from './integration/helpers/migrations';
 
 describe('splitSql', () => {
@@ -50,5 +52,19 @@ select 1;`;
     const stmts = splitSql(`CREATE TABLE trigger (id TEXT);
 INSERT INTO trigger VALUES ('x');`);
     expect(stmts).toHaveLength(2);
+  });
+
+  it('splits the rowid-linked code FTS rebuild (0018) into whole statements', () => {
+    const url = new URL('../migrations/0018_code_fts_rowid.sql', import.meta.url);
+    const sql = readFileSync(fileURLToPath(url), 'utf8');
+    const stmts = splitSql(sql);
+    // 3 DROP TRIGGER + CREATE VIRTUAL + INSERT..SELECT + DROP TABLE + ALTER
+    // + 3 CREATE TRIGGER = 10 statements.
+    expect(stmts).toHaveLength(10);
+    const triggers = stmts.filter((s) => s.toUpperCase().includes('CREATE TRIGGER'));
+    expect(triggers).toHaveLength(3);
+    for (const trigger of triggers) expect(trigger.trimEnd().toUpperCase().endsWith('END')).toBe(true);
+    expect(stmts.some((s) => s.includes('code_fts_new') && s.toUpperCase().includes('RENAME TO'))).toBe(true);
+    expect(stmts.filter((s) => s.includes('WHERE rowid = OLD.rowid'))).toHaveLength(2);
   });
 });

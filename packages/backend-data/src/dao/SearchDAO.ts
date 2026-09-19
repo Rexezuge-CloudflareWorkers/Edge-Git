@@ -22,6 +22,29 @@ interface CodeHit {
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
 
+interface CodeOidEntry {
+  path: string;
+  oid: string | null;
+}
+
+interface CodeFileInput {
+  repoId: string;
+  path: string;
+  oid: string | null;
+  content: string;
+  now: number;
+}
+
+// Conditional upsert: a row that is already identical is left untouched so
+// the AFTER UPDATE FTS trigger never fires. Unconditional rewrites cost
+// ~250 D1 rows-read each (FTS delete-scan + re-tokenize); unchanged files
+// must not pay that. `IS DISTINCT FROM` is NULL-safe (NULL oid = unknown
+// blob, always rewritten when content differs).
+const UPSERT_CODE_FILE_SQL =
+  `INSERT INTO code_index (repo_id, path, oid, content, updated_at) VALUES (?, ?, ?, ?, ?)
+   ON CONFLICT (repo_id, path) DO UPDATE SET oid = excluded.oid, content = excluded.content, updated_at = excluded.updated_at
+   WHERE excluded.oid IS DISTINCT FROM code_index.oid OR excluded.content IS DISTINCT FROM code_index.content`;
+
 function clampLimit(limit: number | undefined): number {
   if (!limit || !Number.isSafeInteger(limit)) return DEFAULT_LIMIT;
   return Math.min(Math.max(limit, 1), MAX_LIMIT);
@@ -202,21 +225,90 @@ class SearchDAO extends BaseDAO {
     }
   }
 
-  public async upsertCodeFile(input: { repoId: string; path: string; oid: string | null; content: string; now: number }): Promise<void> {
+  public async upsertCodeFile(input: { repoId: string; path: string; oid: string | null; content: string; now: number }): Promise<number> {
     try {
-      await this.withRetry(
-        () =>
-          this.database
-            .prepare(
-              `INSERT INTO code_index (repo_id, path, oid, content, updated_at) VALUES (?, ?, ?, ?, ?)
-               ON CONFLICT (repo_id, path) DO UPDATE SET oid = excluded.oid, content = excluded.content, updated_at = excluded.updated_at`,
-            )
-            .bind(input.repoId, input.path, input.oid, input.content, input.now)
-            .run(),
+      const result = await this.withRetry(
+        () => this.database.prepare(UPSERT_CODE_FILE_SQL).bind(input.repoId, input.path, input.oid, input.content, input.now).run(),
         'upsert code index',
       );
+      return result.meta?.changes ?? 0;
     } catch {
       // Legacy DBs without migration 0006 — search degrades to no code results.
+      return 0;
+    }
+  }
+
+  // Batched variant for the backfill cron: one D1 batch per repo instead of
+  // one roundtrip per file. Falls back to sequential upserts on fakes and
+  // legacy bindings without `batch` (and on batch failure, where per-row
+  // retry still applies). Returns the number of rows changed.
+  public async upsertCodeFiles(inputs: CodeFileInput[]): Promise<number> {
+    if (inputs.length === 0) return 0;
+    try {
+      const database = this.database;
+      if (typeof database.batch === 'function') {
+        try {
+          const statements = inputs.map((input) =>
+            database.prepare(UPSERT_CODE_FILE_SQL).bind(input.repoId, input.path, input.oid, input.content, input.now),
+          );
+          const results = await database.batch(statements);
+          return results.reduce((total, result) => total + ((result.meta?.changes ?? 0) || 0), 0);
+        } catch {
+          // Fall through to sequential upserts below.
+        }
+      }
+      let changed = 0;
+      for (const input of inputs) {
+        changed += await this.upsertCodeFile(input);
+      }
+      return changed;
+    } catch {
+      // Legacy DBs without migration 0006 — search degrades to no code results.
+      return 0;
+    }
+  }
+
+  // Dirty-check support for the backfill cron: fetch indexed (path, oid)
+  // pairs once per repo so unchanged HEAD files skip their blob fetch and
+  // upsert entirely. Single indexed read vs ~250 rows-read per rewrite.
+  public async getOidsByRepo(repoId: string): Promise<CodeOidEntry[]> {
+    try {
+      const result = await this.database
+        .prepare('SELECT path, oid FROM code_index WHERE repo_id = ?')
+        .bind(repoId)
+        .all<CodeOidEntry>();
+      return result.results ?? [];
+    } catch {
+      // Legacy DBs without migration 0006.
+      return [];
+    }
+  }
+
+  // Delete index rows for paths no longer present at HEAD (push deletions
+  // never pass through the web delete path). Only call after a successful
+  // HEAD listing — never on listing failure, or a DO outage would wipe the
+  // index. Returns the number of rows removed.
+  public async deleteCodePathsNotIn(repoId: string, keepPaths: string[]): Promise<number> {
+    try {
+      if (keepPaths.length === 0) {
+        const result = await this.withRetry(
+          () => this.database.prepare('DELETE FROM code_index WHERE repo_id = ?').bind(repoId).run(),
+          'delete stale code index',
+        );
+        return result.meta?.changes ?? 0;
+      }
+      const placeholders = keepPaths.map(() => '?').join(', ');
+      const result = await this.withRetry(
+        () =>
+          this.database
+            .prepare(`DELETE FROM code_index WHERE repo_id = ? AND path NOT IN (${placeholders})`)
+            .bind(repoId, ...keepPaths)
+            .run(),
+        'delete stale code index',
+      );
+      return result.meta?.changes ?? 0;
+    } catch {
+      return 0;
     }
   }
 
@@ -313,4 +405,4 @@ class SearchDAO extends BaseDAO {
 }
 
 export { SearchDAO };
-export type { CodeHit, SearchOptions };
+export type { CodeFileInput, CodeHit, CodeOidEntry, SearchOptions };

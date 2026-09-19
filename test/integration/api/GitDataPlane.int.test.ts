@@ -75,8 +75,7 @@ describe('git data-plane on real D1+DO', () => {
     expect(traversal.status).toBe(400);
   });
 
-  it('rejects invalid git service and oversized bodies with 400/413', async () => {
-    expect((await api(`/${OWNER}/${REPO}/info/refs?service=nope`)).status).toBe(400);
+  it('rejects invalid git service and oversized bodies with 400/413', async () => {    expect((await api(`/${OWNER}/${REPO}/info/refs?service=nope`)).status).toBe(400);
 
     const bigFetch = await api(`/${OWNER}/${REPO}/git-upload-pack`, {
       method: 'POST',
@@ -107,5 +106,26 @@ describe('git data-plane on real D1+DO', () => {
       body: 'x',
     });
     expect(bigPush.status).toBe(413);
+  });
+
+  it('indexes editor writes into code search on real D1+FTS5', async () => {
+    const written = await api(
+      `/user/repos/${OWNER}/${REPO}/contents`,
+      json({
+        method: 'POST',
+        body: JSON.stringify({
+          branch: 'main',
+          path: 'src/searchprobe.ts',
+          contentBase64: b64('export function edgegitcodeprobe() { return 1; }'),
+          message: 'Add probe',
+        }),
+      }),
+    );
+    expect([200, 201]).toContain(written.status);
+
+    const res = await api(`/search?q=edgegitcodeprobe&type=code&owner=${OWNER}&repo=${REPO}`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { code?: Array<{ path: string }> };
+    expect(body.code?.map((hit) => hit.path)).toContain('src/searchprobe.ts');
   });
 });

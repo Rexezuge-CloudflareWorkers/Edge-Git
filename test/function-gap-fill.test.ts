@@ -908,9 +908,10 @@ describe('function-gap scheduled tasks', () => {
 
   it('CronTasksWorker 404s unknown paths and guards single-flight', async () => {
     const w = Object.create(CronTasksWorker.prototype) as InstanceType<typeof CronTasksWorker>;
+    (w as unknown as { runs: Map<string, Promise<void>> }).runs = new Map();
     const notFound = await (w as unknown as { fetch(r: Request): Promise<Response> }).fetch(new Request('https://do/nope', { method: 'GET' }));
     expect(notFound.status).toBe(404);
-    (w as unknown as { currentRun: Promise<void> | null }).currentRun = Promise.resolve();
+    (w as unknown as { runs: Map<string, Promise<void>> }).runs.set('', Promise.resolve());
     const busy = await (w as unknown as { fetch(r: Request): Promise<Response> }).fetch(new Request('https://do/run', { method: 'POST' }));
     expect(busy.status).toBe(202);
     expect(await busy.text()).toContain('Already running');
@@ -920,6 +921,7 @@ describe('function-gap scheduled tasks', () => {
     const w = Object.create(CronTasksWorker.prototype) as InstanceType<typeof CronTasksWorker>;
     const env = taskEnv(emptyDb());
     const ctxRuns: Array<Promise<unknown>> = [];
+    (w as unknown as { runs: Map<string, Promise<void>> }).runs = new Map();
     (w as unknown as { env: unknown }).env = env;
     (w as unknown as { ctx: unknown }).ctx = { waitUntil: (p: Promise<unknown>) => ctxRuns.push(p) };
     const res = await (w as unknown as { fetch(r: Request): Promise<Response> }).fetch(new Request('https://do/run', { method: 'POST', body: JSON.stringify({}) }));

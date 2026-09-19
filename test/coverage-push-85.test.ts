@@ -46,14 +46,22 @@ describe('coverage push: AppConfiguration git limits', () => {
 });
 
 describe('coverage push: CronTasksWorker', () => {
-  it('404s non-/run and handles single-flight', async () => {
+  it('404s non-/run and handles per-schedule single-flight', async () => {
     const w = Object.create(CronTasksWorker.prototype) as InstanceType<typeof CronTasksWorker>;
+    (w as unknown as { runs: Map<string, Promise<void>> }).runs = new Map();
     const notFound = await (w as unknown as { fetch(r: Request): Promise<Response> }).fetch(new Request('https://do/nope', { method: 'GET' }));
     expect(notFound.status).toBe(404);
-    // single-flight: set currentRun then fetch /run POST → 202 Already running
-    (w as unknown as { currentRun: Promise<void> | null }).currentRun = Promise.resolve();
-    // need ctx/env for fetch? fetch checks pathname first, then currentRun before touching env.
+    // single-flight: an in-flight run for the same cron → 202 Already running
+    (w as unknown as { runs: Map<string, Promise<void>> }).runs.set('', Promise.resolve());
+    // need ctx/env for fetch? fetch checks pathname first, then the runs map before touching env.
     const busy = await (w as unknown as { fetch(r: Request): Promise<Response> }).fetch(new Request('https://do/run', { method: 'POST' }));
     expect(busy.status).toBe(202);
+    // a different schedule is independent and proceeds to Started.
+    (w as unknown as { ctx: unknown }).ctx = {};
+    (w as unknown as { env: unknown }).env = {};
+    const other = await (w as unknown as { fetch(r: Request): Promise<Response> }).fetch(
+      new Request('https://do/run', { method: 'POST', body: JSON.stringify({ cron: '7 */4 * * *' }) }),
+    );
+    expect(other.status).toBe(202);
   });
 });

@@ -83,15 +83,31 @@ const CRON_TASK_DEFINITIONS: ScheduledTask[] = [
   new MirrorSyncTask(),
 ];
 
+// The 4-hour code-search tick. Must match the second entry of
+// `triggers.crons` in `apps/api/wrangler.template.jsonc`; fast tasks run on
+// every tick, SearchBackfillTask only here. Keep the two in sync when the
+// schedule changes.
+const SEARCH_TICK_CRON = '7 */4 * * *';
+
+function isSearchTick(cron: string): boolean {
+  const normalized = (cron ?? '').trim();
+  // Manual POST /run and unit tests pass no cron — run everything so a
+  // manual trigger never silently skips work.
+  if (!normalized) return true;
+  return normalized === SEARCH_TICK_CRON;
+}
+
 async function runScheduledTasks(env: Env, cron: string, scheduledTime: number): Promise<void> {
   logger.info(`Running scheduled tasks for ${cron} at ${scheduledTime}`);
+  const searchTick = isSearchTick(cron);
+  if (!searchTick) logger.info('Skipping SearchBackfillTask (off search tick)');
   const phase1 = CRON_TASK_DEFINITIONS.filter((t) => t.phase === 1);
-  const phase2 = CRON_TASK_DEFINITIONS.filter((t) => t.phase === 2);
+  const phase2 = CRON_TASK_DEFINITIONS.filter((t) => t.phase === 2 && (searchTick || t.name !== 'SearchBackfillTask'));
   await Promise.all(phase1.map((t) => t.run(env).catch((error: unknown) => logger.error(`Task ${t.name} failed`, error))));
   await Promise.all(phase2.map((t) => t.run(env).catch((error: unknown) => logger.error(`Task ${t.name} failed`, error))));
 }
 
-export { CRON_TASK_DEFINITIONS, runScheduledTasks, ExpiredTokenPruningTask, BackgroundTaskRunPruningTask, SocialPruningTask };
+export { CRON_TASK_DEFINITIONS, runScheduledTasks, isSearchTick, SEARCH_TICK_CRON, ExpiredTokenPruningTask, BackgroundTaskRunPruningTask, SocialPruningTask };
 export { AuditLogCleanupTask } from './AuditLogCleanupTask';
 export { CheckPruneTask } from './CheckPruneTask';
 export { CheckStaleTask } from './CheckStaleTask';

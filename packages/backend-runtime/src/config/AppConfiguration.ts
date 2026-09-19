@@ -26,6 +26,9 @@ import {
   DEFAULT_MAX_RELEASES_PER_REPO,
   DEFAULT_MAX_WIKI_BODY_BYTES,
   DEFAULT_MAX_WIKI_PAGES_PER_REPO,
+  DEFAULT_SEARCH_BACKFILL_FILES_PER_REPO,
+  DEFAULT_SEARCH_BACKFILL_INTERVAL_SECONDS,
+  DEFAULT_SEARCH_BACKFILL_REPOS_PER_TICK,
   DEFAULT_SITE_URL,
 } from './ConfigurationDefaults';
 
@@ -147,6 +150,18 @@ class AppConfiguration {
 
   public getTaskRunRetentionDays(): number {
     return EnvParser.positiveInt(this.env, 'BACKGROUND_TASK_RUN_RETENTION_DAYS', DEFAULT_BACKGROUND_TASK_RUN_RETENTION_DAYS);
+  }
+
+  public getSearchBackfillIntervalSeconds(): number {
+    return EnvParser.positiveInt(this.env, 'SEARCH_BACKFILL_INTERVAL_SECONDS', DEFAULT_SEARCH_BACKFILL_INTERVAL_SECONDS);
+  }
+
+  public getSearchBackfillReposPerTick(): number {
+    return EnvParser.positiveInt(this.env, 'SEARCH_BACKFILL_REPOS_PER_TICK', DEFAULT_SEARCH_BACKFILL_REPOS_PER_TICK);
+  }
+
+  public getSearchBackfillFilesPerRepo(): number {
+    return EnvParser.positiveInt(this.env, 'SEARCH_BACKFILL_FILES_PER_REPO', DEFAULT_SEARCH_BACKFILL_FILES_PER_REPO);
   }
 
   public getAuditLogRetentionDays(): number {
