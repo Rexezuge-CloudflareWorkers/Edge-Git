@@ -64,7 +64,7 @@
     },
   ],
   "triggers": {
-    "crons": ["*/10 * * * *"],
+    "crons": ["*/10 * * * *", "7 */4 * * *"],
   },
   "vars": {
     "ENVIRONMENT": "production",
@@ -96,6 +96,9 @@
     "MAX_ASSET_BYTES": "26214400",
     "BACKGROUND_TASK_RUN_RETENTION_DAYS": "30",
     "AUDIT_LOG_RETENTION_DAYS": "90",
+    "SEARCH_BACKFILL_INTERVAL_SECONDS": "14400",
+    "SEARCH_BACKFILL_REPOS_PER_TICK": "8",
+    "SEARCH_BACKFILL_FILES_PER_REPO": "50",
     "MAX_TEAMS_PER_ORG": "20",
     "MAX_TEAM_MEMBERS": "100",
     "MAX_TEAM_GRANTS": "100",

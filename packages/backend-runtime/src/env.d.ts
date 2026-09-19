@@ -31,6 +31,9 @@ declare global {
     MAX_ASSET_BYTES?: string;
     BACKGROUND_TASK_RUN_RETENTION_DAYS?: string;
     AUDIT_LOG_RETENTION_DAYS?: string;
+    SEARCH_BACKFILL_INTERVAL_SECONDS?: string;
+    SEARCH_BACKFILL_REPOS_PER_TICK?: string;
+    SEARCH_BACKFILL_FILES_PER_REPO?: string;
     MAX_TEAMS_PER_ORG?: string;
     MAX_TEAM_MEMBERS?: string;
     MAX_TEAM_GRANTS?: string;

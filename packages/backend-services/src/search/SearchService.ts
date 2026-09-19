@@ -218,6 +218,38 @@ class SearchService {
     await dao.deleteCodeFile(repoId, path);
   }
 
+  // Backfill dirty-check: indexed (path, oid) pairs for one repo so unchanged
+  // HEAD files skip their blob fetch and upsert entirely.
+  public async getIndexedOids(repoId: string): Promise<Map<string, string | null>> {
+    const dao = await this.deps.searchDAO();
+    const rows = await dao.getOidsByRepo(repoId);
+    const map = new Map<string, string | null>();
+    for (const row of rows) map.set(row.path, row.oid);
+    return map;
+  }
+
+  // Batched backfill write: indexable filtering + truncation mirror
+  // indexFile, then a single D1 batch per repo. Returns rows changed.
+  public async indexFiles(entries: Array<{ repoId: string; path: string; oid: string | null; content: string }>): Promise<number> {
+    const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
+    const rows: Array<{ repoId: string; path: string; oid: string | null; content: string; now: number }> = [];
+    for (const entry of entries) {
+      if (!SearchService.isIndexablePath(entry.path)) continue;
+      if (entry.content.includes(String.fromCodePoint(0))) continue;
+      rows.push({ repoId: entry.repoId, path: entry.path, oid: entry.oid, content: SearchService.truncateForIndex(entry.content), now });
+    }
+    if (rows.length === 0) return 0;
+    const dao = await this.deps.searchDAO();
+    return dao.upsertCodeFiles(rows);
+  }
+
+  // Remove index rows for paths no longer at HEAD. Only call after a
+  // successful HEAD listing (see SearchDAO.deleteCodePathsNotIn).
+  public async purgeStalePaths(repoId: string, keepPaths: string[]): Promise<number> {
+    const dao = await this.deps.searchDAO();
+    return dao.deleteCodePathsNotIn(repoId, keepPaths);
+  }
+
   public async searchDiscussions(
     query: string,
     viewerEmail: string | null,

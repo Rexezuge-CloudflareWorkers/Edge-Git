@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { PktLine } from '@edge-git/git-protocol';
 import { workerFetchAdapter } from '@edge-git/background/transfer/fetchAdapter';
 import { SearchBackfillTask } from '@edge-git/background/scheduled/SearchBackfillTask';
+import { SEARCH_TICK_CRON, isSearchTick, runScheduledTasks } from '@edge-git/background/scheduled/TaskRegistry';
+import { AppConfiguration } from '@edge-git/backend-runtime/config';
 import { ImportSweeperTask } from '@edge-git/background/scheduled/ImportSweeperTask';
 import { CheckPruneTask } from '@edge-git/background/scheduled/CheckPruneTask';
 import { CheckStaleTask } from '@edge-git/background/scheduled/CheckStaleTask';
@@ -135,6 +137,10 @@ function createFakeDb(tables: FakeTables): D1Queryable {
             .slice(0, limit);
           return Promise.resolve({ results: rows as T[] });
         }
+        if (q.startsWith('SELECT path, oid FROM code_index WHERE repo_id = ?')) {
+          const rows = tables.codeIndex.filter((c) => c.repo_id === params[0]).map((c) => ({ path: c.path, oid: c.oid }));
+          return Promise.resolve({ results: rows as T[] });
+        }
         return Promise.resolve({ results: [] });
       },
       run(): Promise<{ success: boolean; meta?: { changes?: number } }> {
@@ -218,9 +224,20 @@ function createFakeDb(tables: FakeTables): D1Queryable {
         if (q.startsWith('INSERT INTO code_index')) {
           const [repo_id, path, oid, content, updated_at] = params as [string, string, string | null, string, number];
           const existing = tables.codeIndex.find((c) => c.repo_id === repo_id && c.path === path);
-          if (existing) Object.assign(existing, { oid, content, updated_at });
-          else tables.codeIndex.push({ repo_id, path, oid, content, updated_at });
+          if (existing) {
+            // Emulate the conditional upsert WHERE clause.
+            if (existing.oid === oid && existing.content === content) {
+              return Promise.resolve({ success: true, meta: { changes: 0 } });
+            }
+            Object.assign(existing, { oid, content, updated_at });
+          } else tables.codeIndex.push({ repo_id, path, oid, content, updated_at });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('DELETE FROM code_index WHERE repo_id = ? AND path NOT IN (')) {
+          const before = tables.codeIndex.length;
+          const keep = new Set((params.slice(1) as unknown[]).map(String));
+          tables.codeIndex = tables.codeIndex.filter((c) => c.repo_id !== params[0] || keep.has(String(c.path)));
+          return Promise.resolve({ success: true, meta: { changes: before - tables.codeIndex.length } });
         }
         return Promise.resolve({ success: true, meta: { changes: 0 } });
       },
@@ -325,6 +342,129 @@ describe('SearchBackfillTask catch-up', () => {
     await new SearchBackfillTask().run(env);
     expect(tables.codeIndex.length).toBeLessThanOrEqual(50);
     expect(tables.codeIndex.length).toBeGreaterThan(0);
+  });
+
+  it('skips unchanged files without fetching blobs', async () => {
+    const tables = seedTables({
+      repos: [repoRow({ id: 'r1' })],
+      codeIndex: [
+        { repo_id: 'r1', path: 'same.ts', oid: OLD, content: 'same', updated_at: 50 },
+        { repo_id: 'r1', path: 'changed.ts', oid: 'c'.repeat(40), content: 'old', updated_at: 50 },
+      ],
+    });
+    const db = createFakeDb(tables);
+    const blobCalls: string[] = [];
+    const env = {
+      DB: db,
+      REPO: {
+        getByName: () => ({
+          listAllFiles: async () => [
+            { path: 'same.ts', oid: OLD },
+            { path: 'changed.ts', oid: OLD },
+          ],
+          getBlob: async ({ filepath }: { filepath: string }) => {
+            blobCalls.push(filepath);
+            return textBlob(`content of ${filepath}`);
+          },
+        }),
+      },
+    } as unknown as Env;
+    await new SearchBackfillTask().run(env);
+    expect(blobCalls).toEqual(['changed.ts']);
+    expect(tables.codeIndex).toHaveLength(2);
+    expect(tables.codeIndex.find((c) => c.path === 'changed.ts')).toMatchObject({ oid: OLD });
+    expect(tables.codeIndex.find((c) => c.path === 'same.ts')).toMatchObject({ updated_at: 50 });
+  });
+
+  it('purges index rows for paths deleted from HEAD', async () => {
+    const tables = seedTables({
+      repos: [repoRow({ id: 'r1' })],
+      codeIndex: [
+        { repo_id: 'r1', path: 'keep.ts', oid: OLD, content: 'keep', updated_at: 50 },
+        { repo_id: 'r1', path: 'gone.ts', oid: OLD, content: 'gone', updated_at: 50 },
+      ],
+    });
+    const db = createFakeDb(tables);
+    const env = {
+      DB: db,
+      REPO: {
+        getByName: () => ({
+          listAllFiles: async () => [{ path: 'keep.ts', oid: OLD }],
+          getBlob: async () => textBlob('keep'),
+        }),
+      },
+    } as unknown as Env;
+    await new SearchBackfillTask().run(env);
+    expect(tables.codeIndex.map((c) => c.path)).toEqual(['keep.ts']);
+  });
+
+  it('never purges when the HEAD listing fails', async () => {
+    const tables = seedTables({
+      repos: [repoRow({ id: 'r1' })],
+      codeIndex: [{ repo_id: 'r1', path: 'keep.ts', oid: OLD, content: 'keep', updated_at: 50 }],
+    });
+    const db = createFakeDb(tables);
+    const env = {
+      DB: db,
+      REPO: { getByName: () => ({ listAllFiles: async () => { throw new Error('do down'); } }) },
+    } as unknown as Env;
+    await new SearchBackfillTask().run(env);
+    expect(tables.codeIndex).toHaveLength(1);
+  });
+});
+
+describe('SearchBackfill scheduling', () => {
+  it('routes search to the 4h tick only', () => {
+    expect(SEARCH_TICK_CRON).toBe('7 */4 * * *');
+    expect(isSearchTick('')).toBe(true);
+    expect(isSearchTick('7 */4 * * *')).toBe(true);
+    expect(isSearchTick('*/10 * * * *')).toBe(false);
+  });
+
+  it('skips DO work on the fast tick but indexes on the search tick', async () => {
+    const fastTables = seedTables({ repos: [repoRow({ id: 'r1' })] });
+    let fastCalls = 0;
+    const fastEnv = {
+      DB: createFakeDb(fastTables),
+      REPO: {
+        getByName: () => ({
+          listAllFiles: async () => {
+            fastCalls += 1;
+            return [];
+          },
+          getBlob: async () => null,
+        }),
+      },
+    } as unknown as Env;
+    await runScheduledTasks(fastEnv, '*/10 * * * *', Date.now());
+    expect(fastCalls).toBe(0);
+    expect(fastTables.codeIndex).toHaveLength(0);
+
+    const slowTables = seedTables({ repos: [repoRow({ id: 'r1' })] });
+    let slowCalls = 0;
+    const slowEnv = {
+      DB: createFakeDb(slowTables),
+      REPO: {
+        getByName: () => ({
+          listAllFiles: async () => {
+            slowCalls += 1;
+            return [{ path: 'a.ts', oid: OLD }];
+          },
+          getBlob: async () => textBlob('hi'),
+        }),
+      },
+    } as unknown as Env;
+    await runScheduledTasks(slowEnv, '7 */4 * * *', Date.now());
+    expect(slowCalls).toBe(1);
+    expect(slowTables.codeIndex).toHaveLength(1);
+  });
+
+  it('search backfill tunables default with env overrides', () => {
+    expect(new AppConfiguration({}).getSearchBackfillIntervalSeconds()).toBe(14400);
+    expect(new AppConfiguration({}).getSearchBackfillReposPerTick()).toBe(8);
+    expect(new AppConfiguration({}).getSearchBackfillFilesPerRepo()).toBe(50);
+    expect(new AppConfiguration({ SEARCH_BACKFILL_INTERVAL_SECONDS: '3600' }).getSearchBackfillIntervalSeconds()).toBe(3600);
+    expect(new AppConfiguration({ SEARCH_BACKFILL_REPOS_PER_TICK: '3' }).getSearchBackfillReposPerTick()).toBe(3);
   });
 });
 

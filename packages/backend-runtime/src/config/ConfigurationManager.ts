@@ -38,6 +38,9 @@ class ConfigurationManager {
   public static readonly processing = {
     getTaskRunRetentionDays: (env: unknown): number => AppConfiguration.fromEnv(env).getTaskRunRetentionDays(),
     getAuditLogRetentionDays: (env: unknown): number => AppConfiguration.fromEnv(env).getAuditLogRetentionDays(),
+    getSearchBackfillIntervalSeconds: (env: unknown): number => AppConfiguration.fromEnv(env).getSearchBackfillIntervalSeconds(),
+    getSearchBackfillReposPerTick: (env: unknown): number => AppConfiguration.fromEnv(env).getSearchBackfillReposPerTick(),
+    getSearchBackfillFilesPerRepo: (env: unknown): number => AppConfiguration.fromEnv(env).getSearchBackfillFilesPerRepo(),
   };
 
   public static readonly webhooks = {
