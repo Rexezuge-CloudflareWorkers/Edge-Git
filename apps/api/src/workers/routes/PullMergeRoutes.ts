@@ -91,7 +91,7 @@ async function openCrossForkPull(
     }).catch(() => undefined);
     return { status: 201, body: created };
   } catch (error) {
-    return { status: toServiceStatus(error), body: { error: error instanceof Error ? error.message : 'Failed to create pull request' } };
+    return { status: toServiceStatus(error), body: { error: toSafeErrorMessage(error, 'Failed to create pull request') } };
   }
 }
 
@@ -193,7 +193,7 @@ async function mergeCrossForkPull(
     if (status === 500) return { status: 400, body: { error: 'Failed to record merge' } };
     const failure = error instanceof Error ? error.message : 'Failed to record merge';
     if (failure.includes('unresolved change requests')) return { status: 409, body: { error: failure } };
-    return { status, body: { error: failure } };
+    return { status, body: { error: toSafeErrorMessage(error, 'Failed to record merge') } };
   }
 }
 
@@ -220,7 +220,7 @@ function registerUserPullMergeRoutes(app: PullApp): void {
     try {
       pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
     if (pull.status === 'merged') return c.json({ error: 'pull request is already merged' }, 400);
     if (pull.status === 'closed') return c.json({ error: 'closed pull requests cannot be merged' }, 400);
@@ -377,7 +377,7 @@ function registerUserPullMergeRoutes(app: PullApp): void {
       if (status === 500) return c.json({ error: 'Failed to record merge' }, 400);
       const failure = error instanceof Error ? error.message : 'Failed to record merge';
       if (failure.includes('unresolved change requests')) return c.json({ error: failure }, 409);
-      return c.json({ error: failure }, status);
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to record merge') }, status);
     }
   });
 }

@@ -4,6 +4,7 @@ import type { AccessIdentityContext } from '@edge-git/backend-services/auth';
 import { getRequestScope } from '@edge-git/backend-runtime/di';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { RoleRank } from '@edge-git/backend-services/permission';
+import { coversScope } from '@edge-git/backend-services/auth';
 import { getBasicCredentials, getBearerToken } from '@edge-git/git-protocol';
 import type { RequestContext } from '@/middleware';
 
@@ -71,6 +72,11 @@ async function requireRoleForRepo(
  * email when the request carries one (or DEV/DEMO mode is on), else the PAT
  * owner when a valid token is presented, else null for anonymous visitors.
  * Never throws — anonymous is a valid outcome here.
+ *
+ * PATs are git-scoped: only tokens covering `repo:read` resolve to an
+ * identity, and fine-grained tokens with `repoGrants` are git-only (they
+ * return null here so a grant for repoA can never read repoB via the public
+ * read-model; use Access or an unscoped token for API reads).
  */
 async function resolvePublicViewer(c: RequestContext): Promise<string | null> {
   const scope = getScope(c as never);
@@ -87,8 +93,9 @@ async function resolvePublicViewer(c: RequestContext): Promise<string | null> {
   const pat = creds?.password || bearer || null;
   if (!pat) return null;
   try {
-    // PATs are git-scoped; public read-model resolution only needs identity.
     const identity = await scope.get(Tokens.TokenService).authenticateWithPAT(pat);
+    if (!coversScope(identity.scopes, 'repo:read')) return null;
+    if (identity.repoGrants.length > 0) return null;
     return identity.email;
   } catch {
     return null;

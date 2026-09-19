@@ -62,9 +62,13 @@ function registerTokenRoutes(app: TokenApp): void {
   app.delete('/user/tokens/:id', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     if (!tokenIdSchema.safeParse(c.req.param('id')).success) return c.json({ error: 'Invalid token id' }, 400);
-    const svc = createRequestScope(c.env).get(Tokens.TokenService);
-    await svc.deleteToken(c.req.param('id'), email);
-    return c.json({ ok: true });
+    try {
+      const svc = createRequestScope(c.env).get(Tokens.TokenService);
+      await svc.deleteToken(c.req.param('id'), email);
+      return c.json({ ok: true });
+    } catch (error) {
+      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
+    }
   });
 }
 

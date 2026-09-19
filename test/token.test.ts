@@ -87,8 +87,8 @@ describe('token scope helpers', () => {
   });
 
   it('normalizeTokenScopes defaults omitted input and rejects bad input', () => {
-    expect(normalizeTokenScopes(undefined)).toEqual(['repo:read', 'repo:write', 'admin']);
-    expect(normalizeTokenScopes(null)).toEqual(['repo:read', 'repo:write', 'admin']);
+    expect(normalizeTokenScopes(undefined)).toEqual(['repo:read', 'repo:write']);
+    expect(normalizeTokenScopes(null)).toEqual(['repo:read', 'repo:write']);
     expect(normalizeTokenScopes(['repo:read'])).toEqual(['repo:read']);
     expect(() => normalizeTokenScopes([])).toThrow('scopes must be');
     expect(() => normalizeTokenScopes(['nope'])).toThrow('scopes must be');

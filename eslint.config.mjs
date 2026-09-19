@@ -326,9 +326,9 @@ export default tseslint.config(
     },
   },
   // Layer 5: apps/api — route through backend-services, not directly to git-service.
-  // Exception: apps/api/src/index.ts re-exports RepoWorker/CronTasksWorker/etc.
-  // from @edge-git/background for DO bindings (mirrors Otter's api→background
-  // binding exception); no other api→background value imports are used.
+  // apps/api may use @edge-git/background (DO bindings re-exported from
+  // src/index.ts plus the transfer runners used by ImportRoutes/MirrorRoutes);
+  // backend-data values stay banned (type-only allowed).
   {
     files: ['apps/api/**/*.{ts,js}'],
     rules: {
@@ -344,6 +344,11 @@ export default tseslint.config(
             {
               group: ['@edge-git/backend-data/dao', '@edge-git/backend-data/dao/*'],
               message: 'apps/api must not import DAOs directly; use @edge-git/backend-services instead (type-only imports are allowed)',
+              allowTypeImports: true,
+            },
+            {
+              group: ['@edge-git/backend-data', '@edge-git/backend-data/*'],
+              message: 'apps/api must not import backend-data values directly; use @edge-git/backend-services instead (type-only imports are allowed)',
               allowTypeImports: true,
             },
           ],

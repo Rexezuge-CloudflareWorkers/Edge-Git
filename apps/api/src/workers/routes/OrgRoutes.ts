@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
-import { toServiceStatus } from './PublicViewerResolver';
+import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 
 type OrgApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -17,7 +17,7 @@ function registerOrgRoutes(app: OrgApp): void {
       const message = error instanceof Error ? error.message : 'Failed to create organization';
       const status =
         message.includes('taken') || message.includes('Invalid') || message.includes('reserved') ? 400 : toServiceStatus(error);
-      return c.json({ error: message }, status);
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to create organization') }, status);
     }
   });
 
@@ -40,7 +40,7 @@ function registerOrgRoutes(app: OrgApp): void {
         .catch(() => null);
       return c.json({ id: org.id, username: org.username, members, viewerRole });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -111,7 +111,7 @@ function registerOrgRoutes(app: OrgApp): void {
       const message = error instanceof Error ? error.message : 'Failed to update organization';
       const status =
         message.includes('taken') || message.includes('Invalid') || message.includes('reserved') ? 400 : toServiceStatus(error);
-      return c.json({ error: message }, status);
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to update organization') }, status);
     }
   });
 
@@ -121,7 +121,7 @@ function registerOrgRoutes(app: OrgApp): void {
       await createRequestScope(c.env).get(Tokens.OrganizationService).disband(c.req.param('org'), email);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
     }
   });
 
@@ -131,7 +131,7 @@ function registerOrgRoutes(app: OrgApp): void {
       const members = await createRequestScope(c.env).get(Tokens.OrganizationService).listMembers(c.req.param('org'), email);
       return c.json({ members });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -146,7 +146,7 @@ function registerOrgRoutes(app: OrgApp): void {
       await createRequestScope(c.env).get(Tokens.OrganizationService).addMember(c.req.param('org'), email, target, role);
       return c.json({ ok: true }, 201);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
     }
   });
 
@@ -160,7 +160,7 @@ function registerOrgRoutes(app: OrgApp): void {
         .setMemberRole(c.req.param('org'), email, decodeURIComponent(c.req.param('member')), body.role);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
     }
   });
 
@@ -172,7 +172,7 @@ function registerOrgRoutes(app: OrgApp): void {
         .removeMember(c.req.param('org'), email, decodeURIComponent(c.req.param('member')));
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
     }
   });
 
@@ -190,7 +190,7 @@ function registerOrgRoutes(app: OrgApp): void {
       const rows = await collabDao.listByRepo(repo.id);
       return c.json({ collaborators: rows.map((r) => ({ email: r.user_email, role: r.role })) });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -211,7 +211,7 @@ function registerOrgRoutes(app: OrgApp): void {
       await collabDao.upsert(repo.id, targetEmail, role, email, now);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
     }
   });
 
@@ -228,7 +228,7 @@ function registerOrgRoutes(app: OrgApp): void {
       await collabDao.remove(repo.id, targetEmail);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
     }
   });
 }

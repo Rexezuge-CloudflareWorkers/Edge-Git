@@ -1,5 +1,5 @@
 import { getRepoStub } from '../repoStub';
-import { resolvePublicViewer, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { resolvePublicViewer, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { ensureHeadObjects, getCrossRepoPreview, isPackLimitError, resolveHeadRepo } from './CrossFork';
 import { parsePullNumber } from './PullShared';
@@ -41,7 +41,7 @@ function registerPullRoutes(app: PullApp): void {
         const pull = await createRequestScope(c.env).get(Tokens.PullRequestService).getByNumber(row.id, number);
         return c.json({ pull });
       } catch (error) {
-        return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+        return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
       }
     });
   });
@@ -54,7 +54,7 @@ function registerPullRoutes(app: PullApp): void {
         const comments = await createRequestScope(c.env).get(Tokens.PullRequestService).listComments(row.id, number);
         return c.json({ comments });
       } catch (error) {
-        return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+        return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
       }
     });
   });
@@ -67,7 +67,7 @@ function registerPullRoutes(app: PullApp): void {
         const reviews = await createRequestScope(c.env).get(Tokens.PullRequestService).listReviews(row.id, number);
         return c.json({ reviews });
       } catch (error) {
-        return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+        return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
       }
     });
   });
@@ -98,7 +98,7 @@ function registerPullRoutes(app: PullApp): void {
         const diff = await getRepoStub(c.env, fullName).getPullDiff({ baseOid: pull.base_oid, headOid: pull.head_oid });
         return c.json({ diff });
       } catch (error) {
-        return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+        return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
       }
     });
   });
@@ -131,7 +131,7 @@ function registerPullRoutes(app: PullApp): void {
         })) as MergePreviewShape | null;
         return c.json({ preview });
       } catch (error) {
-        return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+        return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
       }
     });
   });

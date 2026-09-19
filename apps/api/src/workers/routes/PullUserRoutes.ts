@@ -1,5 +1,5 @@
 import { getRepoStub } from '../repoStub';
-import { requireVisibleRepo, toServiceStatus } from './PublicViewerResolver';
+import { requireVisibleRepo, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
 import { triggerRequiredChecks } from './TriggerChecks';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
@@ -148,7 +148,7 @@ function registerUserPullRoutes(app: PullApp): void {
       }).catch(() => undefined);
       return c.json(created, 201);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to create pull request' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to create pull request') }, toServiceStatus(error));
     }
   });
 
@@ -164,7 +164,7 @@ function registerUserPullRoutes(app: PullApp): void {
       const pull = await createRequestScope(c.env).get(Tokens.PullRequestService).getByNumber(row.id, number);
       return c.json({ pull });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -199,7 +199,7 @@ function registerUserPullRoutes(app: PullApp): void {
       });
       return c.json({ pull });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to update pull request' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to update pull request') }, toServiceStatus(error));
     }
   });
 
@@ -215,7 +215,7 @@ function registerUserPullRoutes(app: PullApp): void {
       const comments = await createRequestScope(c.env).get(Tokens.PullRequestService).listComments(row.id, number);
       return c.json({ comments });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -251,7 +251,7 @@ function registerUserPullRoutes(app: PullApp): void {
       });
       return c.json({ comment }, 201);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to add comment' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to add comment') }, toServiceStatus(error));
     }
   });
 
@@ -267,7 +267,7 @@ function registerUserPullRoutes(app: PullApp): void {
       const reviews = await createRequestScope(c.env).get(Tokens.PullRequestService).listReviews(row.id, number);
       return c.json({ reviews });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -315,7 +315,7 @@ function registerUserPullRoutes(app: PullApp): void {
       return c.json({ review }, 201);
     } catch (error) {
       const status = toServiceStatus(error);
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to add review' }, status === 500 ? 400 : status);
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to add review') }, status === 500 ? 400 : status);
     }
   });
 
@@ -348,7 +348,7 @@ function registerUserPullRoutes(app: PullApp): void {
       const diff = await getRepoStub(c.env, fullName).getPullDiff({ baseOid: pull.base_oid, headOid: pull.head_oid });
       return c.json({ diff });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -384,7 +384,7 @@ function registerUserPullRoutes(app: PullApp): void {
       })) as MergePreviewShape | null;
       return c.json({ preview });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 }

@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
-import { toServiceStatus } from './PublicViewerResolver';
+import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 
 type RuleApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -19,7 +19,7 @@ function registerRuleRoutes(app: RuleApp): void {
       const rules = await scope.get(Tokens.BranchProtectionService).listRules(repo.id);
       return c.json({ rules });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to list rules' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to list rules') }, toServiceStatus(error));
     }
   });
 
@@ -51,7 +51,7 @@ function registerRuleRoutes(app: RuleApp): void {
       });
       return c.json({ rule }, 201);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to create rule' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to create rule') }, toServiceStatus(error));
     }
   });
 
@@ -66,7 +66,7 @@ function registerRuleRoutes(app: RuleApp): void {
       await scope.get(Tokens.BranchProtectionService).deleteRule(repo.id, id);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to delete rule' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to delete rule') }, toServiceStatus(error));
     }
   });
 }

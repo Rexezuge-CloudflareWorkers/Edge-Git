@@ -3,7 +3,7 @@ import { Tokens, createRequestScope } from '@edge-git/backend-services/compositi
 import { RepoService } from '@edge-git/backend-services/repo';
 import { getCheckRunnerStub } from '../checkStub';
 import { emitWebhookEvent, publishCheckUpdate } from './SocialEmit';
-import { requireVisibleRepo, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 
 type CheckApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -60,7 +60,7 @@ function registerCheckPublicRoutes(app: CheckApp): void {
         const { runs, state } = await createRequestScope(c.env).get(Tokens.CheckService).listForSha(row.id, c.req.param('sha'));
         return c.json({ state, checks: runs.map(toCheckJson) });
       } catch (error) {
-        return c.json({ error: error instanceof Error ? error.message : 'Failed to list checks' }, toServiceStatus(error));
+        return c.json({ error: toSafeErrorMessage(error, 'Failed to list checks') }, toServiceStatus(error));
       }
     });
   });
@@ -77,7 +77,7 @@ function registerCheckUserRoutes(app: CheckApp): void {
       const { runs, state } = await createRequestScope(c.env).get(Tokens.CheckService).listForSha(row.id, c.req.param('sha'));
       return c.json({ state, checks: runs.map(toCheckJson) });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to list checks' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to list checks') }, toServiceStatus(error));
     }
   });
 
@@ -140,7 +140,7 @@ function registerCheckUserRoutes(app: CheckApp): void {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to report check';
       const status = message.includes('already completed') ? 409 : toServiceStatus(error);
-      return c.json({ error: message }, status as 400 | 403 | 404 | 500);
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to report check') }, status as 400 | 403 | 404 | 500);
     }
   });
 
@@ -200,7 +200,7 @@ function registerCheckUserRoutes(app: CheckApp): void {
       });
       return c.json({ check: toCheckJson(run) });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to update check' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to update check') }, toServiceStatus(error));
     }
   });
 }

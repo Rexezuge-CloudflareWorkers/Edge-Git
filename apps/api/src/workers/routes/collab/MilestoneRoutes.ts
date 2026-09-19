@@ -1,5 +1,5 @@
 import { withPublicRepo } from '../PublicViewerResolver';
-import { toServiceStatus } from '../PublicViewerResolver';
+import { toSafeErrorMessage, toServiceStatus } from '../PublicViewerResolver';
 import { requireVisibleRepo } from '../PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
@@ -46,7 +46,7 @@ function registerCollabMilestoneUserRoutes(app: CollabApp): void {
         .createMilestone(row.id, body as { title: string });
       return c.json(created, 201);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to create milestone' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to create milestone') }, toServiceStatus(error));
     }
   });
 
@@ -62,7 +62,7 @@ function registerCollabMilestoneUserRoutes(app: CollabApp): void {
       await createRequestScope(c.env).get(Tokens.CollaborationService).updateMilestone(row.id, c.req.param('id'), body);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to update milestone' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to update milestone') }, toServiceStatus(error));
     }
   });
 
@@ -77,7 +77,7 @@ function registerCollabMilestoneUserRoutes(app: CollabApp): void {
       await createRequestScope(c.env).get(Tokens.CollaborationService).deleteMilestone(row.id, c.req.param('id'));
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 }

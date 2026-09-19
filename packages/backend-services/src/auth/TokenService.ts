@@ -69,7 +69,8 @@ class TokenService {
     const tokenHash = await TokenService.hashToken(token);
     const tokenData: UserAccessTokenMetadata | undefined = await dao.getByTokenHash(tokenHash, now);
     if (tokenData) {
-      await dao.updateLastUsedByHash(tokenHash, now);
+      // Best-effort touch: D1 transient failure must not deny a valid token.
+      await dao.updateLastUsedByHash(tokenHash, now).catch(() => undefined);
       // Fail closed: if the grant list cannot be read, deny rather than
       // treating a scoped token as unrestricted (previous `.catch(() => [])`
       // fail-open). A scoped token with unreadable grants must not escalate.
@@ -247,7 +248,8 @@ class TokenService {
 
   public async deleteToken(tokenId: string, userEmail: string): Promise<void> {
     const dao = await this.deps.tokenDAO();
-    await dao.delete(tokenId, userEmail);
+    const deleted = await dao.delete(tokenId, userEmail);
+    if (!deleted) throw new NotFoundError('Token not found');
     await this.deps.tokenGrantDAO().then((d) => d.deleteByToken(tokenId).catch(() => undefined));
   }
 }

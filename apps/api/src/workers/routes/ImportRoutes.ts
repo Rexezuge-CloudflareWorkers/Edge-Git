@@ -4,7 +4,7 @@ import { RepoService } from '@edge-git/backend-services/repo';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { runImportJob } from '@edge-git/background/transfer/ImportRunner';
 import { getRepoStub } from '../repoStub';
-import { toServiceStatus } from './PublicViewerResolver';
+import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 
 type TransferApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -39,7 +39,7 @@ function registerImportRoutes(app: TransferApp): void {
       if (waitUntil) waitUntil(runImportJob(c.env, fullName, job.id).catch(() => undefined));
       return c.json({ job }, 202);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to start import' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to start import') }, toServiceStatus(error));
     }
   });
 
@@ -54,7 +54,7 @@ function registerImportRoutes(app: TransferApp): void {
       if (!job) return c.json({ error: 'No import found' }, 404);
       return c.json({ job });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to load import' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to load import') }, toServiceStatus(error));
     }
   });
 
@@ -68,7 +68,7 @@ function registerImportRoutes(app: TransferApp): void {
       const job = await scope.get(Tokens.ImportService).cancelJob(c.req.param('jobId'));
       return c.json({ job });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to cancel import' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to cancel import') }, toServiceStatus(error));
     }
   });
 
@@ -103,7 +103,7 @@ function registerImportRoutes(app: TransferApp): void {
       }
       return c.json({ refs: heads, oids: exported.oids, byteLength: bytes.byteLength, packBase64: btoa(packBase64) });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to export repository' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to export repository') }, toServiceStatus(error));
     }
   });
 }

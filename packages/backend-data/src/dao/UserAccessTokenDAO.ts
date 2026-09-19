@@ -129,8 +129,8 @@ class UserAccessTokenDAO extends BaseDAO {
     );
   }
 
-  public async delete(tokenId: string, userEmail: string): Promise<void> {
-    await this.withRetry(
+  public async delete(tokenId: string, userEmail: string): Promise<boolean> {
+    const result = await this.withRetry(
       () =>
         this.database
           .prepare('DELETE FROM user_access_tokens WHERE token_id = ? AND lower(user_email) = lower(?)')
@@ -138,6 +138,7 @@ class UserAccessTokenDAO extends BaseDAO {
           .run(),
       'delete access token',
     );
+    return ((result.meta as { changes?: number })?.changes ?? 0) > 0;
   }
 
   public async rotate(tokenId: string, userEmail: string, newHash: string, newPrefix: string, newExpiresAt: number): Promise<boolean> {
