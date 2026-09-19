@@ -2,13 +2,13 @@ import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { SearchService } from '@edge-git/backend-services/search';
 import { RepoService } from '@edge-git/backend-services/repo';
-import { requireVisibleRepo, resolvePublicViewer, toRepoJson, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, resolvePublicViewer, toRepoJson, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import type { RequestContext } from '@/middleware';
 
 type SearchApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
-function badQuery(c: { json: (body: unknown, status?: number) => Response }, message: string): Response {
-  return c.json({ error: message }, 400);
+function badQuery(c: RequestContext, message: string): Response {
+  return jsonError(c, message, 400);
 }
 
 // Public global search — anonymous OK for public content (private rows are
@@ -43,7 +43,7 @@ function registerSearchRoutes(app: SearchApp): void {
       if (owner && repoParam) {
         const repoName = RepoService.normalizeRepo(repoParam);
         const row = await requireVisibleRepo(c.env, owner, repoName, viewerEmail);
-        if (!row) return c.json({ error: 'Not found' }, 404);
+        if (!row) return jsonError(c, 'Not found', 404);
         if (type === 'issues') {
           const issues = await svc.searchIssues(q, viewerEmail, { limit, repoId: row.id });
           return c.json({ type, query: q, issues });
@@ -92,7 +92,7 @@ function registerSearchRoutes(app: SearchApp): void {
     } catch (error) {
       const message = toSafeErrorMessage(error, 'Search failed');
       if (message.includes('at least 2 characters') || message.includes('at most')) return badQuery(c, message);
-      return c.json({ error: message }, toServiceStatus(error));
+      return jsonError(c, message, toServiceStatus(error));
     }
   });
 }

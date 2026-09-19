@@ -798,7 +798,9 @@ describe('OrgRoutes low fill', () => {
     const before = state.orgMembers.length;
     const del = await callWorker(env, `/user/orgs/acme/members/${encodeURIComponent(ALICE)}`, { method: 'DELETE' });
     expect(del.status).toBe(400);
-    expect(await del.json().then((b) => (b as { error: string }).error).catch(() => '')).toContain('last owner');
+    expect(await del.json().then((b) => (b as { Exception?: { Message?: string } }).Exception?.Message ?? '').catch(() => '')).toContain(
+      'last owner',
+    );
     expect(state.orgMembers).toHaveLength(before);
     const demote = await callWorker(env, `/user/orgs/acme/members/${encodeURIComponent(ALICE)}`, patchJson({ role: 'member' }));
     expect(demote.status).toBe(400);

@@ -3,7 +3,7 @@ import { Tokens, createRequestScope } from '@edge-git/backend-services/compositi
 import { RepoService } from '@edge-git/backend-services/repo';
 import { getRepoStub } from '../repoStub';
 import { recordAndNotify } from './SocialEmit';
-import { requireVisibleRepo, resolvePublicViewer, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, resolvePublicViewer, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type ReleaseApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -50,12 +50,12 @@ function registerReleasePublicRoutes(app: ReleaseApp): void {
         const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
         if (release.isDraft) {
           const viewerEmail = await resolvePublicViewer(c as never);
-          if (!(await viewerCanSeeDrafts(c.env, viewerEmail, row.owner, row.name))) return c.json({ error: 'Not found' }, 404);
+          if (!(await viewerCanSeeDrafts(c.env, viewerEmail, row.owner, row.name))) return jsonError(c, 'Not found', 404);
         }
         const assets = await scope.get(Tokens.ReleaseService).listAssets(row.id, release.tagName);
         return c.json({ release, assets });
       } catch (error) {
-        return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+        return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
       }
     });
   });
@@ -67,7 +67,7 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       const scope = createRequestScope(c.env);
       const releases = await scope.get(Tokens.ReleaseService).listReleases(row.id);
@@ -83,11 +83,11 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
-      return c.json({ error: 'Forbidden' }, 403);
+      return jsonError(c, 'Forbidden', 403);
     }
     const { malformed, body } = await readJsonBody<{
       tagName?: unknown;
@@ -96,14 +96,14 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
       isDraft?: unknown;
       isPrerelease?: unknown;
     }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = createRequestScope(c.env);
       const isDraft = body.isDraft === undefined || body.isDraft === true;
       if (!isDraft && typeof body.tagName === 'string') {
         const fullName = `${row.owner}/${row.name}`;
         if (!(await tagExists(c.env, fullName, body.tagName.trim().replace(/\.git$/i, '')))) {
-          return c.json({ error: 'git tag does not exist yet — create the tag first or save as draft' }, 400);
+          return jsonError(c, 'git tag does not exist yet — create the tag first or save as draft', 400);
         }
       }
       const release = await scope
@@ -126,7 +126,7 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
       });
       return c.json({ release }, 201);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to create release') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to create release'), toServiceStatus(error));
     }
   });
 
@@ -135,15 +135,15 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       const scope = createRequestScope(c.env);
       const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
-      if (release.isDraft && !(await viewerCanSeeDrafts(c.env, email, owner, repoName))) return c.json({ error: 'Not found' }, 404);
+      if (release.isDraft && !(await viewerCanSeeDrafts(c.env, email, owner, repoName))) return jsonError(c, 'Not found', 404);
       const assets = await scope.get(Tokens.ReleaseService).listAssets(row.id, release.tagName);
       return c.json({ release, assets });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 
@@ -152,21 +152,21 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
-      return c.json({ error: 'Forbidden' }, 403);
+      return jsonError(c, 'Forbidden', 403);
     }
     const { malformed, body } = await readJsonBody<{ name?: unknown; body?: unknown; isDraft?: unknown; isPrerelease?: unknown }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = createRequestScope(c.env);
       const before = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
       if (before.isDraft && body.isDraft === false) {
         const fullName = `${row.owner}/${row.name}`;
         if (!(await tagExists(c.env, fullName, before.tagName))) {
-          return c.json({ error: 'git tag does not exist yet — push the tag before publishing' }, 400);
+          return jsonError(c, 'git tag does not exist yet — push the tag before publishing', 400);
         }
       }
       const release = await scope.get(Tokens.ReleaseService).updateRelease(row.id, c.req.param('tag'), body);
@@ -185,7 +185,7 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
       }
       return c.json({ release });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to update release') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to update release'), toServiceStatus(error));
     }
   });
 
@@ -194,11 +194,11 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
-      return c.json({ error: 'Forbidden' }, 403);
+      return jsonError(c, 'Forbidden', 403);
     }
     try {
       const scope = createRequestScope(c.env);
@@ -211,7 +211,7 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
       await scope.get(Tokens.ReleaseService).deleteRelease(row.id, release.tagName);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 }

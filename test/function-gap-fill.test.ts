@@ -511,11 +511,11 @@ describe('function-gap backend-errors', () => {
 
   it('mapServiceError maps ServiceError vs plain errors', () => {
     expect(mapServiceError(new BadRequestError('bad q'))).toMatchObject({ status: 400 });
-    expect(mapServiceError(new NotFoundError()).body.error).toBe('NotFound');
+    expect(mapServiceError(new NotFoundError()).body.Exception?.Type).toBe('NotFound');
     expect(mapServiceError(new DatabaseError('db down'))).toMatchObject({ status: 500 });
     const plain = mapServiceError(new Error('unexpected'));
     expect(plain.status).toBe(500);
-    expect(plain.body.error).toBe('InternalError');
+    expect(plain.body.Exception?.Type).toBe('InternalServerError');
   });
 
   it('toServiceStatus preserves 400/401/403/404/409/413/429 and masks 500s', () => {

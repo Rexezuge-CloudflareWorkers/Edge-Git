@@ -40,7 +40,7 @@ describe('backend-errors constructors', () => {
 
   it('maps unknown errors to generic 500', () => {
     expect(mapServiceError(new Error('D1 secret')).status).toBe(500);
-    expect(mapServiceError(new Error('D1 secret')).body.message).not.toContain('D1');
+    expect(mapServiceError(new Error('D1 secret')).body.Exception?.Message ?? '').not.toContain('D1');
     expect(mapServiceError(new UnauthorizedError('denied')).status).toBe(401);
   });
 

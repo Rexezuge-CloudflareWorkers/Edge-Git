@@ -1,4 +1,5 @@
 import type { Hono } from 'hono';
+import { jsonError } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 
 type NotificationApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -36,7 +37,7 @@ function registerUserNotificationRoutes(app: NotificationApp): void {
   app.patch('/user/notifications/:id/read', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const ok = await createRequestScope(c.env).get(Tokens.NotificationService).markRead(c.req.param('id'), email);
-    if (!ok) return c.json({ error: 'Not found' }, 404);
+    if (!ok) return jsonError(c, 'Not found', 404);
     return c.json({ ok: true });
   });
 

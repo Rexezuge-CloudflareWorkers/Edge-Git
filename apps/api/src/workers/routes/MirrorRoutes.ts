@@ -2,7 +2,7 @@ import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { runMirrorSync } from '@edge-git/background/transfer/MirrorRunner';
-import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type MirrorApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -30,10 +30,10 @@ function registerMirrorRoutes(app: MirrorApp): void {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'read');
       const mirror = await scope.get(Tokens.MirrorService).getForRepo(repo.id);
-      if (!mirror) return c.json({ error: 'No mirror configured' }, 404);
+      if (!mirror) return jsonError(c, 'No mirror configured', 404);
       return c.json({ mirror });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to load mirror') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to load mirror'), toServiceStatus(error));
     }
   });
 
@@ -42,16 +42,16 @@ function registerMirrorRoutes(app: MirrorApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const { malformed, body } = await readJsonBody<{ sourceUrl?: string; intervalMinutes?: number }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
-    if (typeof body.sourceUrl !== 'string' || !body.sourceUrl.trim()) return c.json({ error: 'sourceUrl is required' }, 400);
-    if (typeof body.intervalMinutes !== 'number') return c.json({ error: 'intervalMinutes is required' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
+    if (typeof body.sourceUrl !== 'string' || !body.sourceUrl.trim()) return jsonError(c, 'sourceUrl is required', 400);
+    if (typeof body.intervalMinutes !== 'number') return jsonError(c, 'intervalMinutes is required', 400);
     try {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       const mirror = await scope.get(Tokens.MirrorService).configure(repo.id, body.sourceUrl, body.intervalMinutes, email);
       return c.json({ mirror });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to configure mirror') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to configure mirror'), toServiceStatus(error));
     }
   });
 
@@ -63,7 +63,7 @@ function registerMirrorRoutes(app: MirrorApp): void {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       const mirror = await scope.get(Tokens.MirrorService).getForRepo(repo.id);
-      if (!mirror) return c.json({ error: 'No mirror configured' }, 404);
+      if (!mirror) return jsonError(c, 'No mirror configured', 404);
       const waitUntil = waitUntilOf(c);
       if (waitUntil) {
         waitUntil(runMirrorSync(c.env, repo.id).catch(() => undefined));
@@ -74,7 +74,7 @@ function registerMirrorRoutes(app: MirrorApp): void {
       const refreshed = await scope.get(Tokens.MirrorService).getForRepo(repo.id);
       return c.json({ mirror: refreshed, sync: 'done' });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to sync mirror') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to sync mirror'), toServiceStatus(error));
     }
   });
 
@@ -83,15 +83,15 @@ function registerMirrorRoutes(app: MirrorApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const { malformed, body } = await readJsonBody<{ enabled?: boolean }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
-    if (typeof body.enabled !== 'boolean') return c.json({ error: 'enabled is required' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
+    if (typeof body.enabled !== 'boolean') return jsonError(c, 'enabled is required', 400);
     try {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       const mirror = await scope.get(Tokens.MirrorService).setEnabled(repo.id, body.enabled);
       return c.json({ mirror });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to update mirror') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to update mirror'), toServiceStatus(error));
     }
   });
 
@@ -105,7 +105,7 @@ function registerMirrorRoutes(app: MirrorApp): void {
       await scope.get(Tokens.MirrorService).remove(repo.id);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to remove mirror') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to remove mirror'), toServiceStatus(error));
     }
   });
 }

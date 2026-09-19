@@ -4,5 +4,5 @@ export { createServiceContext } from './ServiceContext';
 export type { ServiceContext, ServiceContextOverrides } from './ServiceContext';
 export { ConsoleLogger, SystemClock, NullLogger, FixedClock } from './ServiceContext';
 export type { IClock, ILogger } from './ServiceContext';
-export { memoizeAsync, setRequestScope, getRequestScope, getServiceContext, createRequestContext } from './RequestScope';
+export { memoizeAsync, setRequestScope, getRequestScope, getServiceContext, createRequestContext, asScopedContext } from './RequestScope';
 export type { ScopedContext } from './RequestScope';

@@ -4,7 +4,7 @@ import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { assetNameSchema, decodeBase64Strict, normalizeAssetContentType } from '@edge-git/shared/validation';
 import { getRepoStub } from '../repoStub';
-import { requireVisibleRepo, resolvePublicViewer, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, resolvePublicViewer, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { viewerCanSeeDrafts } from './ReleaseRoutes';
 import { readJsonBody } from './BodyParser';
 
@@ -46,7 +46,7 @@ function registerReleaseAssetPublicRoutes(app: ReleaseAssetApp): void {
         const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
         if (release.isDraft) {
           const viewerEmail = await resolvePublicViewer(c as never);
-          if (!(await viewerCanSeeDrafts(c.env, viewerEmail, row.owner, row.name))) return c.json({ error: 'Not found' }, 404);
+          if (!(await viewerCanSeeDrafts(c.env, viewerEmail, row.owner, row.name))) return jsonError(c, 'Not found', 404);
         }
         const assets = await scope.get(Tokens.ReleaseService).listAssets(row.id, release.tagName);
         return c.json({ assets });
@@ -63,17 +63,17 @@ function registerReleaseAssetPublicRoutes(app: ReleaseAssetApp): void {
         const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
         if (release.isDraft) {
           const viewerEmail = await resolvePublicViewer(c as never);
-          if (!(await viewerCanSeeDrafts(c.env, viewerEmail, row.owner, row.name))) return c.json({ error: 'Not found' }, 404);
+          if (!(await viewerCanSeeDrafts(c.env, viewerEmail, row.owner, row.name))) return jsonError(c, 'Not found', 404);
         }
         const asset = await scope.get(Tokens.ReleaseService).getAsset(row.id, release.tagName, c.req.param('assetId'));
         const bytes = await getRepoStub(c.env, `${row.owner}/${row.name}`).getReleaseAsset({
           releaseId: asset.releaseId,
           assetId: asset.id,
         });
-        if (!bytes || bytes.byteLength === 0) return c.json({ error: 'Not found' }, 404);
+        if (!bytes || bytes.byteLength === 0) return jsonError(c, 'Not found', 404);
         return downloadResponse(bytes, asset.contentType, asset.name);
       } catch (error) {
-        return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+        return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
       }
     });
   });
@@ -85,11 +85,11 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       const scope = createRequestScope(c.env);
       const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
-      if (release.isDraft && !(await viewerCanSeeDrafts(c.env, email, owner, repoName))) return c.json({ error: 'Not found' }, 404);
+      if (release.isDraft && !(await viewerCanSeeDrafts(c.env, email, owner, repoName))) return jsonError(c, 'Not found', 404);
       const assets = await scope.get(Tokens.ReleaseService).listAssets(row.id, release.tagName);
       return c.json({ assets });
     } catch {
@@ -102,28 +102,28 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
-      return c.json({ error: 'Forbidden' }, 403);
+      return jsonError(c, 'Forbidden', 403);
     }
     const { malformed, body } = await readJsonBody<{ name?: unknown; contentBase64?: unknown; contentType?: unknown }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.name !== 'string' || typeof body.contentBase64 !== 'string' || !body.contentBase64) {
-      return c.json({ error: 'name and contentBase64 are required' }, 400);
+      return jsonError(c, 'name and contentBase64 are required', 400);
     }
-    if (!assetNameSchema.safeParse(body.name).success) return c.json({ error: 'Invalid asset name' }, 400);
+    if (!assetNameSchema.safeParse(body.name).success) return jsonError(c, 'Invalid asset name', 400);
     const maxBytes = ConfigurationManager.releases.getMaxAssetBytes(c.env);
     // Pre-decode tripwire on base64 length so oversized bodies 413 without a
     // full `atob` allocation burn.
     if (body.contentBase64.length > Math.ceil(maxBytes * 1.4) + 4) {
-      return c.json({ error: `asset size must be 1-${maxBytes} bytes` }, 413);
+      return jsonError(c, `asset size must be 1-${maxBytes} bytes`, 413);
     }
     const bytes = decodeBase64ToBytes(body.contentBase64);
-    if (!bytes) return c.json({ error: 'contentBase64 must be valid base64' }, 400);
+    if (!bytes) return jsonError(c, 'contentBase64 must be valid base64', 400);
     if (bytes.byteLength === 0 || bytes.byteLength > maxBytes) {
-      return c.json({ error: `asset size must be 1-${maxBytes} bytes` }, 413);
+      return jsonError(c, `asset size must be 1-${maxBytes} bytes`, 413);
     }
     try {
       const scope = createRequestScope(c.env);
@@ -142,11 +142,11 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
           .deleteAsset(row.id, c.req.param('tag'), asset.id)
           .catch(() => undefined);
         // Never surface raw DO error strings (may contain paths/stacks).
-        return c.json({ error: 'Failed to store asset bytes' }, 500);
+        return jsonError(c, 'Failed to store asset bytes', 500);
       }
       return c.json({ asset }, 201);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to upload asset') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to upload asset'), toServiceStatus(error));
     }
   });
 
@@ -155,17 +155,17 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       const scope = createRequestScope(c.env);
       const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
-      if (release.isDraft && !(await viewerCanSeeDrafts(c.env, email, owner, repoName))) return c.json({ error: 'Not found' }, 404);
+      if (release.isDraft && !(await viewerCanSeeDrafts(c.env, email, owner, repoName))) return jsonError(c, 'Not found', 404);
       const asset = await scope.get(Tokens.ReleaseService).getAsset(row.id, release.tagName, c.req.param('assetId'));
       const bytes = await getRepoStub(c.env, `${row.owner}/${row.name}`).getReleaseAsset({ releaseId: asset.releaseId, assetId: asset.id });
-      if (!bytes || bytes.byteLength === 0) return c.json({ error: 'Not found' }, 404);
+      if (!bytes || bytes.byteLength === 0) return jsonError(c, 'Not found', 404);
       return downloadResponse(bytes, asset.contentType, asset.name);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 
@@ -174,11 +174,11 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
-      return c.json({ error: 'Forbidden' }, 403);
+      return jsonError(c, 'Forbidden', 403);
     }
     try {
       const scope = createRequestScope(c.env);
@@ -191,7 +191,7 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
       await scope.get(Tokens.ReleaseService).deleteAsset(row.id, c.req.param('tag'), asset.id);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 }

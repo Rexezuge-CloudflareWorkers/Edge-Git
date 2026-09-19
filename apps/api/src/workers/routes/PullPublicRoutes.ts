@@ -1,5 +1,5 @@
 import { getRepoStub } from '../repoStub';
-import { resolvePublicViewer, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { jsonError, resolvePublicViewer, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { ensureHeadObjects, getCrossRepoPreview, isPackLimitError, resolveHeadRepo } from './CrossFork';
 import { parsePullNumber } from './PullShared';
@@ -36,12 +36,12 @@ function registerPullRoutes(app: PullApp): void {
   app.get('/repos/:owner/:repo/pulls/:number', async (c) => {
     return withPublicRepo(c as never, async (row) => {
       const number = parsePullNumber(c.req.param('number'));
-      if (number === null) return c.json({ error: 'Not found' }, 404);
+      if (number === null) return jsonError(c, 'Not found', 404);
       try {
         const pull = await createRequestScope(c.env).get(Tokens.PullRequestService).getByNumber(row.id, number);
         return c.json({ pull });
       } catch (error) {
-        return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+        return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
       }
     });
   });
@@ -49,12 +49,12 @@ function registerPullRoutes(app: PullApp): void {
   app.get('/repos/:owner/:repo/pulls/:number/comments', async (c) => {
     return withPublicRepo(c as never, async (row) => {
       const number = parsePullNumber(c.req.param('number'));
-      if (number === null) return c.json({ error: 'Not found' }, 404);
+      if (number === null) return jsonError(c, 'Not found', 404);
       try {
         const comments = await createRequestScope(c.env).get(Tokens.PullRequestService).listComments(row.id, number);
         return c.json({ comments });
       } catch (error) {
-        return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+        return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
       }
     });
   });
@@ -62,12 +62,12 @@ function registerPullRoutes(app: PullApp): void {
   app.get('/repos/:owner/:repo/pulls/:number/reviews', async (c) => {
     return withPublicRepo(c as never, async (row) => {
       const number = parsePullNumber(c.req.param('number'));
-      if (number === null) return c.json({ error: 'Not found' }, 404);
+      if (number === null) return jsonError(c, 'Not found', 404);
       try {
         const reviews = await createRequestScope(c.env).get(Tokens.PullRequestService).listReviews(row.id, number);
         return c.json({ reviews });
       } catch (error) {
-        return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+        return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
       }
     });
   });
@@ -75,10 +75,10 @@ function registerPullRoutes(app: PullApp): void {
   app.get('/repos/:owner/:repo/pulls/:number/diff', async (c) => {
     return withPublicRepo(c as never, async (row, fullName) => {
       const number = parsePullNumber(c.req.param('number'));
-      if (number === null) return c.json({ error: 'Not found' }, 404);
+      if (number === null) return jsonError(c, 'Not found', 404);
       try {
         const pull = await createRequestScope(c.env).get(Tokens.PullRequestService).getByNumber(row.id, number);
-        if (!pull.head_oid) return c.json({ error: 'Pull request has no head commit' }, 400);
+        if (!pull.head_oid) return jsonError(c, 'Pull request has no head commit', 400);
         const head = await resolveHeadRepo(c.env, pull);
         if (head) {
           // A private fork's diff must not leak through a public base repo.
@@ -87,18 +87,18 @@ function registerPullRoutes(app: PullApp): void {
             .get(Tokens.PermissionService)
             .getRole(viewerEmail, head.row)
             .catch(() => null);
-          if (!headRole) return c.json({ error: 'Not found' }, 404);
+          if (!headRole) return jsonError(c, 'Not found', 404);
           try {
             await ensureHeadObjects(c.env, fullName, head.fullName, pull.head_oid);
           } catch (error) {
-            if (isPackLimitError(error)) return c.json({ error: error instanceof Error ? error.message : 'Repository too large' }, 413);
-            return c.json({ error: 'head commit not found' }, 400);
+            if (isPackLimitError(error)) return jsonError(c, error instanceof Error ? error.message : 'Repository too large', 413);
+            return jsonError(c, 'head commit not found', 400);
           }
         }
         const diff = await getRepoStub(c.env, fullName).getPullDiff({ baseOid: pull.base_oid, headOid: pull.head_oid });
         return c.json({ diff });
       } catch (error) {
-        return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+        return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
       }
     });
   });
@@ -106,7 +106,7 @@ function registerPullRoutes(app: PullApp): void {
   app.get('/repos/:owner/:repo/pulls/:number/preview', async (c) => {
     return withPublicRepo(c as never, async (row, fullName) => {
       const number = parsePullNumber(c.req.param('number'));
-      if (number === null) return c.json({ error: 'Not found' }, 404);
+      if (number === null) return jsonError(c, 'Not found', 404);
       try {
         const pull = await createRequestScope(c.env).get(Tokens.PullRequestService).getByNumber(row.id, number);
         const head = await resolveHeadRepo(c.env, pull);
@@ -116,12 +116,12 @@ function registerPullRoutes(app: PullApp): void {
             .get(Tokens.PermissionService)
             .getRole(viewerEmail, head.row)
             .catch(() => null);
-          if (!headRole) return c.json({ error: 'Not found' }, 404);
+          if (!headRole) return jsonError(c, 'Not found', 404);
           try {
             const { preview } = await getCrossRepoPreview(c.env, fullName, pull.base_branch, head.fullName, pull.head_branch);
             return c.json({ preview });
           } catch (error) {
-            if (isPackLimitError(error)) return c.json({ error: error instanceof Error ? error.message : 'Repository too large' }, 413);
+            if (isPackLimitError(error)) return jsonError(c, error instanceof Error ? error.message : 'Repository too large', 413);
             return c.json({ preview: null });
           }
         }
@@ -131,7 +131,7 @@ function registerPullRoutes(app: PullApp): void {
         })) as MergePreviewShape | null;
         return c.json({ preview });
       } catch (error) {
-        return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+        return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
       }
     });
   });

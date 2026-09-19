@@ -1,20 +1,18 @@
 import type { Hono } from 'hono';
 import { getRepoStub, ensureRepo } from '../repoStub';
-import {
-  requireVisibleRepo,
-  toRepoJson,
-  toSafeErrorMessage,
-  toServiceStatus,
-  withPublicRepo,
-  withVisibleRepo,
-  getScope,
-} from './PublicViewerResolver';
+import { getScope, jsonError, requireVisibleRepo, toRepoJson, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
 import { Tokens } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { EmailAddress } from '@edge-git/shared/utils';
-import type { RequestContext } from '@/middleware';
 import { readJsonBody } from './BodyParser';
+import {
+  parseOverviewArgs,
+  parseWithLastCommit,
+  sanitizeDepthParam,
+  sanitizePathParam,
+  sanitizeRefParam,
+} from './RepoParamParsers';
 
 type RepoApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -87,10 +85,10 @@ function registerRepoRoutes(app: RepoApp): void {
 
   app.get('/repos/:owner/:repo/commits/:oid', async (c) => {
     const oid = c.req.param('oid');
-    if (!/^[0-9a-f]{40}$/i.test(oid)) return c.json({ error: 'Invalid commit oid' }, 400);
+    if (!/^[0-9a-f]{40}$/i.test(oid)) return jsonError(c, 'Invalid commit oid', 400);
     return withPublicRepo(c as never, async (_row, fullName) => {
       const diff = (await getRepoStub(c.env, fullName).getCommitDiff(oid)) as { commit: unknown } | null;
-      if (!diff || !diff.commit) return c.json({ error: 'Not found' }, 404);
+      if (!diff || !diff.commit) return jsonError(c, 'Not found', 404);
       return c.json(diff);
     });
   });
@@ -100,9 +98,9 @@ function registerRepoRoutes(app: RepoApp): void {
       const url = new URL(c.req.url);
       const baseRef = sanitizeRefParam(url.searchParams.get('base')) ?? '';
       const headRef = sanitizeRefParam(url.searchParams.get('head')) ?? '';
-      if (!baseRef || !headRef) return c.json({ error: 'base and head query params are required' }, 400);
+      if (!baseRef || !headRef) return jsonError(c, 'base and head query params are required', 400);
       const diff = await getRepoStub(c.env, fullName).getCompare({ baseRef, headRef });
-      if (!diff) return c.json({ error: 'Not found' }, 404);
+      if (!diff) return jsonError(c, 'Not found', 404);
       return c.json(diff);
     });
   });
@@ -143,7 +141,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
       description?: string | null;
       isPrivate?: boolean;
     }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const scope = getScope(c);
     let owner = (body.owner ?? '').trim();
     if (!owner) {
@@ -155,7 +153,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
       }
     }
     const name = (body.name ?? '').trim();
-    if (!name) return c.json({ error: 'name is required' }, 400);
+    if (!name) return jsonError(c, 'name is required', 400);
     try {
       RepoService.validateNames(owner, RepoService.normalizeRepo(name));
       const svc = scope.get(Tokens.RepoService);
@@ -185,7 +183,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
           : message.includes('members') || message.includes('owner')
             ? 403
             : 500;
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to create repo') }, status as 400);
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to create repo'), status as 400);
     }
   });
 
@@ -193,7 +191,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const scope = getScope(c);
     const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email, scope);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     const role = await scope
       .get(Tokens.PermissionService)
       .getRole(email, row)
@@ -215,12 +213,12 @@ function registerUserRepoRoutes(app: RepoApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const { malformed, body } = await readJsonBody<{ description?: string | null; isPrivate?: boolean }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const patch: { description?: string | null; isPrivate?: boolean } = {};
     if ('description' in body) patch.description = body.description ?? null;
     if ('isPrivate' in body) patch.isPrivate = body.isPrivate;
     if (patch.description === undefined && patch.isPrivate === undefined) {
-      return c.json({ error: 'Nothing to update' }, 400);
+      return jsonError(c, 'Nothing to update', 400);
     }
     try {
       const updated = await getScope(c as never)
@@ -228,7 +226,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
         .updateRepo(owner, repoName, email, patch);
       return c.json({ ...(toRepoJson(updated) as Record<string, unknown>), viewerCanManage: true });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to update repo') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to update repo'), toServiceStatus(error));
     }
   });
 
@@ -256,163 +254,23 @@ function registerUserRepoRoutes(app: RepoApp): void {
       }
       return c.json({ ok: true, id });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to delete repo') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to delete repo'), toServiceStatus(error));
     }
   });
 }
 
-// Read-model passthroughs (branches/tree/blob/commits/overview) via DO RPC.
-// `withLastCommit=0|false` opts out of per-file last-commit enrichment so
-// the tree lists fast; omitted means enriched (backwards compatible).
-// BREAKING: ref/path/base/head query params are capped at 256 chars at the
-// edge so malformed callers fail fast without burning DO I/O.
-function sanitizeRefParam(raw: string | null | undefined): string | undefined {
-  if (raw == null) return undefined;
-  const trimmed = raw.trim().slice(0, 256);
-  return trimmed || undefined;
-}
+// Read-model passthroughs (branches/tree/blob/commits/overview) via DO RPC
+// live in `RepoReadModelRoutes` (god-file guard); param parsers live in
+// `RepoParamParsers`. Re-exported here so existing importers
+// (`EdgeGitWorker`, route tests) keep working unchanged.
+export {
+  sanitizeRefParam,
+  sanitizePathParam,
+  sanitizeDepthParam,
+  parseWithLastCommit,
+  parseOptionalFlag,
+  parseOverviewArgs,
+} from './RepoParamParsers';
+export { registerUserRepoReadModelRoutes } from './RepoReadModelRoutes';
 
-function sanitizePathParam(raw: string | null | undefined): string | undefined {
-  if (raw == null) return undefined;
-  const trimmed = raw.trim().slice(0, 512);
-  return trimmed || undefined;
-}
-
-function sanitizeDepthParam(raw: string | null | undefined): number | undefined {
-  if (raw == null) return undefined;
-  const text = raw.trim().slice(0, 16);
-  if (text === '') return undefined;
-  const n = Number(text);
-  if (!Number.isSafeInteger(n) || n < 1 || n > 500) return undefined;
-  return n;
-}
-function parseWithLastCommit(raw: string | null): boolean | undefined {
-  return parseOptionalFlag(raw);
-}
-
-function parseOptionalFlag(raw: string | null): boolean | undefined {
-  if (raw === null) return undefined;
-  const v = raw.trim().toLowerCase();
-  if (['0', 'false', 'no'].includes(v)) return false;
-  if (['1', 'true', 'yes'].includes(v)) return true;
-  return undefined;
-}
-
-function parseOverviewArgs(params: URLSearchParams): {
-  ref?: string;
-  path?: string;
-  depth?: number;
-  includeTags?: boolean;
-  includeReadme?: boolean;
-} {
-  const ref = sanitizeRefParam(params.get('ref'));
-  const path = sanitizePathParam(params.get('path'));
-  const depth = sanitizeDepthParam(params.get('depth'));
-  return {
-    ref,
-    path,
-    depth,
-    includeTags: parseOptionalFlag(params.get('includeTags')),
-    includeReadme: parseOptionalFlag(params.get('includeReadme')),
-  };
-}
-
-async function withVisibleRepoLocal(
-  c: RequestContext,
-  owner: string,
-  repoName: string,
-  fn: (fullName: string) => Promise<Response>,
-): Promise<Response> {
-  return withVisibleRepo(c, owner, repoName, async (_row, fullName) => fn(fullName));
-}
-
-function registerUserRepoReadModelRoutes(app: RepoApp): void {
-  app.get('/user/repos/:owner/:repo/branches', async (c) => {
-    const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) => c.json(await getRepoStub(c.env, fullName).getBranches()));
-  });
-
-  app.get('/user/repos/:owner/:repo/tags', async (c) => {
-    const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) => c.json(await getRepoStub(c.env, fullName).getTags()));
-  });
-
-  app.get('/user/repos/:owner/:repo/tree', async (c) => {
-    const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    const url = new URL(c.req.url);
-    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) =>
-      c.json(
-        await getRepoStub(c.env, fullName).getTree({
-          ref: sanitizeRefParam(url.searchParams.get('ref')),
-          path: sanitizePathParam(url.searchParams.get('path')),
-          withLastCommit: parseWithLastCommit(url.searchParams.get('withLastCommit')),
-        }),
-      ),
-    );
-  });
-
-  app.get('/user/repos/:owner/:repo/blob', async (c) => {
-    const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    const url = new URL(c.req.url);
-    const filepath = sanitizePathParam(url.searchParams.get('path')) ?? '';
-    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) =>
-      c.json(await getRepoStub(c.env, fullName).getBlob({ ref: sanitizeRefParam(url.searchParams.get('ref')), filepath })),
-    );
-  });
-
-  app.get('/user/repos/:owner/:repo/commits', async (c) => {
-    const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    const url = new URL(c.req.url);
-    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) =>
-      c.json(
-        await getRepoStub(c.env, fullName).getCommits({
-          ref: sanitizeRefParam(url.searchParams.get('ref')),
-          depth: sanitizeDepthParam(url.searchParams.get('depth')),
-        }),
-      ),
-    );
-  });
-
-  app.get('/user/repos/:owner/:repo/commits/:oid', async (c) => {
-    const oid = c.req.param('oid');
-    if (!/^[0-9a-f]{40}$/i.test(oid)) return c.json({ error: 'Invalid commit oid' }, 400);
-    const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) => {
-      const diff = (await getRepoStub(c.env, fullName).getCommitDiff(oid)) as { commit: unknown } | null;
-      if (!diff || !diff.commit) return c.json({ error: 'Not found' }, 404);
-      return c.json(diff);
-    });
-  });
-
-  app.get('/user/repos/:owner/:repo/compare', async (c) => {
-    const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    const url = new URL(c.req.url);
-    const baseRef = sanitizeRefParam(url.searchParams.get('base')) ?? '';
-    const headRef = sanitizeRefParam(url.searchParams.get('head')) ?? '';
-    if (!baseRef || !headRef) return c.json({ error: 'base and head query params are required' }, 400);
-    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) => {
-      const diff = await getRepoStub(c.env, fullName).getCompare({ baseRef, headRef });
-      if (!diff) return c.json({ error: 'Not found' }, 404);
-      return c.json(diff);
-    });
-  });
-
-  app.get('/user/repos/:owner/:repo/overview', async (c) => {
-    const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    const url = new URL(c.req.url);
-    const args = parseOverviewArgs(url.searchParams);
-    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) =>
-      c.json(await getRepoStub(c.env, fullName).getOverview(args)),
-    );
-  });
-}
-
-export { registerRepoRoutes, registerUserRepoRoutes, registerUserRepoReadModelRoutes, sanitizeRefParam, sanitizePathParam, sanitizeDepthParam };
+export { registerRepoRoutes, registerUserRepoRoutes };

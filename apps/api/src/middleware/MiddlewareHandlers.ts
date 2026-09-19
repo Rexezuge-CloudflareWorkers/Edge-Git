@@ -6,14 +6,15 @@ import { RoleRank } from '@edge-git/backend-services/permission';
 import { AuditService } from '@edge-git/backend-services/audit';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { getBasicCredentials, getBearerToken } from '@edge-git/git-protocol';
-import { getRequestScope } from '@edge-git/backend-runtime/di';
-import { UnauthorizedError, ForbiddenError } from '@edge-git/backend-errors';
+import { getRequestScope, asScopedContext } from '@edge-git/backend-runtime/di';
+import { UnauthorizedError, ForbiddenError, DefaultInternalServerError } from '@edge-git/backend-errors';
+import { ErrorSanitizationUtil } from '@edge-git/shared/utils';
 import { flushDueWebhookDeliveries } from '@/workers/routes/SocialEmit';
 type RequestContext = Context<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
 function getScope(c: RequestContext): ReturnType<typeof createRequestScope> {
   try {
-    return getRequestScope(c as never);
+    return getRequestScope(asScopedContext(c));
   } catch {
     // Fallback preserves unit-test helpers that invoke handlers without
     // `scopeMiddleware`. Production requests always have a scope installed.
@@ -42,9 +43,23 @@ async function userAuthenticationHandler(c: RequestContext, next: Next): Promise
   } catch (error: unknown) {
     const status = error instanceof UnauthorizedError ? 401 : error instanceof ForbiddenError ? 403 : 500;
     // Never leak DB/DO internals on 500 — callers only need a generic message.
-    const message =
-      status === 500 ? 'Internal error' : error instanceof Error ? error.message : 'Unauthorized';
-    return c.json({ error: message }, status as 401);
+    // Wire shape is AWS `{Exception:{Type,Message}}`; git pkt-line paths are
+    // untouched (they return plain-text 401/403 via `unauthorizedGit`).
+    if (status === 500) {
+      console.error('userAuthentication failed:', ErrorSanitizationUtil.sanitizeErrorForLogging(error));
+      return c.json(
+        {
+          Exception: {
+            Type: DefaultInternalServerError.getErrorType(),
+            Message: DefaultInternalServerError.getErrorMessage(),
+          },
+        },
+        500,
+      );
+    }
+    const type = error instanceof ForbiddenError ? 'Forbidden' : 'Unauthorized';
+    const message = error instanceof Error ? error.message : 'Unauthorized';
+    return c.json({ Exception: { Type: type, Message: message } }, status as 401);
   }
 }
 
@@ -245,10 +260,20 @@ class MiddlewareHandlers {
     } catch (error: unknown) {
       if (error instanceof UnauthorizedError || error instanceof ForbiddenError) {
         const message = error instanceof Error ? error.message : 'Unauthorized';
+        const type = error instanceof ForbiddenError ? 'Forbidden' : 'Unauthorized';
         const status = error instanceof ForbiddenError ? 403 : 401;
-        return c.json({ error: message }, status as 401);
+        return c.json({ Exception: { Type: type, Message: message } }, status as 401);
       }
-      return c.json({ error: 'Internal error' }, 500);
+      console.error('requireUser failed:', ErrorSanitizationUtil.sanitizeErrorForLogging(error));
+      return c.json(
+        {
+          Exception: {
+            Type: DefaultInternalServerError.getErrorType(),
+            Message: DefaultInternalServerError.getErrorMessage(),
+          },
+        },
+        500,
+      );
     }
   }
 }

@@ -3,7 +3,7 @@ import { Tokens, createRequestScope } from '@edge-git/backend-services/compositi
 import { RepoService } from '@edge-git/backend-services/repo';
 import { parsePositiveInt } from '@edge-git/shared/validation';
 import { recordAndNotify } from './SocialEmit';
-import { requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type DiscussionApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -41,12 +41,12 @@ function registerDiscussionPublicRoutes(app: DiscussionApp): void {
   app.get('/repos/:owner/:repo/discussions/:number', async (c) => {
     return withPublicRepo(c as never, async (row) => {
       const number = parseNumber(c.req.param('number'));
-      if (number === null) return c.json({ error: 'Invalid discussion number' }, 400);
+      if (number === null) return jsonError(c, 'Invalid discussion number', 400);
       try {
         const result = await createRequestScope(c.env).get(Tokens.DiscussionService).getDiscussionWithComments(row.id, number);
         return c.json(result);
       } catch (error) {
-        return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+        return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
       }
     });
   });
@@ -56,7 +56,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
   app.get('/user/repos/:owner/:repo/discussions/categories', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       const categories = await createRequestScope(c.env).get(Tokens.DiscussionService).listCategories(row.id);
       return c.json({ categories });
@@ -68,7 +68,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
   app.get('/user/repos/:owner/:repo/discussions', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       const url = new URL(c.req.url);
       const discussions = await createRequestScope(c.env)
@@ -83,9 +83,9 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
   app.post('/user/repos/:owner/:repo/discussions', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     const { malformed, body } = await readJsonBody<{ title: unknown; body?: unknown; categorySlug?: unknown }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const discussion = await createRequestScope(c.env).get(Tokens.DiscussionService).createDiscussion(row.id, body, email);
       void recordAndNotify(c.env, {
@@ -101,21 +101,21 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
       });
       return c.json({ discussion }, 201);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to create discussion') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to create discussion'), toServiceStatus(error));
     }
   });
 
   app.get('/user/repos/:owner/:repo/discussions/:number', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     const number = parseNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Invalid discussion number' }, 400);
+    if (number === null) return jsonError(c, 'Invalid discussion number', 400);
     try {
       const result = await createRequestScope(c.env).get(Tokens.DiscussionService).getDiscussionWithComments(row.id, number);
       return c.json(result);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 
@@ -124,11 +124,11 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     const number = parseNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Invalid discussion number' }, 400);
+    if (number === null) return jsonError(c, 'Invalid discussion number', 400);
     const { malformed, body } = await readJsonBody<{ title?: unknown; body?: unknown; categorySlug?: unknown; status?: unknown }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = createRequestScope(c.env);
       const svc = scope.get(Tokens.DiscussionService);
@@ -142,9 +142,9 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
         isWriter = false;
       }
       // Status transitions (lock/answer) need write+; content edits need author or write+.
-      if (!isWriter && body.status !== undefined) return c.json({ error: 'Forbidden' }, 403);
+      if (!isWriter && body.status !== undefined) return jsonError(c, 'Forbidden', 403);
       if (!isAuthor && !isWriter && (body.title !== undefined || body.body !== undefined || body.categorySlug !== undefined))
-        return c.json({ error: 'Forbidden' }, 403);
+        return jsonError(c, 'Forbidden', 403);
       const discussion =
         body.status === undefined
           ? await svc.updateDiscussion(row.id, number, { title: body.title, body: body.body, categorySlug: body.categorySlug })
@@ -163,7 +163,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
       }
       return c.json({ discussion });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to update discussion') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to update discussion'), toServiceStatus(error));
     }
   });
 
@@ -172,9 +172,9 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     const number = parseNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Invalid discussion number' }, 400);
+    if (number === null) return jsonError(c, 'Invalid discussion number', 400);
     try {
       const scope = createRequestScope(c.env);
       const before = await scope.get(Tokens.DiscussionService).getDiscussion(row.id, number);
@@ -182,23 +182,23 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
       try {
         await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
       } catch {
-        if (!isAuthor) return c.json({ error: 'Forbidden' }, 403);
+        if (!isAuthor) return jsonError(c, 'Forbidden', 403);
       }
       await scope.get(Tokens.DiscussionService).deleteDiscussion(row.id, number);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 
   app.post('/user/repos/:owner/:repo/discussions/:number/comments', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     const number = parseNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Invalid discussion number' }, 400);
+    if (number === null) return jsonError(c, 'Invalid discussion number', 400);
     const { malformed, body } = await readJsonBody<{ body?: unknown }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const comment = await createRequestScope(c.env)
         .get(Tokens.DiscussionService)
@@ -216,7 +216,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
       });
       return c.json({ comment }, 201);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to add comment') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to add comment'), toServiceStatus(error));
     }
   });
 
@@ -225,9 +225,9 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     const number = parseNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Invalid discussion number' }, 400);
+    if (number === null) return jsonError(c, 'Invalid discussion number', 400);
     try {
       const scope = createRequestScope(c.env);
       try {
@@ -239,7 +239,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
       await scope.get(Tokens.DiscussionService).deleteComment(row.id, number, c.req.param('commentId'));
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 }

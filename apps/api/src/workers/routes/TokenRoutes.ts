@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { tokenIdSchema } from '@edge-git/shared/validation';
-import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type TokenApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -33,14 +33,14 @@ function registerTokenRoutes(app: TokenApp): void {
       scopes?: unknown;
       repoGrants?: unknown;
     }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
-    if (!body.name) return c.json({ error: 'name is required' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
+    if (!body.name) return jsonError(c, 'name is required', 400);
     try {
       const svc = createRequestScope(c.env).get(Tokens.TokenService);
       const created = await svc.createToken(email, body.name, body.expiresInDays, body.scopes, body.repoGrants);
       return c.json(created, 201);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
     }
   });
 
@@ -49,25 +49,25 @@ function registerTokenRoutes(app: TokenApp): void {
   // from the original duration). The old secret stops working immediately.
   app.post('/user/tokens/:id/rotate', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    if (!tokenIdSchema.safeParse(c.req.param('id')).success) return c.json({ error: 'Invalid token id' }, 400);
+    if (!tokenIdSchema.safeParse(c.req.param('id')).success) return jsonError(c, 'Invalid token id', 400);
     try {
       const svc = createRequestScope(c.env).get(Tokens.TokenService);
       const rotated = await svc.rotateToken(c.req.param('id'), email);
       return c.json(rotated, 201);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
     }
   });
 
   app.delete('/user/tokens/:id', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    if (!tokenIdSchema.safeParse(c.req.param('id')).success) return c.json({ error: 'Invalid token id' }, 400);
+    if (!tokenIdSchema.safeParse(c.req.param('id')).success) return jsonError(c, 'Invalid token id', 400);
     try {
       const svc = createRequestScope(c.env).get(Tokens.TokenService);
       await svc.deleteToken(c.req.param('id'), email);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
     }
   });
 }

@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 import { getRepoStub } from '../repoStub';
-import { requireVisibleRepo, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, toErrorBody, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { readJsonBody } from './BodyParser';
@@ -15,7 +15,7 @@ function toBranchResponse(
 ): { body: unknown; status: 200 | 201 | 400 | 403 | 404 | 409 | 500 } {
   if (!result.ok) {
     const status = [400, 404, 409].includes(result.status ?? 0) ? (result.status as 400 | 404 | 409) : 500;
-    return { body: { error: result.error ?? 'Branch operation failed' }, status };
+    return { body: toErrorBody(status, result.error ?? 'Branch operation failed'), status };
   }
   return { body: result, status: successStatus };
 }
@@ -45,18 +45,18 @@ function registerBranchRoutes(app: RepoApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const { malformed, body } = await readJsonBody<{ name?: string; from?: string }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const name = (body.name ?? '').trim();
-    if (!name) return c.json({ error: 'name is required' }, 400);
+    if (!name) return jsonError(c, 'name is required', 400);
     try {
       const gate = await requireWriteRole(c.env, owner, repoName, email);
-      if (!gate.ok) return c.json({ error: gate.status === 404 ? 'Not found' : 'Forbidden' }, gate.status);
+      if (!gate.ok) return jsonError(c, gate.status === 404 ? 'Not found' : 'Forbidden', gate.status);
       const fullName = `${owner}/${repoName}`;
       const result = (await getRepoStub(c.env, fullName).createBranch({ name, fromRef: body.from || undefined })) as BranchResult;
       const { body: out, status } = toBranchResponse(result, 201);
       return c.json(out, status);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to create branch') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to create branch'), toServiceStatus(error));
     }
   });
 
@@ -65,10 +65,10 @@ function registerBranchRoutes(app: RepoApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const branch = (new URL(c.req.url).searchParams.get('branch') ?? '').trim();
-    if (!branch) return c.json({ error: 'branch query param is required' }, 400);
+    if (!branch) return jsonError(c, 'branch query param is required', 400);
     try {
       const gate = await requireWriteRole(c.env, owner, repoName, email);
-      if (!gate.ok) return c.json({ error: gate.status === 404 ? 'Not found' : 'Forbidden' }, gate.status);
+      if (!gate.ok) return jsonError(c, gate.status === 404 ? 'Not found' : 'Forbidden', gate.status);
       // Branch protection applies to everyone including admins: delete the
       // rule first, then the branch.
       const scope = createRequestScope(c.env);
@@ -78,14 +78,14 @@ function registerBranchRoutes(app: RepoApp): void {
           .get(Tokens.BranchProtectionService)
           .matchForRepo(row.id, branch)
           .catch(() => null);
-        if (rule?.blockDeletion) return c.json({ error: `branch "${branch}" is protected against deletion` }, 403);
+        if (rule?.blockDeletion) return jsonError(c, `branch "${branch}" is protected against deletion`, 403);
       }
       const fullName = `${owner}/${repoName}`;
       const result = (await getRepoStub(c.env, fullName).deleteBranchRef(branch)) as BranchResult;
       const { body: out, status } = toBranchResponse(result, 200);
       return c.json(out, status);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to delete branch') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to delete branch'), toServiceStatus(error));
     }
   });
 
@@ -94,23 +94,23 @@ function registerBranchRoutes(app: RepoApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const { malformed, body } = await readJsonBody<{ branch?: string }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const branch = (body.branch ?? '').trim();
-    if (!branch) return c.json({ error: 'branch is required' }, 400);
+    if (!branch) return jsonError(c, 'branch is required', 400);
     try {
       const row = await requireVisibleRepo(c.env, owner, repoName, email);
-      if (!row) return c.json({ error: 'Not found' }, 404);
+      if (!row) return jsonError(c, 'Not found', 404);
       try {
         await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       } catch {
-        return c.json({ error: 'Forbidden' }, 403);
+        return jsonError(c, 'Forbidden', 403);
       }
       const fullName = `${owner}/${repoName}`;
       const result = (await getRepoStub(c.env, fullName).setDefaultBranch(branch)) as BranchResult;
       const { body: out, status } = toBranchResponse(result, 200);
       return c.json(out, status);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to update default branch') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to update default branch'), toServiceStatus(error));
     }
   });
 }

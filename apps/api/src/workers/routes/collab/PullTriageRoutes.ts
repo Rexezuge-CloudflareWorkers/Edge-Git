@@ -1,4 +1,4 @@
-import { toSafeErrorMessage, toServiceStatus } from '../PublicViewerResolver';
+import { jsonError, toSafeErrorMessage, toServiceStatus } from '../PublicViewerResolver';
 import { requireVisibleRepo } from '../PublicViewerResolver';
 import { recordAndNotify } from '../SocialEmit';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
@@ -14,9 +14,9 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, c.get('AuthenticatedUserEmailAddress'));
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     const number = parseNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Not found' }, 404);
+    if (number === null) return jsonError(c, 'Not found', 404);
     try {
       const scope = createRequestScope(c.env);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
@@ -28,7 +28,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
       }
       return c.json({ pull, ...meta });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 
@@ -38,12 +38,12 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
       const owner = c.req.param('owner');
       const repoName = RepoService.normalizeRepo(c.req.param('repo'));
       const row = await requireVisibleRepo(c.env, owner, repoName, email);
-      if (!row) return c.json({ error: 'Not found' }, 404);
-      if (!(await needWrite(c.env, owner, repoName, email))) return c.json({ error: 'Forbidden' }, 403);
+      if (!row) return jsonError(c, 'Not found', 404);
+      if (!(await needWrite(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
       const number = parseNumber(c.req.param('number'));
-      if (number === null) return c.json({ error: 'Not found' }, 404);
+      if (number === null) return jsonError(c, 'Not found', 404);
       const { malformed, body } = await readJsonBody<{ labelIds?: string[]; assignees?: string[]; milestoneId?: string | null }>(c);
-      if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+      if (malformed) return jsonError(c, 'Invalid JSON body', 400);
       try {
         const scope = createRequestScope(c.env);
         const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
@@ -53,7 +53,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
         else await collab.setPullMilestone(pull.id, row.id, body.milestoneId ?? null);
         return c.json({ ok: true });
       } catch (error) {
-        return c.json({ error: toSafeErrorMessage(error, 'Failed to update pull request') }, toServiceStatus(error));
+        return jsonError(c, toSafeErrorMessage(error, 'Failed to update pull request'), toServiceStatus(error));
       }
     });
   }
@@ -63,9 +63,9 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, c.get('AuthenticatedUserEmailAddress'));
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     const number = parseNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Not found' }, 404);
+    if (number === null) return jsonError(c, 'Not found', 404);
     try {
       const scope = createRequestScope(c.env);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
@@ -75,7 +75,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
         .catch(() => []);
       return c.json({ reviewers });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 
@@ -84,12 +84,12 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
-    if (!(await needWrite(c.env, owner, repoName, email))) return c.json({ error: 'Forbidden' }, 403);
+    if (!row) return jsonError(c, 'Not found', 404);
+    if (!(await needWrite(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
     const number = parseNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Not found' }, 404);
+    if (number === null) return jsonError(c, 'Not found', 404);
     const { malformed, body } = await readJsonBody<{ reviewers?: string[] }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = createRequestScope(c.env);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
@@ -107,7 +107,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
       }).catch(() => undefined);
       return c.json({ ok: true }, 201);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to request reviewers') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to request reviewers'), toServiceStatus(error));
     }
   });
 
@@ -116,17 +116,17 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
-    if (!(await needWrite(c.env, owner, repoName, email))) return c.json({ error: 'Forbidden' }, 403);
+    if (!row) return jsonError(c, 'Not found', 404);
+    if (!(await needWrite(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
     const number = parseNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Not found' }, 404);
+    if (number === null) return jsonError(c, 'Not found', 404);
     try {
       const scope = createRequestScope(c.env);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
       await scope.get(Tokens.CollaborationService).removeReviewer(pull.id, decodeURIComponent(c.req.param('reviewer')));
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 
@@ -135,18 +135,18 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
-    if (!(await needWrite(c.env, owner, repoName, email))) return c.json({ error: 'Forbidden' }, 403);
+    if (!row) return jsonError(c, 'Not found', 404);
+    if (!(await needWrite(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
     const number = parseNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Not found' }, 404);
+    if (number === null) return jsonError(c, 'Not found', 404);
     const { malformed, body } = await readJsonBody<{ isDraft?: boolean }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
-    if (typeof body.isDraft !== 'boolean') return c.json({ error: 'isDraft must be a boolean' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
+    if (typeof body.isDraft !== 'boolean') return jsonError(c, 'isDraft must be a boolean', 400);
     try {
       const pull = await createRequestScope(c.env).get(Tokens.PullRequestService).setDraft(row.id, number, body.isDraft);
       return c.json({ pull });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to update draft') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to update draft'), toServiceStatus(error));
     }
   });
 
@@ -154,9 +154,9 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, c.get('AuthenticatedUserEmailAddress'));
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     const number = parseNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Not found' }, 404);
+    if (number === null) return jsonError(c, 'Not found', 404);
     try {
       const scope = createRequestScope(c.env);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
@@ -169,7 +169,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
       });
       return c.json(suggested);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 }

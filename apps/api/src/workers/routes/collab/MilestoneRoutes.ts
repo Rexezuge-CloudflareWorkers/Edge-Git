@@ -1,4 +1,4 @@
-import { withPublicRepo } from '../PublicViewerResolver';
+import { jsonError, withPublicRepo } from '../PublicViewerResolver';
 import { toSafeErrorMessage, toServiceStatus } from '../PublicViewerResolver';
 import { requireVisibleRepo } from '../PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
@@ -23,7 +23,7 @@ function registerCollabMilestonePublicRoutes(app: CollabApp): void {
 function registerCollabMilestoneUserRoutes(app: CollabApp): void {
   app.get('/user/repos/:owner/:repo/milestones', async (c) => {
     const found = await resolveRepoRow(c.env, c.req.param('owner'), c.req.param('repo'), c.get('AuthenticatedUserEmailAddress'));
-    if (!found) return c.json({ error: 'Not found' }, 404);
+    if (!found) return jsonError(c, 'Not found', 404);
     try {
       const milestones = await createRequestScope(c.env).get(Tokens.CollaborationService).listMilestones(found.row.id);
       return c.json({ milestones });
@@ -37,18 +37,18 @@ function registerCollabMilestoneUserRoutes(app: CollabApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
-    if (!(await needWrite(c.env, owner, repoName, email))) return c.json({ error: 'Forbidden' }, 403);
+    if (!row) return jsonError(c, 'Not found', 404);
+    if (!(await needWrite(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
     const { malformed, body } = await readJsonBody<{ title?: string; description?: string; dueOn?: number }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
-    if (!body.title?.trim()) return c.json({ error: 'title is required' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
+    if (!body.title?.trim()) return jsonError(c, 'title is required', 400);
     try {
       const created = await createRequestScope(c.env)
         .get(Tokens.CollaborationService)
         .createMilestone(row.id, body as { title: string });
       return c.json(created, 201);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to create milestone') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to create milestone'), toServiceStatus(error));
     }
   });
 
@@ -57,15 +57,15 @@ function registerCollabMilestoneUserRoutes(app: CollabApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
-    if (!(await needWrite(c.env, owner, repoName, email))) return c.json({ error: 'Forbidden' }, 403);
+    if (!row) return jsonError(c, 'Not found', 404);
+    if (!(await needWrite(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
     const { malformed, body } = await readJsonBody<{ status?: string }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       await createRequestScope(c.env).get(Tokens.CollaborationService).updateMilestone(row.id, c.req.param('id'), body);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to update milestone') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to update milestone'), toServiceStatus(error));
     }
   });
 
@@ -74,13 +74,13 @@ function registerCollabMilestoneUserRoutes(app: CollabApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
-    if (!(await needWrite(c.env, owner, repoName, email))) return c.json({ error: 'Forbidden' }, 403);
+    if (!row) return jsonError(c, 'Not found', 404);
+    if (!(await needWrite(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
     try {
       await createRequestScope(c.env).get(Tokens.CollaborationService).deleteMilestone(row.id, c.req.param('id'));
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 }

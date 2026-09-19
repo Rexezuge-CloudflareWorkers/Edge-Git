@@ -3,7 +3,7 @@ import { Tokens, createRequestScope } from '@edge-git/backend-services/compositi
 import { RepoService } from '@edge-git/backend-services/repo';
 import { getCheckRunnerStub } from '../checkStub';
 import { emitWebhookEvent, publishCheckUpdate } from './SocialEmit';
-import { requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type CheckApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -61,7 +61,7 @@ function registerCheckPublicRoutes(app: CheckApp): void {
         const { runs, state } = await createRequestScope(c.env).get(Tokens.CheckService).listForSha(row.id, c.req.param('sha'));
         return c.json({ state, checks: runs.map(toCheckJson) });
       } catch (error) {
-        return c.json({ error: toSafeErrorMessage(error, 'Failed to list checks') }, toServiceStatus(error));
+        return jsonError(c, toSafeErrorMessage(error, 'Failed to list checks'), toServiceStatus(error));
       }
     });
   });
@@ -73,12 +73,12 @@ function registerCheckUserRoutes(app: CheckApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       const { runs, state } = await createRequestScope(c.env).get(Tokens.CheckService).listForSha(row.id, c.req.param('sha'));
       return c.json({ state, checks: runs.map(toCheckJson) });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to list checks') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to list checks'), toServiceStatus(error));
     }
   });
 
@@ -89,11 +89,11 @@ function registerCheckUserRoutes(app: CheckApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
-      return c.json({ error: 'Forbidden' }, 403);
+      return jsonError(c, 'Forbidden', 403);
     }
     const { malformed, body } = await readJsonBody<{
       headSha?: unknown;
@@ -102,7 +102,7 @@ function registerCheckUserRoutes(app: CheckApp): void {
       outputTitle?: unknown;
       outputSummary?: unknown;
     }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const run = await createRequestScope(c.env).get(Tokens.CheckService).reportStatus({
         repositoryId: row.id,
@@ -142,7 +142,7 @@ function registerCheckUserRoutes(app: CheckApp): void {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to report check';
       const status = message.includes('already completed') ? 409 : toServiceStatus(error);
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to report check') }, status as 400 | 403 | 404 | 500);
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to report check'), status as 400 | 403 | 404 | 500);
     }
   });
 
@@ -152,11 +152,11 @@ function registerCheckUserRoutes(app: CheckApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
-      return c.json({ error: 'Forbidden' }, 403);
+      return jsonError(c, 'Forbidden', 403);
     }
     const { malformed, body } = await readJsonBody<{
       status?: unknown;
@@ -165,8 +165,8 @@ function registerCheckUserRoutes(app: CheckApp): void {
       outputTitle?: unknown;
       outputSummary?: unknown;
     }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
-    if (typeof body.status !== 'string') return c.json({ error: 'status is required' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
+    if (typeof body.status !== 'string') return jsonError(c, 'status is required', 400);
     try {
       const run = await createRequestScope(c.env)
         .get(Tokens.CheckService)
@@ -203,7 +203,7 @@ function registerCheckUserRoutes(app: CheckApp): void {
       });
       return c.json({ check: toCheckJson(run) });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to update check') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to update check'), toServiceStatus(error));
     }
   });
 }

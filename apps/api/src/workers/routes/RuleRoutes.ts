@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
-import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type RuleApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -20,7 +20,7 @@ function registerRuleRoutes(app: RuleApp): void {
       const rules = await scope.get(Tokens.BranchProtectionService).listRules(repo.id);
       return c.json({ rules });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to list rules') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to list rules'), toServiceStatus(error));
     }
   });
 
@@ -36,8 +36,8 @@ function registerRuleRoutes(app: RuleApp): void {
       blockDeletion?: boolean;
       requireStatusChecks?: unknown;
     }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
-    if (typeof body.pattern !== 'string' || !body.pattern.trim()) return c.json({ error: 'pattern is required' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
+    if (typeof body.pattern !== 'string' || !body.pattern.trim()) return jsonError(c, 'pattern is required', 400);
     try {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
@@ -53,7 +53,7 @@ function registerRuleRoutes(app: RuleApp): void {
       });
       return c.json({ rule }, 201);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to create rule') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to create rule'), toServiceStatus(error));
     }
   });
 
@@ -68,7 +68,7 @@ function registerRuleRoutes(app: RuleApp): void {
       await scope.get(Tokens.BranchProtectionService).deleteRule(repo.id, id);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to delete rule') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to delete rule'), toServiceStatus(error));
     }
   });
 }

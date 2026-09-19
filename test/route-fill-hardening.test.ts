@@ -744,8 +744,8 @@ describe('ProjectRoutes CRUD + move validation', () => {
     const { db } = createFillFakeDb();
     const res = await callWorker(createEnv(db), '/user/repos/alice/demo/projects/1/cards', postJson('/x', { kind: 'note' }));
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toContain('columnId');
+    const body = (await res.json()) as { Exception?: { Type?: string; Message?: string } };
+    expect(body.Exception?.Message ?? '').toContain('columnId');
   });
 
   it('rejects card moves without toColumnId', async () => {
@@ -756,8 +756,8 @@ describe('ProjectRoutes CRUD + move validation', () => {
       { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({}) },
     );
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toContain('toColumnId');
+    const body = (await res.json()) as { Exception?: { Type?: string; Message?: string } };
+    expect(body.Exception?.Message ?? '').toContain('toColumnId');
   });
 
   it('deletes a project and shrinks state', async () => {
@@ -791,8 +791,8 @@ describe('OrgRoutes last-owner guard', () => {
     const before = state.orgMembers.length;
     const res = await callWorker(createEnv(db), `/user/orgs/acme/members/${encodeURIComponent(ALICE)}`, { method: 'DELETE' });
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toContain('last owner');
+    const body = (await res.json()) as { Exception?: { Type?: string; Message?: string } };
+    expect(body.Exception?.Message ?? '').toContain('last owner');
     expect(state.orgMembers).toHaveLength(before);
   });
 
@@ -804,8 +804,8 @@ describe('OrgRoutes last-owner guard', () => {
       body: JSON.stringify({ role: 'member' }),
     });
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toContain('last owner');
+    const body = (await res.json()) as { Exception?: { Type?: string; Message?: string } };
+    expect(body.Exception?.Message ?? '').toContain('last owner');
     expect(state.orgMembers.find((m) => m.user_email === ALICE)?.role).toBe('owner');
   });
 });

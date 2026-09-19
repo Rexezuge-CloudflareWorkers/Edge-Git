@@ -75,7 +75,7 @@ describe('checks lifecycle on real D1', () => {
     const mergePath = `/user/repos/${OWNER}/${REPO}/pulls/7/merge`;
     const blocked = await api(mergePath, json({ method: 'POST', body: JSON.stringify({}) }));
     expect(blocked.status).toBe(409);
-    expect(((await blocked.json()) as { error: string }).error).toContain('required status checks');
+    expect(((await blocked.json()) as { Exception?: { Message?: string } }).Exception?.Message ?? '').toContain('required status checks');
 
     await api(checksBase, json({ method: 'POST', body: JSON.stringify({ headSha, context: 'lint' }) }));
     const runs = (await (await api(`/repos/${OWNER}/${REPO}/commits/${headSha}/checks`)).json()) as { checks: Array<{ id: string }> };

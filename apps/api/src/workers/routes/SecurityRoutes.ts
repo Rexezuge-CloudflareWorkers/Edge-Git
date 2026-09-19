@@ -2,7 +2,7 @@ import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { SecuritySettingsService } from '@edge-git/backend-services/security';
-import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type SecurityApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -21,7 +21,7 @@ function registerSecurityRoutes(app: SecurityApp): void {
       const settings = await scope.get(Tokens.SecuritySettingsService).getSettings(repo.id);
       return c.json({ settings });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to load security settings') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to load security settings'), toServiceStatus(error));
     }
   });
 
@@ -30,8 +30,8 @@ function registerSecurityRoutes(app: SecurityApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const { malformed, body } = await readJsonBody<{ secretScanMode?: unknown }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
-    if (body.secretScanMode === undefined) return c.json({ error: 'secretScanMode is required' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
+    if (body.secretScanMode === undefined) return jsonError(c, 'secretScanMode is required', 400);
     try {
       const mode = SecuritySettingsService.normalizeMode(body.secretScanMode);
       const scope = createRequestScope(c.env);
@@ -39,7 +39,7 @@ function registerSecurityRoutes(app: SecurityApp): void {
       const settings = await scope.get(Tokens.SecuritySettingsService).setMode(repo.id, mode, email);
       return c.json({ settings });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to update security settings') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to update security settings'), toServiceStatus(error));
     }
   });
 }

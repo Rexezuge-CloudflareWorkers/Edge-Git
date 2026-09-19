@@ -1,7 +1,6 @@
 import { getRepoStub } from '../repoStub';
-import { requireVisibleRepo, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, toErrorBody, toErrorType, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
-import { triggerRequiredChecks } from './TriggerChecks';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { CheckService } from '@edge-git/backend-services/checks';
@@ -13,88 +12,6 @@ import { parsePullNumber } from './PullShared';
 import type { MergePreviewShape, PullApp } from './PullShared';
 import { resolveCodeownerEmails, suggestCodeownerHandles } from './CodeownerHelpers';
 import { readJsonBody } from './BodyParser';
-
-interface OpenCrossForkInput {
-  email: string;
-  rowId: string;
-  fullName: string;
-  baseBranch: string;
-  headBranch: string;
-  headOwner: string;
-  headRepo: string;
-  title: string;
-  body: string | null;
-}
-
-async function openCrossForkPull(
-  env: Env,
-  input: OpenCrossForkInput,
-): Promise<{ status: 201 | 400 | 401 | 403 | 404 | 409 | 413 | 429 | 500; body: unknown }> {
-  const headRow = await requireVisibleRepo(env, input.headOwner, input.headRepo, input.email);
-  if (!headRow) return { status: 404, body: { error: 'Not found' } };
-  const headFullName = `${headRow.owner}/${headRow.name}`;
-  let preview: { preview: MergePreviewShape | null };
-  try {
-    preview = await getCrossRepoPreview(env, input.fullName, input.baseBranch, headFullName, input.headBranch);
-  } catch (error) {
-    if (isPackLimitError(error)) return { status: 413, body: { error: error instanceof Error ? error.message : 'Repository too large' } };
-    return { status: 400, body: { error: 'base or head branch not found' } };
-  }
-  if (!preview.preview?.baseOid || !preview.preview?.headOid) return { status: 400, body: { error: 'base or head branch not found' } };
-  try {
-    const scope = createRequestScope(env);
-    const created = await scope.get(Tokens.PullRequestService).createPull({
-      repositoryId: input.rowId,
-      fullName: input.fullName,
-      title: input.title,
-      body: input.body,
-      baseBranch: input.baseBranch,
-      headBranch: input.headBranch,
-      baseOid: preview.preview.baseOid,
-      headOid: preview.preview.headOid,
-      mergeBaseOid: preview.preview.mergeBase ?? null,
-      creatorEmail: input.email,
-      headRepositoryId: headRow.id,
-      headFullName,
-    });
-    // CODEOWNERS auto-request: best-effort, never fails PR creation.
-    try {
-      const suggested = await suggestCodeownerHandles(env, input.fullName, {
-        baseBranch: input.baseBranch,
-        baseOid: preview.preview.baseOid,
-        headOid: preview.preview.headOid,
-      });
-      const ownerEmails = await resolveCodeownerEmails(env, suggested.owners, input.email);
-      if (ownerEmails.length > 0) {
-        await scope.get(Tokens.CollaborationService).requestReviewers(created.id, ownerEmails);
-      }
-    } catch {
-      // best-effort codeowner auto-request
-    }
-    await recordAndNotify(env, {
-      repositoryId: input.rowId,
-      fullName: input.fullName,
-      actorEmail: input.email,
-      type: 'pr_opened',
-      title: `Pull request #${created.number} ${input.title}`,
-      subjectType: 'pull',
-      subjectNumber: created.number,
-      subjectOid: preview.preview.headOid,
-      mentionText: `${input.title}\n${input.body ?? ''}`,
-    });
-    // CI: queue required checks for the base branch against the head SHA.
-    await triggerRequiredChecks(env, {
-      repositoryId: input.rowId,
-      fullName: input.fullName,
-      branch: input.baseBranch,
-      headSha: preview.preview.headOid,
-      actorEmail: input.email,
-    }).catch(() => undefined);
-    return { status: 201, body: created };
-  } catch (error) {
-    return { status: toServiceStatus(error), body: { error: toSafeErrorMessage(error, 'Failed to create pull request') } };
-  }
-}
 
 interface MergeCrossForkInput {
   email: string;
@@ -116,7 +33,7 @@ async function mergeCrossForkPull(
 ): Promise<{ status: 200 | 400 | 401 | 403 | 404 | 409 | 413 | 429 | 500; body: unknown }> {
   const permission = input.scope.get(Tokens.PermissionService);
   const headRole = await permission.getRole(input.email, input.headRow).catch(() => null);
-  if (!headRole) return { status: 404, body: { error: 'Not found' } };
+  if (!headRole) return { status: 404, body: toErrorBody(404, 'Not found') };
   // Head-branch deletion is best-effort: without write on the fork the merge
   // still proceeds and reports deletedHead: false.
   let canDeleteHead = false;
@@ -132,10 +49,12 @@ async function mergeCrossForkPull(
   try {
     cross = await getCrossRepoPreview(env, input.fullName, input.pull.base_branch, input.headFullName, input.pull.head_branch);
   } catch (error) {
-    if (isPackLimitError(error)) return { status: 413, body: { error: error instanceof Error ? error.message : 'Repository too large' } };
-    return { status: 400, body: { error: 'head branch not found' } };
+    if (isPackLimitError(error))
+      return { status: 413, body: toErrorBody(413, error instanceof Error ? error.message : 'Repository too large') };
+    return { status: 400, body: toErrorBody(400, 'head branch not found') };
   }
-  if (!cross.preview?.baseOid || !cross.preview?.headOid) return { status: 400, body: { error: 'head branch not found' } };
+  if (!cross.preview?.baseOid || !cross.preview?.headOid)
+    return { status: 400, body: toErrorBody(400, 'head branch not found') };
   const headOid = cross.preview.headOid;
   try {
     await input.scope.get(Tokens.PullRequestService).refreshOids({
@@ -159,10 +78,20 @@ async function mergeCrossForkPull(
       strategy: input.strategy,
     })) as { type?: string; commitOid?: string; conflicts?: string[]; reason?: string; deletedHead?: boolean };
   } catch (error) {
-    return { status: toServiceStatus(error), body: { error: toSafeErrorMessage(error, 'Merge failed') } };
+    return {
+      status: toServiceStatus(error),
+      body: { Exception: { Type: toErrorType(toServiceStatus(error)), Message: toSafeErrorMessage(error, 'Merge failed') } },
+    };
   }
   if (outcome.type === 'conflict') {
-    return { status: 409, body: { error: 'merge conflicts', conflicts: outcome.conflicts ?? [], reason: outcome.reason ?? null } };
+    return {
+      status: 409,
+      body: {
+        Exception: { Type: 'Conflict', Message: 'merge conflicts' },
+        conflicts: outcome.conflicts ?? [],
+        reason: outcome.reason ?? null,
+      },
+    };
   }
   if (canDeleteHead && input.deleteHead) {
     try {
@@ -191,10 +120,10 @@ async function mergeCrossForkPull(
     return { status: 200, body: { pull: merged, merge: outcome } };
   } catch (error) {
     const status = toServiceStatus(error);
-    if (status === 500) return { status: 400, body: { error: 'Failed to record merge' } };
+    if (status === 500) return { status: 400, body: toErrorBody(400, 'Failed to record merge') };
     const failure = error instanceof Error ? error.message : 'Failed to record merge';
-    if (failure.includes('unresolved change requests')) return { status: 409, body: { error: failure } };
-    return { status, body: { error: toSafeErrorMessage(error, 'Failed to record merge') } };
+    if (failure.includes('unresolved change requests')) return { status: 409, body: toErrorBody(409, failure) };
+    return { status, body: toErrorBody(status, toSafeErrorMessage(error, 'Failed to record merge')) };
   }
 }
 
@@ -208,27 +137,27 @@ function registerUserPullMergeRoutes(app: PullApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
-      return c.json({ error: 'Forbidden' }, 403);
+      return jsonError(c, 'Forbidden', 403);
     }
     const number = parsePullNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Not found' }, 404);
+    if (number === null) return jsonError(c, 'Not found', 404);
     const scope = createRequestScope(c.env);
     let pull;
     try {
       pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
-    if (pull.status === 'merged') return c.json({ error: 'pull request is already merged' }, 400);
-    if (pull.status === 'closed') return c.json({ error: 'closed pull requests cannot be merged' }, 400);
-    if ((pull as { is_draft?: number | null }).is_draft === 1) return c.json({ error: 'draft pull requests cannot be merged' }, 409);
+    if (pull.status === 'merged') return jsonError(c, 'pull request is already merged', 400);
+    if (pull.status === 'closed') return jsonError(c, 'closed pull requests cannot be merged', 400);
+    if ((pull as { is_draft?: number | null }).is_draft === 1) return jsonError(c, 'draft pull requests cannot be merged', 409);
     // Fail fast on blocking reviews before touching git.
     const reviews = await scope.get(Tokens.PullRequestService).listReviews(row.id, number);
-    if (PullRequestService.isBlockedByReviews(reviews)) return c.json({ error: 'pull request has unresolved change requests' }, 409);
+    if (PullRequestService.isBlockedByReviews(reviews)) return jsonError(c, 'pull request has unresolved change requests', 409);
     // Branch protection: the base branch may require N approvals (excluding
     // the PR creator). Applies to same-repo and cross-fork merges alike.
     // Missing protection table on legacy DBs means no rule (fall through).
@@ -253,7 +182,7 @@ function registerUserPullMergeRoutes(app: PullApp): void {
       creatorEmail: pull.creator_email,
       codeowners: { owners: codeownerEmails },
     });
-    if (gate.blocked) return c.json({ error: gate.reason ?? 'pull request is blocked by branch protection' }, 409);
+    if (gate.blocked) return jsonError(c, gate.reason ?? 'pull request is blocked by branch protection', 409);
     // Required status checks: every context listed on the matched rule must
     // report a passing conclusion (success/neutral/skipped) on the merge head
     // SHA. Missing or pending runs block; direct pushes are unaffected
@@ -263,7 +192,11 @@ function registerUserPullMergeRoutes(app: PullApp): void {
       const headSha = pull.head_oid ?? null;
       if (!headSha)
         return c.json(
-          { error: 'required status checks are pending: head commit unknown', requiredChecks: requiredContexts, state: 'pending' },
+          {
+            Exception: { Type: 'Conflict', Message: 'required status checks are pending: head commit unknown' },
+            requiredChecks: requiredContexts,
+            state: 'pending',
+          },
           409,
         );
       const runs = await scope
@@ -282,7 +215,7 @@ function registerUserPullMergeRoutes(app: PullApp): void {
             : `pending checks: ${checkGate.pending.join(', ')}`;
         return c.json(
           {
-            error: `required status checks not satisfied (${detail})`,
+            Exception: { Type: 'Conflict', Message: `required status checks not satisfied (${detail})` },
             requiredChecks: requiredContexts,
             state: checkGate.state,
             pending: checkGate.pending,
@@ -293,7 +226,7 @@ function registerUserPullMergeRoutes(app: PullApp): void {
       }
     }
     const { malformed, body } = await readJsonBody<{ message?: string; deleteHead?: boolean; strategy?: string }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const rawMessage = typeof body.message === 'string' ? body.message.trim() : '';
     const message = rawMessage ? rawMessage.slice(0, 1000) : `Merge pull request #${number}: ${pull.title}`;
     const deleteHead = body.deleteHead === true;
@@ -339,7 +272,7 @@ function registerUserPullMergeRoutes(app: PullApp): void {
     } catch {
       // fall through with stored oid
     }
-    if (!headOid) return c.json({ error: 'head branch not found' }, 400);
+    if (!headOid) return jsonError(c, 'head branch not found', 400);
     let outcome: { type?: string; commitOid?: string; conflicts?: string[]; reason?: string; deletedHead?: boolean };
     try {
       outcome = (await getRepoStub(c.env, `${owner}/${repoName}`).mergePull({
@@ -353,10 +286,17 @@ function registerUserPullMergeRoutes(app: PullApp): void {
         strategy,
       })) as { type?: string; commitOid?: string; conflicts?: string[]; reason?: string; deletedHead?: boolean };
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Merge failed') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Merge failed'), toServiceStatus(error));
     }
     if (outcome.type === 'conflict') {
-      return c.json({ error: 'merge conflicts', conflicts: outcome.conflicts ?? [], reason: outcome.reason ?? null }, 409);
+      return c.json(
+        {
+          Exception: { Type: 'Conflict', Message: 'merge conflicts' },
+          conflicts: outcome.conflicts ?? [],
+          reason: outcome.reason ?? null,
+        },
+        409,
+      );
     }
     try {
       const merged = await scope
@@ -376,13 +316,14 @@ function registerUserPullMergeRoutes(app: PullApp): void {
       return c.json({ pull: merged, merge: outcome });
     } catch (error) {
       const status = toServiceStatus(error);
-      if (status === 500) return c.json({ error: 'Failed to record merge' }, 400);
+      if (status === 500) return jsonError(c, 'Failed to record merge', 400);
       const failure = error instanceof Error ? error.message : 'Failed to record merge';
-      if (failure.includes('unresolved change requests')) return c.json({ error: failure }, 409);
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to record merge') }, status);
+      if (failure.includes('unresolved change requests')) return jsonError(c, failure, 409);
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to record merge'), status);
     }
   });
 }
 
-export { openCrossForkPull, registerUserPullMergeRoutes };
-export type { OpenCrossForkInput };
+export { registerUserPullMergeRoutes };
+export { openCrossForkPull } from './PullMergeHelpers';
+export type { OpenCrossForkInput } from './PullMergeHelpers';

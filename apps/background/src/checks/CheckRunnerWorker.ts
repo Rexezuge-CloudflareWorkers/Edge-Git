@@ -59,7 +59,10 @@ class CheckRunnerWorker extends DurableObject<Env> {
     if (url.pathname === '/enqueue' && request.method === 'POST') {
       const body = (await request.json().catch(() => null)) as EnqueueChecksInput | null;
       if (!body || typeof body.repositoryId !== 'string' || typeof body.headSha !== 'string' || !Array.isArray(body.contexts)) {
-        return Response.json({ error: 'repositoryId, headSha, and contexts are required' }, { status: 400 });
+        return Response.json(
+          { Exception: { Type: 'BadRequest', Message: 'repositoryId, headSha, and contexts are required.' } },
+          { status: 400 },
+        );
       }
       await this.enqueueChecks(body);
       return Response.json({ ok: true });

@@ -27,10 +27,10 @@ describe('middleware error masking', () => {
     const c = authCtx();
     const res = (await handler(c, async () => undefined)) as unknown as Response | void;
     expect(res).toBeInstanceOf(Response);
-    const body = (await (res as Response).json()) as { error: string };
+    const body = (await (res as Response).json()) as { Exception?: { Type?: string; Message?: string } };
     // 401 for auth failures keeps message; 500 must never echo internals.
     if ((res as Response).status === 500) {
-      expect(body.error).toBe('Internal error');
+      expect(body.Exception?.Message).toBe('The server encountered an internal error and was unable to complete your request.');
     } else {
       expect([401, 403]).toContain((res as Response).status);
     }
@@ -42,10 +42,11 @@ describe('middleware error masking', () => {
     expect(out).toBeInstanceOf(Response);
     const res = out as unknown as Response;
     expect(res.status).toBe(500);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toBe('Internal error');
+    const body = (await res.json()) as { Exception?: { Type?: string; Message?: string } };
+    expect(body.Exception?.Type).toBe('InternalServerError');
+    expect(body.Exception?.Message).toBe('The server encountered an internal error and was unable to complete your request.');
     // Must not contain stack traces or SQL fragments.
-    expect(body.error).not.toMatch(/SELECT|D1_|Error: /i);
+    expect(body.Exception?.Message ?? '').not.toMatch(/SELECT|D1_|Error: /i);
     void vi;
   });
 });

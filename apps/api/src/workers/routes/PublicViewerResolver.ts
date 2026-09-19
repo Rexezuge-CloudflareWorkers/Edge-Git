@@ -6,6 +6,7 @@ import { RoleRank } from '@edge-git/backend-services/permission';
 import { coversScope } from '@edge-git/backend-services/auth';
 import { getBasicCredentials, getBearerToken } from '@edge-git/git-protocol';
 import type { RequestContext } from '@/middleware';
+import { asScopedContext } from '@edge-git/backend-runtime/di';
 import { BaseRoute } from '../../endpoints/IBaseRoute';
 
 function toRepoJson(r: RepositoryRow, viewerRole?: string | null): unknown {
@@ -26,7 +27,7 @@ function toRepoJson(r: RepositoryRow, viewerRole?: string | null): unknown {
 
 // Single-scope resolution (Otter pattern). Delegates to `BaseRoute.getScope`
 // so the per-request container fallback stays consistent in one place.
-function getScope(c: { get(key: string): unknown; env: Env }): ReturnType<typeof createRequestScope> {
+function getScope(c: { get(key: string): unknown; env: unknown }): ReturnType<typeof createRequestScope> {
   return BaseRoute.getScope(c);
 }
 
@@ -74,7 +75,7 @@ async function requireRoleForRepo(
  * read-model; use Access or an unscoped token for API reads).
  */
 async function resolvePublicViewer(c: RequestContext): Promise<string | null> {
-  const scope = getScope(c as never);
+  const scope = getScope(asScopedContext(c));
   try {
     const email = await scope
       .get(Tokens.AccessAuthService)
@@ -100,11 +101,12 @@ async function resolvePublicViewer(c: RequestContext): Promise<string | null> {
 async function withPublicRepo(c: RequestContext, fn: (row: RepositoryRow, fullName: string) => Promise<Response>): Promise<Response> {
   const owner = c.req.param('owner');
   const repoParam = c.req.param('repo');
-  if (!owner || !repoParam) return c.json({ error: 'Not found' }, 404);
+  if (!owner || !repoParam)
+    return c.json({ Exception: { Type: 'NotFound', Message: 'Repository not found.' } }, 404);
   const repoName = RepoFullName.normalizeRepo(repoParam);
   const viewerEmail = await resolvePublicViewer(c);
-  const row = await requireVisibleRepo(c.env, owner, repoName, viewerEmail, getScope(c as never));
-  if (!row) return c.json({ error: 'Not found' }, 404);
+  const row = await requireVisibleRepo(c.env, owner, repoName, viewerEmail, getScope(asScopedContext(c)));
+  if (!row) return c.json({ Exception: { Type: 'NotFound', Message: 'Repository not found.' } }, 404);
   return fn(row, `${owner}/${repoName}`);
 }
 
@@ -120,10 +122,10 @@ async function withVisibleRepo(
   repoName: string,
   fn: (row: RepositoryRow, fullName: string) => Promise<Response>,
 ): Promise<Response> {
-  const email = (c as { get(key: string): string }).get('AuthenticatedUserEmailAddress') ?? null;
+  const email = c.get('AuthenticatedUserEmailAddress') ?? null;
   const normalized = RepoFullName.normalizeRepo(repoName);
-  const row = await requireVisibleRepo(c.env, owner, normalized, email, getScope(c as never));
-  if (!row) return c.json({ error: 'Not found' }, 404);
+  const row = await requireVisibleRepo(c.env, owner, normalized, email, getScope(asScopedContext(c)));
+  if (!row) return c.json({ Exception: { Type: 'NotFound', Message: 'Repository not found.' } }, 404);
   return fn(row, `${owner}/${normalized}`);
 }
 
@@ -132,6 +134,23 @@ async function withVisibleRepo(
 // `BaseRoute` directly.
 function toServiceStatus(error: unknown): 400 | 401 | 403 | 404 | 409 | 413 | 429 | 500 {
   return BaseRoute.toServiceStatus(error);
+}
+
+function toErrorType(status: number): string {
+  return BaseRoute.toErrorType(status);
+}
+
+function toErrorBody(status: number, message: string): { Exception: { Type: string; Message: string } } {
+  return BaseRoute.toErrorBody(status, message);
+}
+
+function jsonError(c: RequestContext, message: string, status: number): Response;
+function jsonError(c: RequestContext, type: string, message: string, status: number): Response;
+function jsonError(c: RequestContext, typeOrMessage: string, messageOrStatus: string | number, status = 400): Response {
+  if (typeof messageOrStatus === 'number') {
+    return BaseRoute.jsonError(c, typeOrMessage, messageOrStatus);
+  }
+  return BaseRoute.jsonError(c, typeOrMessage, messageOrStatus, status);
 }
 
 // Mask internal details on 500: callers must use this instead of echoing
@@ -145,7 +164,7 @@ function parseLimit(url: string, def = 100, max = 100): number {
 }
 
 async function readJson<T>(c: RequestContext): Promise<{ malformed: boolean; body: T }> {
-  return BaseRoute.readJson<T>(c as never);
+  return BaseRoute.readJson<T>(c);
 }
 
 export {
@@ -156,6 +175,9 @@ export {
   withPublicRepo,
   withVisibleRepo,
   toServiceStatus,
+  toErrorType,
+  toErrorBody,
+  jsonError,
   toSafeErrorMessage,
   getScope,
   parseLimit,

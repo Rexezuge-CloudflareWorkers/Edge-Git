@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
-import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type TeamApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -27,22 +27,22 @@ function registerTeamRoutes(app: TeamApp): void {
       const teams = await createRequestScope(c.env).get(Tokens.TeamService).listTeams(c.req.param('org'), email);
       return c.json({ teams: teams.map(teamJson) });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 
   app.post('/user/orgs/:org/teams', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const { malformed, body } = await readJsonBody<{ slug?: string; name?: string; description?: string | null }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
-    if (!body.slug) return c.json({ error: 'slug is required' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
+    if (!body.slug) return jsonError(c, 'slug is required', 400);
     try {
       const team = await createRequestScope(c.env)
         .get(Tokens.TeamService)
         .createTeam(c.req.param('org'), email, body as { slug: string });
       return c.json(teamJson(team), 201);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
     }
   });
 
@@ -54,19 +54,19 @@ function registerTeamRoutes(app: TeamApp): void {
       await scope.get(Tokens.OrganizationService).requireMember(c.req.param('org'), email);
       return c.json(teamJson(team));
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 
   app.patch('/user/orgs/:org/teams/:team', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const { malformed, body } = await readJsonBody<{ slug?: string; name?: string; description?: string | null }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const team = await createRequestScope(c.env).get(Tokens.TeamService).renameTeam(c.req.param('org'), c.req.param('team'), email, body);
       return c.json(teamJson(team));
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
     }
   });
 
@@ -76,7 +76,7 @@ function registerTeamRoutes(app: TeamApp): void {
       await createRequestScope(c.env).get(Tokens.TeamService).deleteTeam(c.req.param('org'), c.req.param('team'), email);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
     }
   });
 
@@ -86,38 +86,38 @@ function registerTeamRoutes(app: TeamApp): void {
       const members = await createRequestScope(c.env).get(Tokens.TeamService).listMembers(c.req.param('org'), c.req.param('team'), email);
       return c.json({ members });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 
   app.post('/user/orgs/:org/teams/:team/members', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const { malformed, body } = await readJsonBody<{ username?: string; email?: string; role?: string }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const target = body.username ?? body.email;
-    if (!target) return c.json({ error: 'username or email is required' }, 400);
+    if (!target) return jsonError(c, 'username or email is required', 400);
     const role = body.role ?? 'member';
-    if (role !== 'admin' && role !== 'member') return c.json({ error: 'Invalid role' }, 400);
+    if (role !== 'admin' && role !== 'member') return jsonError(c, 'Invalid role', 400);
     try {
       await createRequestScope(c.env).get(Tokens.TeamService).addMember(c.req.param('org'), c.req.param('team'), email, target, role);
       return c.json({ ok: true }, 201);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
     }
   });
 
   app.patch('/user/orgs/:org/teams/:team/members/:member', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const { malformed, body } = await readJsonBody<{ role?: string }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
-    if (body.role !== 'admin' && body.role !== 'member') return c.json({ error: 'Invalid role' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
+    if (body.role !== 'admin' && body.role !== 'member') return jsonError(c, 'Invalid role', 400);
     try {
       await createRequestScope(c.env)
         .get(Tokens.TeamService)
         .setMemberRole(c.req.param('org'), c.req.param('team'), email, decodeURIComponent(c.req.param('member')), body.role);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
     }
   });
 
@@ -129,7 +129,7 @@ function registerTeamRoutes(app: TeamApp): void {
         .removeMember(c.req.param('org'), c.req.param('team'), email, decodeURIComponent(c.req.param('member')));
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
     }
   });
 
@@ -151,26 +151,26 @@ function registerTeamRoutes(app: TeamApp): void {
       }
       return c.json({ repos });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 
   app.put('/user/orgs/:org/teams/:team/repos/:owner/:repo', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const { malformed, body } = await readJsonBody<{ role?: string }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const role = body.role ?? 'read';
-    if (role !== 'admin' && role !== 'write' && role !== 'read') return c.json({ error: 'Invalid role' }, 400);
+    if (role !== 'admin' && role !== 'write' && role !== 'read') return jsonError(c, 'Invalid role', 400);
     try {
       const scope = createRequestScope(c.env);
       const repo = await scope
         .get(Tokens.RepoService)
         .getByOwnerAndName(c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')));
-      if (!repo) return c.json({ error: 'Repository not found' }, 404);
+      if (!repo) return jsonError(c, 'Repository not found', 404);
       await scope.get(Tokens.TeamService).grantRepo(c.req.param('org'), c.req.param('team'), email, repo.id, role);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
     }
   });
 
@@ -181,11 +181,11 @@ function registerTeamRoutes(app: TeamApp): void {
       const repo = await scope
         .get(Tokens.RepoService)
         .getByOwnerAndName(c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')));
-      if (!repo) return c.json({ error: 'Repository not found' }, 404);
+      if (!repo) return jsonError(c, 'Repository not found', 404);
       await scope.get(Tokens.TeamService).revokeGrant(c.req.param('org'), c.req.param('team'), email, repo.id);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
     }
   });
 }

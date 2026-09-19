@@ -3,7 +3,7 @@ import { Tokens, createRequestScope } from '@edge-git/backend-services/compositi
 import { RepoService } from '@edge-git/backend-services/repo';
 import { parsePositiveInt } from '@edge-git/shared/validation';
 import { recordAndNotify } from './SocialEmit';
-import { requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type ProjectApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -27,12 +27,12 @@ function registerProjectPublicRoutes(app: ProjectApp): void {
   app.get('/repos/:owner/:repo/projects/:number', async (c) => {
     return withPublicRepo(c as never, async (row) => {
       const number = parseProjectNumber(c.req.param('number'));
-      if (number === null) return c.json({ error: 'Invalid project number' }, 400);
+      if (number === null) return jsonError(c, 'Invalid project number', 400);
       try {
         const board = await createRequestScope(c.env).get(Tokens.ProjectService).getProjectBoard(row.id, number);
         return c.json(board);
       } catch (error) {
-        return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+        return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
       }
     });
   });
@@ -42,7 +42,7 @@ function registerProjectUserRoutes(app: ProjectApp): void {
   app.get('/user/repos/:owner/:repo/projects', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       const projects = await createRequestScope(c.env).get(Tokens.ProjectService).listProjects(row.id);
       return c.json({ projects });
@@ -56,14 +56,14 @@ function registerProjectUserRoutes(app: ProjectApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
-      return c.json({ error: 'Forbidden' }, 403);
+      return jsonError(c, 'Forbidden', 403);
     }
     const { malformed, body } = await readJsonBody<{ title: unknown; description?: unknown }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = createRequestScope(c.env);
       const project = await scope.get(Tokens.ProjectService).createProject(row.id, body, email);
@@ -79,21 +79,21 @@ function registerProjectUserRoutes(app: ProjectApp): void {
       });
       return c.json({ project }, 201);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to create project') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to create project'), toServiceStatus(error));
     }
   });
 
   app.get('/user/repos/:owner/:repo/projects/:number', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     const number = parseProjectNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Invalid project number' }, 400);
+    if (number === null) return jsonError(c, 'Invalid project number', 400);
     try {
       const board = await createRequestScope(c.env).get(Tokens.ProjectService).getProjectBoard(row.id, number);
       return c.json(board);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 
@@ -102,16 +102,16 @@ function registerProjectUserRoutes(app: ProjectApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
-      return c.json({ error: 'Forbidden' }, 403);
+      return jsonError(c, 'Forbidden', 403);
     }
     const number = parseProjectNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Invalid project number' }, 400);
+    if (number === null) return jsonError(c, 'Invalid project number', 400);
     const { malformed, body } = await readJsonBody<{ title?: unknown; description?: unknown; status?: unknown }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = createRequestScope(c.env);
       const project =
@@ -132,7 +132,7 @@ function registerProjectUserRoutes(app: ProjectApp): void {
       }
       return c.json({ project });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to update project') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to update project'), toServiceStatus(error));
     }
   });
 
@@ -141,19 +141,19 @@ function registerProjectUserRoutes(app: ProjectApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
-      return c.json({ error: 'Forbidden' }, 403);
+      return jsonError(c, 'Forbidden', 403);
     }
     const number = parseProjectNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Invalid project number' }, 400);
+    if (number === null) return jsonError(c, 'Invalid project number', 400);
     try {
       await createRequestScope(c.env).get(Tokens.ProjectService).deleteProject(row.id, number);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 
@@ -162,23 +162,23 @@ function registerProjectUserRoutes(app: ProjectApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
-      return c.json({ error: 'Forbidden' }, 403);
+      return jsonError(c, 'Forbidden', 403);
     }
     const number = parseProjectNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Invalid project number' }, 400);
+    if (number === null) return jsonError(c, 'Invalid project number', 400);
     const { malformed, body } = await readJsonBody<{ title?: unknown }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const column = await createRequestScope(c.env)
         .get(Tokens.ProjectService)
         .createColumn(row.id, number, body as { title: unknown });
       return c.json({ column }, 201);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to create column') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to create column'), toServiceStatus(error));
     }
   });
 
@@ -187,23 +187,23 @@ function registerProjectUserRoutes(app: ProjectApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
-      return c.json({ error: 'Forbidden' }, 403);
+      return jsonError(c, 'Forbidden', 403);
     }
     const number = parseProjectNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Invalid project number' }, 400);
+    if (number === null) return jsonError(c, 'Invalid project number', 400);
     const { malformed, body } = await readJsonBody<{ title?: unknown }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const column = await createRequestScope(c.env)
         .get(Tokens.ProjectService)
         .renameColumn(row.id, number, c.req.param('columnId'), body as { title: unknown });
       return c.json({ column });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to rename column') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to rename column'), toServiceStatus(error));
     }
   });
 
@@ -212,19 +212,19 @@ function registerProjectUserRoutes(app: ProjectApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
-      return c.json({ error: 'Forbidden' }, 403);
+      return jsonError(c, 'Forbidden', 403);
     }
     const number = parseProjectNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Invalid project number' }, 400);
+    if (number === null) return jsonError(c, 'Invalid project number', 400);
     try {
       await createRequestScope(c.env).get(Tokens.ProjectService).deleteColumn(row.id, number, c.req.param('columnId'));
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 
@@ -233,14 +233,14 @@ function registerProjectUserRoutes(app: ProjectApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
-      return c.json({ error: 'Forbidden' }, 403);
+      return jsonError(c, 'Forbidden', 403);
     }
     const number = parseProjectNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Invalid project number' }, 400);
+    if (number === null) return jsonError(c, 'Invalid project number', 400);
     const { malformed, body } = await readJsonBody<{
       columnId: unknown;
       kind?: unknown;
@@ -249,12 +249,12 @@ function registerProjectUserRoutes(app: ProjectApp): void {
       issueId?: unknown;
       pullRequestId?: unknown;
     }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const card = await createRequestScope(c.env).get(Tokens.ProjectService).createCard(row.id, number, body, email);
       return c.json({ card }, 201);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to create card') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to create card'), toServiceStatus(error));
     }
   });
 
@@ -263,21 +263,21 @@ function registerProjectUserRoutes(app: ProjectApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
-      return c.json({ error: 'Forbidden' }, 403);
+      return jsonError(c, 'Forbidden', 403);
     }
     const number = parseProjectNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Invalid project number' }, 400);
+    if (number === null) return jsonError(c, 'Invalid project number', 400);
     const { malformed, body } = await readJsonBody<{ toColumnId: unknown; position?: unknown }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const card = await createRequestScope(c.env).get(Tokens.ProjectService).moveCard(row.id, number, c.req.param('cardId'), body);
       return c.json({ card });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to move card') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to move card'), toServiceStatus(error));
     }
   });
 
@@ -286,23 +286,23 @@ function registerProjectUserRoutes(app: ProjectApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
-      return c.json({ error: 'Forbidden' }, 403);
+      return jsonError(c, 'Forbidden', 403);
     }
     const number = parseProjectNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Invalid project number' }, 400);
+    if (number === null) return jsonError(c, 'Invalid project number', 400);
     const { malformed, body } = await readJsonBody<{ archived?: unknown }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const card = await createRequestScope(c.env)
         .get(Tokens.ProjectService)
         .setCardArchived(row.id, number, c.req.param('cardId'), body.archived);
       return c.json({ card });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to update card') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to update card'), toServiceStatus(error));
     }
   });
 
@@ -311,19 +311,19 @@ function registerProjectUserRoutes(app: ProjectApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
-      return c.json({ error: 'Forbidden' }, 403);
+      return jsonError(c, 'Forbidden', 403);
     }
     const number = parseProjectNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Invalid project number' }, 400);
+    if (number === null) return jsonError(c, 'Invalid project number', 400);
     try {
       await createRequestScope(c.env).get(Tokens.ProjectService).deleteCard(row.id, number, c.req.param('cardId'));
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 }

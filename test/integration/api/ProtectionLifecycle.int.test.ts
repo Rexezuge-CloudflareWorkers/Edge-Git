@@ -66,7 +66,9 @@ describe('branch protection lifecycle on real D1', () => {
     const mergePath = `/user/repos/${OWNER}/${REPO}/pulls/1/merge`;
     const blocked = await api(mergePath, json({ method: 'POST', body: JSON.stringify({}) }));
     expect(blocked.status).toBe(409);
-    expect(((await blocked.json()) as { error: string }).error).toContain('requires 1 approvals (0 so far)');
+    expect(((await blocked.json()) as { Exception?: { Message?: string } }).Exception?.Message ?? '').toContain(
+      'requires 1 approvals (0 so far)',
+    );
 
     // Self-approval by the PR creator must not count.
     await api(
@@ -85,7 +87,7 @@ describe('branch protection lifecycle on real D1', () => {
       .run();
     const pastGate = await api(mergePath, json({ method: 'POST', body: JSON.stringify({}) }));
     expect(pastGate.status).toBe(400);
-    expect(((await pastGate.json()) as { error: string }).error).toContain('head branch not found');
+    expect(((await pastGate.json()) as { Exception?: { Message?: string } }).Exception?.Message ?? '').toContain('head branch not found');
   });
 
   it('blocks direct web writes and branch deletion on protected branches', async () => {
@@ -95,10 +97,10 @@ describe('branch protection lifecycle on real D1', () => {
       json({ method: 'POST', body: JSON.stringify({ branch: 'main', path: 'x.txt', contentBase64: toB64('x') }) }),
     );
     expect(write.status).toBe(403);
-    expect(((await write.json()) as { error: string }).error).toContain('open a pull request');
+    expect(((await write.json()) as { Exception?: { Message?: string } }).Exception?.Message ?? '').toContain('open a pull request');
 
     const del = await api(`/user/repos/${OWNER}/${REPO}/branches?branch=main`, { method: 'DELETE' });
     expect(del.status).toBe(403);
-    expect(((await del.json()) as { error: string }).error).toContain('protected against deletion');
+    expect(((await del.json()) as { Exception?: { Message?: string } }).Exception?.Message ?? '').toContain('protected against deletion');
   });
 });
