@@ -2,11 +2,17 @@ import ReactMarkdown, { defaultUrlTransform, type Components } from 'react-markd
 import remarkGfm from 'remark-gfm';
 import { cn } from '../../lib/utils';
 
-function isSafeHref(href?: string): boolean {
+export function isSafeHref(href?: string): boolean {
   if (!href) return false;
   const trimmed = href.trim();
   if (trimmed === '') return false;
-  if (trimmed.startsWith('#') || trimmed.startsWith('/') || trimmed.startsWith('?')) return true;
+  if (trimmed.startsWith('#') || trimmed.startsWith('/') || trimmed.startsWith('?')) {
+    // Reject protocol-relative `//evil.com` which would otherwise inherit
+    // https: and render as an external open-redirect.
+    if (trimmed.startsWith('//')) return false;
+    return true;
+  }
+  if (trimmed.startsWith('//')) return false;
   try {
     const parsed = new URL(trimmed, 'https://edge-git.local');
     return ['http:', 'https:', 'mailto:'].includes(parsed.protocol);

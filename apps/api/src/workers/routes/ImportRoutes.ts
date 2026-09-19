@@ -66,8 +66,8 @@ function registerImportRoutes(app: TransferApp): void {
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     try {
       const scope = createRequestScope(c.env);
-      await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
-      const job = await scope.get(Tokens.ImportService).cancelJob(c.req.param('jobId'));
+      const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
+      const job = await scope.get(Tokens.ImportService).cancelJob(c.req.param('jobId'), repo.id);
       return c.json({ job });
     } catch (error) {
       return c.json({ error: toSafeErrorMessage(error, 'Failed to cancel import') }, toServiceStatus(error));

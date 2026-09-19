@@ -242,6 +242,13 @@ interface WebhookPayloadInput {
 }
 
 function buildWebhookPayload(input: WebhookPayloadInput): Record<string, unknown> {
+  // `extra` is allowlisted: reserved top-level keys can never be clobbered
+  // by caller-controlled extra fields.
+  const safeExtra: Record<string, unknown> = { ...input.extra };
+  delete safeExtra.event;
+  delete safeExtra.repository;
+  delete safeExtra.sender;
+  delete safeExtra.processed_at;
   return {
     event: input.event,
     repository: { full_name: input.fullName },
@@ -252,7 +259,7 @@ function buildWebhookPayload(input: WebhookPayloadInput): Record<string, unknown
     ...(input.subjectOid && { subject_oid: input.subjectOid }),
     ...(input.title && { title: input.title.slice(0, 200) }),
     ...(input.action && { action: input.action }),
-    ...input.extra,
+    ...safeExtra,
     processed_at: input.processedAt,
   };
 }

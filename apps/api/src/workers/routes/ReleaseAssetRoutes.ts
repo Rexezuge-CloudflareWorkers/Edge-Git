@@ -141,7 +141,8 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
           .get(Tokens.ReleaseService)
           .deleteAsset(row.id, c.req.param('tag'), asset.id)
           .catch(() => undefined);
-        return c.json({ error: typeof stored?.error === 'string' ? stored.error : 'Failed to store asset bytes' }, 500);
+        // Never surface raw DO error strings (may contain paths/stacks).
+        return c.json({ error: 'Failed to store asset bytes' }, 500);
       }
       return c.json({ asset }, 201);
     } catch (error) {

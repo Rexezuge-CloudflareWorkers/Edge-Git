@@ -10,10 +10,19 @@ import { generateHookSecret, maskUrl, normalizeEvents, secretSuffix, validateWeb
 interface WebhookServiceEnv {
   DB: D1Queryable;
   MAX_HOOKS_PER_REPO?: string;
+  ENVIRONMENT?: string;
 }
 
 interface WebhookServiceDeps {
   webhookDAO?: () => Promise<WebhookDAO>;
+}
+
+function requireProductionHttps(env: WebhookServiceEnv, url: string): void {
+  // BREAKING: production webhooks require https so HMAC secrets never ride
+  // cleartext. Non-production keeps http for local dev.
+  if ((env.ENVIRONMENT ?? '').toLowerCase() === 'production' && url.toLowerCase().startsWith('http://')) {
+    throw new BadRequestError('Webhook url must use https in production');
+  }
 }
 
 const MIN_CUSTOM_SECRET_LENGTH = 16;
@@ -111,6 +120,7 @@ class WebhookService {
     const url = input.url?.trim() ?? '';
     try {
       validateWebhookUrl(url);
+      requireProductionHttps(this.env, url);
     } catch (error) {
       throw new BadRequestError(error instanceof Error ? error.message : 'Invalid webhook URL.');
     }
@@ -172,6 +182,7 @@ class WebhookService {
       url = patch.url.trim();
       try {
         validateWebhookUrl(url);
+        requireProductionHttps(this.env, url);
       } catch (error) {
         throw new BadRequestError(error instanceof Error ? error.message : 'Invalid webhook URL.');
       }

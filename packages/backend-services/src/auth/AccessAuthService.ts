@@ -28,13 +28,18 @@ function demoModeStrategy(env: AccessAuthEnv): Promise<string | null> {
   return Promise.resolve(ConfigurationManager.auth.isDemoMode(env) ? DEMO_USER_EMAIL : null);
 }
 
+function isValidAuthEmail(raw: string): boolean {
+  if (!raw || raw.length > 254 || /\s/.test(raw)) return false;
+  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(raw);
+}
+
 function devEmailStrategy(env: AccessAuthEnv): Promise<string | null> {
   if (!isBypassAllowed(env)) return Promise.resolve(null);
   const raw = env.DEV_AUTH_EMAIL?.trim() ?? '';
   if (!raw) return Promise.resolve(null);
   // Fail closed on malformed bypass emails — fall through to JWT instead of
   // authenticating an invalid identity.
-  if (!raw.includes('@') || raw.length > 254 || /\s/.test(raw)) return Promise.resolve(null);
+  if (!isValidAuthEmail(raw)) return Promise.resolve(null);
   return Promise.resolve(raw.toLowerCase());
 }
 
@@ -52,7 +57,7 @@ async function accessCtxStrategy(_env: AccessAuthEnv, _request: Request, accessC
   // unverified identity must never authenticate.
   if (identity?.emailVerified === false || identity?.email_verified === false) return null;
   const raw = identity?.email?.trim().toLowerCase() ?? '';
-  if (!raw || !raw.includes('@') || raw.length > 254 || /\s/.test(raw)) return null;
+  if (!isValidAuthEmail(raw)) return null;
   return raw;
 }
 
@@ -71,7 +76,12 @@ class AccessAuthService {
     if (cached) return cached;
     const created = createRemoteJWKSet(new URL(`${teamDomain}/cdn-cgi/access/certs`));
     // Bound the cache so distinct team domains cannot grow it without limit.
-    if (this.jwksCache.size >= 10) this.jwksCache.clear();
+    // Evict the oldest entry (LRU-ish) instead of clearing everything so an
+    // attacker cycling domains cannot flush legitimate entries (DoS).
+    if (this.jwksCache.size >= 10) {
+      const oldest = this.jwksCache.keys().next().value;
+      if (oldest !== undefined) this.jwksCache.delete(oldest);
+    }
     this.jwksCache.set(teamDomain, created);
     return created;
   }
@@ -128,7 +138,7 @@ class AccessAuthService {
         throw new UnauthorizedError('Cloudflare Access authentication failed.');
       }
       const email = typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : '';
-      if (!email || !email.includes('@')) {
+      if (!isValidAuthEmail(email)) {
         throw new UnauthorizedError('Cloudflare Access authentication failed.');
       }
       return email;

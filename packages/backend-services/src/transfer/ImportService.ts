@@ -91,10 +91,13 @@ class ImportService {
     return row ? toMetadata(row) : null;
   }
 
-  public async cancelJob(jobId: string): Promise<RepoImportMetadata> {
+  public async cancelJob(jobId: string, repositoryId?: string): Promise<RepoImportMetadata> {
     const dao = await this.deps.importDAO();
     const row = await dao.getById(jobId);
     if (!row) throw new NotFoundError('Import not found');
+    // Scope the cancel to the caller's repo: without this, an admin of repo A
+    // could cancel repo B's job by guessing its UUID.
+    if (repositoryId !== undefined && row.repository_id !== repositoryId) throw new NotFoundError('Import not found');
     if (row.status !== 'pending' && row.status !== 'running') {
       throw new BadRequestError(`Import is already ${row.status}`);
     }

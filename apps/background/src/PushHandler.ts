@@ -141,8 +141,11 @@ class PushHandler {
       logger.error(`(receive-pack) Rejected ${getFullName() ?? 'unknown repo'}: protected branch update declined`);
       // The pack was already indexed above (ancestry needs the new objects).
       // Remove the orphaned pack file so repeated blocked force-pushes cannot
-      // fill the 5GB DO device.
+      // fill the 5GB DO device. Indexed objects remain reachable only via
+      // their OIDs until GC; refs are untouched so atomicity holds. Clear
+      // caches so later reads cannot observe the rejected objects.
       await isoGitFs.promises.unlink(packFilePath).catch(() => undefined);
+      git.clearCache();
       const results = commands.map((cmd) => ({
         ref: cmd.ref,
         ok: false as const,

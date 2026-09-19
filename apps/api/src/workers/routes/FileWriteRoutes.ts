@@ -97,6 +97,16 @@ async function resolveAuthorName(env: Env, email: string): Promise<string> {
   }
 }
 
+function waitUntilOf(c: { executionCtx?: unknown }): ((promise: Promise<unknown>) => void) | null {
+  try {
+    const ctx = c.executionCtx as ExecutionContext | undefined;
+    if (typeof ctx?.waitUntil === 'function') return ctx.waitUntil.bind(ctx);
+  } catch {
+    // ignore — unit tests have no execution context
+  }
+  return null;
+}
+
 function decodeBase64(input: string): Uint8Array | null {
   return decodeBase64Strict(input);
 }
@@ -162,14 +172,14 @@ function registerFileWriteRoutes(app: RepoApp): void {
     const expected = parseExpectedOid(body.expectedOid);
     if (!expected.ok) return c.json({ error: 'expectedOid must be a 40-char hex string' }, 400);
     const maxFileBytes = ConfigurationManager.repo.getMaxFileBytes(c.env);
-    // Pre-auth size tripwire on the base64 length (≈4/3 of bytes) so
-    // unauthenticated oversized bodies are rejected without an `atob` burn.
-    if (body.contentBase64.length > Math.ceil(maxFileBytes * 1.4) + 4) {
-      return c.json({ error: `file too large (max ${maxFileBytes} bytes)` }, 413);
-    }
     try {
       const gate = await requireWriteRole(c.env, owner, repoName, email);
       if (!gate.ok) return c.json({ error: gate.status === 404 ? 'Not found' : 'Forbidden' }, gate.status);
+      // Size tripwire AFTER auth so unauthenticated callers cannot oracle
+      // max-file-bytes vs auth failures via 413-vs-401 distinctions.
+      if (body.contentBase64.length > Math.ceil(maxFileBytes * 1.4) + 4) {
+        return c.json({ error: `file too large (max ${maxFileBytes} bytes)` }, 413);
+      }
       const content = decodeBase64(body.contentBase64);
       if (!content) return c.json({ error: 'contentBase64 is not valid base64' }, 400);
       if (content.byteLength > maxFileBytes) return c.json({ error: `file too large (max ${maxFileBytes} bytes)` }, 413);
@@ -196,7 +206,7 @@ function registerFileWriteRoutes(app: RepoApp): void {
       })) as FileResult;
       const { body: out, status } = toFileResponse(result, result.ok && (result as { created?: boolean }).created ? 201 : 200);
       if (result.ok) {
-        c.executionCtx.waitUntil(
+        waitUntilOf(c)?.(
           indexWrittenFile(c.env, gate.repo.id, filePath, body.contentBase64, (result as { commitOid?: unknown }).commitOid).catch(
             () => undefined,
           ),

@@ -16,44 +16,14 @@ const SECURITY_HEADERS: Record<string, string> = {
 // Paths carrying bearer secrets or private user data — never cache.
 // Exact-prefix match (not substring) so future `/hooks`-like paths cannot
 // accidentally inherit `no-store`, and secret routes cannot be missed.
+// BREAKING: all `/user/*` JSON is `no-store` by default (collaborators,
+// orgs, notifications, stars/watches, search reflecting private titles).
+// Public `/repos/*` stays cacheable except issues/pulls/audit reflections.
 function isSensitiveJsonPath(pathname: string): boolean {
-  if (
-    pathname === '/user/tokens' ||
-    pathname === '/user/realtime/ticket' ||
-    pathname === '/user/realtime/inbox-ticket' ||
-    pathname.startsWith('/user/tokens/') ||
-    pathname.endsWith('/hooks') ||
-    pathname.includes('/hooks/')
-  ) {
+  if (['/user/tokens', '/user/realtime/ticket', '/user/realtime/inbox-ticket'].includes(pathname)) {
     return true;
   }
-  // Bearer-secret adjacent: deploy-key create returns the plaintext key,
-  // export returns pack bytes, mirror/import accept secrets/URLs.
-  if (
-    pathname.endsWith('/keys') ||
-    pathname.includes('/keys/') ||
-    pathname.endsWith('/export') ||
-    pathname.endsWith('/mirror') ||
-    pathname.endsWith('/import') ||
-    pathname.includes('/export/') ||
-    pathname.includes('/mirror/') ||
-    pathname.includes('/import/')
-  ) {
-    return true;
-  }
-  // Private JSON (identity, repo lists, issues/pulls, audit): cacheable by
-  // browsers/CDNs by default, so force no-store to avoid cross-user leaks
-  // on shared machines or misconfigured caches.
-  if (
-    pathname === '/user/me' ||
-    pathname === '/user/repos' ||
-    pathname === '/user/audit' ||
-    pathname.startsWith('/user/me/') ||
-    pathname.startsWith('/user/repos/') ||
-    pathname.startsWith('/user/audit')
-  ) {
-    return true;
-  }
+  if (pathname.startsWith('/user/')) return true;
   return pathname.includes('/issues') || pathname.includes('/pulls') || pathname.includes('/audit');
 }
 
@@ -72,7 +42,7 @@ function applySecurityHeaders(c: HeaderContext): void {
   if (contentType.includes('text/html')) {
     c.header(
       'Content-Security-Policy',
-      "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'self'",
+      "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; object-src 'none'; form-action 'self'; base-uri 'self'; frame-ancestors 'none'; upgrade-insecure-requests",
     );
   }
   // Bearer-secret JSON (PATs, hook secrets, realtime tickets) must never be

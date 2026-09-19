@@ -44,8 +44,8 @@ function registerRepoRoutes(app: RepoApp): void {
       const url = new URL(c.req.url);
       return c.json(
         await getRepoStub(c.env, fullName).getTree({
-          ref: url.searchParams.get('ref') ?? undefined,
-          path: url.searchParams.get('path') ?? undefined,
+          ref: sanitizeRefParam(url.searchParams.get('ref')),
+          path: sanitizePathParam(url.searchParams.get('path')),
           withLastCommit: parseWithLastCommit(url.searchParams.get('withLastCommit')),
         }),
       );
@@ -57,8 +57,8 @@ function registerRepoRoutes(app: RepoApp): void {
       const url = new URL(c.req.url);
       return c.json(
         await getRepoStub(c.env, fullName).getBlob({
-          ref: url.searchParams.get('ref') ?? undefined,
-          filepath: url.searchParams.get('path') ?? '',
+          ref: sanitizeRefParam(url.searchParams.get('ref')),
+          filepath: sanitizePathParam(url.searchParams.get('path')) ?? '',
         }),
       );
     });
@@ -67,11 +67,10 @@ function registerRepoRoutes(app: RepoApp): void {
   app.get('/repos/:owner/:repo/commits', async (c) => {
     return withPublicRepo(c as never, async (_row, fullName) => {
       const url = new URL(c.req.url);
-      const depth = url.searchParams.get('depth');
       return c.json(
         await getRepoStub(c.env, fullName).getCommits({
-          ref: url.searchParams.get('ref') ?? undefined,
-          depth: depth ? Number(depth) : undefined,
+          ref: sanitizeRefParam(url.searchParams.get('ref')),
+          depth: sanitizeDepthParam(url.searchParams.get('depth')),
         }),
       );
     });
@@ -99,8 +98,8 @@ function registerRepoRoutes(app: RepoApp): void {
   app.get('/repos/:owner/:repo/compare', async (c) => {
     return withPublicRepo(c as never, async (_row, fullName) => {
       const url = new URL(c.req.url);
-      const baseRef = url.searchParams.get('base') ?? '';
-      const headRef = url.searchParams.get('head') ?? '';
+      const baseRef = sanitizeRefParam(url.searchParams.get('base')) ?? '';
+      const headRef = sanitizeRefParam(url.searchParams.get('head')) ?? '';
       if (!baseRef || !headRef) return c.json({ error: 'base and head query params are required' }, 400);
       const diff = await getRepoStub(c.env, fullName).getCompare({ baseRef, headRef });
       if (!diff) return c.json({ error: 'Not found' }, 404);
@@ -265,6 +264,28 @@ function registerUserRepoRoutes(app: RepoApp): void {
 // Read-model passthroughs (branches/tree/blob/commits/overview) via DO RPC.
 // `withLastCommit=0|false` opts out of per-file last-commit enrichment so
 // the tree lists fast; omitted means enriched (backwards compatible).
+// BREAKING: ref/path/base/head query params are capped at 256 chars at the
+// edge so malformed callers fail fast without burning DO I/O.
+function sanitizeRefParam(raw: string | null | undefined): string | undefined {
+  if (raw == null) return undefined;
+  const trimmed = raw.trim().slice(0, 256);
+  return trimmed || undefined;
+}
+
+function sanitizePathParam(raw: string | null | undefined): string | undefined {
+  if (raw == null) return undefined;
+  const trimmed = raw.trim().slice(0, 512);
+  return trimmed || undefined;
+}
+
+function sanitizeDepthParam(raw: string | null | undefined): number | undefined {
+  if (raw == null) return undefined;
+  const text = raw.trim().slice(0, 16);
+  if (text === '') return undefined;
+  const n = Number(text);
+  if (!Number.isSafeInteger(n) || n < 1 || n > 500) return undefined;
+  return n;
+}
 function parseWithLastCommit(raw: string | null): boolean | undefined {
   return parseOptionalFlag(raw);
 }
@@ -284,14 +305,13 @@ function parseOverviewArgs(params: URLSearchParams): {
   includeTags?: boolean;
   includeReadme?: boolean;
 } {
-  const ref = params.get('ref') || undefined;
-  const path = params.get('path') || undefined;
-  const depthRaw = params.get('depth');
-  const depth = depthRaw ? Number(depthRaw) : undefined;
+  const ref = sanitizeRefParam(params.get('ref'));
+  const path = sanitizePathParam(params.get('path'));
+  const depth = sanitizeDepthParam(params.get('depth'));
   return {
     ref,
     path,
-    depth: depth !== undefined && Number.isFinite(depth) ? depth : undefined,
+    depth,
     includeTags: parseOptionalFlag(params.get('includeTags')),
     includeReadme: parseOptionalFlag(params.get('includeReadme')),
   };
@@ -326,8 +346,8 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
     return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) =>
       c.json(
         await getRepoStub(c.env, fullName).getTree({
-          ref: url.searchParams.get('ref') ?? undefined,
-          path: url.searchParams.get('path') ?? undefined,
+          ref: sanitizeRefParam(url.searchParams.get('ref')),
+          path: sanitizePathParam(url.searchParams.get('path')),
           withLastCommit: parseWithLastCommit(url.searchParams.get('withLastCommit')),
         }),
       ),
@@ -338,9 +358,9 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const url = new URL(c.req.url);
-    const filepath = url.searchParams.get('path') ?? '';
+    const filepath = sanitizePathParam(url.searchParams.get('path')) ?? '';
     return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) =>
-      c.json(await getRepoStub(c.env, fullName).getBlob({ ref: url.searchParams.get('ref') ?? undefined, filepath })),
+      c.json(await getRepoStub(c.env, fullName).getBlob({ ref: sanitizeRefParam(url.searchParams.get('ref')), filepath })),
     );
   });
 
@@ -348,12 +368,11 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const url = new URL(c.req.url);
-    const depth = url.searchParams.get('depth');
     return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) =>
       c.json(
         await getRepoStub(c.env, fullName).getCommits({
-          ref: url.searchParams.get('ref') ?? undefined,
-          depth: depth ? Number(depth) : undefined,
+          ref: sanitizeRefParam(url.searchParams.get('ref')),
+          depth: sanitizeDepthParam(url.searchParams.get('depth')),
         }),
       ),
     );
@@ -375,8 +394,8 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const url = new URL(c.req.url);
-    const baseRef = url.searchParams.get('base') ?? '';
-    const headRef = url.searchParams.get('head') ?? '';
+    const baseRef = sanitizeRefParam(url.searchParams.get('base')) ?? '';
+    const headRef = sanitizeRefParam(url.searchParams.get('head')) ?? '';
     if (!baseRef || !headRef) return c.json({ error: 'base and head query params are required' }, 400);
     return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) => {
       const diff = await getRepoStub(c.env, fullName).getCompare({ baseRef, headRef });
@@ -396,4 +415,4 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
   });
 }
 
-export { registerRepoRoutes, registerUserRepoRoutes, registerUserRepoReadModelRoutes };
+export { registerRepoRoutes, registerUserRepoRoutes, registerUserRepoReadModelRoutes, sanitizeRefParam, sanitizePathParam, sanitizeDepthParam };
