@@ -85,9 +85,24 @@ export class WriteService {
   }
 
   private async pathExistsAt(commitOid: string, filepath: string): Promise<boolean> {
+    // Walk down from the commit's root tree, only reading trees referenced by
+    // entries already seen. A direct `readBlob` miss leaves a dangling
+    // isomorphic-git rejection that workerd surfaces as unhandled (it fails
+    // `vitest-pool-workers` runs and spams production logs); tree walking
+    // never reads a missing object in the success path.
     try {
-      await git.readBlob({ fs: this.fs, gitdir: this.gitdir, oid: commitOid, filepath });
-      return true;
+      const { commit } = await git.readCommit({ fs: this.fs, gitdir: this.gitdir, oid: commitOid });
+      let treeOid: string = commit.tree;
+      const segments = filepath.split('/');
+      for (let index = 0; index < segments.length; index += 1) {
+        const { tree } = await git.readTree({ fs: this.fs, gitdir: this.gitdir, oid: treeOid });
+        const entry = tree.find((e) => e.path === segments[index]);
+        if (!entry) return false;
+        if (index === segments.length - 1) return true;
+        if (entry.type !== 'tree') return false;
+        treeOid = entry.oid;
+      }
+      return false;
     } catch {
       return false;
     }

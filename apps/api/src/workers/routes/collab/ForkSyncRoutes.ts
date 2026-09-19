@@ -1,4 +1,4 @@
-import { toServiceStatus } from '../PublicViewerResolver';
+import { toSafeErrorMessage, toServiceStatus } from '../PublicViewerResolver';
 import { requireVisibleRepo } from '../PublicViewerResolver';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { getRepoStub } from '../../repoStub';
@@ -46,7 +46,7 @@ function registerCollabForkSyncRoutes(app: CollabApp): void {
         },
       });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to preview sync' }, 500);
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to preview sync') }, 500);
     }
   });
 
@@ -88,7 +88,7 @@ function registerCollabForkSyncRoutes(app: CollabApp): void {
         return c.json({ error: 'sync conflicts', conflicts: outcome.conflicts ?? [], reason: outcome.reason ?? null }, 409);
       return c.json({ sync: outcome });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to sync fork' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to sync fork') }, toServiceStatus(error));
     }
   });
 }

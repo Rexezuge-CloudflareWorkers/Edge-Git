@@ -1,5 +1,5 @@
 import { getRepoStub } from '../repoStub';
-import { requireVisibleRepo, toServiceStatus } from './PublicViewerResolver';
+import { requireVisibleRepo, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
 import { triggerRequiredChecks } from './TriggerChecks';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
@@ -158,7 +158,7 @@ async function mergeCrossForkPull(
       strategy: input.strategy,
     })) as { type?: string; commitOid?: string; conflicts?: string[]; reason?: string; deletedHead?: boolean };
   } catch (error) {
-    return { status: 500, body: { error: error instanceof Error ? error.message : 'Merge failed' } };
+    return { status: 500, body: { error: toSafeErrorMessage(error, 'Merge failed') } };
   }
   if (outcome.type === 'conflict') {
     return { status: 409, body: { error: 'merge conflicts', conflicts: outcome.conflicts ?? [], reason: outcome.reason ?? null } };
@@ -189,9 +189,11 @@ async function mergeCrossForkPull(
     });
     return { status: 200, body: { pull: merged, merge: outcome } };
   } catch (error) {
+    const status = toServiceStatus(error);
+    if (status === 500) return { status: 400, body: { error: 'Failed to record merge' } };
     const failure = error instanceof Error ? error.message : 'Failed to record merge';
-    const status = failure.includes('unresolved change requests') ? 409 : toServiceStatus(error);
-    return { status: status === 500 ? 400 : status, body: { error: failure } };
+    if (failure.includes('unresolved change requests')) return { status: 409, body: { error: failure } };
+    return { status, body: { error: failure } };
   }
 }
 
@@ -349,7 +351,7 @@ function registerUserPullMergeRoutes(app: PullApp): void {
         strategy,
       })) as { type?: string; commitOid?: string; conflicts?: string[]; reason?: string; deletedHead?: boolean };
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Merge failed' }, 500);
+      return c.json({ error: toSafeErrorMessage(error, 'Merge failed') }, 500);
     }
     if (outcome.type === 'conflict') {
       return c.json({ error: 'merge conflicts', conflicts: outcome.conflicts ?? [], reason: outcome.reason ?? null }, 409);
@@ -371,9 +373,11 @@ function registerUserPullMergeRoutes(app: PullApp): void {
       });
       return c.json({ pull: merged, merge: outcome });
     } catch (error) {
+      const status = toServiceStatus(error);
+      if (status === 500) return c.json({ error: 'Failed to record merge' }, 400);
       const failure = error instanceof Error ? error.message : 'Failed to record merge';
-      const status = failure.includes('unresolved change requests') ? 409 : toServiceStatus(error);
-      return c.json({ error: failure }, status === 500 ? 400 : status);
+      if (failure.includes('unresolved change requests')) return c.json({ error: failure }, 409);
+      return c.json({ error: failure }, status);
     }
   });
 }

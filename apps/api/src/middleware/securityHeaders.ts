@@ -13,18 +13,34 @@ const SECURITY_HEADERS: Record<string, string> = {
   'Origin-Agent-Cluster': '?1',
 };
 
-// Paths carrying bearer secrets — never allow caching of their responses.
+// Paths carrying bearer secrets or private user data — never cache.
 // Exact-prefix match (not substring) so future `/hooks`-like paths cannot
 // accidentally inherit `no-store`, and secret routes cannot be missed.
 function isSensitiveJsonPath(pathname: string): boolean {
-  return (
+  if (
     pathname === '/user/tokens' ||
-    pathname.startsWith('/user/tokens/') ||
-    pathname.includes('/hooks/') ||
-    pathname.endsWith('/hooks') ||
     pathname === '/user/realtime/ticket' ||
-    pathname === '/user/realtime/inbox-ticket'
-  );
+    pathname === '/user/realtime/inbox-ticket' ||
+    pathname.startsWith('/user/tokens/') ||
+    pathname.endsWith('/hooks') ||
+    pathname.includes('/hooks/')
+  ) {
+    return true;
+  }
+  // Private JSON (identity, repo lists, issues/pulls, audit): cacheable by
+  // browsers/CDNs by default, so force no-store to avoid cross-user leaks
+  // on shared machines or misconfigured caches.
+  if (
+    pathname === '/user/me' ||
+    pathname === '/user/repos' ||
+    pathname === '/user/audit' ||
+    pathname.startsWith('/user/me/') ||
+    pathname.startsWith('/user/repos/') ||
+    pathname.startsWith('/user/audit')
+  ) {
+    return true;
+  }
+  return pathname.includes('/issues') || pathname.includes('/pulls') || pathname.includes('/audit');
 }
 
 /**
