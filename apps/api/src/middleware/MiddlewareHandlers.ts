@@ -168,7 +168,7 @@ async function webhookFlushHandler(c: RequestContext, next: Next): Promise<Respo
   try {
     const waitUntil = (c.executionCtx as ExecutionContext | undefined)?.waitUntil?.bind(c.executionCtx);
     if (typeof waitUntil === 'function') {
-      waitUntil(flushDueWebhookDeliveries(c.env));
+      waitUntil(flushDueWebhookDeliveries(c.env).catch(() => undefined));
     }
   } catch {
     // Flush is best-effort; cron covers the gap.
@@ -204,13 +204,13 @@ async function activityAuditHandler(c: RequestContext, next: Next): Promise<Resp
       // Reuse the per-request scope so audit uses the same memoized
       // singletons (no second Secrets Store round-trip).
       const scope = resolveScope(c);
-      const record = scope.get(Tokens.AuditService).record(event);
+      const record = scope.get(Tokens.AuditService).record(event).catch(() => undefined);
       const waitUntil = (c.executionCtx as ExecutionContext | undefined)?.waitUntil?.bind(c.executionCtx);
       if (typeof waitUntil === 'function') {
         waitUntil(record);
       } else {
         // No execution context (unit tests): fire-and-forget, never throws.
-        void record.catch(() => undefined);
+        void record;
       }
     } catch {
       // Auditing must never fail the request.

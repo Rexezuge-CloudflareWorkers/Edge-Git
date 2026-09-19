@@ -4,6 +4,7 @@ import { RepoService } from '@edge-git/backend-services/repo';
 import { getCheckRunnerStub } from '../checkStub';
 import { emitWebhookEvent, publishCheckUpdate } from './SocialEmit';
 import { requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { readJsonBody } from './BodyParser';
 
 type CheckApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -94,13 +95,14 @@ function registerCheckUserRoutes(app: CheckApp): void {
     } catch {
       return c.json({ error: 'Forbidden' }, 403);
     }
-    const body = (await c.req.json().catch(() => ({}))) as {
+    const { malformed, body } = await readJsonBody<{
       headSha?: unknown;
       context?: unknown;
       detailsUrl?: unknown;
       outputTitle?: unknown;
       outputSummary?: unknown;
-    };
+    }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     try {
       const run = await createRequestScope(c.env).get(Tokens.CheckService).reportStatus({
         repositoryId: row.id,
@@ -156,13 +158,14 @@ function registerCheckUserRoutes(app: CheckApp): void {
     } catch {
       return c.json({ error: 'Forbidden' }, 403);
     }
-    const body = (await c.req.json().catch(() => ({}))) as {
+    const { malformed, body } = await readJsonBody<{
       status?: unknown;
       conclusion?: unknown;
       detailsUrl?: unknown;
       outputTitle?: unknown;
       outputSummary?: unknown;
-    };
+    }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     if (typeof body.status !== 'string') return c.json({ error: 'status is required' }, 400);
     try {
       const run = await createRequestScope(c.env)

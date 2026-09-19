@@ -3,6 +3,7 @@ import { Tokens, createRequestScope } from '@edge-git/backend-services/compositi
 import { RepoService } from '@edge-git/backend-services/repo';
 import { SecuritySettingsService } from '@edge-git/backend-services/security';
 import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { readJsonBody } from './BodyParser';
 
 type SecurityApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -28,7 +29,8 @@ function registerSecurityRoutes(app: SecurityApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    const body = (await c.req.json().catch(() => ({}))) as { secretScanMode?: unknown };
+    const { malformed, body } = await readJsonBody<{ secretScanMode?: unknown }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     if (body.secretScanMode === undefined) return c.json({ error: 'secretScanMode is required' }, 400);
     try {
       const mode = SecuritySettingsService.normalizeMode(body.secretScanMode);

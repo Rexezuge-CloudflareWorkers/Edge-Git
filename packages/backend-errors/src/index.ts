@@ -1,5 +1,8 @@
 export { ServiceError } from './IServiceError';
 export { BadRequestError } from './BadRequestError';
+export { ConflictError } from './ConflictError';
+export { PayloadTooLargeError } from './PayloadTooLargeError';
+export { RateLimitedError } from './RateLimitedError';
 export { DatabaseError } from './DatabaseError';
 export {
   AiSummaryRetryableError,

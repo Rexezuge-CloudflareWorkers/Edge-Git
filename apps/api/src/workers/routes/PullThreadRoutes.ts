@@ -4,6 +4,7 @@ import { Tokens, createRequestScope } from '@edge-git/backend-services/compositi
 import { RepoService } from '@edge-git/backend-services/repo';
 import { parsePullNumber } from './PullShared';
 import type { PullApp } from './PullShared';
+import { readJsonBody } from './BodyParser';
 
 function registerPullThreadRoutes(app: PullApp): void {
   app.get('/repos/:owner/:repo/pulls/:number/threads', async (c) => {
@@ -50,13 +51,14 @@ function registerUserPullThreadRoutes(app: PullApp): void {
     if (!row) return c.json({ error: 'Not found' }, 404);
     const number = parsePullNumber(c.req.param('number'));
     if (number === null) return c.json({ error: 'Not found' }, 404);
-    const body = (await c.req.json().catch(() => ({}))) as {
+    const { malformed, body } = await readJsonBody<{
       path?: string;
       line?: number | null;
       side?: string | null;
       commitOid?: string | null;
       body?: string;
-    };
+    }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     try {
       const scope = createRequestScope(c.env);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
@@ -94,7 +96,8 @@ function registerUserPullThreadRoutes(app: PullApp): void {
     if (!row) return c.json({ error: 'Not found' }, 404);
     const number = parsePullNumber(c.req.param('number'));
     if (number === null) return c.json({ error: 'Not found' }, 404);
-    const body = (await c.req.json().catch(() => ({}))) as { body?: string };
+    const { malformed, body } = await readJsonBody<{ body?: string }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     try {
       const scope = createRequestScope(c.env);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
@@ -130,7 +133,8 @@ function registerUserPullThreadRoutes(app: PullApp): void {
     if (!row) return c.json({ error: 'Not found' }, 404);
     const number = parsePullNumber(c.req.param('number'));
     if (number === null) return c.json({ error: 'Not found' }, 404);
-    const body = (await c.req.json().catch(() => ({}))) as { resolved?: boolean };
+    const { malformed, body } = await readJsonBody<{ resolved?: boolean }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     if (typeof body.resolved !== 'boolean') return c.json({ error: 'resolved must be a boolean' }, 400);
     try {
       const scope = createRequestScope(c.env);
@@ -172,7 +176,8 @@ function registerUserPullThreadRoutes(app: PullApp): void {
     }
     const number = parsePullNumber(c.req.param('number'));
     if (number === null) return c.json({ error: 'Not found' }, 404);
-    const body = (await c.req.json().catch(() => ({}))) as { reason?: string };
+    const { malformed, body } = await readJsonBody<{ reason?: string }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     try {
       const scope = createRequestScope(c.env);
       const review = await scope.get(Tokens.PullRequestService).dismissReview({

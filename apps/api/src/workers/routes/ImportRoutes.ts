@@ -5,6 +5,7 @@ import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { runImportJob } from '@edge-git/background/transfer/ImportRunner';
 import { getRepoStub } from '../repoStub';
 import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { readJsonBody } from './BodyParser';
 
 type TransferApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -28,7 +29,8 @@ function registerImportRoutes(app: TransferApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    const body = (await c.req.json().catch(() => ({}))) as { sourceUrl?: string };
+    const { malformed, body } = await readJsonBody<{ sourceUrl?: string }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     if (typeof body.sourceUrl !== 'string' || !body.sourceUrl.trim()) return c.json({ error: 'sourceUrl is required' }, 400);
     try {
       const scope = createRequestScope(c.env);

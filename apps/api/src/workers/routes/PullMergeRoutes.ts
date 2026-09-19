@@ -12,6 +12,7 @@ import { getCrossRepoPreview, isPackLimitError, resolveHeadRepo } from './CrossF
 import { parsePullNumber } from './PullShared';
 import type { MergePreviewShape, PullApp } from './PullShared';
 import { resolveCodeownerEmails, suggestCodeownerHandles } from './CodeownerHelpers';
+import { readJsonBody } from './BodyParser';
 
 interface OpenCrossForkInput {
   email: string;
@@ -28,7 +29,7 @@ interface OpenCrossForkInput {
 async function openCrossForkPull(
   env: Env,
   input: OpenCrossForkInput,
-): Promise<{ status: 201 | 400 | 403 | 404 | 413 | 500; body: unknown }> {
+): Promise<{ status: 201 | 400 | 401 | 403 | 404 | 409 | 413 | 429 | 500; body: unknown }> {
   const headRow = await requireVisibleRepo(env, input.headOwner, input.headRepo, input.email);
   if (!headRow) return { status: 404, body: { error: 'Not found' } };
   const headFullName = `${headRow.owner}/${headRow.name}`;
@@ -112,7 +113,7 @@ interface MergeCrossForkInput {
 async function mergeCrossForkPull(
   env: Env,
   input: MergeCrossForkInput,
-): Promise<{ status: 200 | 400 | 403 | 404 | 409 | 413 | 500; body: unknown }> {
+): Promise<{ status: 200 | 400 | 401 | 403 | 404 | 409 | 413 | 429 | 500; body: unknown }> {
   const permission = input.scope.get(Tokens.PermissionService);
   const headRole = await permission.getRole(input.email, input.headRow).catch(() => null);
   if (!headRole) return { status: 404, body: { error: 'Not found' } };
@@ -158,7 +159,7 @@ async function mergeCrossForkPull(
       strategy: input.strategy,
     })) as { type?: string; commitOid?: string; conflicts?: string[]; reason?: string; deletedHead?: boolean };
   } catch (error) {
-    return { status: 500, body: { error: toSafeErrorMessage(error, 'Merge failed') } };
+    return { status: toServiceStatus(error), body: { error: toSafeErrorMessage(error, 'Merge failed') } };
   }
   if (outcome.type === 'conflict') {
     return { status: 409, body: { error: 'merge conflicts', conflicts: outcome.conflicts ?? [], reason: outcome.reason ?? null } };
@@ -291,7 +292,8 @@ function registerUserPullMergeRoutes(app: PullApp): void {
         );
       }
     }
-    const body = (await c.req.json().catch(() => ({}))) as { message?: string; deleteHead?: boolean; strategy?: string };
+    const { malformed, body } = await readJsonBody<{ message?: string; deleteHead?: boolean; strategy?: string }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     const rawMessage = typeof body.message === 'string' ? body.message.trim() : '';
     const message = rawMessage ? rawMessage.slice(0, 1000) : `Merge pull request #${number}: ${pull.title}`;
     const deleteHead = body.deleteHead === true;
@@ -351,7 +353,7 @@ function registerUserPullMergeRoutes(app: PullApp): void {
         strategy,
       })) as { type?: string; commitOid?: string; conflicts?: string[]; reason?: string; deletedHead?: boolean };
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Merge failed') }, 500);
+      return c.json({ error: toSafeErrorMessage(error, 'Merge failed') }, toServiceStatus(error));
     }
     if (outcome.type === 'conflict') {
       return c.json({ error: 'merge conflicts', conflicts: outcome.conflicts ?? [], reason: outcome.reason ?? null }, 409);

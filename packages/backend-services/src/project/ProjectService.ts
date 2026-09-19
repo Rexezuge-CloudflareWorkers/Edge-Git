@@ -18,6 +18,11 @@ interface ProjectServiceDeps {
 }
 
 const MAX_TITLE = 100;
+
+function isUniqueViolation(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /unique|constraint/i.test(message);
+}
 const MAX_DESCRIPTION = 1000;
 const MAX_NOTE_TITLE = 200;
 const MAX_NOTE_BODY = 10_000;
@@ -96,24 +101,35 @@ class ProjectService {
     const max = ConfigurationManager.collabSurfaces.getMaxProjectsPerRepo(this.env);
     const count = await dao.countByRepo(repositoryId).catch(() => 0);
     if (count >= max) throw new BadRequestError(`Maximum ${max} projects per repository`);
-    const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
-    const id = UUIDUtil.getRandomUUID();
-    const number = await dao.nextNumber(repositoryId);
-    await dao.createProject({ id, repositoryId, number, title, description, creatorEmail: creatorEmail.toLowerCase(), now });
-    // Seed the canonical three columns so boards are usable immediately.
-    const seeds: Array<{ title: string; position: number }> = [
-      { title: 'Todo', position: 0 },
-      { title: 'In Progress', position: 1 },
-      { title: 'Done', position: 2 },
-    ];
-    for (const seed of seeds) {
-      await dao
-        .createColumn({ id: UUIDUtil.getRandomUUID(), projectId: id, title: seed.title, position: seed.position, now })
-        .catch(() => undefined);
+    // Retry on UNIQUE(repository_id, number) races from concurrent POSTs.
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
+      const id = UUIDUtil.getRandomUUID();
+      const number = await dao.nextNumber(repositoryId);
+      try {
+        await dao.createProject({ id, repositoryId, number, title, description, creatorEmail: creatorEmail.toLowerCase(), now });
+        // Seed the canonical three columns so boards are usable immediately.
+        const seeds: Array<{ title: string; position: number }> = [
+          { title: 'Todo', position: 0 },
+          { title: 'In Progress', position: 1 },
+          { title: 'Done', position: 2 },
+        ];
+        for (const seed of seeds) {
+          await dao
+            .createColumn({ id: UUIDUtil.getRandomUUID(), projectId: id, title: seed.title, position: seed.position, now })
+            .catch(() => undefined);
+        }
+        const row = await dao.getById(id, repositoryId);
+        if (!row) throw new NotFoundError('Project not found');
+        return toMetadata(row);
+      } catch (error) {
+        if (error instanceof NotFoundError) throw error;
+        lastError = error;
+        if (!isUniqueViolation(error)) throw error;
+      }
     }
-    const row = await dao.getById(id, repositoryId);
-    if (!row) throw new NotFoundError('Project not found');
-    return toMetadata(row);
+    throw lastError instanceof Error ? lastError : new BadRequestError('Failed to create project');
   }
 
   public async listProjects(repositoryId: string): Promise<ProjectMetadata[]> {

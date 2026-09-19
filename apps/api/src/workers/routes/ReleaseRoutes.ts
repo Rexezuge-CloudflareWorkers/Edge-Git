@@ -4,6 +4,7 @@ import { RepoService } from '@edge-git/backend-services/repo';
 import { getRepoStub } from '../repoStub';
 import { recordAndNotify } from './SocialEmit';
 import { requireVisibleRepo, resolvePublicViewer, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { readJsonBody } from './BodyParser';
 
 type ReleaseApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -88,13 +89,14 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
     } catch {
       return c.json({ error: 'Forbidden' }, 403);
     }
-    const body = (await c.req.json().catch(() => ({}))) as {
+    const { malformed, body } = await readJsonBody<{
       tagName?: unknown;
       name?: unknown;
       body?: unknown;
       isDraft?: unknown;
       isPrerelease?: unknown;
-    };
+    }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     try {
       const scope = createRequestScope(c.env);
       const isDraft = body.isDraft === undefined || body.isDraft === true;
@@ -156,7 +158,8 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
     } catch {
       return c.json({ error: 'Forbidden' }, 403);
     }
-    const body = (await c.req.json().catch(() => ({}))) as { name?: unknown; body?: unknown; isDraft?: unknown; isPrerelease?: unknown };
+    const { malformed, body } = await readJsonBody<{ name?: unknown; body?: unknown; isDraft?: unknown; isPrerelease?: unknown }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     try {
       const scope = createRequestScope(c.env);
       const before = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));

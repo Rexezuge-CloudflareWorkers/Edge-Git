@@ -54,6 +54,14 @@ class ImportDAO extends BaseDAO {
     return row !== null;
   }
 
+  public async countActiveForRepo(repositoryId: string): Promise<number> {
+    const row = await this.database
+      .prepare("SELECT COUNT(*) AS n FROM repo_imports WHERE repository_id = ? AND status IN ('pending', 'running')")
+      .bind(repositoryId)
+      .first<{ n: number }>();
+    return row?.n ?? 0;
+  }
+
   public async claimDue(limit: number, staleAfterSeconds: number, now: number): Promise<RepoImportRow[]> {
     const cutoff = now - staleAfterSeconds;
     const result = await this.database

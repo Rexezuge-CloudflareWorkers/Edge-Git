@@ -14,6 +14,7 @@ import { Tokens } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { EmailAddress } from '@edge-git/shared/utils';
 import type { RequestContext } from '@/middleware';
+import { readJsonBody } from './BodyParser';
 
 type RepoApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -137,12 +138,13 @@ function registerUserRepoRoutes(app: RepoApp): void {
 
   app.post('/user/repos', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const body = (await c.req.json().catch(() => ({}))) as {
+    const { malformed, body } = await readJsonBody<{
       owner?: string;
       name?: string;
       description?: string | null;
       isPrivate?: boolean;
-    };
+    }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     const scope = getScope(c);
     let owner = (body.owner ?? '').trim();
     if (!owner) {
@@ -213,7 +215,8 @@ function registerUserRepoRoutes(app: RepoApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    const body = (await c.req.json().catch(() => ({}))) as { description?: string | null; isPrivate?: boolean };
+    const { malformed, body } = await readJsonBody<{ description?: string | null; isPrivate?: boolean }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     const patch: { description?: string | null; isPrivate?: boolean } = {};
     if ('description' in body) patch.description = body.description ?? null;
     if ('isPrivate' in body) patch.isPrivate = body.isPrivate;

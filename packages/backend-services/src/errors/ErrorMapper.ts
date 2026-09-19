@@ -21,9 +21,10 @@ function mapServiceError(error: unknown, locale?: string | null): MappedError {
   return { status: 500, body: { error: 'InternalError', message: strings.common.internalError } };
 }
 
-function toServiceStatus(error: unknown): 400 | 403 | 404 | 500 {
+function toServiceStatus(error: unknown): 400 | 401 | 403 | 404 | 409 | 413 | 429 | 500 {
   const mapped = mapServiceError(error);
-  if ([400, 403, 404].includes(mapped.status)) return mapped.status as 400 | 403 | 404;
+  if ([400, 401, 403, 404, 409, 413, 429].includes(mapped.status))
+    return mapped.status as 400 | 401 | 403 | 404 | 409 | 413 | 429;
   return 500;
 }
 

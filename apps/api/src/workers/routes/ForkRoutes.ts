@@ -5,6 +5,7 @@ import { Tokens, createRequestScope } from '@edge-git/backend-services/compositi
 import { RepoService } from '@edge-git/backend-services/repo';
 import { copyRepoGit, isPackLimitError } from './CrossFork';
 import { recordAndNotify } from './SocialEmit';
+import { readJsonBody } from './BodyParser';
 
 type ForkApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -39,12 +40,13 @@ function registerUserForkRoutes(app: ForkApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    const body = (await c.req.json().catch(() => ({}))) as {
+    const { malformed, body } = await readJsonBody<{
       owner?: string;
       name?: string;
       description?: string | null;
       isPrivate?: boolean;
-    };
+    }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     const scope = createRequestScope(c.env);
     let fork: { id: string; owner: string; name: string; fullName: string; isPrivate: boolean };
     try {

@@ -20,6 +20,11 @@ const MAX_BODY = 20_000;
 const MAX_COMMENT_BODY = 10_000;
 const SLUG_RE = /^[a-z0-9-]{1,50}$/;
 
+function isUniqueViolation(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /unique|constraint/i.test(message);
+}
+
 function toCategoryMetadata(row: {
   id: string;
   repository_id: string;
@@ -122,13 +127,25 @@ class DiscussionService {
       if (!category) throw new BadRequestError('unknown category');
       categoryId = category.id;
     }
-    const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
-    const id = UUIDUtil.getRandomUUID();
-    const number = await dao.nextNumber(repositoryId);
-    await dao.createDiscussion({ id, repositoryId, categoryId, number, title, body, authorEmail: authorEmail.toLowerCase(), now });
-    const row = await dao.getByNumber(repositoryId, number);
-    if (!row) throw new NotFoundError('Discussion not found');
-    return toMetadata(row);
+    // Retry on UNIQUE(repository_id, number) races from concurrent POSTs:
+    // re-read MAX(number)+1 after a conflict (3 attempts, then surface).
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const id = UUIDUtil.getRandomUUID();
+      const attemptNow = TimestampUtil.getCurrentUnixTimestampInSeconds();
+      const number = await dao.nextNumber(repositoryId);
+      try {
+        await dao.createDiscussion({ id, repositoryId, categoryId, number, title, body, authorEmail: authorEmail.toLowerCase(), now: attemptNow });
+        const row = await dao.getByNumber(repositoryId, number);
+        if (!row) throw new NotFoundError('Discussion not found');
+        return toMetadata(row);
+      } catch (error) {
+        if (error instanceof NotFoundError) throw error;
+        lastError = error;
+        if (!isUniqueViolation(error)) throw error;
+      }
+    }
+    throw lastError instanceof Error ? lastError : new BadRequestError('Failed to create discussion');
   }
 
   public async listDiscussions(repositoryId: string, categorySlug?: string): Promise<DiscussionMetadata[]> {

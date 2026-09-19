@@ -3,6 +3,7 @@ import { getRepoStub } from '../repoStub';
 import { requireVisibleRepo, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
+import { readJsonBody } from './BodyParser';
 
 type RepoApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -43,7 +44,8 @@ function registerBranchRoutes(app: RepoApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    const body = (await c.req.json().catch(() => ({}))) as { name?: string; from?: string };
+    const { malformed, body } = await readJsonBody<{ name?: string; from?: string }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     const name = (body.name ?? '').trim();
     if (!name) return c.json({ error: 'name is required' }, 400);
     try {
@@ -91,7 +93,8 @@ function registerBranchRoutes(app: RepoApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    const body = (await c.req.json().catch(() => ({}))) as { branch?: string };
+    const { malformed, body } = await readJsonBody<{ branch?: string }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     const branch = (body.branch ?? '').trim();
     if (!branch) return c.json({ error: 'branch is required' }, 400);
     try {

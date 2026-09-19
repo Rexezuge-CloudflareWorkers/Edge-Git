@@ -139,6 +139,10 @@ class PushHandler {
     }
     if (forceBlocked.size > 0) {
       logger.error(`(receive-pack) Rejected ${getFullName() ?? 'unknown repo'}: protected branch update declined`);
+      // The pack was already indexed above (ancestry needs the new objects).
+      // Remove the orphaned pack file so repeated blocked force-pushes cannot
+      // fill the 5GB DO device.
+      await isoGitFs.promises.unlink(packFilePath).catch(() => undefined);
       const results = commands.map((cmd) => ({
         ref: cmd.ref,
         ok: false as const,

@@ -5,6 +5,7 @@ import { Tokens, createRequestScope } from '@edge-git/backend-services/compositi
 import { RepoService } from '@edge-git/backend-services/repo';
 import { needAdmin, resolveRepoRow } from './CollabHelpers';
 import type { CollabApp } from './CollabHelpers';
+import { readJsonBody } from '../BodyParser';
 
 function registerCollabLabelPublicRoutes(app: CollabApp): void {
   app.get('/repos/:owner/:repo/labels', async (c) => {
@@ -38,7 +39,8 @@ function registerCollabLabelUserRoutes(app: CollabApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return c.json({ error: 'Not found' }, 404);
     if (!(await needAdmin(c.env, owner, repoName, email))) return c.json({ error: 'Forbidden' }, 403);
-    const body = (await c.req.json().catch(() => ({}))) as { name?: string; color?: string; description?: string };
+    const { malformed, body } = await readJsonBody<{ name?: string; color?: string; description?: string }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     try {
       const created = await createRequestScope(c.env)
         .get(Tokens.CollaborationService)

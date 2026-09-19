@@ -2,6 +2,7 @@ import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { readJsonBody } from './BodyParser';
 
 type TeamApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -32,7 +33,8 @@ function registerTeamRoutes(app: TeamApp): void {
 
   app.post('/user/orgs/:org/teams', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const body = (await c.req.json().catch(() => ({}))) as { slug?: string; name?: string; description?: string | null };
+    const { malformed, body } = await readJsonBody<{ slug?: string; name?: string; description?: string | null }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     if (!body.slug) return c.json({ error: 'slug is required' }, 400);
     try {
       const team = await createRequestScope(c.env)
@@ -58,7 +60,8 @@ function registerTeamRoutes(app: TeamApp): void {
 
   app.patch('/user/orgs/:org/teams/:team', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const body = (await c.req.json().catch(() => ({}))) as { slug?: string; name?: string; description?: string | null };
+    const { malformed, body } = await readJsonBody<{ slug?: string; name?: string; description?: string | null }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     try {
       const team = await createRequestScope(c.env).get(Tokens.TeamService).renameTeam(c.req.param('org'), c.req.param('team'), email, body);
       return c.json(teamJson(team));
@@ -89,7 +92,8 @@ function registerTeamRoutes(app: TeamApp): void {
 
   app.post('/user/orgs/:org/teams/:team/members', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const body = (await c.req.json().catch(() => ({}))) as { username?: string; email?: string; role?: string };
+    const { malformed, body } = await readJsonBody<{ username?: string; email?: string; role?: string }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     const target = body.username ?? body.email;
     if (!target) return c.json({ error: 'username or email is required' }, 400);
     const role = body.role ?? 'member';
@@ -104,7 +108,8 @@ function registerTeamRoutes(app: TeamApp): void {
 
   app.patch('/user/orgs/:org/teams/:team/members/:member', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const body = (await c.req.json().catch(() => ({}))) as { role?: string };
+    const { malformed, body } = await readJsonBody<{ role?: string }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     if (body.role !== 'admin' && body.role !== 'member') return c.json({ error: 'Invalid role' }, 400);
     try {
       await createRequestScope(c.env)
@@ -152,7 +157,8 @@ function registerTeamRoutes(app: TeamApp): void {
 
   app.put('/user/orgs/:org/teams/:team/repos/:owner/:repo', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const body = (await c.req.json().catch(() => ({}))) as { role?: string };
+    const { malformed, body } = await readJsonBody<{ role?: string }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     const role = body.role ?? 'read';
     if (role !== 'admin' && role !== 'write' && role !== 'read') return c.json({ error: 'Invalid role' }, 400);
     try {

@@ -18,6 +18,9 @@ import {
   NotFoundError,
   RetryableError,
   UnauthorizedError,
+  ConflictError,
+  PayloadTooLargeError,
+  RateLimitedError,
   AiSummaryRetryableError,
   ProviderApiNonRetryableError,
   ProviderApiRetryableError,
@@ -515,12 +518,15 @@ describe('function-gap backend-errors', () => {
     expect(plain.body.error).toBe('InternalError');
   });
 
-  it('toServiceStatus collapses to 400/403/404/500 and masks 500s', () => {
+  it('toServiceStatus preserves 400/401/403/404/409/413/429 and masks 500s', () => {
     expect(mapToStatus(new BadRequestError('b'))).toBe(400);
     expect(mapToStatus(new ForbiddenError())).toBe(403);
     expect(mapToStatus(new NotFoundError())).toBe(404);
     expect(mapToStatus(new Error('plain'))).toBe(500);
-    expect(mapToStatus(new UnauthorizedError())).toBe(500);
+    expect(mapToStatus(new UnauthorizedError())).toBe(401);
+    expect(mapToStatus(new ConflictError('c'))).toBe(409);
+    expect(mapToStatus(new PayloadTooLargeError('p'))).toBe(413);
+    expect(mapToStatus(new RateLimitedError('r'))).toBe(429);
     expect(apiToStatus(new BadRequestError('b'))).toBe(400);
     expect(toSafeErrorMessage(new BadRequestError('visible problem'), 'fallback')).toBe('visible problem');
     expect(toSafeErrorMessage(new Error('D1 SELECT failed at offset 12'), 'fallback')).toBe('fallback');

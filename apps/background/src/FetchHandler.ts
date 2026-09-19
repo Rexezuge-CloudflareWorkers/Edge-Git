@@ -104,7 +104,9 @@ class FetchHandler {
       try {
         commonCommits = await git.findCommonCommits(fetchRequest.haves, limits.maxHaves);
       } catch (error) {
-        const message = error instanceof PackLimitError ? error.message : (error as Error).message;
+        // Never echo git-internal paths/oids to anonymous fetchers: only
+        // PackLimitError carries a safe message, everything else is masked.
+        const message = error instanceof PackLimitError ? error.message : 'failed to negotiate fetch';
         logger.error(`(upload-pack-fetch) Rejected ${getFullName() ?? 'unknown repo'}: ${message}`);
         return buildFetchErrorResponse(message, 400);
       }

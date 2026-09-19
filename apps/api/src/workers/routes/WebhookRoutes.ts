@@ -3,6 +3,7 @@ import { Tokens, createRequestScope } from '@edge-git/backend-services/compositi
 import { WEBHOOK_EVENTS } from '@edge-git/backend-services/webhook';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { readJsonBody } from './BodyParser';
 
 type WebhookApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -34,7 +35,8 @@ function registerWebhookRoutes(app: WebhookApp): void {
   app.post('/user/repos/:owner/:repo/hooks', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const { owner, repoName } = repoParams(c);
-    const body = (await c.req.json().catch(() => ({}))) as { url?: unknown; events?: unknown; secret?: unknown };
+    const { malformed, body } = await readJsonBody<{ url?: unknown; events?: unknown; secret?: unknown }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     if (typeof body.url !== 'string' || !body.url.trim()) return c.json({ error: 'url is required' }, 400);
     try {
       const scope = createRequestScope(c.env);
@@ -71,7 +73,8 @@ function registerWebhookRoutes(app: WebhookApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const { owner, repoName } = repoParams(c);
     const id = c.req.param('id');
-    const body = (await c.req.json().catch(() => ({}))) as { url?: unknown; events?: unknown; isActive?: unknown };
+    const { malformed, body } = await readJsonBody<{ url?: unknown; events?: unknown; isActive?: unknown }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     try {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');

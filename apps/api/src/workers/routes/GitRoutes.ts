@@ -136,7 +136,9 @@ function registerGitRoutes(app: GitApp): void {
         }
       }
     } catch {
-      // Scanning never fails the push; block-mode errors above return early.
+      // Fail closed: without the mode we cannot know whether the operator
+      // configured `block`. A D1 outage must not silently downgrade to `off`.
+      return c.text('secret scan unavailable; try again later', 503);
     }
     // Branch protection is resolved here (D1) and passed into the DO (which
     // owns git truth but cannot read D1). Protection resolution is fail-closed:

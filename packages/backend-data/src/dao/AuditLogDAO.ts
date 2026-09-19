@@ -28,6 +28,10 @@ export interface AuditLogFilters {
   endTime?: number;
 }
 
+function escapeLike(term: string): string {
+  return term.replaceAll('!', '!!').replaceAll('%', '!%').replaceAll('_', '!_');
+}
+
 class AuditLogDAO extends BaseDAO {
   constructor(database: D1Queryable) {
     super(database);
@@ -76,7 +80,7 @@ class AuditLogDAO extends BaseDAO {
   }
 
   public async query(filters: AuditLogFilters, limit = 50, cursor?: string): Promise<{ logs: AuditLogRow[]; nextCursor: string | null }> {
-    const decoded = this.decodeCursor<{ timestamp: number; log_id: string }>(cursor);
+    const decoded = this.decodeCursorOrThrow<{ timestamp: number; log_id: string }>(cursor);
     const conditions: string[] = [];
     const values: Array<string | number> = [];
     if (filters.orgId) {
@@ -96,8 +100,8 @@ class AuditLogDAO extends BaseDAO {
       values.push(filters.action);
     }
     if (filters.resourcePrefix) {
-      conditions.push('resource LIKE ?');
-      values.push(`${filters.resourcePrefix}%`);
+      conditions.push("resource LIKE ? ESCAPE '!'");
+      values.push(`${escapeLike(filters.resourcePrefix)}%`);
     }
     if (filters.startTime !== undefined) {
       conditions.push('timestamp >= ?');
@@ -137,9 +141,9 @@ class AuditLogDAO extends BaseDAO {
     limit = 50,
     cursor?: string,
   ): Promise<{ logs: AuditLogRow[]; nextCursor: string | null }> {
-    const decoded = this.decodeCursor<{ timestamp: number; log_id: string }>(cursor);
-    const conditions: string[] = ['(org_id = ? OR resource LIKE ? OR resource LIKE ?)'];
-    const values: Array<string | number> = [orgId, `org/${orgUsername}%`, `${orgUsername}/%`];
+    const decoded = this.decodeCursorOrThrow<{ timestamp: number; log_id: string }>(cursor);
+    const conditions: string[] = ["(org_id = ? OR resource LIKE ? ESCAPE '!' OR resource LIKE ? ESCAPE '!')"];
+    const values: Array<string | number> = [orgId, `org/${escapeLike(orgUsername)}%`, `${escapeLike(orgUsername)}/%`];
     if (filters.repoId) {
       conditions.push('repo_id = ?');
       values.push(filters.repoId);

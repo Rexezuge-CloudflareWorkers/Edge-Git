@@ -85,7 +85,7 @@ class EventDAO extends BaseDAO {
     limit = 50,
     cursor?: string,
   ): Promise<{ events: RepoEventRow[]; nextCursor: string | null }> {
-    const decoded = this.decodeCursor<{ created_at: number; id: string }>(cursor);
+    const decoded = this.decodeCursorOrThrow<{ created_at: number; id: string }>(cursor);
     const pageSize = limit + 1;
     const result =
       decoded === undefined
