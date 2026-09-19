@@ -10,6 +10,7 @@ import { openCrossForkPull } from './PullMergeRoutes';
 import { parsePullNumber } from './PullShared';
 import type { MergePreviewShape, PullApp } from './PullShared';
 import { resolveCodeownerEmails, suggestCodeownerHandles } from './CodeownerHelpers';
+import { readJsonBody } from './BodyParser';
 
 function registerUserPullRoutes(app: PullApp): void {
   app.get('/user/repos/:owner/:repo/pulls', async (c) => {
@@ -51,7 +52,7 @@ function registerUserPullRoutes(app: PullApp): void {
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return c.json({ error: 'Not found' }, 404);
-    const body = (await c.req.json().catch(() => ({}))) as {
+    const { malformed, body } = await readJsonBody<{
       title?: string;
       body?: string;
       baseBranch?: string;
@@ -59,7 +60,8 @@ function registerUserPullRoutes(app: PullApp): void {
       headOwner?: string;
       headRepo?: string;
       isDraft?: boolean;
-    };
+    }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     if (!body.title?.trim()) return c.json({ error: 'title is required' }, 400);
     if (!body.baseBranch?.trim() || !body.headBranch?.trim()) return c.json({ error: 'baseBranch and headBranch are required' }, 400);
     if (!PullRequestService.isValidBranchName(body.baseBranch.trim()) || !PullRequestService.isValidBranchName(body.headBranch.trim())) {
@@ -182,7 +184,8 @@ function registerUserPullRoutes(app: PullApp): void {
     }
     const number = parsePullNumber(c.req.param('number'));
     if (number === null) return c.json({ error: 'Not found' }, 404);
-    const body = (await c.req.json().catch(() => ({}))) as { status?: string };
+    const { malformed, body } = await readJsonBody<{ status?: string }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     try {
       const pull = await createRequestScope(c.env)
         .get(Tokens.PullRequestService)
@@ -227,7 +230,8 @@ function registerUserPullRoutes(app: PullApp): void {
     if (!row) return c.json({ error: 'Not found' }, 404);
     const number = parsePullNumber(c.req.param('number'));
     if (number === null) return c.json({ error: 'Not found' }, 404);
-    const body = (await c.req.json().catch(() => ({}))) as { body?: string };
+    const { malformed, body } = await readJsonBody<{ body?: string }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     if (typeof body.body !== 'string' || !body.body.trim()) return c.json({ error: 'body is required' }, 400);
     try {
       const scope = createRequestScope(c.env);
@@ -279,7 +283,8 @@ function registerUserPullRoutes(app: PullApp): void {
     if (!row) return c.json({ error: 'Not found' }, 404);
     const number = parsePullNumber(c.req.param('number'));
     if (number === null) return c.json({ error: 'Not found' }, 404);
-    const body = (await c.req.json().catch(() => ({}))) as { state?: string; body?: string; commitOid?: string };
+    const { malformed, body } = await readJsonBody<{ state?: string; body?: string; commitOid?: string }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     if (typeof body.state !== 'string') return c.json({ error: 'state is required' }, 400);
     try {
       const scope = createRequestScope(c.env);

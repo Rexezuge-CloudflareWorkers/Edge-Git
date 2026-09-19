@@ -315,12 +315,19 @@ export async function runCustomCheckScript(input: SandboxInput): Promise<Sandbox
   let settled: SandboxResult;
   let abandoned = false;
   try {
-    const outcome = (await Promise.race([
-      ctx.evalCodeAsync(source, 'check.js'),
-      new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('__wall_timeout__')), Math.max(1000, input.limits.wallMs));
-      }),
-    ])) as { error?: QuickJSHandle; value?: QuickJSHandle };
+    let wallTimer: ReturnType<typeof setTimeout> | undefined;
+    const wallTimeout = new Promise<never>((_, reject) => {
+      wallTimer = setTimeout(() => reject(new Error('__wall_timeout__')), Math.max(1000, input.limits.wallMs));
+    });
+    let outcome: { error?: QuickJSHandle; value?: QuickJSHandle };
+    try {
+      outcome = (await Promise.race([ctx.evalCodeAsync(source, 'check.js'), wallTimeout])) as {
+        error?: QuickJSHandle;
+        value?: QuickJSHandle;
+      };
+    } finally {
+      if (wallTimer) clearTimeout(wallTimer);
+    }
     if (outcome.error) {
       const message = safeDumpMessage(ctx, outcome.error);
       outcome.error.dispose();

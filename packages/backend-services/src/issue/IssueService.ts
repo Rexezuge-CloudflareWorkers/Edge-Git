@@ -12,6 +12,11 @@ interface IssueServiceDeps {
   issueDAO?: () => Promise<IssueDAO>;
 }
 
+function isUniqueViolation(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /unique|constraint/i.test(message);
+}
+
 class IssueService {
   private readonly deps: Required<IssueServiceDeps>;
 
@@ -43,20 +48,31 @@ class IssueService {
     const body = input.body?.trim() ? input.body.trim() : null;
     if (body && body.length > 10_000) throw new BadRequestError('body must be at most 10000 characters');
     const dao = await this.deps.issueDAO();
-    const number = await dao.nextNumber(input.repositoryId);
-    const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
-    const id = UUIDUtil.getRandomUUID();
-    await dao.create({
-      id,
-      repositoryId: input.repositoryId,
-      fullName: input.fullName,
-      number,
-      title,
-      body,
-      creatorEmail: input.creatorEmail,
-      now,
-    });
-    return { id, number };
+    // Retry on UNIQUE(repository_id, number) races from concurrent POSTs:
+    // re-read MAX(number)+1 after a conflict (3 attempts, then surface).
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const number = await dao.nextNumber(input.repositoryId);
+      const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
+      const id = UUIDUtil.getRandomUUID();
+      try {
+        await dao.create({
+          id,
+          repositoryId: input.repositoryId,
+          fullName: input.fullName,
+          number,
+          title,
+          body,
+          creatorEmail: input.creatorEmail,
+          now,
+        });
+        return { id, number };
+      } catch (error) {
+        lastError = error;
+        if (!isUniqueViolation(error)) throw error;
+      }
+    }
+    throw lastError instanceof Error ? lastError : new BadRequestError('Failed to create issue');
   }
 
   public async getByNumber(repositoryId: string, number: number): Promise<IssueRow> {

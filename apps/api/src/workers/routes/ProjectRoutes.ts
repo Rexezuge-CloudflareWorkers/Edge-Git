@@ -4,6 +4,7 @@ import { RepoService } from '@edge-git/backend-services/repo';
 import { parsePositiveInt } from '@edge-git/shared/validation';
 import { recordAndNotify } from './SocialEmit';
 import { requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { readJsonBody } from './BodyParser';
 
 type ProjectApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -61,7 +62,8 @@ function registerProjectUserRoutes(app: ProjectApp): void {
     } catch {
       return c.json({ error: 'Forbidden' }, 403);
     }
-    const body = (await c.req.json().catch(() => ({}))) as { title: unknown; description?: unknown };
+    const { malformed, body } = await readJsonBody<{ title: unknown; description?: unknown }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     try {
       const scope = createRequestScope(c.env);
       const project = await scope.get(Tokens.ProjectService).createProject(row.id, body, email);
@@ -108,7 +110,8 @@ function registerProjectUserRoutes(app: ProjectApp): void {
     }
     const number = parseProjectNumber(c.req.param('number'));
     if (number === null) return c.json({ error: 'Invalid project number' }, 400);
-    const body = (await c.req.json().catch(() => ({}))) as { title?: unknown; description?: unknown; status?: unknown };
+    const { malformed, body } = await readJsonBody<{ title?: unknown; description?: unknown; status?: unknown }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     try {
       const scope = createRequestScope(c.env);
       const project =
@@ -167,7 +170,8 @@ function registerProjectUserRoutes(app: ProjectApp): void {
     }
     const number = parseProjectNumber(c.req.param('number'));
     if (number === null) return c.json({ error: 'Invalid project number' }, 400);
-    const body = (await c.req.json().catch(() => ({}))) as { title?: unknown };
+    const { malformed, body } = await readJsonBody<{ title?: unknown }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     try {
       const column = await createRequestScope(c.env)
         .get(Tokens.ProjectService)
@@ -191,7 +195,8 @@ function registerProjectUserRoutes(app: ProjectApp): void {
     }
     const number = parseProjectNumber(c.req.param('number'));
     if (number === null) return c.json({ error: 'Invalid project number' }, 400);
-    const body = (await c.req.json().catch(() => ({}))) as { title?: unknown };
+    const { malformed, body } = await readJsonBody<{ title?: unknown }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     try {
       const column = await createRequestScope(c.env)
         .get(Tokens.ProjectService)
@@ -236,14 +241,15 @@ function registerProjectUserRoutes(app: ProjectApp): void {
     }
     const number = parseProjectNumber(c.req.param('number'));
     if (number === null) return c.json({ error: 'Invalid project number' }, 400);
-    const body = (await c.req.json().catch(() => ({}))) as {
+    const { malformed, body } = await readJsonBody<{
       columnId: unknown;
       kind?: unknown;
       noteTitle?: unknown;
       noteBody?: unknown;
       issueId?: unknown;
       pullRequestId?: unknown;
-    };
+    }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     try {
       const card = await createRequestScope(c.env).get(Tokens.ProjectService).createCard(row.id, number, body, email);
       return c.json({ card }, 201);
@@ -265,7 +271,8 @@ function registerProjectUserRoutes(app: ProjectApp): void {
     }
     const number = parseProjectNumber(c.req.param('number'));
     if (number === null) return c.json({ error: 'Invalid project number' }, 400);
-    const body = (await c.req.json().catch(() => ({}))) as { toColumnId: unknown; position?: unknown };
+    const { malformed, body } = await readJsonBody<{ toColumnId: unknown; position?: unknown }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     try {
       const card = await createRequestScope(c.env).get(Tokens.ProjectService).moveCard(row.id, number, c.req.param('cardId'), body);
       return c.json({ card });
@@ -287,7 +294,8 @@ function registerProjectUserRoutes(app: ProjectApp): void {
     }
     const number = parseProjectNumber(c.req.param('number'));
     if (number === null) return c.json({ error: 'Invalid project number' }, 400);
-    const body = (await c.req.json().catch(() => ({}))) as { archived?: unknown };
+    const { malformed, body } = await readJsonBody<{ archived?: unknown }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     try {
       const card = await createRequestScope(c.env)
         .get(Tokens.ProjectService)

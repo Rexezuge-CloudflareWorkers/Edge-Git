@@ -2,6 +2,7 @@ import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { readJsonBody } from './BodyParser';
 
 type RuleApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -27,14 +28,15 @@ function registerRuleRoutes(app: RuleApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    const body = (await c.req.json().catch(() => ({}))) as {
+    const { malformed, body } = await readJsonBody<{
       pattern?: string;
       requirePr?: boolean;
       requiredApprovals?: number;
       blockForcePush?: boolean;
       blockDeletion?: boolean;
       requireStatusChecks?: unknown;
-    };
+    }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     if (typeof body.pattern !== 'string' || !body.pattern.trim()) return c.json({ error: 'pattern is required' }, 400);
     try {
       const scope = createRequestScope(c.env);

@@ -72,6 +72,13 @@ async function defaultPostJson(
       redirect: 'manual',
       signal: AbortSignal.timeout(init.timeoutMs),
     });
+    // Secrets ride in `X-EdgeGit-Signature-256`: http: deliveries send the
+    // HMAC cleartext. Allowed for local dev, but warn so operators notice.
+    try {
+      if (new URL(url).protocol === 'http:') console.warn('Webhook delivery over cleartext http — prefer https');
+    } catch {
+      // URL already validated above; warning must never fail delivery.
+    }
     await response.arrayBuffer().catch(() => undefined);
     if (response.ok) return { httpStatus: response.status, error: null };
     return { httpStatus: response.status, error: `Webhook returned HTTP ${response.status}` };

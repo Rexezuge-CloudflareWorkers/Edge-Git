@@ -5,6 +5,7 @@ import { Tokens, createRequestScope } from '@edge-git/backend-services/compositi
 import { RepoService } from '@edge-git/backend-services/repo';
 import { needWrite, resolveRepoRow } from './CollabHelpers';
 import type { CollabApp } from './CollabHelpers';
+import { readJsonBody } from '../BodyParser';
 
 function registerCollabMilestonePublicRoutes(app: CollabApp): void {
   app.get('/repos/:owner/:repo/milestones', async (c) => {
@@ -38,7 +39,8 @@ function registerCollabMilestoneUserRoutes(app: CollabApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return c.json({ error: 'Not found' }, 404);
     if (!(await needWrite(c.env, owner, repoName, email))) return c.json({ error: 'Forbidden' }, 403);
-    const body = (await c.req.json().catch(() => ({}))) as { title?: string; description?: string; dueOn?: number };
+    const { malformed, body } = await readJsonBody<{ title?: string; description?: string; dueOn?: number }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     if (!body.title?.trim()) return c.json({ error: 'title is required' }, 400);
     try {
       const created = await createRequestScope(c.env)
@@ -57,7 +59,8 @@ function registerCollabMilestoneUserRoutes(app: CollabApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return c.json({ error: 'Not found' }, 404);
     if (!(await needWrite(c.env, owner, repoName, email))) return c.json({ error: 'Forbidden' }, 403);
-    const body = (await c.req.json().catch(() => ({}))) as { status?: string };
+    const { malformed, body } = await readJsonBody<{ status?: string }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     try {
       await createRequestScope(c.env).get(Tokens.CollaborationService).updateMilestone(row.id, c.req.param('id'), body);
       return c.json({ ok: true });

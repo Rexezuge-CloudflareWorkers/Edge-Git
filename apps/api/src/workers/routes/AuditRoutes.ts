@@ -1,10 +1,20 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
+import { BadRequestError } from '@edge-git/backend-errors';
 import { clampAuditLimit, truncateAuditFilter } from '@edge-git/shared/validation';
 import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 
 type AuditApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
+
+function isValidAuditCursor(cursor: string): boolean {
+  try {
+    JSON.parse(atob(cursor));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function parseAuditQuery(url: string): {
   userEmail?: string;
@@ -25,7 +35,14 @@ function parseAuditQuery(url: string): {
   if (truncateAuditFilter(userEmail ?? undefined)) out.userEmail = truncateAuditFilter(userEmail ?? undefined);
   if (truncateAuditFilter(action ?? undefined)) out.action = truncateAuditFilter(action ?? undefined);
   if (truncateAuditFilter(repo ?? undefined)) out.repo = truncateAuditFilter(repo ?? undefined);
-  if (cursor) out.cursor = cursor.slice(0, 500);
+  if (cursor) {
+    const sliced = cursor.slice(0, 500);
+    // Tampered cursors fail closed (400 in the DAO via decodeCursorOrThrow),
+    // never silently restart at page 1 — but drop obvious garbage early so
+    // oversized/invalid cursors cannot fan out into D1.
+    if (!isValidAuditCursor(sliced)) throw new BadRequestError('Invalid cursor');
+    out.cursor = sliced;
+  }
   // NOTE: `Number(null)` is 0, so missing params must stay unset — otherwise
   // every unfiltered query would silently gain `timestamp <= 0` and match
   // nothing (fail-closed the wrong way: empty audit trails).

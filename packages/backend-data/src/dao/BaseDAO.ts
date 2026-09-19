@@ -43,6 +43,10 @@ abstract class BaseDAO {
     return CursorUtil.decode<T>(cursor);
   }
 
+  protected decodeCursorOrThrow<T>(cursor: string | undefined): T | undefined {
+    return CursorUtil.decodeOrThrow<T>(cursor);
+  }
+
   // Generic row lookup by primary key. Table/column identifiers are allow-listed
   // to keep dynamic SQL safe; values always go through bindings.
   protected static async findById<T>(db: D1Queryable, table: string, idColumn: string, idValue: string, columns = '*'): Promise<T | null> {

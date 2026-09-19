@@ -4,6 +4,7 @@ import { Tokens, createRequestScope } from '@edge-git/backend-services/compositi
 import { RepoService } from '@edge-git/backend-services/repo';
 import { getIssueMetaSafe, needWrite, parseNumber } from './CollabHelpers';
 import type { CollabApp } from './CollabHelpers';
+import { readJsonBody } from '../BodyParser';
 
 function registerCollabIssueTriageRoutes(app: CollabApp): void {
   // Issue triage: labels / assignees / milestone + meta
@@ -33,7 +34,8 @@ function registerCollabIssueTriageRoutes(app: CollabApp): void {
       if (!(await needWrite(c.env, owner, repoName, email))) return c.json({ error: 'Forbidden' }, 403);
       const number = parseNumber(c.req.param('number'));
       if (number === null) return c.json({ error: 'Not found' }, 404);
-      const body = (await c.req.json().catch(() => ({}))) as { labelIds?: string[]; assignees?: string[]; milestoneId?: string | null };
+      const { malformed, body } = await readJsonBody<{ labelIds?: string[]; assignees?: string[]; milestoneId?: string | null }>(c);
+      if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
       try {
         const scope = createRequestScope(c.env);
         const issue = await scope.get(Tokens.IssueService).getByNumber(row.id, number);

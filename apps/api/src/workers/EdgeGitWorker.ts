@@ -149,6 +149,31 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     app.use('/user/repos/:owner/:repo/issues*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'issues' }));
     app.use('/user/repos/:owner/:repo/pulls*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'pulls' }));
     app.use('/user/repos/:owner/:repo/comments*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'comments' }));
+    // Previously uncapped list/mutating surfaces (D1/DO burn via enumeration):
+    // audit readers, notifications/social, checks/keys, releases/assets,
+    // collab surfaces, labels/milestones/threads/reviews, fork/sync, branches.
+    app.use('/user/audit*', rateLimit({ windowMs: 60_000, max: 60, keyPrefix: 'audit-read' }));
+    app.use('/user/orgs/*/audit*', rateLimit({ windowMs: 60_000, max: 60, keyPrefix: 'audit-org' }));
+    app.use('/user/notifications*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'notifications' }));
+    app.use('/user/repos/:owner/:repo/branches*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'branches' }));
+    app.use('/user/repos/:owner/:repo/rules*', rateLimit({ windowMs: 60_000, max: 60, keyPrefix: 'rules' }));
+    app.use('/user/repos/:owner/:repo/collaborators*', rateLimit({ windowMs: 60_000, max: 60, keyPrefix: 'collabs' }));
+    app.use('/user/repos/:owner/:repo/checks*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'checks' }));
+    app.use('/user/repos/:owner/:repo/keys*', rateLimit({ windowMs: 60_000, max: 60, keyPrefix: 'deploy-keys' }));
+    app.use('/user/repos/:owner/:repo/releases*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'releases' }));
+    app.use('/user/repos/:owner/:repo/projects*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'projects' }));
+    app.use('/user/repos/:owner/:repo/discussions*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'discussions' }));
+    app.use('/user/repos/:owner/:repo/wiki*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'wiki' }));
+    app.use('/user/repos/:owner/:repo/snippets*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'snippets' }));
+    app.use('/user/repos/:owner/:repo/labels*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'labels' }));
+    app.use('/user/repos/:owner/:repo/milestones*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'milestones' }));
+    app.use('/user/repos/:owner/:repo/threads*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'threads' }));
+    app.use('/user/repos/:owner/:repo/reviews*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'reviews' }));
+    app.use('/user/repos/:owner/:repo/fork*', rateLimit({ windowMs: 60_000, max: 30, keyPrefix: 'fork' }));
+    app.use('/user/repos/:owner/:repo/star*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'social-mutate' }));
+    app.use('/user/repos/:owner/:repo/watch*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'social-mutate' }));
+    app.use('/user/stars*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'social-read' }));
+    app.use('/user/watches*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'social-read' }));
 
     registerUserRepoRoutes(app);
     registerUserSettingsRoutes(app);

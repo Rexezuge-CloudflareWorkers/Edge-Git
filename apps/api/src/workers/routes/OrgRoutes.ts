@@ -2,13 +2,15 @@ import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { readJsonBody } from './BodyParser';
 
 type OrgApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
 function registerOrgRoutes(app: OrgApp): void {
   app.post('/user/orgs', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const body = (await c.req.json().catch(() => ({}))) as { username?: string };
+    const { malformed, body } = await readJsonBody<{ username?: string }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     if (!body.username) return c.json({ error: 'username is required' }, 400);
     try {
       const org = await createRequestScope(c.env).get(Tokens.OrganizationService).createOrganization(email, body.username);
@@ -47,7 +49,8 @@ function registerOrgRoutes(app: OrgApp): void {
   app.patch('/user/orgs/:org', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const orgName = c.req.param('org');
-    const body = (await c.req.json().catch(() => ({}))) as { username?: string };
+    const { malformed, body } = await readJsonBody<{ username?: string }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     try {
       const scope = createRequestScope(c.env);
       let org = await scope.get(Tokens.OrganizationService).requireOwner(orgName, email);
@@ -137,7 +140,8 @@ function registerOrgRoutes(app: OrgApp): void {
 
   app.post('/user/orgs/:org/members', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const body = (await c.req.json().catch(() => ({}))) as { username?: string; email?: string; role?: string };
+    const { malformed, body } = await readJsonBody<{ username?: string; email?: string; role?: string }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     const target = body.username ?? body.email;
     if (!target) return c.json({ error: 'username or email is required' }, 400);
     const role = body.role ?? 'member';
@@ -152,7 +156,8 @@ function registerOrgRoutes(app: OrgApp): void {
 
   app.patch('/user/orgs/:org/members/:member', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const body = (await c.req.json().catch(() => ({}))) as { role?: string };
+    const { malformed, body } = await readJsonBody<{ role?: string }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     if (body.role !== 'owner' && body.role !== 'member') return c.json({ error: 'Invalid role' }, 400);
     try {
       await createRequestScope(c.env)
@@ -199,7 +204,8 @@ function registerOrgRoutes(app: OrgApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const member = decodeURIComponent(c.req.param('member'));
-    const body = (await c.req.json().catch(() => ({}))) as { role?: string };
+    const { malformed, body } = await readJsonBody<{ role?: string }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     const role = body.role ?? 'read';
     if (role !== 'admin' && role !== 'write' && role !== 'read') return c.json({ error: 'Invalid role' }, 400);
     try {

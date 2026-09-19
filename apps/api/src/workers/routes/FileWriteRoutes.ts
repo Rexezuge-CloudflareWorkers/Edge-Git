@@ -16,9 +16,11 @@ type FileResult = { ok: boolean; error?: string; status?: number } & Record<stri
 function toFileResponse(
   result: FileResult,
   successStatus: 200 | 201,
-): { body: unknown; status: 200 | 201 | 400 | 403 | 404 | 409 | 413 | 500 } {
+): { body: unknown; status: 200 | 201 | 400 | 401 | 403 | 404 | 409 | 413 | 429 | 500 } {
   if (!result.ok) {
-    const status = [400, 404, 409, 413].includes(result.status ?? 0) ? (result.status as 400 | 404 | 409 | 413) : 500;
+    const status = [400, 401, 403, 404, 409, 413, 429].includes(result.status ?? 0)
+      ? (result.status as 400 | 401 | 403 | 404 | 409 | 413 | 429)
+      : 500;
     return { body: { error: result.error ?? 'File operation failed' }, status };
   }
   return { body: result, status: successStatus };
@@ -41,14 +43,16 @@ async function requireWriteRole(
 }
 
 // Direct web commits to a `require_pr` branch must go through a pull
-// request instead. Returns a 403 response when blocked, else null.
-async function checkProtectedBranch(env: Env, repoId: string, branch: string): Promise<{ error: string } | null> {
-  const rule = await createRequestScope(env)
-    .get(Tokens.BranchProtectionService)
-    .matchForRepo(repoId, branch)
-    .catch(() => null);
-  if (rule?.requirePr) return { error: `branch "${branch}" is protected: open a pull request instead` };
-  return null;
+// request instead. Returns a 403 response when blocked, a 503 when the rule
+// lookup fails (fail closed), else null.
+async function checkProtectedBranch(env: Env, repoId: string, branch: string): Promise<{ error: string } | { unavailable: true } | null> {
+  try {
+    const rule = await createRequestScope(env).get(Tokens.BranchProtectionService).matchForRepo(repoId, branch);
+    if (rule?.requirePr) return { error: `branch "${branch}" is protected: open a pull request instead` };
+    return null;
+  } catch {
+    return { unavailable: true };
+  }
 }
 
 // Best-effort code search indexing for web file writes. Push indexing is
@@ -114,23 +118,21 @@ function parseExpectedOid(value: unknown): { ok: true; value: string | null | un
 // Push-time secret scanning for web editor saves (warn by default, block
 // when configured). Returns a 403 JSON response in block mode, the finding
 // count in warn mode (surfaced via response header), or null when clean/off.
+// Throws on settings lookup failure so callers fail closed (503) instead of
+// silently downgrading a configured `block` to `off`.
 async function checkSecretContent(
   env: Env,
   repoId: string,
   content: Uint8Array,
 ): Promise<{ blocked: { error: string } } | { warning: number } | null> {
-  try {
-    const mode = await createRequestScope(env).get(Tokens.SecuritySettingsService).getMode(repoId);
-    if (mode === 'off') return null;
-    const findings = scanBytes(content);
-    if (findings.length === 0) return null;
-    if (mode === 'block') {
-      return { blocked: { error: `Save blocked: possible secret detected (${findings.map((f) => f.ruleId).join(', ')})` } };
-    }
-    return { warning: findings.length };
-  } catch {
-    return null;
+  const mode = await createRequestScope(env).get(Tokens.SecuritySettingsService).getMode(repoId);
+  if (mode === 'off') return null;
+  const findings = scanBytes(content);
+  if (findings.length === 0) return null;
+  if (mode === 'block') {
+    return { blocked: { error: `Save blocked: possible secret detected (${findings.map((f) => f.ruleId).join(', ')})` } };
   }
+  return { warning: findings.length };
 }
 
 // Authenticated single-file writes — `write+` only. POST upserts UTF-8 text
@@ -172,8 +174,14 @@ function registerFileWriteRoutes(app: RepoApp): void {
       if (!content) return c.json({ error: 'contentBase64 is not valid base64' }, 400);
       if (content.byteLength > maxFileBytes) return c.json({ error: `file too large (max ${maxFileBytes} bytes)` }, 413);
       const blocked = await checkProtectedBranch(c.env, gate.repo.id, branch);
+      if (blocked && 'unavailable' in blocked) return c.json({ error: 'Branch protection unavailable; try again later' }, 503);
       if (blocked) return c.json({ error: blocked.error }, 403);
-      const secret = await checkSecretContent(c.env, gate.repo.id, content);
+      let secret: { blocked: { error: string } } | { warning: number } | null;
+      try {
+        secret = await checkSecretContent(c.env, gate.repo.id, content);
+      } catch {
+        return c.json({ error: 'Secret scan unavailable; try again later' }, 503);
+      }
       if (secret && 'blocked' in secret) return c.json({ error: secret.blocked.error }, 403);
       const secretWarning = secret && 'warning' in secret ? secret.warning : 0;
       const message = sanitizeCommitMessage(body.message, `Update ${filePath}`);
@@ -188,7 +196,11 @@ function registerFileWriteRoutes(app: RepoApp): void {
       })) as FileResult;
       const { body: out, status } = toFileResponse(result, result.ok && (result as { created?: boolean }).created ? 201 : 200);
       if (result.ok) {
-        void indexWrittenFile(c.env, gate.repo.id, filePath, body.contentBase64, (result as { commitOid?: unknown }).commitOid);
+        c.executionCtx.waitUntil(
+          indexWrittenFile(c.env, gate.repo.id, filePath, body.contentBase64, (result as { commitOid?: unknown }).commitOid).catch(
+            () => undefined,
+          ),
+        );
       }
       if (secretWarning > 0)
         c.header('X-EdgeGit-Secret-Warning', `${secretWarning} possible secret(s) detected; rotate any exposed credentials`);
@@ -217,6 +229,7 @@ function registerFileWriteRoutes(app: RepoApp): void {
       const gate = await requireWriteRole(c.env, owner, repoName, email);
       if (!gate.ok) return c.json({ error: gate.status === 404 ? 'Not found' : 'Forbidden' }, gate.status);
       const blocked = await checkProtectedBranch(c.env, gate.repo.id, branch);
+      if (blocked && 'unavailable' in blocked) return c.json({ error: 'Branch protection unavailable; try again later' }, 503);
       if (blocked) return c.json({ error: blocked.error }, 403);
       const message = sanitizeCommitMessage(params.get('message'), `Delete ${filePath}`);
       const result = (await getRepoStub(c.env, `${owner}/${repoName}`).commitFile({

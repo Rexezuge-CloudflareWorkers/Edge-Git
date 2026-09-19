@@ -1,12 +1,12 @@
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import type { AccessIdentityContext } from '@edge-git/backend-services/auth';
-import { getRequestScope } from '@edge-git/backend-runtime/di';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { RoleRank } from '@edge-git/backend-services/permission';
 import { coversScope } from '@edge-git/backend-services/auth';
 import { getBasicCredentials, getBearerToken } from '@edge-git/git-protocol';
 import type { RequestContext } from '@/middleware';
+import { BaseRoute } from '../../endpoints/IBaseRoute';
 
 function toRepoJson(r: RepositoryRow, viewerRole?: string | null): unknown {
   const base = {
@@ -24,15 +24,10 @@ function toRepoJson(r: RepositoryRow, viewerRole?: string | null): unknown {
   return viewerRole ? { ...base, viewerRole } : base;
 }
 
-// Single-scope resolution (Otter pattern). Prefers the per-request container
-// installed by `scopeMiddleware`; falls back to a fresh scope for call sites
-// outside middleware ordering (tests, git auth helpers).
+// Single-scope resolution (Otter pattern). Delegates to `BaseRoute.getScope`
+// so the per-request container fallback stays consistent in one place.
 function getScope(c: { get(key: string): unknown; env: Env }): ReturnType<typeof createRequestScope> {
-  try {
-    return getRequestScope(c as never);
-  } catch {
-    return createRequestScope(c.env);
-  }
+  return BaseRoute.getScope(c);
 }
 
 async function requireVisibleRepo(
@@ -132,18 +127,25 @@ async function withVisibleRepo(
   return fn(row, `${owner}/${normalized}`);
 }
 
-import { toServiceStatus as toMappedStatus } from '@edge-git/backend-services/errors';
-
-function toServiceStatus(error: unknown): 400 | 403 | 404 | 500 {
-  return toMappedStatus(error);
+// Shared BaseRoute helpers — delegated so both stay consistent. Routes keep
+// importing from here for backwards compatibility; new code may import
+// `BaseRoute` directly.
+function toServiceStatus(error: unknown): 400 | 401 | 403 | 404 | 409 | 413 | 429 | 500 {
+  return BaseRoute.toServiceStatus(error);
 }
 
 // Mask internal details on 500: callers must use this instead of echoing
 // `error.message` directly, otherwise D1/DO internals leak to clients.
 function toSafeErrorMessage(error: unknown, fallback: string): string {
-  const status = toServiceStatus(error);
-  if (status === 500) return fallback;
-  return error instanceof Error && error.message ? error.message : fallback;
+  return BaseRoute.toSafeErrorMessage(error, fallback);
+}
+
+function parseLimit(url: string, def = 100, max = 100): number {
+  return BaseRoute.parseLimit(url, def, max);
+}
+
+async function readJson<T>(c: RequestContext): Promise<{ malformed: boolean; body: T }> {
+  return BaseRoute.readJson<T>(c as never);
 }
 
 export {
@@ -156,4 +158,6 @@ export {
   toServiceStatus,
   toSafeErrorMessage,
   getScope,
+  parseLimit,
+  readJson,
 };

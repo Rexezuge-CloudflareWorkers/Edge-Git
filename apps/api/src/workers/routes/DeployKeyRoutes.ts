@@ -3,6 +3,7 @@ import { Tokens, createRequestScope } from '@edge-git/backend-services/compositi
 import { DeployKeyService } from '@edge-git/backend-services/deploykey';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { readJsonBody } from './BodyParser';
 
 type DeployKeyApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -28,7 +29,8 @@ function registerDeployKeyRoutes(app: DeployKeyApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    const body = (await c.req.json().catch(() => ({}))) as { name?: string; permission?: unknown; expiresInDays?: number };
+    const { malformed, body } = await readJsonBody<{ name?: string; permission?: unknown; expiresInDays?: number }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     if (typeof body.name !== 'string' || !body.name.trim()) return c.json({ error: 'name is required' }, 400);
     try {
       const scope = createRequestScope(c.env);

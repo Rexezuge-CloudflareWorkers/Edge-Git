@@ -3,6 +3,7 @@ import { Tokens, createRequestScope } from '@edge-git/backend-services/compositi
 import { RepoService } from '@edge-git/backend-services/repo';
 import { runMirrorSync } from '@edge-git/background/transfer/MirrorRunner';
 import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { readJsonBody } from './BodyParser';
 
 type MirrorApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -40,7 +41,8 @@ function registerMirrorRoutes(app: MirrorApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    const body = (await c.req.json().catch(() => ({}))) as { sourceUrl?: string; intervalMinutes?: number };
+    const { malformed, body } = await readJsonBody<{ sourceUrl?: string; intervalMinutes?: number }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     if (typeof body.sourceUrl !== 'string' || !body.sourceUrl.trim()) return c.json({ error: 'sourceUrl is required' }, 400);
     if (typeof body.intervalMinutes !== 'number') return c.json({ error: 'intervalMinutes is required' }, 400);
     try {
@@ -80,7 +82,8 @@ function registerMirrorRoutes(app: MirrorApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    const body = (await c.req.json().catch(() => ({}))) as { enabled?: boolean };
+    const { malformed, body } = await readJsonBody<{ enabled?: boolean }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     if (typeof body.enabled !== 'boolean') return c.json({ error: 'enabled is required' }, 400);
     try {
       const scope = createRequestScope(c.env);

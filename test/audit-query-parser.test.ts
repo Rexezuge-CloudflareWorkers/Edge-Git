@@ -21,9 +21,14 @@ describe('parseAuditQuery (Number(null) trap)', () => {
   });
 
   it('supports user_email alias and cursor passthrough', () => {
-    expect(parseAuditQuery('https://x/user/audit?user_email=a@x.com&cursor=c1')).toEqual({
+    const valid = btoa(JSON.stringify({ timestamp: 1, log_id: 'a' }));
+    expect(parseAuditQuery(`https://x/user/audit?user_email=a@x.com&cursor=${valid}`)).toEqual({
       userEmail: 'a@x.com',
-      cursor: 'c1',
+      cursor: valid,
     });
+  });
+
+  it('rejects tampered cursors instead of silently restarting', () => {
+    expect(() => parseAuditQuery('https://x/user/audit?cursor=c1')).toThrow('Invalid cursor');
   });
 });

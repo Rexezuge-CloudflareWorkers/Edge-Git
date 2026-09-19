@@ -2,6 +2,7 @@ import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { emitWebhookEvent } from './SocialEmit';
 import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { readJsonBody } from './BodyParser';
 
 type SnippetApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -70,7 +71,8 @@ function registerSnippetUserRoutes(app: SnippetApp): void {
 
   app.post('/user/snippets', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const body = (await c.req.json().catch(() => ({}))) as { title?: unknown; visibility?: unknown; files?: unknown };
+    const { malformed, body } = await readJsonBody<{ title?: unknown; visibility?: unknown; files?: unknown }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     try {
       const scope = createRequestScope(c.env);
       const result = await scope
@@ -106,7 +108,8 @@ function registerSnippetUserRoutes(app: SnippetApp): void {
 
   app.patch('/user/snippets/:id', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const body = (await c.req.json().catch(() => ({}))) as { title?: unknown; visibility?: unknown; files?: unknown };
+    const { malformed, body } = await readJsonBody<{ title?: unknown; visibility?: unknown; files?: unknown }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     try {
       const result = await createRequestScope(c.env).get(Tokens.SnippetService).updateSnippet(c.req.param('id'), email, body);
       return c.json(result);

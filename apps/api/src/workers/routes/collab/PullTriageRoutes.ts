@@ -6,6 +6,7 @@ import { RepoService } from '@edge-git/backend-services/repo';
 import { suggestCodeownerHandles } from '../CodeownerHelpers';
 import { needWrite, parseNumber } from './CollabHelpers';
 import type { CollabApp } from './CollabHelpers';
+import { readJsonBody } from '../BodyParser';
 
 function registerCollabPullTriageRoutes(app: CollabApp): void {
   // Pull triage: labels / assignees / milestone + meta
@@ -41,7 +42,8 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
       if (!(await needWrite(c.env, owner, repoName, email))) return c.json({ error: 'Forbidden' }, 403);
       const number = parseNumber(c.req.param('number'));
       if (number === null) return c.json({ error: 'Not found' }, 404);
-      const body = (await c.req.json().catch(() => ({}))) as { labelIds?: string[]; assignees?: string[]; milestoneId?: string | null };
+      const { malformed, body } = await readJsonBody<{ labelIds?: string[]; assignees?: string[]; milestoneId?: string | null }>(c);
+      if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
       try {
         const scope = createRequestScope(c.env);
         const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
@@ -86,7 +88,8 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
     if (!(await needWrite(c.env, owner, repoName, email))) return c.json({ error: 'Forbidden' }, 403);
     const number = parseNumber(c.req.param('number'));
     if (number === null) return c.json({ error: 'Not found' }, 404);
-    const body = (await c.req.json().catch(() => ({}))) as { reviewers?: string[] };
+    const { malformed, body } = await readJsonBody<{ reviewers?: string[] }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     try {
       const scope = createRequestScope(c.env);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
@@ -136,7 +139,8 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
     if (!(await needWrite(c.env, owner, repoName, email))) return c.json({ error: 'Forbidden' }, 403);
     const number = parseNumber(c.req.param('number'));
     if (number === null) return c.json({ error: 'Not found' }, 404);
-    const body = (await c.req.json().catch(() => ({}))) as { isDraft?: boolean };
+    const { malformed, body } = await readJsonBody<{ isDraft?: boolean }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     if (typeof body.isDraft !== 'boolean') return c.json({ error: 'isDraft must be a boolean' }, 400);
     try {
       const pull = await createRequestScope(c.env).get(Tokens.PullRequestService).setDraft(row.id, number, body.isDraft);

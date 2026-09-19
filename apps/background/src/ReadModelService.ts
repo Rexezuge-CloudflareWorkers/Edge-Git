@@ -9,6 +9,27 @@ const README_NAMES = new Set(['README.md', 'README.markdown', 'README.mdown', 'R
 // the UI can still load them on demand via getBlob.
 const MAX_OVERVIEW_README_BYTES = 512 * 1024;
 
+// Upper bound for unbounded Promise.all fan-out (tag peel, tree last-commit).
+// Malicious refs with thousands of tags/entries would otherwise spawn
+// thousands of parallel git reads in the DO.
+const MAX_FANOUT = 100;
+const FANOUT_CONCURRENCY = 10;
+
+async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out = Array.from({ length: items.length }, () => undefined as R);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const i = next;
+      next += 1;
+      const item = items[i];
+      if (item !== undefined) out[i] = await fn(item);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
 // Read-model queries served over DO RPC (branches/tree/blob/commits).
 // Lifecycle (ensure initialized, cache refresh) stays with RepoWorker via
 // prepare(); this service only runs git queries.
@@ -37,14 +58,13 @@ class ReadModelService {
     Array<{ name: string; ref: string; oid: string; peeledOid: string | null; type: 'lightweight' | 'annotated' }>
   > {
     const tags = await this.git.listTags();
-    const enriched = await Promise.all(
-      tags.map(async (t) => {
-        const name = t.ref.startsWith('refs/tags/') ? t.ref.slice('refs/tags/'.length) : t.ref;
-        const peeledOid: string | null = await this.git.peelTag(t.oid);
-        const type: 'lightweight' | 'annotated' = peeledOid === null ? 'lightweight' : 'annotated';
-        return { name, ref: t.ref, oid: t.oid, peeledOid, type };
-      }),
-    );
+    const capped = tags.slice(0, MAX_FANOUT);
+    const enriched = await mapWithConcurrency(capped, FANOUT_CONCURRENCY, async (t) => {
+      const name = t.ref.startsWith('refs/tags/') ? t.ref.slice('refs/tags/'.length) : t.ref;
+      const peeledOid: string | null = await this.git.peelTag(t.oid);
+      const type: 'lightweight' | 'annotated' = peeledOid === null ? 'lightweight' : 'annotated';
+      return { name, ref: t.ref, oid: t.oid, peeledOid, type };
+    });
     enriched.sort((a, b) => a.name.localeCompare(b.name));
     return enriched;
   }
@@ -59,16 +79,15 @@ class ReadModelService {
     if (!withLastCommit) {
       return (tree as Array<Record<string, unknown>>).map((item) => ({ ...item, lastCommit: null }));
     }
-    const data = await Promise.all(
-      (tree as Array<{ path: string }>).map(async (item) => {
-        const lastCommit = (await this.git.getLog({
-          ref,
-          depth: 1,
-          filepath: path ? `${path}/${item.path}` : item.path,
-        })) as Array<unknown>;
-        return { ...item, lastCommit: lastCommit[0] || null };
-      }),
-    );
+    const capped = (tree as Array<{ path: string }>).slice(0, MAX_FANOUT);
+    const data = await mapWithConcurrency(capped, FANOUT_CONCURRENCY, async (item) => {
+      const lastCommit = (await this.git.getLog({
+        ref,
+        depth: 1,
+        filepath: path ? `${path}/${item.path}` : item.path,
+      })) as Array<unknown>;
+      return { ...item, lastCommit: lastCommit[0] || null };
+    });
     return data;
   }
 

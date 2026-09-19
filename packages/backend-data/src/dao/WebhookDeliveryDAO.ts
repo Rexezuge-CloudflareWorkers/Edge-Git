@@ -119,7 +119,7 @@ class WebhookDeliveryDAO extends BaseDAO {
     limit: number,
     cursor?: string,
   ): Promise<{ deliveries: WebhookDeliveryRow[]; nextCursor: string | null }> {
-    const decoded = this.decodeCursor<{ created_at: number; id: string }>(cursor);
+    const decoded = this.decodeCursorOrThrow<{ created_at: number; id: string }>(cursor);
     const pageSize = limit + 1;
     const result =
       decoded === undefined

@@ -1,13 +1,17 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { resolvePublicViewer, toRepoJson, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { readJsonBody } from './BodyParser';
 
 type UserApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
 function parseLimit(url: string): number {
   const raw = new URL(url).searchParams.get('limit');
-  const n = raw ? Number(raw) : 100;
-  if (!Number.isFinite(n)) return 100;
+  // Invalid values fall back to a safe default (20), never to the max:
+  // `?limit=abc` must not silently become a 100-row over-fetch.
+  if (raw === null || raw.trim() === '') return 20;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return 20;
   return Math.min(100, Math.max(1, Math.floor(n)));
 }
 
@@ -239,7 +243,8 @@ function registerUserProfileRoutes(app: UserApp): void {
 function registerUserSettingsRoutes(app: UserApp): void {
   app.patch('/user/me/username', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const body = (await c.req.json().catch(() => ({}))) as { username?: string };
+    const { malformed, body } = await readJsonBody<{ username?: string }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     if (!body.username || typeof body.username !== 'string') return c.json({ error: 'username is required' }, 400);
     try {
       const scope = createRequestScope(c.env);

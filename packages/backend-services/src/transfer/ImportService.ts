@@ -68,6 +68,18 @@ class ImportService {
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const id = UUIDUtil.getRandomUUID();
     await dao.create({ id, repositoryId, sourceUrl: normalized, createdBy: createdBy.toLowerCase(), now });
+    // Post-create single-flight: two concurrent POSTs can both pass the
+    // pre-check. If we lost the race, cancel our own job and surface 400.
+    try {
+      const active = await dao.countActiveForRepo(repositoryId).catch(() => 1);
+      if (active > 1) {
+        await dao.markCancelled(id, TimestampUtil.getCurrentUnixTimestampInSeconds()).catch(() => undefined);
+        throw new BadRequestError('An import is already in progress for this repository');
+      }
+    } catch (error) {
+      if (error instanceof BadRequestError) throw error;
+      // Count lookup failure must not fail the job itself.
+    }
     const row = await dao.getById(id);
     if (!row) throw new NotFoundError('Import not found');
     return toMetadata(row);

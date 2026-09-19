@@ -3,6 +3,7 @@ import { Tokens, createRequestScope } from '@edge-git/backend-services/compositi
 import { RepoService } from '@edge-git/backend-services/repo';
 import { recordAndNotify } from './SocialEmit';
 import { requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { readJsonBody } from './BodyParser';
 
 type WikiApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -64,7 +65,8 @@ function registerWikiUserRoutes(app: WikiApp): void {
     } catch {
       return c.json({ error: 'Forbidden' }, 403);
     }
-    const body = (await c.req.json().catch(() => ({}))) as { slug: unknown; title: unknown; body?: unknown };
+    const { malformed, body } = await readJsonBody<{ slug: unknown; title: unknown; body?: unknown }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     try {
       const page = await createRequestScope(c.env).get(Tokens.WikiService).createPage(row.id, body, email);
       void recordAndNotify(c.env, {
@@ -118,7 +120,8 @@ function registerWikiUserRoutes(app: WikiApp): void {
     } catch {
       return c.json({ error: 'Forbidden' }, 403);
     }
-    const body = (await c.req.json().catch(() => ({}))) as { title?: unknown; body?: unknown; expectedRevision?: unknown };
+    const { malformed, body } = await readJsonBody<{ title?: unknown; body?: unknown; expectedRevision?: unknown }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     try {
       const page = await createRequestScope(c.env).get(Tokens.WikiService).updatePage(row.id, c.req.param('slug'), body, email);
       void recordAndNotify(c.env, {

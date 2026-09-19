@@ -4,6 +4,7 @@ import { RepoService } from '@edge-git/backend-services/repo';
 import { getRepoStub } from '../../repoStub';
 import { needWrite } from './CollabHelpers';
 import type { CollabApp } from './CollabHelpers';
+import { readJsonBody } from '../BodyParser';
 
 function registerCollabForkSyncRoutes(app: CollabApp): void {
   // Fork sync preview + sync (fork pulls upstream changes)
@@ -57,12 +58,13 @@ function registerCollabForkSyncRoutes(app: CollabApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return c.json({ error: 'Not found' }, 404);
     if (!(await needWrite(c.env, owner, repoName, email))) return c.json({ error: 'Forbidden' }, 403);
-    const body = (await c.req.json().catch(() => ({}))) as {
+    const { malformed, body } = await readJsonBody<{
       upstreamOwner?: string;
       upstreamRepo?: string;
       upstreamBranch?: string;
       branch?: string;
-    };
+    }>(c);
+    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
     const upstreamOwner = body.upstreamOwner?.trim() || '';
     const upstreamRepo = body.upstreamRepo ? RepoService.normalizeRepo(body.upstreamRepo) : '';
     if (!upstreamOwner || !upstreamRepo) return c.json({ error: 'upstreamOwner and upstreamRepo are required' }, 400);
