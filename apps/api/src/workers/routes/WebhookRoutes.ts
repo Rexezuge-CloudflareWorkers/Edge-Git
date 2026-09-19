@@ -2,7 +2,7 @@ import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { WEBHOOK_EVENTS } from '@edge-git/backend-services/webhook';
 import { RepoService } from '@edge-git/backend-services/repo';
-import { toServiceStatus } from './PublicViewerResolver';
+import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 
 type WebhookApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -27,7 +27,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
       const hooks = await scope.get(Tokens.WebhookService).listHooks(repo.id);
       return c.json({ hooks, events: [...WEBHOOK_EVENTS] });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to list webhooks' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to list webhooks') }, toServiceStatus(error));
     }
   });
 
@@ -49,7 +49,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
       });
       return c.json({ hook, secret }, 201);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to create webhook' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to create webhook') }, toServiceStatus(error));
     }
   });
 
@@ -63,7 +63,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
       const hook = await scope.get(Tokens.WebhookService).getHook(id, repo.id);
       return c.json({ hook });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to load webhook' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to load webhook') }, toServiceStatus(error));
     }
   });
 
@@ -82,7 +82,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
       });
       return c.json({ hook });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to update webhook' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to update webhook') }, toServiceStatus(error));
     }
   });
 
@@ -96,7 +96,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
       await scope.get(Tokens.WebhookService).deleteHook(id, repo.id);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to delete webhook' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to delete webhook') }, toServiceStatus(error));
     }
   });
 
@@ -110,7 +110,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
       const { hook, secret } = await scope.get(Tokens.WebhookService).rotateHookSecret(id, repo.id);
       return c.json({ hook, secret });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to rotate webhook secret' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to rotate webhook secret') }, toServiceStatus(error));
     }
   });
 
@@ -124,7 +124,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
       const delivery = await scope.get(Tokens.WebhookDeliveryService).sendTestPing(id, repo.id, `${repo.owner}/${repo.name}`, email);
       return c.json({ delivery }, 201);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to send test ping' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to send test ping') }, toServiceStatus(error));
     }
   });
 
@@ -141,7 +141,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
       const { deliveries, nextCursor } = await scope.get(Tokens.WebhookDeliveryService).listDeliveries(id, repo.id, limit, cursor);
       return c.json({ deliveries, nextCursor });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to list deliveries' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to list deliveries') }, toServiceStatus(error));
     }
   });
 
@@ -155,7 +155,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
       const delivery = await scope.get(Tokens.WebhookDeliveryService).redeliver(deliveryId, repo.id);
       return c.json({ delivery });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to redeliver' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to redeliver') }, toServiceStatus(error));
     }
   });
 }

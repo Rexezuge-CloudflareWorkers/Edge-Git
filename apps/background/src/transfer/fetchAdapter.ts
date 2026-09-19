@@ -47,7 +47,9 @@ function workerFetchAdapter(): RemoteGitFetcher {
   return {
     async get(url: string, headers: Record<string, string>, signal: AbortSignal) {
       const res = await fetchNoAutoRedirect(url, { headers, signal });
-      assertPublicFinalUrl(res.url || url);
+      // Validate the URL we actually requested (`current`), not the
+      // runtime-reported `Response.url` which may normalize differently.
+      // fetchNoAutoRedirect already validated every hop pre-request.
       return { status: res.status, contentType: res.headers.get('content-type'), body: new Uint8Array(await res.arrayBuffer()) };
     },
     async post(url: string, headers: Record<string, string>, body: Uint8Array, signal: AbortSignal) {
@@ -57,7 +59,6 @@ function workerFetchAdapter(): RemoteGitFetcher {
         body: body as unknown as BodyInit,
         signal,
       });
-      assertPublicFinalUrl(res.url || url);
       return { status: res.status, body: new Uint8Array(await res.arrayBuffer()) };
     },
   };

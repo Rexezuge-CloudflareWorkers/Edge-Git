@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { emitWebhookEvent } from './SocialEmit';
-import { toServiceStatus } from './PublicViewerResolver';
+import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 
 type SnippetApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -32,7 +32,7 @@ function registerSnippetPublicRoutes(app: SnippetApp): void {
       const result = await createRequestScope(c.env).get(Tokens.SnippetService).getSnippet(c.req.param('id'), viewerEmail);
       return c.json(result);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -52,7 +52,7 @@ function registerSnippetPublicRoutes(app: SnippetApp): void {
       const snippets = await createRequestScope(c.env).get(Tokens.SnippetService).listByOwner(user.email, viewerEmail);
       return c.json({ snippets });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 }
@@ -89,7 +89,7 @@ function registerSnippetUserRoutes(app: SnippetApp): void {
       }).catch(() => undefined);
       return c.json(result, 201);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to create snippet' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to create snippet') }, toServiceStatus(error));
     }
   });
 
@@ -100,7 +100,7 @@ function registerSnippetUserRoutes(app: SnippetApp): void {
       if (result.snippet.ownerEmail.toLowerCase() !== email.toLowerCase()) return c.json({ error: 'Not found' }, 404);
       return c.json(result);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -113,7 +113,7 @@ function registerSnippetUserRoutes(app: SnippetApp): void {
     } catch (error) {
       const status = toServiceStatus(error);
       if (error instanceof Error && error.message.includes('Only the snippet owner')) return c.json({ error: error.message }, 403);
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to update snippet' }, status);
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to update snippet') }, status);
     }
   });
 
@@ -124,7 +124,7 @@ function registerSnippetUserRoutes(app: SnippetApp): void {
       return c.json({ ok: true });
     } catch (error) {
       if (error instanceof Error && error.message.includes('Only the snippet owner')) return c.json({ error: error.message }, 403);
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 }

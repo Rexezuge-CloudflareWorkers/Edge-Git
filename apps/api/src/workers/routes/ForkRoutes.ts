@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 import { ensureRepo, getRepoStub } from '../repoStub';
-import { requireVisibleRepo, resolvePublicViewer, toRepoJson, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { requireVisibleRepo, resolvePublicViewer, toRepoJson, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { copyRepoGit, isPackLimitError } from './CrossFork';
@@ -50,7 +50,7 @@ function registerUserForkRoutes(app: ForkApp): void {
     try {
       fork = await scope.get(Tokens.ForkService).createForkRow(email, owner, repoName, body);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to fork repository' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to fork repository') }, toServiceStatus(error));
     }
     const sourceFullName = `${owner}/${repoName}`;
     try {

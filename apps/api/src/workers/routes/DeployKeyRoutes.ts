@@ -2,7 +2,7 @@ import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { DeployKeyService } from '@edge-git/backend-services/deploykey';
 import { RepoService } from '@edge-git/backend-services/repo';
-import { toServiceStatus } from './PublicViewerResolver';
+import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 
 type DeployKeyApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -20,7 +20,7 @@ function registerDeployKeyRoutes(app: DeployKeyApp): void {
       const keys = await scope.get(Tokens.DeployKeyService).listKeys(repo.id);
       return c.json({ keys });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to list deploy keys' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to list deploy keys') }, toServiceStatus(error));
     }
   });
 
@@ -38,7 +38,7 @@ function registerDeployKeyRoutes(app: DeployKeyApp): void {
         .createKey(repo.id, body.name, DeployKeyService.normalizePermission(body.permission), email, body.expiresInDays);
       return c.json(created, 201);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to create deploy key' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to create deploy key') }, toServiceStatus(error));
     }
   });
 
@@ -52,7 +52,7 @@ function registerDeployKeyRoutes(app: DeployKeyApp): void {
       await scope.get(Tokens.DeployKeyService).revokeKey(repo.id, c.req.param('id'));
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to revoke deploy key' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to revoke deploy key') }, toServiceStatus(error));
     }
   });
 }

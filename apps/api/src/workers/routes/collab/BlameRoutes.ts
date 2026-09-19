@@ -1,4 +1,4 @@
-import { withPublicRepo } from '../PublicViewerResolver';
+import { toSafeErrorMessage, withPublicRepo } from '../PublicViewerResolver';
 import { requireVisibleRepo } from '../PublicViewerResolver';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { getRepoStub } from '../../repoStub';
@@ -15,7 +15,7 @@ function registerCollabBlamePublicRoutes(app: CollabApp): void {
         if (!blame) return c.json({ error: 'Not found' }, 404);
         return c.json({ blame });
       } catch (error) {
-        return c.json({ error: error instanceof Error ? error.message : 'Failed to load blame' }, 500);
+        return c.json({ error: toSafeErrorMessage(error, 'Failed to load blame') }, 500);
       }
     });
   });
@@ -35,7 +35,7 @@ function registerCollabBlameUserRoutes(app: CollabApp): void {
       if (!blame) return c.json({ error: 'Not found' }, 404);
       return c.json({ blame });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to load blame' }, 500);
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to load blame') }, 500);
     }
   });
 }

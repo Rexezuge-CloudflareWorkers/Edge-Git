@@ -13,7 +13,7 @@ interface AccessAuthEnv {
 
 interface AccessIdentityContext {
   access?: {
-    getIdentity: () => Promise<{ email?: string | null } | null>;
+    getIdentity: () => Promise<{ email?: string | null; emailVerified?: boolean | null; email_verified?: boolean | null } | null>;
   };
 }
 
@@ -47,6 +47,10 @@ async function accessJwtStrategy(env: AccessAuthEnv, request: Request): Promise<
 
 async function accessCtxStrategy(_env: AccessAuthEnv, _request: Request, accessCtx?: AccessIdentityContext): Promise<string | null> {
   const identity = await accessCtx?.access?.getIdentity?.().catch(() => null);
+  // Fail closed on unverified identities — mirrors the JWT path's
+  // `email_verified === false` reject. Access bindings are trusted, but an
+  // unverified identity must never authenticate.
+  if (identity?.emailVerified === false || identity?.email_verified === false) return null;
   const raw = identity?.email?.trim().toLowerCase() ?? '';
   if (!raw || !raw.includes('@') || raw.length > 254 || /\s/.test(raw)) return null;
   return raw;

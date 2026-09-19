@@ -146,6 +146,7 @@ describe('UserService usernames', () => {
         }) as never,
       namespaceDAO: async () =>
         ({
+          get: async (ci: string) => (namespaces.has(ci) ? { username_ci: ci, user_email: 'alice@example.com' } : null),
           isTaken: async (ci: string) => namespaces.has(ci),
           claimIgnore: async (input: { usernameCi: string }) => {
             namespaces.add(input.usernameCi);
@@ -171,7 +172,9 @@ describe('UserService usernames', () => {
     const renamed = await svc.renameUsername('alice@example.com', 'alice-new');
     expect(renamed.username).toBe('alice-new');
     expect(renamedOwners).toEqual([{ oldCi: 'alice', next: 'alice-new' }]);
-    expect(namespaces.has('alice')).toBe(false);
+    // Hardening: old handles stay reserved to block hijack (breaking).
+    expect(namespaces.has('alice')).toBe(true);
+    expect(namespaces.has('alice-new')).toBe(true);
     await expect(svc.renameUsername('alice@example.com', 'bad name!')).rejects.toThrow('Invalid');
   });
 

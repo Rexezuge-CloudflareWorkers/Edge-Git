@@ -128,6 +128,14 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     // are abuse-prone: cap creation tightly, search generously.
     app.use('/user/repos', rateLimit({ windowMs: 60_000, max: 30, keyPrefix: 'repo-create' }));
     app.use('/search', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'search' }));
+    // Public read-model enumeration guard: username/org profiles + public
+    // repo metadata are cheap to scrape, so cap them separately.
+    app.use('/users/*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'public-users' }));
+    app.use('/repos/*', rateLimit({ windowMs: 60_000, max: 300, keyPrefix: 'public-repos' }));
+    // Username rename is destructive (frees the old name immediately) —
+    // cap it tightly like repo creation.
+    app.use('/user/me/username', rateLimit({ windowMs: 60_000, max: 10, keyPrefix: 'username-rename' }));
+    app.use('/user/orgs*', rateLimit({ windowMs: 60_000, max: 60, keyPrefix: 'org-mutate' }));
     // Abuse-prone mutating surfaces: imports/mirrors fan out to third-party
     // hosts (SSRF amplification), webhook test/redeliver triggers outbound
     // fetch, file-write drives DO I/O. Per-isolate buckets; cron/DOs remain

@@ -189,26 +189,36 @@ class UserService {
     // as authoritative (claim/isTaken both throw there).
     let namespaceClaimed = false;
     let legacyNamespaces = false;
+    let claimedFresh = false;
     try {
       const ns = await this.deps.namespaceDAO();
       await ns.claim({ usernameCi: handleCi, kind: 'user', userEmail: normalized, now });
       namespaceClaimed = true;
+      claimedFresh = true;
     } catch (error) {
-      // Claim race or legacy-DB error: check once more to report taken cleanly.
+      // Claim race or legacy-DB error: if the existing claim belongs to self
+      // (rename-back after a failed DO move), treat as success so rollback
+      // never orphans the user. Otherwise report taken cleanly.
       try {
         const nsDao = await this.deps.namespaceDAO();
-        if (await nsDao.isTaken(handleCi)) throw new BadRequestError('Username is already taken');
+        const row = await nsDao.get(handleCi).catch(() => null);
+        if (row && row.user_email?.toLowerCase() === normalized) {
+          namespaceClaimed = true;
+          claimedFresh = false;
+        } else {
+          if (await nsDao.isTaken(handleCi)) throw new BadRequestError('Username is already taken');
+        }
       } catch (inner) {
         if (inner instanceof BadRequestError) throw inner;
         // isTaken itself threw → namespaces table missing → legacy path.
         legacyNamespaces = true;
       }
-      if (!legacyNamespaces) throw error instanceof Error ? error : new BadRequestError('Username is already taken');
+      if (!legacyNamespaces && !namespaceClaimed) throw error instanceof Error ? error : new BadRequestError('Username is already taken');
     }
     try {
       await dao.setUsername(normalized, handle, now);
     } catch (error) {
-      if (namespaceClaimed) {
+      if (claimedFresh) {
         try {
           const ns = await this.deps.namespaceDAO();
           await ns.release(handleCi);
@@ -218,20 +228,13 @@ class UserService {
       }
       throw error;
     }
-    try {
-      const ns = await this.deps.namespaceDAO();
-      if (oldCi) {
-        try {
-          await ns.release(oldCi);
-        } catch {
-          // ignore
-        }
-      }
-    } catch {
-      // ignore — users.username is source of truth on legacy DBs
-    }
+    // Hardening: old names stay reserved (no immediate release) so a
+    // concurrent attacker cannot hijack the freed handle in the window
+    // between D1 rename and DO move. BREAKING: renamed-away handles remain
+    // taken. A future tombstone/GC migration can free them after a grace
+    // period; until then rollback (rename back) always succeeds as self.
     // Simple rename: cascade owner on user-owned repos (plus denormalized
-    // `full_name` sidecars), free the old name immediately.
+    // `full_name` sidecars).
     if (oldCi) {
       try {
         await cascadeOwnerRepos(

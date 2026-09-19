@@ -51,6 +51,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function stripTrailingDots(host: string): string {
+  let end = host.length;
+  while (end > 0 && host.charAt(end - 1) === '.') end -= 1;
+  return host.slice(0, end);
+}
+
 function toSandboxResult(conclusion: SandboxResult['conclusion'], title: string, summary: string, logs: string[]): SandboxResult {
   const tail = logs.length > 0 ? `\nlogs:\n${logs.join('\n')}` : '';
   return { conclusion, title: sliceText(title, MAX_OUTPUT_TITLE), summary: sliceText(`${summary}${tail}`, MAX_OUTPUT_SUMMARY) };
@@ -205,8 +211,13 @@ export async function runCustomCheckScript(input: SandboxInput): Promise<Sandbox
           return fail('fetch(url) must be an absolute URL');
         }
         if (parsed.protocol !== 'https:') return fail('fetch(url) must use https');
-        if (!input.allowHosts.includes(parsed.hostname.toLowerCase()))
-          return fail(`fetch blocked: ${parsed.hostname} is not in allowHosts`);
+        // Canonicalize before allowlist compare: lowercase + strip trailing
+        // dot so `Example.COM.` cannot bypass `example.com`. Hostname
+        // excludes port by design (URL.hostname), so ports are intentionally
+        // not part of the allowlist — same host, any port.
+        const canonicalHost = stripTrailingDots(parsed.hostname.toLowerCase());
+        const allowListed = input.allowHosts.map((h) => stripTrailingDots(h.toLowerCase())).includes(canonicalHost);
+        if (!allowListed) return fail(`fetch blocked: ${parsed.hostname} is not in allowHosts`);
         try {
           validateWebhookUrl(url);
         } catch {

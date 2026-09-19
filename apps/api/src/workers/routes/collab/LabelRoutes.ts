@@ -1,5 +1,5 @@
 import { withPublicRepo } from '../PublicViewerResolver';
-import { toServiceStatus } from '../PublicViewerResolver';
+import { toSafeErrorMessage, toServiceStatus } from '../PublicViewerResolver';
 import { requireVisibleRepo } from '../PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
@@ -45,7 +45,7 @@ function registerCollabLabelUserRoutes(app: CollabApp): void {
         .createLabel(row.id, body as { name: string });
       return c.json(created, 201);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to create label' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to create label') }, toServiceStatus(error));
     }
   });
 
@@ -60,7 +60,7 @@ function registerCollabLabelUserRoutes(app: CollabApp): void {
       await createRequestScope(c.env).get(Tokens.CollaborationService).deleteLabel(row.id, c.req.param('id'));
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 }

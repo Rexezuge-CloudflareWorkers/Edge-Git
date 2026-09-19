@@ -13,6 +13,8 @@ type IsoGitFsClient = ReturnType<IsoGitFs['getPromiseFsClient']>;
  * `ConfigurationManager` statics scattered across call sites.
  */
 class RepoLifecycle {
+  private initPromise: Promise<void> | null = null;
+
   constructor(
     private readonly ctx: DurableObjectState,
     private readonly env: Env,
@@ -47,6 +49,10 @@ class RepoLifecycle {
       }
     }
     await this.ctx.storage.delete('fullName');
+    // Drop cached refs so a recreated same-name repo never serves stale refs
+    // within the cache TTL. Optional-chained for fakes lacking the method.
+    (this.git as unknown as { clearCache?: () => void }).clearCache?.();
+    this.initPromise = null;
   }
 
   public async ensureRepoInitialized(): Promise<void> {
@@ -54,9 +60,15 @@ class RepoLifecycle {
       await this.isoGitFs.promises.stat('/repo/HEAD');
       return;
     } catch {
-      // missing HEAD → init below
+      // missing HEAD → init below (memoized so concurrent fetch+RPC inits
+      // share one init instead of double-init TOCTOU).
     }
-    await this.initRepo();
+    if (!this.initPromise) {
+      this.initPromise = this.initRepo().finally(() => {
+        this.initPromise = null;
+      });
+    }
+    await this.initPromise;
   }
 
   public async prepare(): Promise<void> {
@@ -66,7 +78,7 @@ class RepoLifecycle {
     this.git.ensureFreshCache(this.config.getGitCacheTtlSeconds());
   }
 
-  public getLimits(): FetchLimits & { maxCommands: number } {
+  public getLimits(): FetchLimits & { maxCommands: number; maxRefs: number } {
     return {
       maxWants: this.config.getMaxFetchWants(),
       maxHaves: this.config.getMaxFetchHaves(),
@@ -74,6 +86,7 @@ class RepoLifecycle {
       maxObjects: this.config.getMaxPackObjects(),
       maxPackBytes: this.config.getMaxPackBytes(),
       maxFetchBodyBytes: this.config.getMaxFetchBodyBytes(),
+      maxRefs: this.config.getMaxPushCommands() * 10,
     };
   }
 }

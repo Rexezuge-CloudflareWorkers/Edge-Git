@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 import { getRepoStub } from '../repoStub';
-import { requireVisibleRepo, toServiceStatus } from './PublicViewerResolver';
+import { requireVisibleRepo, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
 
@@ -54,7 +54,7 @@ function registerBranchRoutes(app: RepoApp): void {
       const { body: out, status } = toBranchResponse(result, 201);
       return c.json(out, status);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to create branch' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to create branch') }, toServiceStatus(error));
     }
   });
 
@@ -83,7 +83,7 @@ function registerBranchRoutes(app: RepoApp): void {
       const { body: out, status } = toBranchResponse(result, 200);
       return c.json(out, status);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to delete branch' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to delete branch') }, toServiceStatus(error));
     }
   });
 
@@ -107,7 +107,7 @@ function registerBranchRoutes(app: RepoApp): void {
       const { body: out, status } = toBranchResponse(result, 200);
       return c.json(out, status);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to update default branch' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to update default branch') }, toServiceStatus(error));
     }
   });
 }

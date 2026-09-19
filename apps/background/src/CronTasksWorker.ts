@@ -23,10 +23,14 @@ class CronTasksWorker extends DurableObject<Env> {
       .finally(() => {
         this.currentRun = null;
       });
-    // Don't await here; DO will keep running via waitUntil semantics of the caller.
-    // For scheduled() path we await explicitly.
-    await this.currentRun;
-    return Response.json({ ok: true });
+    // Single-flight without blocking: return 202 immediately and let the DO
+    // keep running via waitUntil. Awaiting here would serialize cron ticks
+    // behind the full phase1+phase2 run and risk DO fetch wall-time timeouts.
+    const waitUntil = (this.ctx as unknown as { waitUntil?: (p: Promise<unknown>) => void }).waitUntil?.bind(this.ctx);
+    if (typeof waitUntil === 'function') {
+      waitUntil(this.currentRun);
+    }
+    return new Response('Started', { status: 202 });
   }
 }
 

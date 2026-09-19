@@ -2,7 +2,10 @@ import type { CheckRunnerWorker, RealtimeWorker, RepoWorker } from '@edge-git/ba
 
 function getRepoStub(env: Env, fullName: string): DurableObjectStub & RepoWorker {
   const stub = env.REPO.getByName(fullName) as unknown as DurableObjectStub & RepoWorker;
-  // Fire-and-forget fullName persistence; ensure is also called explicitly on create.
+  // Name persistence is first-writer-wins in `setFullName`; callers that need
+  // it durably must `await ensureRepo`. Fire-and-forget here only warms the
+  // isolate — failures are ignored because read paths call `prepare()` which
+  // loads the stored name.
   void (stub.setFullName(fullName) as Promise<unknown>).catch(() => undefined);
   return stub;
 }

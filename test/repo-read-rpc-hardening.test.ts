@@ -98,7 +98,7 @@ function makeRpc(parts: {
   readModelOverrides?: Record<string, Fn>;
   withFs?: boolean;
   withAssets?: boolean;
-  limits?: { maxObjects: number; maxPackBytes: number };
+  limits?: { maxObjects: number; maxPackBytes: number; maxRefs?: number };
 } = {}) {
   const prepare = vi.fn(async () => undefined);
   const git = makeGit(parts.gitOverrides);
@@ -106,7 +106,7 @@ function makeRpc(parts: {
   const isoGitFs = parts.withFs === false ? undefined : makeFs();
   const releaseAssets = parts.withAssets === false ? undefined : makeAssetStore();
   const config = { getMaxMergeDiffFiles: () => 7, getMaxFileBytes: () => 1024 };
-  const getLimits = parts.limits ? () => parts.limits as { maxObjects: number; maxPackBytes: number } : undefined;
+  const getLimits = parts.limits ? () => parts.limits as { maxObjects: number; maxPackBytes: number; maxRefs?: number } : undefined;
   const rpc = new RepoReadRpc({ git, readModel, prepare, config, isoGitFs, releaseAssets, getLimits } as never);
   return { rpc, git, readModel, prepare, isoGitFs, releaseAssets };
 }
@@ -368,8 +368,8 @@ describe('RepoReadRpc updateRefs filtering', () => {
     expect(result).toEqual({ updated: ['refs/heads/a'] });
   });
 
-  it('forwards large batches whole (no silent ref-count truncation)', async () => {
-    const { rpc, git } = makeRpc();
+  it('forwards large batches within maxRefs whole (no silent truncation)', async () => {
+    const { rpc, git } = makeRpc({ limits: { maxObjects: 10_000, maxPackBytes: 52_428_800, maxRefs: 2000 } });
     const updates = Array.from({ length: 1500 }, (_, i) => ({
       ref: `refs/heads/b-${i}`,
       oldOid: OID_ZERO,
@@ -379,6 +379,30 @@ describe('RepoReadRpc updateRefs filtering', () => {
     expect(git.applyRefUpdates).toHaveBeenCalledTimes(1);
     expect((git.applyRefUpdates.mock.calls[0][0] as unknown[])).toHaveLength(1500);
     expect(result.updated).toHaveLength(1500);
+  });
+
+  it('rejects batches over maxRefs', async () => {
+    const { rpc, git } = makeRpc({ limits: { maxObjects: 10_000, maxPackBytes: 52_428_800, maxRefs: 10 } });
+    const updates = Array.from({ length: 11 }, (_, i) => ({
+      ref: `refs/heads/b-${i}`,
+      oldOid: OID_ZERO,
+      newOid: OID_B,
+    }));
+    await expect(rpc.updateRefs(updates)).rejects.toMatchObject({ name: 'PackLimitError' });
+    expect(git.applyRefUpdates).not.toHaveBeenCalled();
+  });
+
+  it('blocks deletions and tag overwrites via direct RPC', async () => {
+    const { rpc, git } = makeRpc();
+    // Deletion (new zero) is dropped.
+    await expect(
+      rpc.updateRefs([{ ref: 'refs/heads/main', oldOid: OID_A, newOid: OID_ZERO }]),
+    ).resolves.toEqual({ updated: [] });
+    // Tag overwrite (existing tag) is dropped; tag create (old zero) passes.
+    await expect(
+      rpc.updateRefs([{ ref: 'refs/tags/v1', oldOid: OID_A, newOid: OID_B }]),
+    ).resolves.toEqual({ updated: [] });
+    expect(git.applyRefUpdates).not.toHaveBeenCalled();
   });
 
   it('returns empty when every update is malformed', async () => {

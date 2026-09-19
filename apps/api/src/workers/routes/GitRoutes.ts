@@ -141,16 +141,16 @@ function registerGitRoutes(app: GitApp): void {
     // Branch protection is resolved here (D1) and passed into the DO (which
     // owns git truth but cannot read D1). Protection resolution is fail-closed:
     // a D1 failure rejects the push with 503 instead of pushing unprotected.
-    // Unparseable bodies yield no branch rules and let the DO validate the
-    // pack itself.
+    // Unparseable bodies are 400 (the DO would reject them anyway, but
+    // without protections the require_pr gate could be bypassed).
     let protections: ProtectedRefRule[];
     try {
       protections = await resolvePushProtections(c.env, auth.repo.id, body);
     } catch (error) {
-      if (error instanceof Error && error.message === 'push protections unavailable') {
+      if (error instanceof PushProtectionsUnavailableError) {
         return c.text('push protections unavailable; try again later', 503);
       }
-      protections = [];
+      return c.text('invalid push request', 400);
     }
     const res = await stub.receivePack(body, protections);
     if (res.ok && auth.userEmail) {
@@ -201,15 +201,29 @@ function registerGitRoutes(app: GitApp): void {
 }
 
 // Map this push's branch commands to their longest-matching protection
-// rules. Tags and other non-branch refs never match. Parse failures return
-// no rules (the DO validates the pack); D1 failures throw so callers can
-// fail closed with 503.
+// rules. Tags and other non-branch refs never match. Parse failures throw
+// PushBodyInvalidError (400); D1 failures throw PushProtectionsUnavailableError
+// (503) so callers fail closed instead of pushing unprotected.
+class PushProtectionsUnavailableError extends Error {
+  constructor() {
+    super('push protections unavailable');
+    this.name = 'PushProtectionsUnavailableError';
+  }
+}
+
+class PushBodyInvalidError extends Error {
+  constructor() {
+    super('invalid push request');
+    this.name = 'PushBodyInvalidError';
+  }
+}
+
 async function resolvePushProtections(env: Env, repositoryId: string, body: Uint8Array): Promise<ProtectedRefRule[]> {
   let commands: Array<{ ref: string }>;
   try {
     commands = parseReceivePackRequest(body).commands;
   } catch {
-    return [];
+    throw new PushBodyInvalidError();
   }
   const branches = new Set<string>();
   for (const cmd of commands) {
@@ -222,7 +236,7 @@ async function resolvePushProtections(env: Env, repositoryId: string, body: Uint
   try {
     rules = await scope.get(Tokens.BranchProtectionService).listRules(repositoryId);
   } catch {
-    throw new Error('push protections unavailable');
+    throw new PushProtectionsUnavailableError();
   }
   if (rules.length === 0) return [];
   const protections: ProtectedRefRule[] = [];

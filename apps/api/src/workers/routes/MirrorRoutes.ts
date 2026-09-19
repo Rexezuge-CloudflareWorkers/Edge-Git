@@ -2,7 +2,7 @@ import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { runMirrorSync } from '@edge-git/background/transfer/MirrorRunner';
-import { toServiceStatus } from './PublicViewerResolver';
+import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 
 type MirrorApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -32,7 +32,7 @@ function registerMirrorRoutes(app: MirrorApp): void {
       if (!mirror) return c.json({ error: 'No mirror configured' }, 404);
       return c.json({ mirror });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to load mirror' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to load mirror') }, toServiceStatus(error));
     }
   });
 
@@ -49,7 +49,7 @@ function registerMirrorRoutes(app: MirrorApp): void {
       const mirror = await scope.get(Tokens.MirrorService).configure(repo.id, body.sourceUrl, body.intervalMinutes, email);
       return c.json({ mirror });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to configure mirror' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to configure mirror') }, toServiceStatus(error));
     }
   });
 
@@ -72,7 +72,7 @@ function registerMirrorRoutes(app: MirrorApp): void {
       const refreshed = await scope.get(Tokens.MirrorService).getForRepo(repo.id);
       return c.json({ mirror: refreshed, sync: 'done' });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to sync mirror' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to sync mirror') }, toServiceStatus(error));
     }
   });
 
@@ -88,7 +88,7 @@ function registerMirrorRoutes(app: MirrorApp): void {
       const mirror = await scope.get(Tokens.MirrorService).setEnabled(repo.id, body.enabled);
       return c.json({ mirror });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to update mirror' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to update mirror') }, toServiceStatus(error));
     }
   });
 
@@ -102,7 +102,7 @@ function registerMirrorRoutes(app: MirrorApp): void {
       await scope.get(Tokens.MirrorService).remove(repo.id);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to remove mirror' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to remove mirror') }, toServiceStatus(error));
     }
   });
 }

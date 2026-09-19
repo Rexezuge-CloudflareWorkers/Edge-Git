@@ -1,4 +1,4 @@
-import { toServiceStatus } from '../PublicViewerResolver';
+import { toSafeErrorMessage, toServiceStatus } from '../PublicViewerResolver';
 import { requireVisibleRepo } from '../PublicViewerResolver';
 import { recordAndNotify } from '../SocialEmit';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
@@ -27,7 +27,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
       }
       return c.json({ pull, ...meta });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -51,7 +51,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
         else await collab.setPullMilestone(pull.id, row.id, body.milestoneId ?? null);
         return c.json({ ok: true });
       } catch (error) {
-        return c.json({ error: error instanceof Error ? error.message : 'Failed to update pull request' }, toServiceStatus(error));
+        return c.json({ error: toSafeErrorMessage(error, 'Failed to update pull request') }, toServiceStatus(error));
       }
     });
   }
@@ -73,7 +73,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
         .catch(() => []);
       return c.json({ reviewers });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -104,7 +104,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
       }).catch(() => undefined);
       return c.json({ ok: true }, 201);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to request reviewers' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to request reviewers') }, toServiceStatus(error));
     }
   });
 
@@ -123,7 +123,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
       await scope.get(Tokens.CollaborationService).removeReviewer(pull.id, decodeURIComponent(c.req.param('reviewer')));
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -142,7 +142,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
       const pull = await createRequestScope(c.env).get(Tokens.PullRequestService).setDraft(row.id, number, body.isDraft);
       return c.json({ pull });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to update draft' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to update draft') }, toServiceStatus(error));
     }
   });
 
@@ -165,7 +165,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
       });
       return c.json(suggested);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 }

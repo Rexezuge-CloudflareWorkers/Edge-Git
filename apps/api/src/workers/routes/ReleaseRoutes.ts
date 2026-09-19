@@ -3,7 +3,7 @@ import { Tokens, createRequestScope } from '@edge-git/backend-services/compositi
 import { RepoService } from '@edge-git/backend-services/repo';
 import { getRepoStub } from '../repoStub';
 import { recordAndNotify } from './SocialEmit';
-import { requireVisibleRepo, resolvePublicViewer, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { requireVisibleRepo, resolvePublicViewer, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 
 type ReleaseApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -54,7 +54,7 @@ function registerReleasePublicRoutes(app: ReleaseApp): void {
         const assets = await scope.get(Tokens.ReleaseService).listAssets(row.id, release.tagName);
         return c.json({ release, assets });
       } catch (error) {
-        return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+        return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
       }
     });
   });
@@ -124,7 +124,7 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
       });
       return c.json({ release }, 201);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to create release' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to create release') }, toServiceStatus(error));
     }
   });
 
@@ -141,7 +141,7 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
       const assets = await scope.get(Tokens.ReleaseService).listAssets(row.id, release.tagName);
       return c.json({ release, assets });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -182,7 +182,7 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
       }
       return c.json({ release });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to update release' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to update release') }, toServiceStatus(error));
     }
   });
 
@@ -208,7 +208,7 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
       await scope.get(Tokens.ReleaseService).deleteRelease(row.id, release.tagName);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 }

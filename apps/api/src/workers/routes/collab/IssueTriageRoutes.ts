@@ -1,4 +1,4 @@
-import { toServiceStatus } from '../PublicViewerResolver';
+import { toSafeErrorMessage, toServiceStatus } from '../PublicViewerResolver';
 import { requireVisibleRepo } from '../PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
@@ -19,7 +19,7 @@ function registerCollabIssueTriageRoutes(app: CollabApp): void {
       const meta = await getIssueMetaSafe(c.env, issue.id);
       return c.json({ issue, ...meta, milestoneId: (issue as { milestone_id?: string | null }).milestone_id ?? null });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -43,7 +43,7 @@ function registerCollabIssueTriageRoutes(app: CollabApp): void {
         else await collab.setIssueMilestone(issue.id, row.id, body.milestoneId ?? null);
         return c.json({ ok: true });
       } catch (error) {
-        return c.json({ error: error instanceof Error ? error.message : 'Failed to update issue' }, toServiceStatus(error));
+        return c.json({ error: toSafeErrorMessage(error, 'Failed to update issue') }, toServiceStatus(error));
       }
     });
   }

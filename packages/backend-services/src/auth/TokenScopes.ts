@@ -3,7 +3,7 @@ import type { TokenScope } from '@edge-git/shared';
 
 const TOKEN_SCOPES: readonly TokenScope[] = ['repo:read', 'repo:write', 'admin'];
 
-const DEFAULT_TOKEN_SCOPES: readonly TokenScope[] = ['repo:read', 'repo:write', 'admin'];
+const DEFAULT_TOKEN_SCOPES: readonly TokenScope[] = ['repo:read', 'repo:write'];
 
 // Scope hierarchy: `admin` implies `repo:write`, which implies `repo:read`.
 // A token covers a requirement when it holds the required scope or any

@@ -346,6 +346,16 @@ export default tseslint.config(
               message: 'apps/api must not import DAOs directly; use @edge-git/backend-services instead (type-only imports are allowed)',
               allowTypeImports: true,
             },
+            {
+              group: ['@edge-git/backend-data', '@edge-git/backend-data/*'],
+              message: 'apps/api must not import backend-data values directly; use @edge-git/backend-services instead (type-only imports are allowed)',
+              allowTypeImports: true,
+            },
+            {
+              group: ['@edge-git/background', '@edge-git/background/*'],
+              message: 'apps/api must not import background values directly except the DO binding re-export in src/index.ts',
+              allowTypeImports: true,
+            },
           ],
         },
       ],
@@ -361,6 +371,13 @@ export default tseslint.config(
           patterns: [{ group: ['@edge-git/api', '@edge-git/api/*'], message: 'apps/background must not import from apps/api' }],
         },
       ],
+    },
+  },
+  // Exception: DO binding re-export lives in apps/api/src/index.ts.
+  {
+    files: ['apps/api/src/index.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
     },
   },
 

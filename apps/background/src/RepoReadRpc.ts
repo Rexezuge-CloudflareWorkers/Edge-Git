@@ -14,7 +14,7 @@ interface RepoReadRpcDeps {
   config: AppConfiguration;
   isoGitFs?: IsoGitFsClient;
   releaseAssets?: ReleaseAssetStore;
-  getLimits?: () => { maxObjects: number; maxPackBytes: number };
+  getLimits?: () => { maxObjects: number; maxPackBytes: number; maxRefs?: number };
 }
 
 /**
@@ -34,7 +34,7 @@ class RepoReadRpc {
   private readonly config: AppConfiguration;
   private readonly isoGitFs?: IsoGitFsClient;
   private readonly releaseAssets?: ReleaseAssetStore;
-  private readonly getLimits?: () => { maxObjects: number; maxPackBytes: number };
+  private readonly getLimits?: () => { maxObjects: number; maxPackBytes: number; maxRefs?: number };
 
   constructor(deps: RepoReadRpcDeps) {
     this.git = deps.git;
@@ -200,6 +200,7 @@ class RepoReadRpc {
 
   public async updateRefs(updates: Array<{ ref: string; oldOid: string; newOid: string }>): Promise<unknown> {
     await this.prepare();
+    const ZERO_OID = '0'.repeat(40);
     const pending = (updates ?? []).filter(
       (u) =>
         typeof u.ref === 'string' &&
@@ -208,14 +209,30 @@ class RepoReadRpc {
         /^[0-9a-f]{40}$/.test(u.newOid),
     );
     if (pending.length === 0) return { updated: [] };
+    // Bound direct-RPC fan-out: production import/mirror paths bound via
+    // transferLimits().maxRefs, but direct stub calls bypassed it.
+    const maxRefs = this.getLimits?.().maxRefs ?? 1000;
+    if (pending.length > maxRefs) {
+      throw new PackLimitError(`too many refs: ${pending.length} > ${maxRefs}`);
+    }
+    // Fail closed on deletions and tag overwrites: this RPC is used by
+    // mirror/fork-sync which only create (old zero) + fast-forward heads.
+    // Deletions (new zero) and tag overwrites (existing tag, new oid) must
+    // go through push protection in PushHandler, not direct RPC.
+    const safe = pending.filter((u) => {
+      if (u.newOid === ZERO_OID) return false;
+      if (u.ref.startsWith('refs/tags/') && u.oldOid !== ZERO_OID) return false;
+      return true;
+    });
+    if (safe.length === 0) return { updated: [] };
     const results = await this.git.applyRefUpdates(
-      pending.map((u) => ({ oldOid: u.oldOid, newOid: u.newOid, ref: u.ref })),
+      safe.map((u) => ({ oldOid: u.oldOid, newOid: u.newOid, ref: u.ref })),
       false,
     );
     this.git.clearCache();
     const updated: string[] = [];
     for (const [i, result] of results.entries()) {
-      if (result.ok) updated.push(pending[i].ref);
+      if (result.ok) updated.push(safe[i].ref);
     }
     return { updated };
   }
@@ -241,6 +258,11 @@ class RepoReadRpc {
     if (pack.byteLength > limits.maxPackBytes) {
       throw new PackLimitError(`pack too large: ${pack.byteLength} > ${limits.maxPackBytes} bytes`);
     }
+    const maxRefs = limits.maxRefs ?? 1000;
+    const pending = (refs ?? []).filter((r) => typeof r.ref === 'string' && /^[0-9a-f]{40}$/.test(r.oid));
+    if (pending.length > maxRefs) {
+      throw new PackLimitError(`too many refs: ${pending.length} > ${maxRefs}`);
+    }
     if (!this.isoGitFs) return { importedRefs: [] };
     const suffix = `${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
     const packFilePath = `/repo/objects/pack/fork-${suffix}.pack`;
@@ -257,7 +279,6 @@ class RepoReadRpc {
     }
     this.git.clearCache();
     const importedRefs: string[] = [];
-    const pending = (refs ?? []).filter((r) => typeof r.ref === 'string' && /^[0-9a-f]{40}$/.test(r.oid));
     if (pending.length > 0) {
       const results = await this.git.applyRefUpdates(
         pending.map((r) => ({ oldOid: '0'.repeat(40), newOid: r.oid, ref: r.ref })),

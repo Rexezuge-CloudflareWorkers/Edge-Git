@@ -1,4 +1,4 @@
-import { requireVisibleRepo, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
@@ -16,7 +16,7 @@ function registerPullThreadRoutes(app: PullApp): void {
         const threads = await scope.get(Tokens.PullThreadService).listThreads(pull.id);
         return c.json({ threads });
       } catch (error) {
-        return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+        return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
       }
     });
   });
@@ -37,7 +37,7 @@ function registerUserPullThreadRoutes(app: PullApp): void {
       const threads = await scope.get(Tokens.PullThreadService).listThreads(pull.id);
       return c.json({ threads });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -82,7 +82,7 @@ function registerUserPullThreadRoutes(app: PullApp): void {
       });
       return c.json({ thread }, 201);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to open thread' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to open thread') }, toServiceStatus(error));
     }
   });
 
@@ -117,7 +117,7 @@ function registerUserPullThreadRoutes(app: PullApp): void {
       });
       return c.json({ comment }, 201);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to reply' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to reply') }, toServiceStatus(error));
     }
   });
 
@@ -153,7 +153,7 @@ function registerUserPullThreadRoutes(app: PullApp): void {
       });
       return c.json({ thread: updated });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to update thread' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to update thread') }, toServiceStatus(error));
     }
   });
 
@@ -192,7 +192,7 @@ function registerUserPullThreadRoutes(app: PullApp): void {
       }
       return c.json({ review });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to dismiss review' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to dismiss review') }, toServiceStatus(error));
     }
   });
 }

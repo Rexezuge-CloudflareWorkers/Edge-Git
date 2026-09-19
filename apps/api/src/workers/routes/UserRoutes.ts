@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { resolvePublicViewer, toRepoJson, toServiceStatus } from './PublicViewerResolver';
+import { resolvePublicViewer, toRepoJson, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 
 type UserApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -306,7 +306,7 @@ function registerUserSettingsRoutes(app: UserApp): void {
       const message = error instanceof Error ? error.message : 'Failed to rename';
       const status =
         message.includes('taken') || message.includes('Invalid') || message.includes('reserved') ? 400 : toServiceStatus(error);
-      return c.json({ error: message }, status);
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to rename') }, status);
     }
   });
 }

@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 import { getRepoStub, ensureRepo } from '../repoStub';
-import { requireVisibleRepo, toRepoJson, toServiceStatus, withPublicRepo, withVisibleRepo, getScope } from './PublicViewerResolver';
+import { requireVisibleRepo, toRepoJson, toSafeErrorMessage, toServiceStatus, withPublicRepo, withVisibleRepo, getScope } from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
 import { Tokens } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
@@ -176,7 +176,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
           : message.includes('members') || message.includes('owner')
             ? 403
             : 500;
-      return c.json({ error: message }, status as 400);
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to create repo') }, status as 400);
     }
   });
 
@@ -218,7 +218,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
         .updateRepo(owner, repoName, email, patch);
       return c.json({ ...(toRepoJson(updated) as Record<string, unknown>), viewerCanManage: true });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to update repo' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to update repo') }, toServiceStatus(error));
     }
   });
 
@@ -246,7 +246,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
       }
       return c.json({ ok: true, id });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to delete repo' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to delete repo') }, toServiceStatus(error));
     }
   });
 }

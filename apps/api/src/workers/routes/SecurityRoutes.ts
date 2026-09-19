@@ -2,7 +2,7 @@ import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { SecuritySettingsService } from '@edge-git/backend-services/security';
-import { toServiceStatus } from './PublicViewerResolver';
+import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 
 type SecurityApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -20,7 +20,7 @@ function registerSecurityRoutes(app: SecurityApp): void {
       const settings = await scope.get(Tokens.SecuritySettingsService).getSettings(repo.id);
       return c.json({ settings });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to load security settings' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to load security settings') }, toServiceStatus(error));
     }
   });
 
@@ -37,7 +37,7 @@ function registerSecurityRoutes(app: SecurityApp): void {
       const settings = await scope.get(Tokens.SecuritySettingsService).setMode(repo.id, mode, email);
       return c.json({ settings });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to update security settings' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to update security settings') }, toServiceStatus(error));
     }
   });
 }

@@ -5,7 +5,7 @@ import { NotFoundError } from '@edge-git/backend-errors';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import type { WebhookDeliveryMetadata, WebhookEventName } from '@edge-git/shared';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
-import { buildWebhookPayload, signDelivery } from './WebhookEvents';
+import { buildWebhookPayload, signDelivery, validateWebhookUrl } from './WebhookEvents';
 
 interface WebhookDeliveryServiceEnv {
   DB: D1Queryable;
@@ -55,6 +55,15 @@ async function defaultPostJson(
   url: string,
   init: { headers: Record<string, string>; body: string; timeoutMs: number },
 ): Promise<{ httpStatus: number | null; error: string | null }> {
+  try {
+    // Re-validate on delivery: the stored hook URL may have been valid at
+    // creation but rebound via DNS since. Literal-IP/private hosts are
+    // rejected here; DNS-resolved private IPs remain documented best-effort
+    // (no resolver in Workers — use allowlist/egress proxy for strict).
+    validateWebhookUrl(url);
+  } catch (error) {
+    return { httpStatus: null, error: error instanceof Error ? error.message.slice(0, 500) : 'Invalid webhook URL.' };
+  }
   try {
     const response = await fetch(url, {
       method: 'POST',
@@ -259,6 +268,14 @@ class WebhookDeliveryService {
     if (!hook || hook.is_active !== 1) {
       await deliveryDAO
         .markSettled(deliveryId, { status: 'failed', nextRetryAt: now, httpStatus: null, error: 'Webhook is missing or disabled.', now })
+        .catch(() => undefined);
+      return false;
+    }
+    try {
+      validateWebhookUrl(hook.url);
+    } catch {
+      await deliveryDAO
+        .markSettled(deliveryId, { status: 'failed', nextRetryAt: now, httpStatus: null, error: 'Webhook URL is blocked.', now })
         .catch(() => undefined);
       return false;
     }

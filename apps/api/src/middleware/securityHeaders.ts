@@ -27,6 +27,20 @@ function isSensitiveJsonPath(pathname: string): boolean {
   ) {
     return true;
   }
+  // Bearer-secret adjacent: deploy-key create returns the plaintext key,
+  // export returns pack bytes, mirror/import accept secrets/URLs.
+  if (
+    pathname.endsWith('/keys') ||
+    pathname.includes('/keys/') ||
+    pathname.endsWith('/export') ||
+    pathname.endsWith('/mirror') ||
+    pathname.endsWith('/import') ||
+    pathname.includes('/export/') ||
+    pathname.includes('/mirror/') ||
+    pathname.includes('/import/')
+  ) {
+    return true;
+  }
   // Private JSON (identity, repo lists, issues/pulls, audit): cacheable by
   // browsers/CDNs by default, so force no-store to avoid cross-user leaks
   // on shared machines or misconfigured caches.
@@ -45,8 +59,10 @@ function isSensitiveJsonPath(pathname: string): boolean {
 
 /**
  * Baseline security headers for API JSON responses and the SPA shell.
- * The SPA needs inline scripts/styles, so CSP stays permissive-but-bounded
- * (`frame-ancestors 'none'` blocks clickjacking without breaking Vite).
+ * The SPA ships inline scripts/styles from the Vite build, so CSP allows
+ * 'unsafe-inline' for scripts + styles (bounded by same-origin + no
+ * frame-ancestors). Without it the shell breaks; hashes/nonces are a
+ * future tightening once the build emits stable hashes.
  */
 function applySecurityHeaders(c: HeaderContext): void {
   for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
@@ -56,7 +72,7 @@ function applySecurityHeaders(c: HeaderContext): void {
   if (contentType.includes('text/html')) {
     c.header(
       'Content-Security-Policy',
-      "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'",
+      "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'self'",
     );
   }
   // Bearer-secret JSON (PATs, hook secrets, realtime tickets) must never be

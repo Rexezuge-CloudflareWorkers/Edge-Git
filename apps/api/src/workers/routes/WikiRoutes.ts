@@ -2,7 +2,7 @@ import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { recordAndNotify } from './SocialEmit';
-import { requireVisibleRepo, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 
 type WikiApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -31,7 +31,7 @@ function registerWikiPublicRoutes(app: WikiApp): void {
         const page = await createRequestScope(c.env).get(Tokens.WikiService).getPage(row.id, c.req.param('slug'));
         return c.json({ page });
       } catch (error) {
-        return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+        return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
       }
     });
   });
@@ -79,7 +79,7 @@ function registerWikiUserRoutes(app: WikiApp): void {
       });
       return c.json({ page }, 201);
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Failed to create wiki page' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to create wiki page') }, toServiceStatus(error));
     }
   });
 
@@ -91,7 +91,7 @@ function registerWikiUserRoutes(app: WikiApp): void {
       const page = await createRequestScope(c.env).get(Tokens.WikiService).getPage(row.id, c.req.param('slug'));
       return c.json({ page });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -103,7 +103,7 @@ function registerWikiUserRoutes(app: WikiApp): void {
       const revisions = await createRequestScope(c.env).get(Tokens.WikiService).listRevisions(row.id, c.req.param('slug'));
       return c.json({ revisions });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 
@@ -138,7 +138,7 @@ function registerWikiUserRoutes(app: WikiApp): void {
       // Optimistic-concurrency conflicts surface as 409; map the service
       // ConflictError (500 by default) explicitly.
       if (message.startsWith('revision conflict')) return c.json({ error: message }, 409);
-      return c.json({ error: message }, status === 500 ? 400 : status);
+      return c.json({ error: toSafeErrorMessage(error, 'Failed to update wiki page') }, status === 500 ? 400 : status);
     }
   });
 
@@ -157,7 +157,7 @@ function registerWikiUserRoutes(app: WikiApp): void {
       await createRequestScope(c.env).get(Tokens.WikiService).deletePage(row.id, c.req.param('slug'));
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : 'Not found' }, toServiceStatus(error));
+      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
     }
   });
 }

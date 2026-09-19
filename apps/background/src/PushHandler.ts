@@ -42,6 +42,14 @@ class PushHandler {
 
   public async receivePack(data: Uint8Array, limits: PushLimits, protections: ProtectedRefRule[] = []): Promise<Response> {
     const { isoGitFs, git, getFullName } = this.deps;
+    // Pre-parse bound: parseReceivePackRequest itself parses unbounded body,
+    // so reject oversized packs before parsing (direct stub calls bypass the
+    // API Content-Length/body checks).
+    if (data.byteLength > limits.maxPackBytes) {
+      const message = `pack too large: ${data.byteLength} > ${limits.maxPackBytes} bytes`;
+      logger.error(`(receive-pack) Rejected ${getFullName() ?? 'unknown repo'}: ${message}`);
+      return buildReportStatus([{ ref: '*', ok: false, error: message }], false);
+    }
     const { commands, packfile, capabilities } = parseReceivePackRequest(data);
 
     if (commands.length === 0) {
