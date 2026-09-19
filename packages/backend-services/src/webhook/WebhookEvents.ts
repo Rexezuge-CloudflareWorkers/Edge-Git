@@ -244,11 +244,11 @@ interface WebhookPayloadInput {
 function buildWebhookPayload(input: WebhookPayloadInput): Record<string, unknown> {
   // `extra` is allowlisted: reserved top-level keys can never be clobbered
   // by caller-controlled extra fields.
-  const { event: _e, repository: _r, sender: _s, processed_at: _p, ...safeExtra } = (input.extra ?? {}) as Record<string, unknown>;
-  void _e;
-  void _r;
-  void _s;
-  void _p;
+  const safeExtra: Record<string, unknown> = { ...input.extra };
+  delete safeExtra.event;
+  delete safeExtra.repository;
+  delete safeExtra.sender;
+  delete safeExtra.processed_at;
   return {
     event: input.event,
     repository: { full_name: input.fullName },

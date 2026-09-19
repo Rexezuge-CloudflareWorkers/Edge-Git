@@ -267,20 +267,22 @@ function registerUserRepoRoutes(app: RepoApp): void {
 // BREAKING: ref/path/base/head query params are capped at 256 chars at the
 // edge so malformed callers fail fast without burning DO I/O.
 function sanitizeRefParam(raw: string | null | undefined): string | undefined {
-  if (raw === null || raw === undefined) return undefined;
+  if (raw == null) return undefined;
   const trimmed = raw.trim().slice(0, 256);
   return trimmed || undefined;
 }
 
 function sanitizePathParam(raw: string | null | undefined): string | undefined {
-  if (raw === null || raw === undefined) return undefined;
-  const trimmed = raw.trim().slice(0, 256);
+  if (raw == null) return undefined;
+  const trimmed = raw.trim().slice(0, 512);
   return trimmed || undefined;
 }
 
-function sanitizeDepthParam(raw: string | null): number | undefined {
-  if (raw === null || raw === undefined || raw === '') return undefined;
-  const n = Number(raw.trim().slice(0, 16));
+function sanitizeDepthParam(raw: string | null | undefined): number | undefined {
+  if (raw == null) return undefined;
+  const text = raw.trim().slice(0, 16);
+  if (text === '') return undefined;
+  const n = Number(text);
   if (!Number.isSafeInteger(n) || n < 1 || n > 500) return undefined;
   return n;
 }

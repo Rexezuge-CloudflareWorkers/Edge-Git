@@ -20,7 +20,7 @@ const SECURITY_HEADERS: Record<string, string> = {
 // orgs, notifications, stars/watches, search reflecting private titles).
 // Public `/repos/*` stays cacheable except issues/pulls/audit reflections.
 function isSensitiveJsonPath(pathname: string): boolean {
-  if (pathname === '/user/tokens' || pathname === '/user/realtime/ticket' || pathname === '/user/realtime/inbox-ticket') {
+  if (['/user/tokens', '/user/realtime/ticket', '/user/realtime/inbox-ticket'].includes(pathname)) {
     return true;
   }
   if (pathname.startsWith('/user/')) return true;

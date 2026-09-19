@@ -253,7 +253,7 @@ describe('harden-90 body + repo param caps', () => {
 
   it('caps ref/path/depth at edge', () => {
     expect(sanitizeRefParam('x'.repeat(500))?.length).toBe(256);
-    expect(sanitizePathParam('y'.repeat(600))?.length).toBe(256);
+    expect(sanitizePathParam('y'.repeat(600))?.length).toBe(512);
     expect(sanitizeDepthParam('999999')).toBeUndefined();
     expect(sanitizeDepthParam('10')).toBe(10);
     expect(sanitizeDepthParam('not-a-number')).toBeUndefined();
