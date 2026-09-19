@@ -62,6 +62,12 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     // Security headers first so even the shell/health early routes carry
     // them; scope + guards follow for the remaining routes.
     app.use('*', securityHeaders());
+    // Global 500 mask: never leak D1/DO internals on uncaught throws.
+    // Route handlers must still use toSafeErrorMessage for caught errors.
+    app.onError((error, c) => {
+      console.error('Unhandled worker error', error instanceof Error ? error.message : error);
+      return c.json({ error: 'Internal error' }, 500);
+    });
 
     // User home (public shell; data is gated per-endpoint). /user stays the
     // Cloudflare Access entry point and redirects into the authenticated app.
@@ -79,6 +85,9 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     // cross-isolate backstop). Generous limits so legitimate use never 429s.
     app.use('/:owner/:repo/git-upload-pack', rateLimit({ windowMs: 60_000, max: 300, keyPrefix: 'git-fetch' }));
     app.use('/:owner/:repo/git-receive-pack', rateLimit({ windowMs: 60_000, max: 60, keyPrefix: 'git-push' }));
+    // Anonymous credential-oracle guard: info/refs distinguishes 401/403 and
+    // is cheap to poll, so cap it separately from pack POSTs.
+    app.use('/:owner/:repo/info/refs', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'git-refs' }));
     // Immediate webhook dispatch runs after mutating handlers via
     // `waitUntil` (cron retries the rest). Registered before the routes so
     // Hono executes the middleware first.
@@ -115,6 +124,10 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     app.use('/user/*', MiddlewareHandlers.webhookFlush());
     app.use('/user/tokens*', rateLimit({ windowMs: 60_000, max: 30, keyPrefix: 'tokens' }));
     app.use('/user/realtime/*', rateLimit({ windowMs: 60_000, max: 60, keyPrefix: 'realtime' }));
+    // Repo creation + expensive search (x3 over-fetch + visibility filter)
+    // are abuse-prone: cap creation tightly, search generously.
+    app.use('/user/repos', rateLimit({ windowMs: 60_000, max: 30, keyPrefix: 'repo-create' }));
+    app.use('/search', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'search' }));
     // Abuse-prone mutating surfaces: imports/mirrors fan out to third-party
     // hosts (SSRF amplification), webhook test/redeliver triggers outbound
     // fetch, file-write drives DO I/O. Per-isolate buckets; cron/DOs remain
@@ -123,6 +136,11 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     app.use('/user/repos/:owner/:repo/mirror*', rateLimit({ windowMs: 60_000, max: 20, keyPrefix: 'mirror' }));
     app.use('/user/repos/:owner/:repo/hooks*', rateLimit({ windowMs: 60_000, max: 30, keyPrefix: 'webhook-mutate' }));
     app.use('/user/repos/:owner/:repo/contents*', rateLimit({ windowMs: 60_000, max: 60, keyPrefix: 'file-write' }));
+    // Comment/issue/pull write surfaces: per-repo buckets so one hot repo
+    // cannot exhaust a global bucket for everyone else.
+    app.use('/user/repos/:owner/:repo/issues*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'issues' }));
+    app.use('/user/repos/:owner/:repo/pulls*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'pulls' }));
+    app.use('/user/repos/:owner/:repo/comments*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'comments' }));
 
     registerUserRepoRoutes(app);
     registerUserSettingsRoutes(app);

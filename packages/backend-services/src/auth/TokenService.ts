@@ -172,7 +172,15 @@ class TokenService {
     await dao.create(tokenId, normalized, tokenHash, trimmedName, expiresAt, now, effectiveScopes, prefix);
     if (resolvedGrants.length > 0) {
       const grantDAO = await this.deps.tokenGrantDAO();
-      await grantDAO.setGrants(tokenId, resolvedGrants, now).catch(() => undefined);
+      try {
+        await grantDAO.setGrants(tokenId, resolvedGrants, now);
+      } catch {
+        // Fail closed: a scoped token whose grants cannot persist must not
+        // silently become unrestricted. Best-effort rollback then throw so
+        // the caller sees 500 (masked) instead of a full-access token.
+        await dao.delete(tokenId, normalized).catch(() => undefined);
+        throw new Error('Failed to persist repository grants for token');
+      }
     }
     return { tokenId, token, name: trimmedName, expiresAt, scopes: effectiveScopes, prefix };
   }
@@ -184,7 +192,10 @@ class TokenService {
     const repoDAO = await this.deps.repositoryDAO();
     const enriched: UserAccessTokenMetadata[] = [];
     for (const token of tokens) {
-      const grants = await grantDAO.listByToken(token.tokenId).catch(() => []);
+      // Fail closed for display: propagate grant-read failures instead of
+      // showing a scoped token with `repoGrants: []` (looks unrestricted).
+      // Callers map thrown errors to masked 500s.
+      const grants = await grantDAO.listByToken(token.tokenId);
       const detailed: TokenRepoGrantMetadata[] = [];
       for (const grant of grants) {
         const meta = await this.grantMetadata(repoDAO, grant);
@@ -213,7 +224,8 @@ class TokenService {
 
   public async rotateToken(tokenId: string, userEmail: string): Promise<{ token: string; expiresAt: number; prefix: string }> {
     const dao = await this.deps.tokenDAO();
-    const tokens = await dao.getByUserEmail(userEmail);
+    const normalized = userEmail.toLowerCase();
+    const tokens = await dao.getByUserEmail(normalized);
     const existing = tokens.find((t) => t.tokenId === tokenId);
     if (!existing) throw new NotFoundError('Token not found');
     const maxExpiry = ConfigurationManager.token.getMaxExpiryDays(this.env);
@@ -222,13 +234,13 @@ class TokenService {
     const raw = UUIDUtil.getRandomUUIDNoDash() + UUIDUtil.getRandomUUIDNoDash();
     const rotated = await dao.rotate(
       tokenId,
-      userEmail,
+      normalized,
       await TokenService.hashToken(raw),
       tokenPrefixOf(raw),
       TimestampUtil.addDays(now, lifetimeDays),
     );
     if (!rotated) throw new NotFoundError('Token not found');
-    const current = await dao.getByUserEmail(userEmail);
+    const current = await dao.getByUserEmail(normalized);
     const refreshed = current.find((t) => t.tokenId === tokenId);
     return { token: raw, expiresAt: refreshed?.expiresAt ?? TimestampUtil.addDays(now, lifetimeDays), prefix: tokenPrefixOf(raw) };
   }

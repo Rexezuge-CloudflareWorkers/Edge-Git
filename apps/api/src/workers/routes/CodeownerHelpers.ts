@@ -29,8 +29,47 @@ function decodeBlobContent(blob: { contentBase64?: string; isBinary?: boolean } 
 
 async function readCodeownerRules(env: Env, fullName: string, baseBranch: string): Promise<CodeownerRule[]> {
   const stub = getRepoStub(env, fullName);
+  // List-then-read: a direct `getBlob` miss leaves a dangling isomorphic-git
+  // rejection that workerd surfaces as unhandled (it fails
+  // `vitest-pool-workers` runs and spams production logs). Membership checks
+  // against tree listings only ever read objects known to exist. Stubs
+  // without `getTree` (unit-test fakes) fall back to direct probing.
+  if (typeof (stub as { getTree?: unknown }).getTree !== 'function') {
+    for (const candidate of CODEOWNER_CANDIDATES) {
+      try {
+        const blob = (await stub.getBlob({ ref: baseBranch, filepath: candidate })) as {
+          contentBase64?: string;
+          isBinary?: boolean;
+        } | null;
+        const content = decodeBlobContent(blob);
+        if (content) return parseCodeowners(content);
+      } catch {
+        continue;
+      }
+    }
+    return [];
+  }
+  let rootNames: Set<string>;
+  try {
+    const root = (await stub.getTree({ ref: baseBranch, withLastCommit: false })) as Array<{ path: string }> | null;
+    rootNames = new Set((root ?? []).map((e) => e.path));
+  } catch {
+    return [];
+  }
   for (const candidate of CODEOWNER_CANDIDATES) {
     try {
+      const slash = candidate.indexOf('/');
+      if (slash === -1) {
+        if (!rootNames.has(candidate)) continue;
+      } else {
+        const dir = candidate.slice(0, slash);
+        if (!rootNames.has(dir)) continue;
+        const leaf = candidate.slice(slash + 1);
+        const sub = (await stub.getTree({ ref: baseBranch, path: dir, withLastCommit: false })) as Array<{
+          path: string;
+        }> | null;
+        if ((sub ?? []).every((e) => e.path !== leaf)) continue;
+      }
       const blob = (await stub.getBlob({ ref: baseBranch, filepath: candidate })) as {
         contentBase64?: string;
         isBinary?: boolean;

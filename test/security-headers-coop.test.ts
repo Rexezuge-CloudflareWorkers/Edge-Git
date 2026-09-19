@@ -26,7 +26,19 @@ describe('security headers hardening', () => {
     expect(isSensitiveJsonPath('/user/repos/a/b/hooks')).toBe(true);
     expect(isSensitiveJsonPath('/user/repos/a/b/hooks/h1/deliveries')).toBe(true);
     expect(isSensitiveJsonPath('/user/realtime/ticket')).toBe(true);
-    expect(isSensitiveJsonPath('/user/repos')).toBe(false);
     expect(isSensitiveJsonPath('/health')).toBe(false);
+  });
+
+  it('marks private JSON paths as no-store to avoid cross-user cache leaks', () => {
+    expect(isSensitiveJsonPath('/user/me')).toBe(true);
+    expect(isSensitiveJsonPath('/user/repos')).toBe(true);
+    expect(isSensitiveJsonPath('/user/repos/a/b')).toBe(true);
+    expect(isSensitiveJsonPath('/user/audit')).toBe(true);
+    expect(isSensitiveJsonPath('/user/orgs/acme/audit')).toBe(true);
+    expect(isSensitiveJsonPath('/user/repos/a/b/issues')).toBe(true);
+    expect(isSensitiveJsonPath('/user/repos/a/b/pulls/1')).toBe(true);
+    expect(isSensitiveJsonPath('/repos/a/b/issues')).toBe(true);
+    expect(isSensitiveJsonPath('/health')).toBe(false);
+    expect(isSensitiveJsonPath('/search')).toBe(false);
   });
 });
