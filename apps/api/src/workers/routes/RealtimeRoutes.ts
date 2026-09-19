@@ -6,7 +6,7 @@ import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { isShard } from '@edge-git/shared/realtime';
 import { repoNameSchema, usernameSchema } from '@edge-git/shared/validation';
 import { getRealtimeStub } from '../realtimeStub';
-import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type RealtimeApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -25,11 +25,11 @@ function realtimeDisabled(env: Env): boolean {
 // socket. Failures return plain HTTP errors — the SPA falls back to polling.
 function registerRealtimePublicRoutes(app: RealtimeApp): void {
   app.get('/realtime/ws', async (c) => {
-    if (realtimeDisabled(c.env)) return c.json({ error: 'Realtime is disabled' }, 503);
+    if (realtimeDisabled(c.env)) return jsonError(c, 'Realtime is disabled', 503);
     const shard = new URL(c.req.url).searchParams.get('shard') ?? '';
-    if (!isShard(shard)) return c.json({ error: 'Not found' }, 404);
+    if (!isShard(shard)) return jsonError(c, 'Not found', 404);
     if (c.req.header('Upgrade')?.toLowerCase() !== 'websocket') {
-      return c.json({ error: 'WebSocket upgrade required' }, 426);
+      return jsonError(c, 'WebSocket upgrade required', 426);
     }
     try {
       // The shard DO serves `/ws`; rewrite the path but preserve the upgrade
@@ -38,7 +38,7 @@ function registerRealtimePublicRoutes(app: RealtimeApp): void {
       url.pathname = '/ws';
       return await getRealtimeStub(c.env, shard).fetch(new Request(url.href, c.req.raw));
     } catch {
-      return c.json({ error: 'Unavailable' }, 503);
+      return jsonError(c, 'Unavailable', 503);
     }
   });
 }
@@ -49,16 +49,16 @@ function registerRealtimePublicRoutes(app: RealtimeApp): void {
 function registerRealtimeUserRoutes(app: RealtimeApp): void {
   app.post('/user/realtime/ticket', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    if (realtimeDisabled(c.env)) return c.json({ error: 'Realtime is disabled' }, 503);
+    if (realtimeDisabled(c.env)) return jsonError(c, 'Realtime is disabled', 503);
     const { malformed, body } = await readJsonBody<{ owner?: unknown; repo?: unknown; channels?: unknown }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.owner !== 'string' || typeof body.repo !== 'string') {
-      return c.json({ error: 'owner and repo are required' }, 400);
+      return jsonError(c, 'owner and repo are required', 400);
     }
-    if (!usernameSchema.safeParse(body.owner.trim()).success) return c.json({ error: 'Invalid owner' }, 400);
-    if (!repoNameSchema.safeParse(body.repo.trim()).success) return c.json({ error: 'Invalid repo' }, 400);
+    if (!usernameSchema.safeParse(body.owner.trim()).success) return jsonError(c, 'Invalid owner', 400);
+    if (!repoNameSchema.safeParse(body.repo.trim()).success) return jsonError(c, 'Invalid repo', 400);
     if (body.channels !== undefined && !Array.isArray(body.channels)) {
-      return c.json({ error: 'channels must be an array' }, 400);
+      return jsonError(c, 'channels must be an array', 400);
     }
     let grant;
     try {
@@ -71,28 +71,28 @@ function registerRealtimeUserRoutes(app: RealtimeApp): void {
           channels: body.channels,
         });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
     try {
       const issued = await getRealtimeStub(c.env, grant.shard).issueTicket({ shard: grant.shard, channels: grant.channels, viewer: email });
-      if ('error' in issued) return c.json({ error: 'Unavailable' }, 503);
+      if ('error' in issued) return jsonError(c, 'Unavailable', 503);
       return c.json({ shard: grant.shard, ticket: issued.ticket, expiresAt: issued.expiresAt, channels: grant.channels });
     } catch {
-      return c.json({ error: 'Unavailable' }, 503);
+      return jsonError(c, 'Unavailable', 503);
     }
   });
 
   app.get('/user/realtime/inbox-ticket', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    if (realtimeDisabled(c.env)) return c.json({ error: 'Realtime is disabled' }, 503);
+    if (realtimeDisabled(c.env)) return jsonError(c, 'Realtime is disabled', 503);
     try {
       const hash = await RealtimeService.inboxHashForEmail(email);
       const grant = createRequestScope(c.env).get(Tokens.RealtimeService).inboxSubscription(hash);
       const issued = await getRealtimeStub(c.env, grant.shard).issueTicket({ shard: grant.shard, channels: grant.channels, viewer: email });
-      if ('error' in issued) return c.json({ error: 'Unavailable' }, 503);
+      if ('error' in issued) return jsonError(c, 'Unavailable', 503);
       return c.json({ shard: grant.shard, ticket: issued.ticket, expiresAt: issued.expiresAt, channels: grant.channels });
     } catch {
-      return c.json({ error: 'Unavailable' }, 503);
+      return jsonError(c, 'Unavailable', 503);
     }
   });
 }

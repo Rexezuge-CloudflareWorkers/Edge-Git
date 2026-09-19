@@ -1,6 +1,7 @@
 import type { Hono } from 'hono';
+import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { resolvePublicViewer, toRepoJson, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, resolvePublicViewer, toRepoJson, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type UserApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -16,8 +17,8 @@ function parseLimit(url: string): number {
 }
 
 async function hasVisibleRepo(
-  repos: Array<{ id: string }>,
-  getRole: (repo: { id: string } & Record<string, unknown>) => Promise<string | null>,
+  repos: RepositoryRow[],
+  getRole: (repo: RepositoryRow) => Promise<string | null>,
 ): Promise<boolean> {
   for (const repo of repos) {
     const role = await getRole(repo);
@@ -79,7 +80,7 @@ function registerUserProfileRoutes(app: UserApp): void {
             }
             if (!visible && repoDao) {
               const repos = await repoDao.listByOrgId(org.id, 5).catch(() => []);
-              visible = await hasVisibleRepo(repos, (repo) => permission.getRole(viewerEmail, repo as never).catch(() => null));
+              visible = await hasVisibleRepo(repos, (repo) => permission.getRole(viewerEmail, repo).catch(() => null));
             }
             if (visible) count += 1;
           }
@@ -101,7 +102,7 @@ function registerUserProfileRoutes(app: UserApp): void {
       .get(Tokens.OrganizationService)
       .getByUsername(username)
       .catch(() => null);
-    if (!org) return c.json({ error: 'Not found' }, 404);
+    if (!org) return jsonError(c, 'Not found', 404);
     let repoCount = 0;
     let memberCount: number | null = null;
     let viewerIsMember = false;
@@ -181,7 +182,7 @@ function registerUserProfileRoutes(app: UserApp): void {
       .get(Tokens.OrganizationService)
       .getByUsername(username)
       .catch(() => null);
-    if (!org) return c.json({ error: 'Not found' }, 404);
+    if (!org) return jsonError(c, 'Not found', 404);
     const repoDao = await scope.get(Tokens.RepositoryDAO)();
     const byOrg = await repoDao.listByOrgId(org.id, 200).catch(() => []);
     const byOwner = await repoDao.listByOwner(org.username, 200).catch(() => []);
@@ -212,7 +213,7 @@ function registerUserProfileRoutes(app: UserApp): void {
       .get(Tokens.UserService)
       .getByUsername(username)
       .catch(() => null);
-    if (!user?.username) return c.json({ error: 'Not found' }, 404);
+    if (!user?.username) return jsonError(c, 'Not found', 404);
     const orgService = scope.get(Tokens.OrganizationService);
     const orgs = await orgService.listOrgsForUser(user.email).catch(() => []);
     const viewerIsSelf = (viewerEmail ?? '').toLowerCase() === user.email.toLowerCase();
@@ -232,7 +233,7 @@ function registerUserProfileRoutes(app: UserApp): void {
       }
       if (!show && repoDao) {
         const repos = await repoDao.listByOrgId(org.id, 5).catch(() => []);
-        show = await hasVisibleRepo(repos, (repo) => permission.getRole(viewerEmail, repo as never).catch(() => null));
+        show = await hasVisibleRepo(repos, (repo) => permission.getRole(viewerEmail, repo).catch(() => null));
       }
       if (show) visible.push({ username: org.username });
     }
@@ -244,8 +245,8 @@ function registerUserSettingsRoutes(app: UserApp): void {
   app.patch('/user/me/username', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const { malformed, body } = await readJsonBody<{ username?: string }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
-    if (!body.username || typeof body.username !== 'string') return c.json({ error: 'username is required' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
+    if (!body.username || typeof body.username !== 'string') return jsonError(c, 'username is required', 400);
     try {
       const scope = createRequestScope(c.env);
       const before = await scope
@@ -299,9 +300,9 @@ function registerUserSettingsRoutes(app: UserApp): void {
               .renameUsername(email, before.username)
               .catch(() => undefined);
             if (isPackLimitError(moveError)) {
-              return c.json({ error: moveError instanceof Error ? moveError.message : 'Repository too large to move' }, 413);
+              return jsonError(c, moveError instanceof Error ? moveError.message : 'Repository too large to move', 413);
             }
-            return c.json({ error: 'Failed to move repository data' }, 500);
+            return jsonError(c, 'Failed to move repository data', 500);
           }
         }
       }
@@ -311,7 +312,7 @@ function registerUserSettingsRoutes(app: UserApp): void {
       const message = error instanceof Error ? error.message : 'Failed to rename';
       const status =
         message.includes('taken') || message.includes('Invalid') || message.includes('reserved') ? 400 : toServiceStatus(error);
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to rename') }, status);
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to rename'), status);
     }
   });
 }

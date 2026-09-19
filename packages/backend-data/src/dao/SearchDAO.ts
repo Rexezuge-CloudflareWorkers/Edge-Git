@@ -5,6 +5,18 @@ import type { PullRequestRow } from './PullRequestDAO';
 import type { RepositoryRow } from './RepositoryDAO';
 import type { DiscussionRow } from './DiscussionDAO';
 import type { SnippetRow } from './SnippetDAO';
+import {
+  CODE_SEARCH_COLUMNS,
+  REPO_SEARCH_COLUMNS,
+  SNIPPET_SEARCH_COLUMNS,
+  TITLE_BODY_SEARCH_COLUMNS,
+  UPSERT_CODE_FILE_SQL,
+  buildFtsQuery,
+  buildLikeOrClause,
+  clampSearchLimit,
+  likeParamsForTokens,
+  tokenizeSearchQuery,
+} from './SearchQueries';
 
 interface SearchOptions {
   limit?: number;
@@ -19,9 +31,6 @@ interface CodeHit {
   updated_at: number;
 }
 
-const DEFAULT_LIMIT = 20;
-const MAX_LIMIT = 50;
-
 interface CodeOidEntry {
   path: string;
   oid: string | null;
@@ -35,25 +44,6 @@ interface CodeFileInput {
   now: number;
 }
 
-// Conditional upsert: a row that is already identical is left untouched so
-// the AFTER UPDATE FTS trigger never fires. Unconditional rewrites cost
-// ~250 D1 rows-read each (FTS delete-scan + re-tokenize); unchanged files
-// must not pay that. `IS DISTINCT FROM` is NULL-safe (NULL oid = unknown
-// blob, always rewritten when content differs).
-const UPSERT_CODE_FILE_SQL =
-  `INSERT INTO code_index (repo_id, path, oid, content, updated_at) VALUES (?, ?, ?, ?, ?)
-   ON CONFLICT (repo_id, path) DO UPDATE SET oid = excluded.oid, content = excluded.content, updated_at = excluded.updated_at
-   WHERE excluded.oid IS DISTINCT FROM code_index.oid OR excluded.content IS DISTINCT FROM code_index.content`;
-
-function clampLimit(limit: number | undefined): number {
-  if (!limit || !Number.isSafeInteger(limit)) return DEFAULT_LIMIT;
-  return Math.min(Math.max(limit, 1), MAX_LIMIT);
-}
-
-function escapeLike(term: string): string {
-  return term.replaceAll('!', '!!').replaceAll('%', '!%').replaceAll('_', '!_');
-}
-
 /**
  * Metadata search over repositories + issues.
  *
@@ -62,6 +52,9 @@ function escapeLike(term: string): string {
  * lacks FTS5. Callers (SearchService) filter private rows via
  * PermissionService — this DAO intentionally returns candidates including
  * private repos so visibility stays in one place.
+ *
+ * Token/FTS/LIKE construction lives in `SearchQueries` (pure builders);
+ * methods here only run statements and degrade to `[]` on legacy DBs.
  */
 class SearchDAO extends BaseDAO {
   constructor(database: D1Queryable) {
@@ -69,10 +62,10 @@ class SearchDAO extends BaseDAO {
   }
 
   public async searchRepos(query: string, opts: SearchOptions = {}): Promise<RepositoryRow[]> {
-    const limit = clampLimit(opts.limit);
-    const tokens = query.trim().split(/\s+/).filter(Boolean).slice(0, 10);
+    const limit = clampSearchLimit(opts.limit);
+    const tokens = tokenizeSearchQuery(query);
     if (tokens.length === 0) return [];
-    const ftsQuery = tokens.map((t) => `"${t.replaceAll('"', '""')}"*`).join(' AND ');
+    const ftsQuery = buildFtsQuery(tokens);
     try {
       const result = await this.database
         .prepare(`SELECT r.* FROM repo_fts f JOIN repositories r ON r.id = f.repo_id WHERE repo_fts MATCH ? ORDER BY rank LIMIT ?`)
@@ -81,17 +74,8 @@ class SearchDAO extends BaseDAO {
       return result.results ?? [];
     } catch {
       // FTS5 unavailable — LIKE fallback over name/description/full name.
-      const likes = tokens
-        .map(
-          () => `(lower(owner) LIKE ? ESCAPE '!' OR lower(name) LIKE ? ESCAPE '!' OR lower(COALESCE(description, '')) LIKE ? ESCAPE '!')`,
-        )
-        .join(' AND ');
-      const params: unknown[] = [];
-      for (const t of tokens) {
-        const pattern = `%${escapeLike(t.toLowerCase())}%`;
-        params.push(pattern, pattern, pattern);
-      }
-      params.push(limit);
+      const likes = buildLikeOrClause(REPO_SEARCH_COLUMNS, tokens.length);
+      const params: unknown[] = [...likeParamsForTokens(tokens, REPO_SEARCH_COLUMNS.length), limit];
       try {
         const result = await this.database
           .prepare(`SELECT * FROM repositories WHERE ${likes} ORDER BY updated_at DESC LIMIT ?`)
@@ -105,10 +89,10 @@ class SearchDAO extends BaseDAO {
   }
 
   public async searchIssues(query: string, opts: SearchOptions = {}): Promise<IssueRow[]> {
-    const limit = clampLimit(opts.limit);
-    const tokens = query.trim().split(/\s+/).filter(Boolean).slice(0, 10);
+    const limit = clampSearchLimit(opts.limit);
+    const tokens = tokenizeSearchQuery(query);
     if (tokens.length === 0) return [];
-    const ftsQuery = tokens.map((t) => `"${t.replaceAll('"', '""')}"*`).join(' AND ');
+    const ftsQuery = buildFtsQuery(tokens);
     try {
       const base = opts.repoId
         ? `SELECT i.* FROM issue_fts f JOIN issues i ON i.id = f.issue_id WHERE issue_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
@@ -118,12 +102,8 @@ class SearchDAO extends BaseDAO {
       ).all<IssueRow>();
       return result.results ?? [];
     } catch {
-      const likes = tokens.map(() => `(lower(title) LIKE ? ESCAPE '!' OR lower(COALESCE(body, '')) LIKE ? ESCAPE '!')`).join(' AND ');
-      const params: unknown[] = [];
-      for (const t of tokens) {
-        const pattern = `%${escapeLike(t.toLowerCase())}%`;
-        params.push(pattern, pattern);
-      }
+      const likes = buildLikeOrClause(TITLE_BODY_SEARCH_COLUMNS, tokens.length);
+      const params: unknown[] = likeParamsForTokens(tokens, TITLE_BODY_SEARCH_COLUMNS.length);
       try {
         if (opts.repoId) {
           params.push(opts.repoId, limit);
@@ -146,10 +126,10 @@ class SearchDAO extends BaseDAO {
   }
 
   public async searchPulls(query: string, opts: SearchOptions = {}): Promise<PullRequestRow[]> {
-    const limit = clampLimit(opts.limit);
-    const tokens = query.trim().split(/\s+/).filter(Boolean).slice(0, 10);
+    const limit = clampSearchLimit(opts.limit);
+    const tokens = tokenizeSearchQuery(query);
     if (tokens.length === 0) return [];
-    const ftsQuery = tokens.map((t) => `"${t.replaceAll('"', '""')}"*`).join(' AND ');
+    const ftsQuery = buildFtsQuery(tokens);
     try {
       const base = opts.repoId
         ? `SELECT p.* FROM pull_fts f JOIN pull_requests p ON p.id = f.pull_id WHERE pull_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
@@ -159,12 +139,8 @@ class SearchDAO extends BaseDAO {
       ).all<PullRequestRow>();
       return result.results ?? [];
     } catch {
-      const likes = tokens.map(() => `(lower(title) LIKE ? ESCAPE '!' OR lower(COALESCE(body, '')) LIKE ? ESCAPE '!')`).join(' AND ');
-      const params: unknown[] = [];
-      for (const t of tokens) {
-        const pattern = `%${escapeLike(t.toLowerCase())}%`;
-        params.push(pattern, pattern);
-      }
+      const likes = buildLikeOrClause(TITLE_BODY_SEARCH_COLUMNS, tokens.length);
+      const params: unknown[] = likeParamsForTokens(tokens, TITLE_BODY_SEARCH_COLUMNS.length);
       try {
         if (opts.repoId) {
           const result = await this.database
@@ -186,10 +162,10 @@ class SearchDAO extends BaseDAO {
   }
 
   public async searchCode(query: string, opts: SearchOptions = {}): Promise<CodeHit[]> {
-    const limit = clampLimit(opts.limit);
-    const tokens = query.trim().split(/\s+/).filter(Boolean).slice(0, 10);
+    const limit = clampSearchLimit(opts.limit);
+    const tokens = tokenizeSearchQuery(query);
     if (tokens.length === 0) return [];
-    const ftsQuery = tokens.map((t) => `"${t.replaceAll('"', '""')}"*`).join(' AND ');
+    const ftsQuery = buildFtsQuery(tokens);
     try {
       const base = opts.repoId
         ? `SELECT c.* FROM code_fts f JOIN code_index c ON c.repo_id = f.repo_id AND c.path = f.path WHERE code_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
@@ -199,12 +175,8 @@ class SearchDAO extends BaseDAO {
       ).all<CodeHit>();
       return result.results ?? [];
     } catch {
-      const likes = tokens.map(() => `(lower(path) LIKE ? ESCAPE '!' OR lower(content) LIKE ? ESCAPE '!')`).join(' AND ');
-      const params: unknown[] = [];
-      for (const t of tokens) {
-        const pattern = `%${escapeLike(t.toLowerCase())}%`;
-        params.push(pattern, pattern);
-      }
+      const likes = buildLikeOrClause(CODE_SEARCH_COLUMNS, tokens.length);
+      const params: unknown[] = likeParamsForTokens(tokens, CODE_SEARCH_COLUMNS.length);
       try {
         if (opts.repoId) {
           const result = await this.database
@@ -335,10 +307,10 @@ class SearchDAO extends BaseDAO {
   }
 
   public async searchDiscussions(query: string, opts: SearchOptions = {}): Promise<DiscussionRow[]> {
-    const limit = clampLimit(opts.limit);
-    const tokens = query.trim().split(/\s+/).filter(Boolean).slice(0, 10);
+    const limit = clampSearchLimit(opts.limit);
+    const tokens = tokenizeSearchQuery(query);
     if (tokens.length === 0) return [];
-    const ftsQuery = tokens.map((t) => `"${t.replaceAll('"', '""')}"*`).join(' AND ');
+    const ftsQuery = buildFtsQuery(tokens);
     try {
       const base = opts.repoId
         ? `SELECT d.* FROM discussion_fts f JOIN discussions d ON d.id = f.discussion_id WHERE discussion_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
@@ -348,12 +320,8 @@ class SearchDAO extends BaseDAO {
       ).all<DiscussionRow>();
       return result.results ?? [];
     } catch {
-      const likes = tokens.map(() => `(lower(title) LIKE ? ESCAPE '!' OR lower(COALESCE(body, '')) LIKE ? ESCAPE '!')`).join(' AND ');
-      const params: unknown[] = [];
-      for (const t of tokens) {
-        const pattern = `%${escapeLike(t.toLowerCase())}%`;
-        params.push(pattern, pattern);
-      }
+      const likes = buildLikeOrClause(TITLE_BODY_SEARCH_COLUMNS, tokens.length);
+      const params: unknown[] = likeParamsForTokens(tokens, TITLE_BODY_SEARCH_COLUMNS.length);
       try {
         if (opts.repoId) {
           const result = await this.database
@@ -375,10 +343,10 @@ class SearchDAO extends BaseDAO {
   }
 
   public async searchSnippets(query: string, opts: { limit?: number } = {}): Promise<SnippetRow[]> {
-    const limit = clampLimit(opts.limit);
-    const tokens = query.trim().split(/\s+/).filter(Boolean).slice(0, 10);
+    const limit = clampSearchLimit(opts.limit);
+    const tokens = tokenizeSearchQuery(query);
     if (tokens.length === 0) return [];
-    const ftsQuery = tokens.map((t) => `"${t.replaceAll('"', '""')}"*`).join(' AND ');
+    const ftsQuery = buildFtsQuery(tokens);
     try {
       const result = await this.database
         .prepare(
@@ -388,8 +356,8 @@ class SearchDAO extends BaseDAO {
         .all<SnippetRow>();
       return result.results ?? [];
     } catch {
-      const likes = tokens.map(() => `lower(title) LIKE ? ESCAPE '!'`).join(' AND ');
-      const params: unknown[] = tokens.map((t) => `%${escapeLike(t.toLowerCase())}%`);
+      const likes = buildLikeOrClause(SNIPPET_SEARCH_COLUMNS, tokens.length);
+      const params: unknown[] = likeParamsForTokens(tokens, SNIPPET_SEARCH_COLUMNS.length);
       try {
         params.push(limit);
         const result = await this.database

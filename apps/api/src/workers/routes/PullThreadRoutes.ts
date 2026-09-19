@@ -1,4 +1,4 @@
-import { requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
@@ -10,14 +10,14 @@ function registerPullThreadRoutes(app: PullApp): void {
   app.get('/repos/:owner/:repo/pulls/:number/threads', async (c) => {
     return withPublicRepo(c as never, async (row) => {
       const number = parsePullNumber(c.req.param('number'));
-      if (number === null) return c.json({ error: 'Not found' }, 404);
+      if (number === null) return jsonError(c, 'Not found', 404);
       try {
         const scope = createRequestScope(c.env);
         const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
         const threads = await scope.get(Tokens.PullThreadService).listThreads(pull.id);
         return c.json({ threads });
       } catch (error) {
-        return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+        return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
       }
     });
   });
@@ -29,16 +29,16 @@ function registerUserPullThreadRoutes(app: PullApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     const number = parsePullNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Not found' }, 404);
+    if (number === null) return jsonError(c, 'Not found', 404);
     try {
       const scope = createRequestScope(c.env);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
       const threads = await scope.get(Tokens.PullThreadService).listThreads(pull.id);
       return c.json({ threads });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 
@@ -48,9 +48,9 @@ function registerUserPullThreadRoutes(app: PullApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     const number = parsePullNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Not found' }, 404);
+    if (number === null) return jsonError(c, 'Not found', 404);
     const { malformed, body } = await readJsonBody<{
       path?: string;
       line?: number | null;
@@ -58,7 +58,7 @@ function registerUserPullThreadRoutes(app: PullApp): void {
       commitOid?: string | null;
       body?: string;
     }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = createRequestScope(c.env);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
@@ -84,7 +84,7 @@ function registerUserPullThreadRoutes(app: PullApp): void {
       });
       return c.json({ thread }, 201);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to open thread') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to open thread'), toServiceStatus(error));
     }
   });
 
@@ -93,11 +93,11 @@ function registerUserPullThreadRoutes(app: PullApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     const number = parsePullNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Not found' }, 404);
+    if (number === null) return jsonError(c, 'Not found', 404);
     const { malformed, body } = await readJsonBody<{ body?: string }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = createRequestScope(c.env);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
@@ -120,7 +120,7 @@ function registerUserPullThreadRoutes(app: PullApp): void {
       });
       return c.json({ comment }, 201);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to reply') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to reply'), toServiceStatus(error));
     }
   });
 
@@ -130,23 +130,23 @@ function registerUserPullThreadRoutes(app: PullApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     const number = parsePullNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Not found' }, 404);
+    if (number === null) return jsonError(c, 'Not found', 404);
     const { malformed, body } = await readJsonBody<{ resolved?: boolean }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
-    if (typeof body.resolved !== 'boolean') return c.json({ error: 'resolved must be a boolean' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
+    if (typeof body.resolved !== 'boolean') return jsonError(c, 'resolved must be a boolean', 400);
     try {
       const scope = createRequestScope(c.env);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
       const threads = await scope.get(Tokens.PullThreadService).listThreads(pull.id);
       const thread = threads.find((t) => t.id === c.req.param('threadId'));
-      if (!thread) return c.json({ error: 'Not found' }, 404);
+      if (!thread) return jsonError(c, 'Not found', 404);
       if (thread.author_email.toLowerCase() !== email.toLowerCase()) {
         try {
           await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
         } catch {
-          return c.json({ error: 'Forbidden' }, 403);
+          return jsonError(c, 'Forbidden', 403);
         }
       }
       const updated = await scope.get(Tokens.PullThreadService).resolveThread({
@@ -157,7 +157,7 @@ function registerUserPullThreadRoutes(app: PullApp): void {
       });
       return c.json({ thread: updated });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to update thread') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to update thread'), toServiceStatus(error));
     }
   });
 
@@ -168,16 +168,16 @@ function registerUserPullThreadRoutes(app: PullApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     try {
       await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
-      return c.json({ error: 'Forbidden' }, 403);
+      return jsonError(c, 'Forbidden', 403);
     }
     const number = parsePullNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Not found' }, 404);
+    if (number === null) return jsonError(c, 'Not found', 404);
     const { malformed, body } = await readJsonBody<{ reason?: string }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = createRequestScope(c.env);
       const review = await scope.get(Tokens.PullRequestService).dismissReview({
@@ -197,7 +197,7 @@ function registerUserPullThreadRoutes(app: PullApp): void {
       }
       return c.json({ review });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to dismiss review') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to dismiss review'), toServiceStatus(error));
     }
   });
 }

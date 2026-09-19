@@ -221,9 +221,10 @@ class RealtimeWorker extends DurableObject<Env> {
     const ownName = this.ctx.id?.name;
     if (ownName && shard !== ownName) return new Response('Not Found', { status: 404 });
     if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
-      return Response.json({ error: 'WebSocket upgrade required' }, { status: 426 });
+      return Response.json({ Exception: { Type: 'MethodNotAllowed', Message: 'WebSocket upgrade required.' } }, { status: 426 });
     }
-    if (!this.isRealtimeEnabled()) return Response.json({ error: 'Realtime is disabled' }, { status: 503 });
+    if (!this.isRealtimeEnabled())
+      return Response.json({ Exception: { Type: 'InternalServerError', Message: 'Realtime is disabled.' } }, { status: 503 });
     let record: TicketRecord | undefined;
     try {
       record = await this.ctx.storage.get<TicketRecord>(`ticket:${ticket}`);
@@ -234,10 +235,10 @@ class RealtimeWorker extends DurableObject<Env> {
     if (ticket) await this.ctx.storage.delete(`ticket:${ticket}`).catch(() => undefined);
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     if (!record || record.shard !== shard || record.expiresAt <= now || record.channels.length === 0) {
-      return Response.json({ error: 'Invalid or expired ticket' }, { status: 401 });
+      return Response.json({ Exception: { Type: 'Unauthorized', Message: 'Invalid or expired ticket.' } }, { status: 401 });
     }
     if (!this.makeRoom(record.viewer)) {
-      return Response.json({ error: 'Too many connections' }, { status: 503 });
+      return Response.json({ Exception: { Type: 'InternalServerError', Message: 'Too many connections.' } }, { status: 503 });
     }
     const pair = new WebSocketPair();
     const client = pair[0];
@@ -253,7 +254,7 @@ class RealtimeWorker extends DurableObject<Env> {
       server.serializeAttachment(attachment);
     } catch (error) {
       logger.error('RealtimeWorker: acceptWebSocket failed', error);
-      return Response.json({ error: 'Unavailable' }, { status: 503 });
+      return Response.json({ Exception: { Type: 'InternalServerError', Message: 'Realtime is unavailable.' } }, { status: 503 });
     }
     try {
       server.send(JSON.stringify({ v: 1, type: 'hello', shard, channels: attachment.channels }));

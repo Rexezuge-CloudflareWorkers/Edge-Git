@@ -1,5 +1,5 @@
 import type { Hono } from 'hono';
-import { requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
@@ -41,12 +41,12 @@ function registerIssueRoutes(app: IssueApp): void {
   app.get('/repos/:owner/:repo/issues/:number', async (c) => {
     return withPublicRepo(c as never, async (row) => {
       const number = parseIssueNumber(c.req.param('number'));
-      if (number === null) return c.json({ error: 'Not found' }, 404);
+      if (number === null) return jsonError(c, 'Not found', 404);
       try {
         const issue = await createRequestScope(c.env).get(Tokens.IssueService).getByNumber(row.id, number);
         return c.json({ issue });
       } catch (error) {
-        return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+        return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
       }
     });
   });
@@ -54,12 +54,12 @@ function registerIssueRoutes(app: IssueApp): void {
   app.get('/repos/:owner/:repo/issues/:number/comments', async (c) => {
     return withPublicRepo(c as never, async (row) => {
       const number = parseIssueNumber(c.req.param('number'));
-      if (number === null) return c.json({ error: 'Not found' }, 404);
+      if (number === null) return jsonError(c, 'Not found', 404);
       try {
         const comments = await createRequestScope(c.env).get(Tokens.IssueService).listComments(row.id, number);
         return c.json({ comments });
       } catch (error) {
-        return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+        return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
       }
     });
   });
@@ -70,7 +70,7 @@ function registerUserIssueRoutes(app: IssueApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, c.get('AuthenticatedUserEmailAddress'));
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     const scope = createRequestScope(c.env);
     const issues = await scope.get(Tokens.IssueService).listByRepo(row.id, 50);
     const label = c.req.query('label');
@@ -98,10 +98,10 @@ function registerUserIssueRoutes(app: IssueApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     const { malformed, body } = await readJsonBody<{ title?: string; body?: string }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
-    if (!body.title) return c.json({ error: 'title is required' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
+    if (!body.title) return jsonError(c, 'title is required', 400);
     const created = await createRequestScope(c.env)
       .get(Tokens.IssueService)
       .createIssue({
@@ -129,14 +129,14 @@ function registerUserIssueRoutes(app: IssueApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     const number = parseIssueNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Not found' }, 404);
+    if (number === null) return jsonError(c, 'Not found', 404);
     try {
       const issue = await createRequestScope(c.env).get(Tokens.IssueService).getByNumber(row.id, number);
       return c.json({ issue });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 
@@ -145,17 +145,17 @@ function registerUserIssueRoutes(app: IssueApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     // Write+ (collaborator write, org member with grant, or admin/owner) may triage issues.
     try {
       await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
-      return c.json({ error: 'Forbidden' }, 403);
+      return jsonError(c, 'Forbidden', 403);
     }
     const number = parseIssueNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Not found' }, 404);
+    if (number === null) return jsonError(c, 'Not found', 404);
     const { malformed, body } = await readJsonBody<{ status?: string }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const issue = await createRequestScope(c.env)
         .get(Tokens.IssueService)
@@ -172,7 +172,7 @@ function registerUserIssueRoutes(app: IssueApp): void {
       });
       return c.json({ issue });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to update issue') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to update issue'), toServiceStatus(error));
     }
   });
 
@@ -181,14 +181,14 @@ function registerUserIssueRoutes(app: IssueApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     const number = parseIssueNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Not found' }, 404);
+    if (number === null) return jsonError(c, 'Not found', 404);
     try {
       const comments = await createRequestScope(c.env).get(Tokens.IssueService).listComments(row.id, number);
       return c.json({ comments });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 
@@ -197,12 +197,12 @@ function registerUserIssueRoutes(app: IssueApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     const number = parseIssueNumber(c.req.param('number'));
-    if (number === null) return c.json({ error: 'Not found' }, 404);
+    if (number === null) return jsonError(c, 'Not found', 404);
     const { malformed, body } = await readJsonBody<{ body?: string }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
-    if (typeof body.body !== 'string' || !body.body.trim()) return c.json({ error: 'body is required' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
+    if (typeof body.body !== 'string' || !body.body.trim()) return jsonError(c, 'body is required', 400);
     try {
       const scope = createRequestScope(c.env);
       const issue = await scope.get(Tokens.IssueService).getByNumber(row.id, number);
@@ -225,7 +225,7 @@ function registerUserIssueRoutes(app: IssueApp): void {
       });
       return c.json({ comment }, 201);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to add comment') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to add comment'), toServiceStatus(error));
     }
   });
 }

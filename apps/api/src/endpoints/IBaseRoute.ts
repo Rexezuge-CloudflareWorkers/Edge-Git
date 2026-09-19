@@ -1,8 +1,9 @@
 import type { Context } from 'hono';
-import { ServiceError } from '@edge-git/backend-errors';
+import { ServiceError, DatabaseError, DefaultInternalServerError } from '@edge-git/backend-errors';
 import { getBackendStrings } from '@edge-git/shared/i18n';
+import { ErrorSanitizationUtil } from '@edge-git/shared/utils';
 import { createRequestScope } from '@edge-git/backend-services/composition';
-import { getRequestScope } from '@edge-git/backend-runtime/di';
+import { getRequestScope, asScopedContext } from '@edge-git/backend-runtime/di';
 import { toServiceStatus as toMappedStatus } from '@edge-git/backend-services/errors';
 import { readJsonBody } from '../workers/routes/BodyParser';
 
@@ -38,11 +39,11 @@ abstract class BaseRoute {
    * installed by `scopeMiddleware`; falls back to a fresh scope for call sites
    * outside middleware ordering (tests, git auth helpers).
    */
-  public static getScope(c: { get(key: string): unknown; env: Env }): ReturnType<typeof createRequestScope> {
+  public static getScope(c: { get(key: string): unknown; env: unknown }): ReturnType<typeof createRequestScope> {
     try {
-      return getRequestScope(c as never);
+      return getRequestScope(asScopedContext(c));
     } catch {
-      return createRequestScope(c.env);
+      return createRequestScope(c.env as Env);
     }
   }
 
@@ -51,7 +52,9 @@ abstract class BaseRoute {
    * from a valid empty object — callers must return 400 on malformed instead
    * of collapsing to `{}` and surfacing a misleading `required` error.
    */
-  public static async readJson<T>(c: HonoContext | Context): Promise<{ malformed: boolean; body: T }> {
+  public static async readJson<T>(
+    c: HonoContext | Context | { req: { json: () => Promise<unknown>; header?: (name: string) => string | undefined } },
+  ): Promise<{ malformed: boolean; body: T }> {
     return readJsonBody<T>(c);
   }
 
@@ -84,20 +87,87 @@ abstract class BaseRoute {
     return error instanceof Error && error.message ? error.message : fallback;
   }
 
+  /**
+   * Status → AWS `Exception.Type` mapping for direct validation returns.
+   * Call sites that previously wrote `c.json({ error: msg }, status)` must
+   * use `jsonError` so the wire shape stays `{Exception:{Type,Message}}`.
+   */
+  public static toErrorType(status: number): string {
+    switch (status) {
+      case 400: {
+        return 'BadRequest';
+      }
+      case 401: {
+        return 'Unauthorized';
+      }
+      case 403: {
+        return 'Forbidden';
+      }
+      case 404: {
+        return 'NotFound';
+      }
+      case 409: {
+        return 'Conflict';
+      }
+      case 413: {
+        return 'PayloadTooLarge';
+      }
+      case 429: {
+        return 'RateLimited';
+      }
+      default: {
+        return 'InternalServerError';
+      }
+    }
+  }
+
+  public static toErrorBody(status: number, message: string): { Exception: { Type: string; Message: string } } {
+    return { Exception: { Type: this.toErrorType(status), Message: message } };
+  }
+
+  public static jsonError(c: HonoContext, message: string, status: number): Response;
+  public static jsonError(c: HonoContext, type: string, message: string, status: number): Response;
+  public static jsonError(c: HonoContext, typeOrMessage: string, messageOrStatus: string | number, status = 400): Response {
+    if (typeof messageOrStatus === 'number') {
+      return c.json(
+        { Exception: { Type: this.toErrorType(messageOrStatus), Message: typeOrMessage } },
+        messageOrStatus as 400,
+      );
+    }
+    return c.json({ Exception: { Type: typeOrMessage, Message: messageOrStatus } }, status as 400);
+  }
+
   public static toErrorResponse(c: HonoContext, error: unknown): Response {
+    if (error instanceof DatabaseError) {
+      console.error('Caught database error during execution:', ErrorSanitizationUtil.sanitizeErrorForLogging(error));
+      return Response.json(
+        { Exception: { Type: error.getErrorType(), Message: error.getErrorMessage() } },
+        { status: error.getErrorCode() },
+      );
+    }
     if (error instanceof ServiceError) {
       const code = error.getErrorCode();
-      const body = {
-        error: error.getErrorType(),
-        message: error.getErrorMessage(),
-      };
+      const body = { Exception: { Type: error.getErrorType(), Message: error.getErrorMessage() } };
+      if (code < 500) {
+        console.warn(`Responding with ${error.getErrorType()}:`, ErrorSanitizationUtil.sanitizeErrorForLogging(error));
+      } else {
+        console.error('Caught service error during execution:', ErrorSanitizationUtil.sanitizeErrorForLogging(error));
+      }
       return Response.json(body, { status: code });
     }
     // Untyped errors are masked as 500; log the cause server-side only.
-    console.error('Unhandled route error', error instanceof Error ? error.message : error);
+    console.error('Unhandled route error', ErrorSanitizationUtil.sanitizeErrorForLogging(error));
     const locale = this.resolveLocale(c);
     const strings = getBackendStrings(locale);
-    return Response.json({ error: 'InternalError', message: strings.common.internalError }, { status: 500 });
+    return Response.json(
+      {
+        Exception: {
+          Type: DefaultInternalServerError.getErrorType(),
+          Message: strings.common.internalError,
+        },
+      },
+      { status: 500 },
+    );
   }
 
   private static resolveLocale(c: HonoContext): string {
@@ -116,7 +186,7 @@ abstract class BaseRoute {
   }
 
   protected fail(message: string, status = 400): Response {
-    return Response.json({ error: message }, { status });
+    return Response.json({ Exception: { Type: 'BadRequest', Message: message } }, { status });
   }
 }
 

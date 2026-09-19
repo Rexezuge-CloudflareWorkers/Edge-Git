@@ -3,7 +3,7 @@ import { Tokens, createRequestScope } from '@edge-git/backend-services/compositi
 import { RepoService } from '@edge-git/backend-services/repo';
 import { BadRequestError } from '@edge-git/backend-errors';
 import { clampAuditLimit, truncateAuditFilter } from '@edge-git/shared/validation';
-import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 
 type AuditApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -102,7 +102,7 @@ function registerAuditRoutes(app: AuditApp): void {
       if (query.repo) {
         const name = query.repo.includes('/') ? (query.repo.split('/').at(-1) ?? query.repo) : query.repo;
         const repo = await scope.get(Tokens.RepoService).getByOwnerAndName(c.req.param('org'), RepoService.normalizeRepo(name));
-        if (!repo) return c.json({ error: 'Repository not found' }, 404);
+        if (!repo) return jsonError(c, 'Repository not found', 404);
         repoId = repo.id;
       }
       const { logs, nextCursor } = await scope
@@ -116,7 +116,7 @@ function registerAuditRoutes(app: AuditApp): void {
         );
       return c.json({ logs: logJson(logs), nextCursor });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 
@@ -129,7 +129,7 @@ function registerAuditRoutes(app: AuditApp): void {
         .queryMine(email, { action: query.action, startTime: query.startTime, endTime: query.endTime }, query.limit, query.cursor);
       return c.json({ logs: logJson(logs), nextCursor });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
     }
   });
 }

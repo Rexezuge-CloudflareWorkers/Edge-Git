@@ -151,6 +151,10 @@ class PermissionService {
    * Best team-derived role for a viewer on an org repo: for every grant on
    * this repo, checks membership in the granting team (scoped to the same
    * org) and returns the max role. Teams never apply to user-owned repos.
+   *
+   * Batched (Otter `RepositoryHelper` pattern): team rows + membership rows
+   * load concurrently with per-request dedup so the git-auth hot path is
+   * `1 grant list + 1 fan-out` instead of sequential N+1 round-trips.
    */
   private async getTeamRole(orgId: string, repoId: string, viewer: string): Promise<RepoPermission | null> {
     const grantDAO = await this.deps.teamGrantDAO();
@@ -158,17 +162,26 @@ class PermissionService {
     if (grants.length === 0) return null;
     const memberDAO = await this.deps.teamMemberDAO();
     const teamDAO = await this.deps.teamDAO();
+    const uniqueTeamIds = [...new Set(grants.map((g) => g.team_id))];
+    const [teams, memberships] = await Promise.all([
+      Promise.all(uniqueTeamIds.map((id) => teamDAO.getById(id).catch(() => null))),
+      Promise.all(uniqueTeamIds.map((id) => memberDAO.get(id, viewer).catch(() => null))),
+    ]);
+    const teamById = new Map(
+      teams.filter((t): t is NonNullable<typeof t> => t !== null).map((t) => [t.id, t] as const),
+    );
+    // Positional membership: `memberships[i]` answers `uniqueTeamIds[i]`.
+    // (Do not rely on the row's `team_id` field — fakes/legacy rows may omit it.)
+    const memberTeamIds = new Set(uniqueTeamIds.filter((_, i) => memberships[i] !== null));
     let best: RepoPermission | null = null;
     for (const grant of grants) {
-      try {
-        const team = await teamDAO.getById(grant.team_id).catch(() => null);
-        if (!team || team.org_id !== orgId) continue;
-        const membership = await memberDAO.get(grant.team_id, viewer).catch(() => null);
-        if (!membership) continue;
-        const role = grant.role;
-        if (!best || ROLE_RANK[role] > ROLE_RANK[best]) best = role;
-      } catch {
-        continue;
+      const team = teamById.get(grant.team_id);
+      if (!team || team.org_id !== orgId) continue;
+      if (!memberTeamIds.has(grant.team_id)) continue;
+      const role = grant.role;
+      if (!best || ROLE_RANK[role] > ROLE_RANK[best]) {
+        best = role;
+        if (best === 'admin') break;
       }
     }
     return best;

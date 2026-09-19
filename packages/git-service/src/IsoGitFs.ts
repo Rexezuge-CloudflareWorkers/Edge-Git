@@ -73,7 +73,12 @@ export class IsoGitFs {
     try {
       const data: unknown = this.dofs.read(normalizedPath, { encoding });
       if (typeof data === 'string') {
-        if (!encoding || encoding === 'buffer') return Promise.resolve(new TextEncoder().encode(data));
+        if (!encoding || encoding === 'buffer') {
+          // dofs returned a binary-as-string payload: decode latin1 (one byte
+          // per char) so pack bytes survive. `TextEncoder` (utf8) would
+          // corrupt bytes >= 0x80.
+          return Promise.resolve(Uint8Array.from(data, (ch) => (ch.codePointAt(0) ?? 0) & 0xff));
+        }
         return Promise.resolve(data);
       }
       const bytes = data instanceof Uint8Array ? data : new Uint8Array(data as ArrayBuffer);
@@ -89,11 +94,12 @@ export class IsoGitFs {
     let arrayLike: ArrayBuffer | string;
     if (typeof data === 'string' || data instanceof ArrayBuffer) {
       arrayLike = data;
+    } else if (data instanceof Uint8Array) {
+      // Zero-copy slice: avoids `new Uint8Array(len).set(...)` on 50MB packs.
+      arrayLike = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
     } else {
       const view = data;
-      const copy = new Uint8Array(view.byteLength);
-      copy.set(new Uint8Array(view.buffer, view.byteOffset, view.byteLength));
-      arrayLike = copy.buffer;
+      arrayLike = view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength) as ArrayBuffer;
     }
     const normalizedPath = normalizePath(filepath);
     try {

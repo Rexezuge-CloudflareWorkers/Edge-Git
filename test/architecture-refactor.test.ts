@@ -44,10 +44,10 @@ describe('refactor: policy objects + error mapper', () => {
   it('maps service errors centrally', () => {
     const mapped = mapServiceError(new NotFoundError('nope'));
     expect(mapped.status).toBe(404);
-    expect(mapped.body.error).toBeTruthy();
+    expect(mapped.body.Exception?.Type).toBeTruthy();
     const internal = mapServiceError(new Error('boom'), 'zh-CN');
     expect(internal.status).toBe(500);
-    expect(internal.body.message).toBe(getBackendStrings('zh-CN').common.internalError);
+    expect(internal.body.Exception?.Message).toBe(getBackendStrings('zh-CN').common.internalError);
     expect(toServiceStatus(new BadRequestError('bad'))).toBe(400);
     expect(toServiceStatus(new Error('boom'))).toBe(500);
   });

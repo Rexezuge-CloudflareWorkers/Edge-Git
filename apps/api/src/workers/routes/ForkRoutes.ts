@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 import { ensureRepo, getRepoStub } from '../repoStub';
-import { requireVisibleRepo, resolvePublicViewer, toRepoJson, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, resolvePublicViewer, toRepoJson, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { copyRepoGit, isPackLimitError } from './CrossFork';
@@ -46,13 +46,13 @@ function registerUserForkRoutes(app: ForkApp): void {
       description?: string | null;
       isPrivate?: boolean;
     }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const scope = createRequestScope(c.env);
     let fork: { id: string; owner: string; name: string; fullName: string; isPrivate: boolean };
     try {
       fork = await scope.get(Tokens.ForkService).createForkRow(email, owner, repoName, body);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to fork repository') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to fork repository'), toServiceStatus(error));
     }
     const sourceFullName = `${owner}/${repoName}`;
     try {
@@ -67,9 +67,9 @@ function registerUserForkRoutes(app: ForkApp): void {
         // best-effort DO purge
       }
       if (isPackLimitError(error)) {
-        return c.json({ error: error instanceof Error ? error.message : 'Repository too large to fork' }, 413);
+        return jsonError(c, error instanceof Error ? error.message : 'Repository too large to fork', 413);
       }
-      return c.json({ error: 'Failed to copy repository data' }, 500);
+      return jsonError(c, 'Failed to copy repository data', 500);
     }
     await scope
       .get(Tokens.WatchService)
@@ -100,7 +100,7 @@ function registerUserForkRoutes(app: ForkApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     const scope = createRequestScope(c.env);
     const permission = scope.get(Tokens.PermissionService);
     const forks = await scope.get(Tokens.ForkService).listForks(row.id, 100);

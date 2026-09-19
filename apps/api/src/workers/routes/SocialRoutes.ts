@@ -1,5 +1,5 @@
 import type { Hono } from 'hono';
-import { requireVisibleRepo, resolvePublicViewer, toRepoJson, withPublicRepo } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, resolvePublicViewer, toRepoJson, withPublicRepo } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { emitWebhookEvent, publishLiveUpdate } from './SocialEmit';
@@ -83,7 +83,7 @@ function registerUserSocialRoutes(app: SocialApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     const scope = createRequestScope(c.env);
     await scope.get(Tokens.StarService).star(row.id, email);
     await emitWebhookEvent(c.env, {
@@ -108,7 +108,7 @@ function registerUserSocialRoutes(app: SocialApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     const scope = createRequestScope(c.env);
     await scope.get(Tokens.StarService).unstar(row.id, email);
     await emitWebhookEvent(c.env, {
@@ -126,7 +126,7 @@ function registerUserSocialRoutes(app: SocialApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     const scope = createRequestScope(c.env);
     await scope.get(Tokens.WatchService).watch(row.id, email);
     await emitWebhookEvent(c.env, {
@@ -151,7 +151,7 @@ function registerUserSocialRoutes(app: SocialApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
+    if (!row) return jsonError(c, 'Not found', 404);
     const scope = createRequestScope(c.env);
     await scope.get(Tokens.WatchService).unwatch(row.id, email);
     await emitWebhookEvent(c.env, {

@@ -1,7 +1,28 @@
+function extractErrorMessage(payloadText: string, status: number): string {
+  if (!payloadText) return `HTTP ${status}`;
+  try {
+    const data = JSON.parse(payloadText) as {
+      Exception?: { Type?: string; Message?: string };
+      error?: string;
+      message?: string;
+    };
+    // AWS envelope first, then legacy `{error,message}`, then raw text.
+    const exceptionMessage = data?.Exception?.Message;
+    if (typeof exceptionMessage === 'string' && exceptionMessage.length > 0) return exceptionMessage;
+    const legacy = data?.message ?? data?.error;
+    if (typeof legacy === 'string' && legacy.length > 0) return legacy;
+    const type = data?.Exception?.Type;
+    if (typeof type === 'string' && type.length > 0) return `${type} (HTTP ${status})`;
+  } catch {
+    // Plain-text body (git paths, proxies): surface as-is.
+  }
+  return payloadText || `HTTP ${status}`;
+}
+
 export async function readJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(error || `HTTP ${response.status}`);
+    const text = await response.text();
+    throw new Error(extractErrorMessage(text, response.status));
   }
   return response.json();
 }

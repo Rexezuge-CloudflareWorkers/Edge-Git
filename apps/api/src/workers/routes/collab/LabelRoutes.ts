@@ -1,4 +1,4 @@
-import { withPublicRepo } from '../PublicViewerResolver';
+import { jsonError, withPublicRepo } from '../PublicViewerResolver';
 import { toSafeErrorMessage, toServiceStatus } from '../PublicViewerResolver';
 import { requireVisibleRepo } from '../PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
@@ -23,7 +23,7 @@ function registerCollabLabelPublicRoutes(app: CollabApp): void {
 function registerCollabLabelUserRoutes(app: CollabApp): void {
   app.get('/user/repos/:owner/:repo/labels', async (c) => {
     const found = await resolveRepoRow(c.env, c.req.param('owner'), c.req.param('repo'), c.get('AuthenticatedUserEmailAddress'));
-    if (!found) return c.json({ error: 'Not found' }, 404);
+    if (!found) return jsonError(c, 'Not found', 404);
     try {
       const labels = await createRequestScope(c.env).get(Tokens.CollaborationService).listLabels(found.row.id);
       return c.json({ labels });
@@ -37,17 +37,17 @@ function registerCollabLabelUserRoutes(app: CollabApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
-    if (!(await needAdmin(c.env, owner, repoName, email))) return c.json({ error: 'Forbidden' }, 403);
+    if (!row) return jsonError(c, 'Not found', 404);
+    if (!(await needAdmin(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
     const { malformed, body } = await readJsonBody<{ name?: string; color?: string; description?: string }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const created = await createRequestScope(c.env)
         .get(Tokens.CollaborationService)
         .createLabel(row.id, body as { name: string });
       return c.json(created, 201);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to create label') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to create label'), toServiceStatus(error));
     }
   });
 
@@ -56,13 +56,13 @@ function registerCollabLabelUserRoutes(app: CollabApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
-    if (!row) return c.json({ error: 'Not found' }, 404);
-    if (!(await needAdmin(c.env, owner, repoName, email))) return c.json({ error: 'Forbidden' }, 403);
+    if (!row) return jsonError(c, 'Not found', 404);
+    if (!(await needAdmin(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
     try {
       await createRequestScope(c.env).get(Tokens.CollaborationService).deleteLabel(row.id, c.req.param('id'));
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 }

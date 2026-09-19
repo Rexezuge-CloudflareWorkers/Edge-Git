@@ -66,7 +66,7 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     // Route handlers must still use toSafeErrorMessage for caught errors.
     app.onError((error, c) => {
       console.error('Unhandled worker error', error instanceof Error ? error.message : error);
-      return c.json({ error: 'Internal error' }, 500);
+      return c.json({ Exception: { Type: 'InternalServerError', Message: 'Internal Server Error.' } }, 500);
     });
 
     // User home (public shell; data is gated per-endpoint). /user stays the

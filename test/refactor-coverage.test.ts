@@ -163,7 +163,7 @@ describe('BaseRoute template method', () => {
     expect(notFound.status).toBe(404);
     const masked = await new BoomRoute().handle(jsonCtx);
     expect(masked.status).toBe(500);
-    expect(await masked.json()).toMatchObject({ error: 'InternalError' });
+    expect(await masked.json()).toMatchObject({ Exception: { Type: 'InternalServerError' } });
     const bad = await new FailHelperRoute().handle(jsonCtx);
     expect(bad.status).toBe(400);
     const direct = BaseRoute.toErrorResponse(jsonCtx, new ForbiddenError('no'));

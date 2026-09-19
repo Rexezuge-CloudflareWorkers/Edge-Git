@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
-import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type OrgApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -10,8 +10,8 @@ function registerOrgRoutes(app: OrgApp): void {
   app.post('/user/orgs', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const { malformed, body } = await readJsonBody<{ username?: string }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
-    if (!body.username) return c.json({ error: 'username is required' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
+    if (!body.username) return jsonError(c, 'username is required', 400);
     try {
       const org = await createRequestScope(c.env).get(Tokens.OrganizationService).createOrganization(email, body.username);
       return c.json({ id: org.id, username: org.username }, 201);
@@ -19,7 +19,7 @@ function registerOrgRoutes(app: OrgApp): void {
       const message = error instanceof Error ? error.message : 'Failed to create organization';
       const status =
         message.includes('taken') || message.includes('Invalid') || message.includes('reserved') ? 400 : toServiceStatus(error);
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to create organization') }, status);
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to create organization'), status);
     }
   });
 
@@ -42,7 +42,7 @@ function registerOrgRoutes(app: OrgApp): void {
         .catch(() => null);
       return c.json({ id: org.id, username: org.username, members, viewerRole });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 
@@ -50,7 +50,7 @@ function registerOrgRoutes(app: OrgApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const orgName = c.req.param('org');
     const { malformed, body } = await readJsonBody<{ username?: string }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = createRequestScope(c.env);
       let org = await scope.get(Tokens.OrganizationService).requireOwner(orgName, email);
@@ -102,9 +102,9 @@ function registerOrgRoutes(app: OrgApp): void {
                 .rename(org.username, email, before)
                 .catch(() => undefined);
               if (isPackLimitError(moveError)) {
-                return c.json({ error: moveError instanceof Error ? moveError.message : 'Repository too large to move' }, 413);
+                return jsonError(c, moveError instanceof Error ? moveError.message : 'Repository too large to move', 413);
               }
-              return c.json({ error: 'Failed to move repository data' }, 500);
+              return jsonError(c, 'Failed to move repository data', 500);
             }
           }
         }
@@ -114,7 +114,7 @@ function registerOrgRoutes(app: OrgApp): void {
       const message = error instanceof Error ? error.message : 'Failed to update organization';
       const status =
         message.includes('taken') || message.includes('Invalid') || message.includes('reserved') ? 400 : toServiceStatus(error);
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to update organization') }, status);
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to update organization'), status);
     }
   });
 
@@ -124,7 +124,7 @@ function registerOrgRoutes(app: OrgApp): void {
       await createRequestScope(c.env).get(Tokens.OrganizationService).disband(c.req.param('org'), email);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
     }
   });
 
@@ -134,38 +134,38 @@ function registerOrgRoutes(app: OrgApp): void {
       const members = await createRequestScope(c.env).get(Tokens.OrganizationService).listMembers(c.req.param('org'), email);
       return c.json({ members });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 
   app.post('/user/orgs/:org/members', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const { malformed, body } = await readJsonBody<{ username?: string; email?: string; role?: string }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const target = body.username ?? body.email;
-    if (!target) return c.json({ error: 'username or email is required' }, 400);
+    if (!target) return jsonError(c, 'username or email is required', 400);
     const role = body.role ?? 'member';
-    if (role !== 'owner' && role !== 'member') return c.json({ error: 'Invalid role' }, 400);
+    if (role !== 'owner' && role !== 'member') return jsonError(c, 'Invalid role', 400);
     try {
       await createRequestScope(c.env).get(Tokens.OrganizationService).addMember(c.req.param('org'), email, target, role);
       return c.json({ ok: true }, 201);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
     }
   });
 
   app.patch('/user/orgs/:org/members/:member', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const { malformed, body } = await readJsonBody<{ role?: string }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
-    if (body.role !== 'owner' && body.role !== 'member') return c.json({ error: 'Invalid role' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
+    if (body.role !== 'owner' && body.role !== 'member') return jsonError(c, 'Invalid role', 400);
     try {
       await createRequestScope(c.env)
         .get(Tokens.OrganizationService)
         .setMemberRole(c.req.param('org'), email, decodeURIComponent(c.req.param('member')), body.role);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
     }
   });
 
@@ -177,7 +177,7 @@ function registerOrgRoutes(app: OrgApp): void {
         .removeMember(c.req.param('org'), email, decodeURIComponent(c.req.param('member')));
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
     }
   });
 
@@ -190,12 +190,12 @@ function registerOrgRoutes(app: OrgApp): void {
       const scope = createRequestScope(c.env);
       await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       const repo = await scope.get(Tokens.RepoService).getByOwnerAndName(owner, repoName);
-      if (!repo) return c.json({ error: 'Not found' }, 404);
+      if (!repo) return jsonError(c, 'Not found', 404);
       const collabDao = await scope.get(Tokens.RepoCollaboratorDAO)();
       const rows = await collabDao.listByRepo(repo.id);
       return c.json({ collaborators: rows.map((r) => ({ email: r.user_email, role: r.role })) });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Not found') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
 
@@ -205,9 +205,9 @@ function registerOrgRoutes(app: OrgApp): void {
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const member = decodeURIComponent(c.req.param('member'));
     const { malformed, body } = await readJsonBody<{ role?: string }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const role = body.role ?? 'read';
-    if (role !== 'admin' && role !== 'write' && role !== 'read') return c.json({ error: 'Invalid role' }, 400);
+    if (role !== 'admin' && role !== 'write' && role !== 'read') return jsonError(c, 'Invalid role', 400);
     try {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
@@ -217,7 +217,7 @@ function registerOrgRoutes(app: OrgApp): void {
       await collabDao.upsert(repo.id, targetEmail, role, email, now);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
     }
   });
 
@@ -234,7 +234,7 @@ function registerOrgRoutes(app: OrgApp): void {
       await collabDao.remove(repo.id, targetEmail);
       return c.json({ ok: true });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
     }
   });
 }

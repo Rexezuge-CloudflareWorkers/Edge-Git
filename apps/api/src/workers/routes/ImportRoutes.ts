@@ -4,7 +4,7 @@ import { RepoService } from '@edge-git/backend-services/repo';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { runImportJob } from '@edge-git/background/transfer/ImportRunner';
 import { getRepoStub } from '../repoStub';
-import { toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type TransferApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -30,8 +30,8 @@ function registerImportRoutes(app: TransferApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const { malformed, body } = await readJsonBody<{ sourceUrl?: string }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
-    if (typeof body.sourceUrl !== 'string' || !body.sourceUrl.trim()) return c.json({ error: 'sourceUrl is required' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
+    if (typeof body.sourceUrl !== 'string' || !body.sourceUrl.trim()) return jsonError(c, 'sourceUrl is required', 400);
     try {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
@@ -41,7 +41,7 @@ function registerImportRoutes(app: TransferApp): void {
       if (waitUntil) waitUntil(runImportJob(c.env, fullName, job.id).catch(() => undefined));
       return c.json({ job }, 202);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to start import') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to start import'), toServiceStatus(error));
     }
   });
 
@@ -53,10 +53,10 @@ function registerImportRoutes(app: TransferApp): void {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'read');
       const job = await scope.get(Tokens.ImportService).latestForRepo(repo.id);
-      if (!job) return c.json({ error: 'No import found' }, 404);
+      if (!job) return jsonError(c, 'No import found', 404);
       return c.json({ job });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to load import') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to load import'), toServiceStatus(error));
     }
   });
 
@@ -70,7 +70,7 @@ function registerImportRoutes(app: TransferApp): void {
       const job = await scope.get(Tokens.ImportService).cancelJob(c.req.param('jobId'), repo.id);
       return c.json({ job });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to cancel import') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to cancel import'), toServiceStatus(error));
     }
   });
 
@@ -87,12 +87,12 @@ function registerImportRoutes(app: TransferApp): void {
       const stub = getRepoStub(c.env, `${owner}/${repoName}`);
       const listed = (await stub.listRefs()) as { refs: Array<{ ref: string; oid: string }> };
       const heads = (listed.refs ?? []).filter((r) => r.ref.startsWith('refs/heads/') || r.ref.startsWith('refs/tags/'));
-      if (heads.length === 0) return c.json({ error: 'Repository is empty' }, 404);
+      if (heads.length === 0) return jsonError(c, 'Repository is empty', 404);
       const exported = await stub.exportPack(heads.map((r) => r.oid));
-      if (!exported.pack || exported.pack.byteLength === 0) return c.json({ error: 'Nothing to export' }, 404);
+      if (!exported.pack || exported.pack.byteLength === 0) return jsonError(c, 'Nothing to export', 404);
       const maxBytes = ConfigurationManager.transfer.getMaxExportBytes(c.env);
       if (exported.pack.byteLength > maxBytes) {
-        return c.json({ error: `Repository too large to export (${exported.pack.byteLength} > ${maxBytes} bytes)` }, 413);
+        return jsonError(c, `Repository too large to export (${exported.pack.byteLength} > ${maxBytes} bytes)`, 413);
       }
       let packBase64 = '';
       const bytes = exported.pack;
@@ -105,7 +105,7 @@ function registerImportRoutes(app: TransferApp): void {
       }
       return c.json({ refs: heads, oids: exported.oids, byteLength: bytes.byteLength, packBase64: btoa(packBase64) });
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to export repository') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to export repository'), toServiceStatus(error));
     }
   });
 }

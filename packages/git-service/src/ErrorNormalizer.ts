@@ -6,7 +6,9 @@ export function normalizePath(p: string): string {
   if (!path.startsWith('/')) path = `/${path}`;
   const out: string[] = [];
   for (const rawSeg of path.split('/')) {
-    const seg = rawSeg.trim();
+    // No trimming: git paths are byte-exact — `" my file "` is distinct from
+    // `"my file"`. Only skip empties / `.` and resolve `..` lexically.
+    const seg = rawSeg;
     if (!seg || seg === '.') continue;
     if (seg === '..') {
       if (out.length > 0) out.pop();
@@ -33,8 +35,16 @@ const KNOWN_CODES = new Set(['ENOENT', 'ENOTDIR', 'EISDIR', 'EEXIST', 'EPERM', '
 
 export class ErrorNormalizer {
   ensureErrCode(error: Error): ErrorWithCode {
+    // Preserve codes already set by the underlying FS (dofs / isomorphic-git).
+    const existing = (error as { code?: unknown }).code;
+    if (typeof existing === 'string' && existing.length > 0) {
+      const preserved = new ErrorWithCode(error.message, existing);
+      const withPath = error as { path?: unknown; syscall?: unknown };
+      if (typeof withPath.path === 'string') preserved.path = withPath.path;
+      if (typeof withPath.syscall === 'string') preserved.syscall = withPath.syscall;
+      return preserved;
+    }
     const e = new ErrorWithCode(error.message);
-    if ((e as { code?: string }).code) return e;
     const msg = e.message.trim();
     if (KNOWN_CODES.has(msg)) {
       e.code = msg;

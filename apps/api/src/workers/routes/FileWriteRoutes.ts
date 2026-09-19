@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { getRepoStub } from '../repoStub';
-import { requireVisibleRepo, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, toErrorBody, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { branchNameSchema, decodeBase64Strict, sanitizeCommitMessage } from '@edge-git/shared/validation';
@@ -21,7 +21,7 @@ function toFileResponse(
     const status = [400, 401, 403, 404, 409, 413, 429].includes(result.status ?? 0)
       ? (result.status as 400 | 401 | 403 | 404 | 409 | 413 | 429)
       : 500;
-    return { body: { error: result.error ?? 'File operation failed' }, status };
+    return { body: toErrorBody(status, result.error ?? 'File operation failed'), status };
   }
   return { body: result, status: successStatus };
 }
@@ -161,38 +161,38 @@ function registerFileWriteRoutes(app: RepoApp): void {
       message?: string;
       expectedOid?: string | null;
     }>(c);
-    if (malformed) return c.json({ error: 'Invalid JSON body' }, 400);
+    if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const branch = (body.branch ?? '').trim();
-    if (!branch) return c.json({ error: 'branch is required' }, 400);
-    if (!branchNameSchema.safeParse(branch).success) return c.json({ error: 'Invalid branch name' }, 400);
+    if (!branch) return jsonError(c, 'branch is required', 400);
+    if (!branchNameSchema.safeParse(branch).success) return jsonError(c, 'Invalid branch name', 400);
     const filePath = (body.path ?? '').trim();
-    if (!filePath) return c.json({ error: 'path is required' }, 400);
-    if (!isSafeFilePath(filePath)) return c.json({ error: 'path must be a safe relative file path' }, 400);
-    if (typeof body.contentBase64 !== 'string') return c.json({ error: 'contentBase64 is required' }, 400);
+    if (!filePath) return jsonError(c, 'path is required', 400);
+    if (!isSafeFilePath(filePath)) return jsonError(c, 'path must be a safe relative file path', 400);
+    if (typeof body.contentBase64 !== 'string') return jsonError(c, 'contentBase64 is required', 400);
     const expected = parseExpectedOid(body.expectedOid);
-    if (!expected.ok) return c.json({ error: 'expectedOid must be a 40-char hex string' }, 400);
+    if (!expected.ok) return jsonError(c, 'expectedOid must be a 40-char hex string', 400);
     const maxFileBytes = ConfigurationManager.repo.getMaxFileBytes(c.env);
     try {
       const gate = await requireWriteRole(c.env, owner, repoName, email);
-      if (!gate.ok) return c.json({ error: gate.status === 404 ? 'Not found' : 'Forbidden' }, gate.status);
+      if (!gate.ok) return jsonError(c, gate.status === 404 ? 'Not found' : 'Forbidden', gate.status);
       // Size tripwire AFTER auth so unauthenticated callers cannot oracle
       // max-file-bytes vs auth failures via 413-vs-401 distinctions.
       if (body.contentBase64.length > Math.ceil(maxFileBytes * 1.4) + 4) {
-        return c.json({ error: `file too large (max ${maxFileBytes} bytes)` }, 413);
+        return jsonError(c, `file too large (max ${maxFileBytes} bytes)`, 413);
       }
       const content = decodeBase64(body.contentBase64);
-      if (!content) return c.json({ error: 'contentBase64 is not valid base64' }, 400);
-      if (content.byteLength > maxFileBytes) return c.json({ error: `file too large (max ${maxFileBytes} bytes)` }, 413);
+      if (!content) return jsonError(c, 'contentBase64 is not valid base64', 400);
+      if (content.byteLength > maxFileBytes) return jsonError(c, `file too large (max ${maxFileBytes} bytes)`, 413);
       const blocked = await checkProtectedBranch(c.env, gate.repo.id, branch);
-      if (blocked && 'unavailable' in blocked) return c.json({ error: 'Branch protection unavailable; try again later' }, 503);
-      if (blocked) return c.json({ error: blocked.error }, 403);
+      if (blocked && 'unavailable' in blocked) return jsonError(c, 'Branch protection unavailable; try again later', 503);
+      if (blocked) return jsonError(c, blocked.error, 403);
       let secret: { blocked: { error: string } } | { warning: number } | null;
       try {
         secret = await checkSecretContent(c.env, gate.repo.id, content);
       } catch {
-        return c.json({ error: 'Secret scan unavailable; try again later' }, 503);
+        return jsonError(c, 'Secret scan unavailable; try again later', 503);
       }
-      if (secret && 'blocked' in secret) return c.json({ error: secret.blocked.error }, 403);
+      if (secret && 'blocked' in secret) return jsonError(c, secret.blocked.error, 403);
       const secretWarning = secret && 'warning' in secret ? secret.warning : 0;
       const message = sanitizeCommitMessage(body.message, `Update ${filePath}`);
       const result = (await getRepoStub(c.env, `${owner}/${repoName}`).commitFile({
@@ -216,7 +216,7 @@ function registerFileWriteRoutes(app: RepoApp): void {
         c.header('X-EdgeGit-Secret-Warning', `${secretWarning} possible secret(s) detected; rotate any exposed credentials`);
       return c.json(out, status);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to save file') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to save file'), toServiceStatus(error));
     }
   });
 
@@ -228,19 +228,19 @@ function registerFileWriteRoutes(app: RepoApp): void {
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const params = new URL(c.req.url).searchParams;
     const branch = (params.get('branch') ?? '').trim();
-    if (!branch) return c.json({ error: 'branch query param is required' }, 400);
-    if (!branchNameSchema.safeParse(branch).success) return c.json({ error: 'Invalid branch name' }, 400);
+    if (!branch) return jsonError(c, 'branch query param is required', 400);
+    if (!branchNameSchema.safeParse(branch).success) return jsonError(c, 'Invalid branch name', 400);
     const filePath = (params.get('path') ?? '').trim();
-    if (!filePath) return c.json({ error: 'path query param is required' }, 400);
-    if (!isSafeFilePath(filePath)) return c.json({ error: 'path must be a safe relative file path' }, 400);
+    if (!filePath) return jsonError(c, 'path query param is required', 400);
+    if (!isSafeFilePath(filePath)) return jsonError(c, 'path must be a safe relative file path', 400);
     const expected = parseExpectedOid(params.get('expectedOid'));
-    if (!expected.ok) return c.json({ error: 'expectedOid must be a 40-char hex string' }, 400);
+    if (!expected.ok) return jsonError(c, 'expectedOid must be a 40-char hex string', 400);
     try {
       const gate = await requireWriteRole(c.env, owner, repoName, email);
-      if (!gate.ok) return c.json({ error: gate.status === 404 ? 'Not found' : 'Forbidden' }, gate.status);
+      if (!gate.ok) return jsonError(c, gate.status === 404 ? 'Not found' : 'Forbidden', gate.status);
       const blocked = await checkProtectedBranch(c.env, gate.repo.id, branch);
-      if (blocked && 'unavailable' in blocked) return c.json({ error: 'Branch protection unavailable; try again later' }, 503);
-      if (blocked) return c.json({ error: blocked.error }, 403);
+      if (blocked && 'unavailable' in blocked) return jsonError(c, 'Branch protection unavailable; try again later', 503);
+      if (blocked) return jsonError(c, blocked.error, 403);
       const message = sanitizeCommitMessage(params.get('message'), `Delete ${filePath}`);
       const result = (await getRepoStub(c.env, `${owner}/${repoName}`).commitFile({
         branch,
@@ -261,7 +261,7 @@ function registerFileWriteRoutes(app: RepoApp): void {
       }
       return c.json(out, status);
     } catch (error) {
-      return c.json({ error: toSafeErrorMessage(error, 'Failed to delete file') }, toServiceStatus(error));
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to delete file'), toServiceStatus(error));
     }
   });
 }

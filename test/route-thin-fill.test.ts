@@ -648,7 +648,7 @@ describe('ReleaseRoutes thin edges', () => {
       body: JSON.stringify({ isDraft: false }),
     });
     expect(publish.status).toBe(400);
-    expect(((await publish.json()) as { error: string }).error).toContain('git tag');
+    expect(((await publish.json()) as { Exception?: { Message?: string } }).Exception?.Message ?? '').toContain('git tag');
   });
 
   it('rejects non-draft creation without git tag', async () => {

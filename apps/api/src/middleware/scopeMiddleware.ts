@@ -1,5 +1,5 @@
 import type { Context, Next } from 'hono';
-import { createServiceContext, setRequestScope } from '@edge-git/backend-runtime/di';
+import { createServiceContext, setRequestScope, asScopedContext } from '@edge-git/backend-runtime/di';
 import { createRequestScope } from '@edge-git/backend-services/composition';
 
 type ScopeContext = Context<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -14,7 +14,7 @@ type ScopeContext = Context<{ Bindings: Env; Variables: { AuthenticatedUserEmail
 async function scopeMiddleware(c: ScopeContext, next: Next): Promise<Response | void> {
   const scope = createRequestScope(c.env);
   const ctx = createServiceContext(c.env);
-  setRequestScope(c as never, scope, ctx);
+  setRequestScope(asScopedContext(c), scope, ctx);
   await next();
 }
 
