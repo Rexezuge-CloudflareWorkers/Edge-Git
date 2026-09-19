@@ -1,6 +1,14 @@
 import type { Hono } from 'hono';
 import { getRepoStub, ensureRepo } from '../repoStub';
-import { requireVisibleRepo, toRepoJson, toSafeErrorMessage, toServiceStatus, withPublicRepo, withVisibleRepo, getScope } from './PublicViewerResolver';
+import {
+  requireVisibleRepo,
+  toRepoJson,
+  toSafeErrorMessage,
+  toServiceStatus,
+  withPublicRepo,
+  withVisibleRepo,
+  getScope,
+} from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
 import { Tokens } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
@@ -116,7 +124,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
 
   app.get('/user/repos', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const scope = getScope(c as never);
+    const scope = getScope(c);
     const rows = await scope.get(Tokens.RepoService).listVisibleForUser(email, 100);
     const permission = scope.get(Tokens.PermissionService);
     const repos = [];
@@ -135,7 +143,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
       description?: string | null;
       isPrivate?: boolean;
     };
-    const scope = getScope(c as never);
+    const scope = getScope(c);
     let owner = (body.owner ?? '').trim();
     if (!owner) {
       try {
@@ -182,7 +190,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
 
   app.get('/user/repos/:owner/:repo', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const scope = getScope(c as never);
+    const scope = getScope(c);
     const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email, scope);
     if (!row) return c.json({ error: 'Not found' }, 404);
     const role = await scope
