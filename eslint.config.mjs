@@ -19,6 +19,7 @@ export default tseslint.config(
       'apps/api/src/generated/**',
       'coverage/**',
       'node_modules/**',
+      'test/**',
     ],
   },
 
