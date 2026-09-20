@@ -1,5 +1,7 @@
 import { BaseDAO } from './BaseDAO';
 import type { D1Queryable } from '../utils/D1Types';
+import { isMissingSchemaError } from '../utils/D1ErrorClassifier';
+import { DatabaseError } from '@edge-git/backend-errors';
 
 export interface RepositoryRow {
   id: string;
@@ -70,8 +72,11 @@ class RepositoryDAO extends BaseDAO {
         'create repository',
       );
       return;
-    } catch {
-      // Fallback for DBs without 0004 fork columns: retry without them.
+    } catch (error) {
+      // Fail closed: only fall back for DBs without 0004 fork columns.
+      // Genuine failures (constraint, D1 outage) must propagate, never retry
+      // silently on a narrower schema and mask the real error + double cost.
+      if (!isMissingSchemaError(error)) throw error;
     }
     try {
       await this.withRetry(
@@ -98,7 +103,9 @@ class RepositoryDAO extends BaseDAO {
             .run(),
         'create repository',
       );
-    } catch {
+    } catch (error) {
+      // Fail closed: only legacy DBs without 0002 columns fall through.
+      if (!isMissingSchemaError(error)) throw error;
       // Fallback for DBs without 0002 columns (unit fakes / old D1): legacy insert.
       await this.withRetry(
         () =>
@@ -114,11 +121,23 @@ class RepositoryDAO extends BaseDAO {
   }
 
   public async getByOwnerAndName(owner: string, name: string): Promise<RepositoryRow | null> {
-    // Case-insensitive lookup covers 0002 rows (owner_ci/name_ci) and legacy
-    // rows (owner/name with any case). Keeps `/:owner/:repo` stable across rename case.
+    // Indexed case-insensitive lookup first: `owner_ci/name_ci` are indexed
+    // (migration 0002). `lower(owner)` cannot use those indexes (full scan),
+    // so it is only a fallback for legacy rows lacking the ci columns.
+    const ownerCi = owner.toLowerCase();
+    const nameCi = name.toLowerCase();
+    try {
+      const indexed = await this.database
+        .prepare('SELECT * FROM repositories WHERE owner_ci = ? AND name_ci = ? LIMIT 1')
+        .bind(ownerCi, nameCi)
+        .first<RepositoryRow>();
+      if (indexed) return indexed;
+    } catch (error) {
+      if (!isMissingSchemaError(error)) throw error;
+    }
     const ci = await this.database
       .prepare('SELECT * FROM repositories WHERE lower(owner) = ? AND lower(name) = ? LIMIT 1')
-      .bind(owner.toLowerCase(), name.toLowerCase())
+      .bind(ownerCi, nameCi)
       .first<RepositoryRow>();
     if (ci) return ci;
     return this.database
@@ -132,9 +151,19 @@ class RepositoryDAO extends BaseDAO {
   }
 
   public async listByOwner(owner: string, limit = 100): Promise<RepositoryRow[]> {
+    const ownerCi = owner.toLowerCase();
+    try {
+      const result = await this.database
+        .prepare('SELECT * FROM repositories WHERE owner_ci = ? ORDER BY updated_at DESC LIMIT ?')
+        .bind(ownerCi, limit)
+        .all<RepositoryRow>();
+      if ((result.results ?? []).length > 0) return result.results ?? [];
+    } catch (error) {
+      if (!isMissingSchemaError(error)) throw error;
+    }
     const result = await this.database
       .prepare('SELECT * FROM repositories WHERE lower(owner) = ? ORDER BY updated_at DESC LIMIT ?')
-      .bind(owner.toLowerCase(), limit)
+      .bind(ownerCi, limit)
       .all<RepositoryRow>();
     if ((result.results ?? []).length > 0) return result.results ?? [];
     const legacy = await this.database
@@ -159,7 +188,9 @@ class RepositoryDAO extends BaseDAO {
         .bind(orgId, limit)
         .all<RepositoryRow>();
       return result.results ?? [];
-    } catch {
+    } catch (error) {
+      // Fail closed: only legacy DBs without org columns degrade to [].
+      if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to list repositories by org: ${error instanceof Error ? error.message : String(error)}`);
       return [];
     }
   }
@@ -173,7 +204,8 @@ class RepositoryDAO extends BaseDAO {
         .bind(userEmail, limit)
         .all<RepositoryRow>();
       return result.results ?? [];
-    } catch {
+    } catch (error) {
+      if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to list collaborator repositories: ${error instanceof Error ? error.message : String(error)}`);
       return [];
     }
   }
@@ -185,13 +217,14 @@ class RepositoryDAO extends BaseDAO {
       await this.withRetry(
         () =>
           this.database
-            .prepare('UPDATE repositories SET owner = ?, owner_ci = ?, updated_at = ? WHERE lower(owner) = ?')
-            .bind(newOwner, newCi, stamp, oldOwnerCi)
+            .prepare('UPDATE repositories SET owner = ?, owner_ci = ?, updated_at = ? WHERE owner_ci = ?')
+            .bind(newOwner, newCi, stamp, oldOwnerCi.toLowerCase())
             .run(),
         'rename repo owner',
       );
       return;
-    } catch {
+    } catch (error) {
+      if (!isMissingSchemaError(error)) throw error;
       // Fall through to legacy variants below (missing columns on old D1).
     }
     try {
@@ -203,7 +236,8 @@ class RepositoryDAO extends BaseDAO {
             .run(),
         'rename repo owner',
       );
-    } catch {
+    } catch (error) {
+      if (!isMissingSchemaError(error)) throw error;
       await this.withRetry(
         () => this.database.prepare('UPDATE repositories SET owner = ? WHERE owner = ?').bind(newOwner, oldOwnerCi).run(),
         'rename repo owner legacy',
@@ -212,7 +246,7 @@ class RepositoryDAO extends BaseDAO {
   }
 
   // Refresh denormalized fork-source names after the source owner renames.
-  // Best-effort: silently skips DBs without the 0004 fork columns.
+  // Best-effort only for legacy DBs without fork columns; genuine failures propagate.
   public async updateForkSourceFullName(sourceRepoId: string, sourceFullName: string): Promise<void> {
     try {
       await this.withRetry(
@@ -223,7 +257,8 @@ class RepositoryDAO extends BaseDAO {
             .run(),
         'rename fork source full name',
       );
-    } catch {
+    } catch (error) {
+      if (!isMissingSchemaError(error)) throw error;
       // Legacy DBs without fork columns — nothing to refresh.
     }
   }
@@ -235,7 +270,8 @@ class RepositoryDAO extends BaseDAO {
         .bind(sourceRepoId, limit)
         .all<RepositoryRow>();
       return result.results ?? [];
-    } catch {
+    } catch (error) {
+      if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to list forks: ${error instanceof Error ? error.message : String(error)}`);
       // DBs without 0004 fork columns (unit fakes / old D1) have no forks.
       return [];
     }
@@ -248,7 +284,8 @@ class RepositoryDAO extends BaseDAO {
         .bind(sourceRepoId)
         .first<{ n: number }>();
       return row?.n ?? 0;
-    } catch {
+    } catch (error) {
+      if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to count forks: ${error instanceof Error ? error.message : String(error)}`);
       return 0;
     }
   }
@@ -281,6 +318,7 @@ class RepositoryDAO extends BaseDAO {
 
   // Backfill support: most-recently-updated repos first. Offset pagination is
   // fine here (cron iterates slowly, exact cursors unnecessary).
+  // Fail closed: only legacy-schema errors degrade to [].
   public async listRecent(limit = 50, offset = 0): Promise<RepositoryRow[]> {
     try {
       const result = await this.database
@@ -288,7 +326,8 @@ class RepositoryDAO extends BaseDAO {
         .bind(limit, offset)
         .all<RepositoryRow>();
       return result.results ?? [];
-    } catch {
+    } catch (error) {
+      if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to list recent repositories: ${error instanceof Error ? error.message : String(error)}`);
       return [];
     }
   }

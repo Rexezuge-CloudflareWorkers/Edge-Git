@@ -19,7 +19,6 @@ export default tseslint.config(
       'apps/api/src/generated/**',
       'coverage/**',
       'node_modules/**',
-      'test/**',
     ],
   },
 
@@ -379,13 +378,27 @@ export default tseslint.config(
       '@typescript-eslint/require-await': 'off',
       // Redundant type constituents appear in typed mock stubs
       '@typescript-eslint/no-redundant-type-constituents': 'off',
+      // `as never` casts are the standard fake-DB double pattern in tests
+      '@typescript-eslint/no-unnecessary-type-assertion': 'off',
       // Promise.withResolvers() and function-scoping refactors are cosmetic in tests
       'unicorn/prefer-promise-with-resolvers': 'off',
       'unicorn/consistent-function-scoping': 'off',
+      // Fake-DB builders push-then-return and sort without comparators by convention
+      'unicorn/no-return-array-push': 'off',
+      'unicorn/require-array-sort-compare': 'off',
+      // Iterator-helper rewrites churn test fakes with no runtime benefit
+      'unicorn/prefer-iterator-helpers': 'off',
+      'unicorn/prefer-iterator-to-array': 'off',
+      // String replacement with test-driven values is intentional in assertions
+      'unicorn/no-unsafe-string-replacement': 'off',
       // sonarjs/assertions-in-tests fires false positives when test helpers handle assertions indirectly
       'sonarjs/assertions-in-tests': 'off',
       // sonarjs/no-extra-arguments fires incorrectly on Vitest mock overloads
       'sonarjs/no-extra-arguments': 'off',
+      // Union/inline types in test fakes are more readable than aliases
+      'sonarjs/use-type-alias': 'off',
+      // Alphabetical-sort rule fights deterministic fixture ordering in tests
+      'sonarjs/no-alphabetical-sort': 'off',
     },
   },
 );

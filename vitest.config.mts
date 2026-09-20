@@ -18,7 +18,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['test/**/*.test.ts'],
+    include: ['test/**/*.test.{ts,tsx}'],
     exclude: ['test/integration/**'],
     coverage: {
       provider: 'v8',
@@ -27,10 +27,10 @@ export default defineConfig({
       include: ['apps/api/src/**/*.ts', 'apps/background/src/**/*.ts', 'packages/**/src/**/*.ts'],
       exclude: ['**/*.test.ts', '**/*.d.ts', '**/index.ts', '**/types.d.ts', '**/model/**'],
       thresholds: {
-        statements: 80,
-        branches: 70,
-        functions: 80,
-        lines: 85,
+        statements: 82,
+        branches: 72,
+        functions: 82,
+        lines: 87,
       },
     },
   },

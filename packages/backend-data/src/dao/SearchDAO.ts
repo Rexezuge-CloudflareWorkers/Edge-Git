@@ -1,5 +1,7 @@
 import { BaseDAO } from './BaseDAO';
 import type { D1Queryable } from '../utils/D1Types';
+import { isMissingSchemaError } from '../utils/D1ErrorClassifier';
+import { DatabaseError } from '@edge-git/backend-errors';
 import type { IssueRow } from './IssueDAO';
 import type { PullRequestRow } from './PullRequestDAO';
 import type { RepositoryRow } from './RepositoryDAO';
@@ -82,7 +84,8 @@ class SearchDAO extends BaseDAO {
           .bind(...params)
           .all<RepositoryRow>();
         return result.results ?? [];
-      } catch {
+      } catch (error) {
+        if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to search repositories: ${error instanceof Error ? error.message : String(error)}`);
         return [];
       }
     }
@@ -119,7 +122,8 @@ class SearchDAO extends BaseDAO {
           .bind(...params)
           .all<IssueRow>();
         return result.results ?? [];
-      } catch {
+      } catch (error) {
+        if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to search issues: ${error instanceof Error ? error.message : String(error)}`);
         return [];
       }
     }
@@ -155,7 +159,8 @@ class SearchDAO extends BaseDAO {
           .bind(...params)
           .all<PullRequestRow>();
         return result.results ?? [];
-      } catch {
+      } catch (error) {
+        if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to search pulls: ${error instanceof Error ? error.message : String(error)}`);
         return [];
       }
     }
@@ -191,7 +196,8 @@ class SearchDAO extends BaseDAO {
           .bind(...params)
           .all<CodeHit>();
         return result.results ?? [];
-      } catch {
+      } catch (error) {
+        if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to search code: ${error instanceof Error ? error.message : String(error)}`);
         return [];
       }
     }
@@ -204,7 +210,8 @@ class SearchDAO extends BaseDAO {
         'upsert code index',
       );
       return result.meta?.changes ?? 0;
-    } catch {
+    } catch (error) {
+      if (!isMissingSchemaError(error)) throw error;
       // Legacy DBs without migration 0006 — search degrades to no code results.
       return 0;
     }
@@ -225,7 +232,8 @@ class SearchDAO extends BaseDAO {
           );
           const results = await database.batch(statements);
           return results.reduce((total, result) => total + ((result.meta?.changes ?? 0) || 0), 0);
-        } catch {
+        } catch (error) {
+          if (!isMissingSchemaError(error)) throw error;
           // Fall through to sequential upserts below.
         }
       }
@@ -234,7 +242,8 @@ class SearchDAO extends BaseDAO {
         changed += await this.upsertCodeFile(input);
       }
       return changed;
-    } catch {
+    } catch (error) {
+      if (!isMissingSchemaError(error)) throw error;
       // Legacy DBs without migration 0006 — search degrades to no code results.
       return 0;
     }
@@ -250,7 +259,8 @@ class SearchDAO extends BaseDAO {
         .bind(repoId)
         .all<CodeOidEntry>();
       return result.results ?? [];
-    } catch {
+    } catch (error) {
+      if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to list indexed oids: ${error instanceof Error ? error.message : String(error)}`);
       // Legacy DBs without migration 0006.
       return [];
     }
@@ -279,7 +289,8 @@ class SearchDAO extends BaseDAO {
         'delete stale code index',
       );
       return result.meta?.changes ?? 0;
-    } catch {
+    } catch (error) {
+      if (!isMissingSchemaError(error)) throw error;
       return 0;
     }
   }
@@ -290,7 +301,8 @@ class SearchDAO extends BaseDAO {
         () => this.database.prepare('DELETE FROM code_index WHERE repo_id = ? AND path = ?').bind(repoId, path).run(),
         'delete code index file',
       );
-    } catch {
+    } catch (error) {
+      if (!isMissingSchemaError(error)) throw error;
       // ignore — table may not exist on old DBs
     }
   }
@@ -301,7 +313,8 @@ class SearchDAO extends BaseDAO {
         () => this.database.prepare('DELETE FROM code_index WHERE repo_id = ?').bind(repoId).run(),
         'delete code index by repo',
       );
-    } catch {
+    } catch (error) {
+      if (!isMissingSchemaError(error)) throw error;
       // ignore — table may not exist on old DBs
     }
   }
@@ -336,7 +349,8 @@ class SearchDAO extends BaseDAO {
           .bind(...params)
           .all<DiscussionRow>();
         return result.results ?? [];
-      } catch {
+      } catch (error) {
+        if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to search discussions: ${error instanceof Error ? error.message : String(error)}`);
         return [];
       }
     }
@@ -365,7 +379,8 @@ class SearchDAO extends BaseDAO {
           .bind(...params)
           .all<SnippetRow>();
         return result.results ?? [];
-      } catch {
+      } catch (error) {
+        if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to search snippets: ${error instanceof Error ? error.message : String(error)}`);
         return [];
       }
     }

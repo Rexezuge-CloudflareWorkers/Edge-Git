@@ -77,6 +77,9 @@ describe('PermissionService roles', () => {
             return null;
           },
         }) as never,
+      teamDAO: async () => ({ getById: async () => null }) as never,
+      teamMemberDAO: async () => ({ get: async () => null }) as never,
+      teamGrantDAO: async () => ({ listByRepo: async () => [] }) as never,
     });
     const repo = orgRepo();
     await expect(svc.getRole('owner@example.com', repo as never)).resolves.toBe('admin');
@@ -206,7 +209,7 @@ describe('RepoService org creation', () => {
         }) as never,
       userDAO: async () =>
         ({
-          getByEmail: async (email: string) => ({ email, username: email.split('@')[0] }),
+          getByEmail: async (email: string) => ({ email, username: email.split('@', 1)[0] }),
         }) as never,
       organizationDAO: async () =>
         ({
@@ -285,7 +288,7 @@ describe('OrganizationService happy paths', () => {
             listByOrg: async (orgId: string) =>
               [...(members.get(orgId)?.entries() ?? [])].map(([user_email, role]) => ({ org_id: orgId, user_email, role })),
             listOrgsByUser: async (email: string) =>
-              [...members.entries()]
+              [...members]
                 .filter(([, m]) => m.has(email))
                 .map(([org_id]) => ({ org_id, user_email: email, role: members.get(org_id)!.get(email)! })),
             countOwners: async (orgId: string) => [...(members.get(orgId)?.values() ?? [])].filter((r) => r === 'owner').length,
@@ -299,7 +302,7 @@ describe('OrganizationService happy paths', () => {
         userDAO: async () =>
           ({
             getByUsernameCi: async (ci: string) => (ci === 'alice' ? { email: 'alice@x.co', username: 'alice' } : null),
-            getByEmail: async (email: string) => ({ email, username: email.split('@')[0] }),
+            getByEmail: async (email: string) => ({ email, username: email.split('@', 1)[0] }),
           }) as never,
         repositoryDAO: async () =>
           ({

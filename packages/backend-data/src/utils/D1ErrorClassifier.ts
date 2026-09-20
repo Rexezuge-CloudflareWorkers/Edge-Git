@@ -45,4 +45,13 @@ function isD1ErrorRetryable(errorMessage: string): boolean {
   return false;
 }
 
-export { isD1ErrorRetryable };
+// Fail-closed helper (hardening): distinguishes "legacy DB / unit fake
+// missing a table or column" (safe to degrade to [] / fallback query) from
+// genuine D1 failures (must propagate as DatabaseError, never silent []).
+// Callers must only swallow `true` here; everything else rethrows.
+function isMissingSchemaError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
+  return /no\s+such\s+(?:table|column|index)/i.test(message);
+}
+
+export { isD1ErrorRetryable, isMissingSchemaError };

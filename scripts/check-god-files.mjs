@@ -17,6 +17,10 @@ const EXCLUDE_SUFFIX = ['.test.ts', '.spec.ts', '.int.test.ts', '.d.ts'];
 function shouldSkip(path) {
   if (path.includes('/locales/') || path.includes('/generated/') || path.includes('/__tests__/') || path.includes('/__mocks__/'))
     return true;
+  // Tooling is not product source: build/lint/test configs and scripts grow
+  // with project surface, not complexity. Guard only product + test code.
+  if (path.includes('/scripts/')) return true;
+  if (/\.config\.(m?[jt]s|cjs)$/.test(path)) return true;
   if (path.endsWith('.json') || path.endsWith('.sql') || path.endsWith('.md')) return true;
   if (EXCLUDE_SUFFIX.some((s) => path.endsWith(s))) return true;
   if (path.endsWith('/index.ts') && path.includes('backend-services/src')) return false;

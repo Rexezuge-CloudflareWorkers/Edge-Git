@@ -9,6 +9,8 @@ import {
   TeamRepoGrantDAO,
 } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
+import { isMissingSchemaError } from '@edge-git/backend-data/utils';
+import { DatabaseError } from '@edge-git/backend-errors';
 import type { RepoRole } from '@edge-git/backend-data/dao';
 
 type RepoPermission = RepoRole;
@@ -78,6 +80,8 @@ class PermissionService {
     const viewer = viewerEmail.toLowerCase();
 
     // Resolve org (0002 path with graceful fallback for legacy DBs/fakes).
+    // Fail closed: only missing-table errors degrade; genuine D1 failures
+    // throw DatabaseError instead of falling through to public-read.
     let orgId: string | null = null;
     try {
       const ownerType = PermissionService.ownerTypeOf(repo);
@@ -93,16 +97,17 @@ class PermissionService {
         }
       } else {
         // User-owned fast path may still be an org repo on legacy rows: check registry once.
-        // Namespace lookup is cheap; missing-table errors fall through to user logic.
         try {
           const orgDAO = await this.deps.organizationDAO();
           const maybeOrg = await orgDAO.getByUsernameCi(PermissionService.ownerCiOf(repo));
           if (maybeOrg && (repo.org_id === maybeOrg.id || repo.owner_type === 'org')) orgId = maybeOrg.id;
-        } catch {
+        } catch (error) {
+          if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to resolve organization: ${error instanceof Error ? error.message : String(error)}`);
           // ignore — legacy DB without organizations table
         }
       }
-    } catch {
+    } catch (error) {
+      if (!isMissingSchemaError(error)) throw error instanceof DatabaseError ? error : new DatabaseError(`Failed to resolve permission: ${error instanceof Error ? error.message : String(error)}`);
       orgId = null;
     }
 
@@ -111,7 +116,8 @@ class PermissionService {
         const memberDAO = await this.deps.organizationMemberDAO();
         const membership = await memberDAO.get(orgId, viewer);
         if (membership?.role === 'owner') return 'admin';
-      } catch {
+      } catch (error) {
+        if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to check org membership: ${error instanceof Error ? error.message : String(error)}`);
         // missing table → fall through to collaborator/public checks
       }
       let best: RepoPermission | null = null;
@@ -119,16 +125,16 @@ class PermissionService {
         const collabDAO = await this.deps.repoCollaboratorDAO();
         const grant = await collabDAO.get(repo.id, viewer);
         if (grant) best = grant.role;
-      } catch {
-        // ignore
+      } catch (error) {
+        if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to check collaborator grant: ${error instanceof Error ? error.message : String(error)}`);
       }
       // Team-derived grants (org repos only): max of direct + team grants.
       // Missing team tables (legacy DBs/fakes) fall through silently.
       try {
         const teamBest = await this.getTeamRole(orgId, repo.id, viewer);
         if (teamBest && (!best || ROLE_RANK[teamBest] > ROLE_RANK[best])) best = teamBest;
-      } catch {
-        // ignore
+      } catch (error) {
+        if (!isMissingSchemaError(error)) throw error instanceof DatabaseError ? error : new DatabaseError(`Failed to check team grants: ${error instanceof Error ? error.message : String(error)}`);
       }
       if (best) return best;
       return isPrivate ? null : 'read';
@@ -141,8 +147,8 @@ class PermissionService {
       const collabDAO = await this.deps.repoCollaboratorDAO();
       const grant = await collabDAO.get(repo.id, viewer);
       if (grant) return grant.role;
-    } catch {
-      // ignore
+    } catch (error) {
+      if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to check collaborator grant: ${error instanceof Error ? error.message : String(error)}`);
     }
     return isPrivate ? null : 'read';
   }
@@ -158,14 +164,28 @@ class PermissionService {
    */
   private async getTeamRole(orgId: string, repoId: string, viewer: string): Promise<RepoPermission | null> {
     const grantDAO = await this.deps.teamGrantDAO();
-    const grants = await grantDAO.listByRepo(repoId).catch(() => []);
+    let grants: Array<{ team_id: string; role: RepoPermission }>;
+    try {
+      grants = await grantDAO.listByRepo(repoId);
+    } catch (error) {
+      if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to list team grants: ${error instanceof Error ? error.message : String(error)}`);
+      return null;
+    }
     if (grants.length === 0) return null;
     const memberDAO = await this.deps.teamMemberDAO();
     const teamDAO = await this.deps.teamDAO();
     const uniqueTeamIds = [...new Set(grants.map((g) => g.team_id))];
+    const swallowMissing = async <T>(op: Promise<T>): Promise<T | null> => {
+      try {
+        return await op;
+      } catch (error) {
+        if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to resolve team role: ${error instanceof Error ? error.message : String(error)}`);
+        return null;
+      }
+    };
     const [teams, memberships] = await Promise.all([
-      Promise.all(uniqueTeamIds.map((id) => teamDAO.getById(id).catch(() => null))),
-      Promise.all(uniqueTeamIds.map((id) => memberDAO.get(id, viewer).catch(() => null))),
+      Promise.all(uniqueTeamIds.map((id) => swallowMissing(teamDAO.getById(id)))),
+      Promise.all(uniqueTeamIds.map((id) => swallowMissing(memberDAO.get(id, viewer)))),
     ]);
     const teamById = new Map(
       teams.filter((t): t is NonNullable<typeof t> => t !== null).map((t) => [t.id, t] as const),
