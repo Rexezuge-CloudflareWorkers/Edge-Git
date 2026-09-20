@@ -6,4 +6,4 @@ export {
   WebhookDeliveryTask,
 } from './TaskRegistry';
 export type { ScheduledTask } from './TaskRegistry';
-export { BaseScheduledTask } from './IScheduledTask';
+export { BaseScheduledTask, AbstractPruningTask } from './IScheduledTask';

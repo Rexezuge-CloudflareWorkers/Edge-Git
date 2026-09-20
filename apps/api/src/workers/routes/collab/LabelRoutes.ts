@@ -9,7 +9,7 @@ import { readJsonBody } from '../BodyParser';
 
 function registerCollabLabelPublicRoutes(app: CollabApp): void {
   app.get('/repos/:owner/:repo/labels', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       try {
         const labels = await createRequestScope(c.env).get(Tokens.CollaborationService).listLabels(row.id);
         return c.json({ labels });

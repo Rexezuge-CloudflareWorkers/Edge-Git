@@ -9,7 +9,7 @@ import { readJsonBody } from '../BodyParser';
 
 function registerCollabMilestonePublicRoutes(app: CollabApp): void {
   app.get('/repos/:owner/:repo/milestones', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       try {
         const milestones = await createRequestScope(c.env).get(Tokens.CollaborationService).listMilestones(row.id);
         return c.json({ milestones });

@@ -7,14 +7,14 @@ import type { MergePreviewShape, PullApp } from './PullShared';
 
 function registerPullRoutes(app: PullApp): void {
   app.get('/repos/:owner/:repo/pulls', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       const scope = createRequestScope(c.env);
       const label = c.req.query('label');
       const q = (c.req.query('q') ?? '').trim();
       let pulls = q
         ? await scope
             .get(Tokens.SearchService)
-            .searchPulls(q, await resolvePublicViewer(c as never).catch(() => null), { limit: 50, repoId: row.id })
+            .searchPulls(q, await resolvePublicViewer(c).catch(() => null), { limit: 50, repoId: row.id })
             .catch(() => null)
         : null;
       if (!pulls) pulls = await scope.get(Tokens.PullRequestService).listByRepo(row.id, 50);
@@ -34,7 +34,7 @@ function registerPullRoutes(app: PullApp): void {
   });
 
   app.get('/repos/:owner/:repo/pulls/:number', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       const number = parsePullNumber(c.req.param('number'));
       if (number === null) return jsonError(c, 'Not found', 404);
       try {
@@ -47,7 +47,7 @@ function registerPullRoutes(app: PullApp): void {
   });
 
   app.get('/repos/:owner/:repo/pulls/:number/comments', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       const number = parsePullNumber(c.req.param('number'));
       if (number === null) return jsonError(c, 'Not found', 404);
       try {
@@ -60,7 +60,7 @@ function registerPullRoutes(app: PullApp): void {
   });
 
   app.get('/repos/:owner/:repo/pulls/:number/reviews', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       const number = parsePullNumber(c.req.param('number'));
       if (number === null) return jsonError(c, 'Not found', 404);
       try {
@@ -73,7 +73,7 @@ function registerPullRoutes(app: PullApp): void {
   });
 
   app.get('/repos/:owner/:repo/pulls/:number/diff', async (c) => {
-    return withPublicRepo(c as never, async (row, fullName) => {
+    return withPublicRepo(c, async (row, fullName) => {
       const number = parsePullNumber(c.req.param('number'));
       if (number === null) return jsonError(c, 'Not found', 404);
       try {
@@ -82,7 +82,7 @@ function registerPullRoutes(app: PullApp): void {
         const head = await resolveHeadRepo(c.env, pull);
         if (head) {
           // A private fork's diff must not leak through a public base repo.
-          const viewerEmail = await resolvePublicViewer(c as never);
+          const viewerEmail = await resolvePublicViewer(c);
           const headRole = await createRequestScope(c.env)
             .get(Tokens.PermissionService)
             .getRole(viewerEmail, head.row)
@@ -104,14 +104,14 @@ function registerPullRoutes(app: PullApp): void {
   });
 
   app.get('/repos/:owner/:repo/pulls/:number/preview', async (c) => {
-    return withPublicRepo(c as never, async (row, fullName) => {
+    return withPublicRepo(c, async (row, fullName) => {
       const number = parsePullNumber(c.req.param('number'));
       if (number === null) return jsonError(c, 'Not found', 404);
       try {
         const pull = await createRequestScope(c.env).get(Tokens.PullRequestService).getByNumber(row.id, number);
         const head = await resolveHeadRepo(c.env, pull);
         if (head) {
-          const viewerEmail = await resolvePublicViewer(c as never);
+          const viewerEmail = await resolvePublicViewer(c);
           const headRole = await createRequestScope(c.env)
             .get(Tokens.PermissionService)
             .getRole(viewerEmail, head.row)

@@ -8,7 +8,7 @@ import { readJsonBody } from './BodyParser';
 
 function registerPullThreadRoutes(app: PullApp): void {
   app.get('/repos/:owner/:repo/pulls/:number/threads', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       const number = parsePullNumber(c.req.param('number'));
       if (number === null) return jsonError(c, 'Not found', 404);
       try {

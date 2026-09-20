@@ -56,7 +56,7 @@ function enqueueChecksBestEffort(
 
 function registerCheckPublicRoutes(app: CheckApp): void {
   app.get('/repos/:owner/:repo/commits/:sha/checks', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       try {
         const { runs, state } = await createRequestScope(c.env).get(Tokens.CheckService).listForSha(row.id, c.req.param('sha'));
         return c.json({ state, checks: runs.map(toCheckJson) });

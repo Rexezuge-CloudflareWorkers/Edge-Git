@@ -29,20 +29,20 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
   app.get('/user/repos/:owner/:repo/branches', async (c) => {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) => c.json(await getRepoStub(c.env, fullName).getBranches()));
+    return withVisibleRepoLocal(c, owner, repoName, async (fullName) => c.json(await getRepoStub(c.env, fullName).getBranches()));
   });
 
   app.get('/user/repos/:owner/:repo/tags', async (c) => {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) => c.json(await getRepoStub(c.env, fullName).getTags()));
+    return withVisibleRepoLocal(c, owner, repoName, async (fullName) => c.json(await getRepoStub(c.env, fullName).getTags()));
   });
 
   app.get('/user/repos/:owner/:repo/tree', async (c) => {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const url = new URL(c.req.url);
-    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) =>
+    return withVisibleRepoLocal(c, owner, repoName, async (fullName) =>
       c.json(
         await getRepoStub(c.env, fullName).getTree({
           ref: sanitizeRefParam(url.searchParams.get('ref')),
@@ -58,7 +58,7 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const url = new URL(c.req.url);
     const filepath = sanitizePathParam(url.searchParams.get('path')) ?? '';
-    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) =>
+    return withVisibleRepoLocal(c, owner, repoName, async (fullName) =>
       c.json(await getRepoStub(c.env, fullName).getBlob({ ref: sanitizeRefParam(url.searchParams.get('ref')), filepath })),
     );
   });
@@ -67,7 +67,7 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const url = new URL(c.req.url);
-    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) =>
+    return withVisibleRepoLocal(c, owner, repoName, async (fullName) =>
       c.json(
         await getRepoStub(c.env, fullName).getCommits({
           ref: sanitizeRefParam(url.searchParams.get('ref')),
@@ -82,7 +82,7 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
     if (!/^[0-9a-f]{40}$/i.test(oid)) return jsonError(c, 'Invalid commit oid', 400);
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
-    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) => {
+    return withVisibleRepoLocal(c, owner, repoName, async (fullName) => {
       const diff = (await getRepoStub(c.env, fullName).getCommitDiff(oid)) as { commit: unknown } | null;
       if (!diff || !diff.commit) return jsonError(c, 'Not found', 404);
       return c.json(diff);
@@ -96,7 +96,7 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
     const baseRef = sanitizeRefParam(url.searchParams.get('base')) ?? '';
     const headRef = sanitizeRefParam(url.searchParams.get('head')) ?? '';
     if (!baseRef || !headRef) return jsonError(c, 'base and head query params are required', 400);
-    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) => {
+    return withVisibleRepoLocal(c, owner, repoName, async (fullName) => {
       const diff = await getRepoStub(c.env, fullName).getCompare({ baseRef, headRef });
       if (!diff) return jsonError(c, 'Not found', 404);
       return c.json(diff);
@@ -108,7 +108,7 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     const url = new URL(c.req.url);
     const args = parseOverviewArgs(url.searchParams);
-    return withVisibleRepoLocal(c as never, owner, repoName, async (fullName) =>
+    return withVisibleRepoLocal(c, owner, repoName, async (fullName) =>
       c.json(await getRepoStub(c.env, fullName).getOverview(args)),
     );
   });

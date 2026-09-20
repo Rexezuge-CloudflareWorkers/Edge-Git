@@ -9,7 +9,7 @@ type WikiApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress:
 
 function registerWikiPublicRoutes(app: WikiApp): void {
   app.get('/repos/:owner/:repo/wiki', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       const url = new URL(c.req.url);
       const q = (url.searchParams.get('q') ?? '').trim();
       try {
@@ -27,7 +27,7 @@ function registerWikiPublicRoutes(app: WikiApp): void {
   });
 
   app.get('/repos/:owner/:repo/wiki/:slug', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       try {
         const page = await createRequestScope(c.env).get(Tokens.WikiService).getPage(row.id, c.req.param('slug'));
         return c.json({ page });

@@ -14,7 +14,7 @@ function parseProjectNumber(raw: string | undefined): number | null {
 
 function registerProjectPublicRoutes(app: ProjectApp): void {
   app.get('/repos/:owner/:repo/projects', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       try {
         const projects = await createRequestScope(c.env).get(Tokens.ProjectService).listProjects(row.id);
         return c.json({ projects });
@@ -25,7 +25,7 @@ function registerProjectPublicRoutes(app: ProjectApp): void {
   });
 
   app.get('/repos/:owner/:repo/projects/:number', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       const number = parseProjectNumber(c.req.param('number'));
       if (number === null) return jsonError(c, 'Invalid project number', 400);
       try {

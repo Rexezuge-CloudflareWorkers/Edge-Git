@@ -14,7 +14,7 @@ function parseNumber(raw: string | undefined): number | null {
 
 function registerDiscussionPublicRoutes(app: DiscussionApp): void {
   app.get('/repos/:owner/:repo/discussions/categories', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       try {
         const categories = await createRequestScope(c.env).get(Tokens.DiscussionService).listCategories(row.id);
         return c.json({ categories });
@@ -25,7 +25,7 @@ function registerDiscussionPublicRoutes(app: DiscussionApp): void {
   });
 
   app.get('/repos/:owner/:repo/discussions', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       try {
         const url = new URL(c.req.url);
         const discussions = await createRequestScope(c.env)
@@ -39,7 +39,7 @@ function registerDiscussionPublicRoutes(app: DiscussionApp): void {
   });
 
   app.get('/repos/:owner/:repo/discussions/:number', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       const number = parseNumber(c.req.param('number'));
       if (number === null) return jsonError(c, 'Invalid discussion number', 400);
       try {

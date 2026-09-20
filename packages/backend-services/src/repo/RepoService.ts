@@ -122,12 +122,16 @@ class RepoService {
     });
   }
 
-  /** @deprecated Import `RepoFullName` from `@edge-git/shared/utils` directly. */
+  /**
+  @deprecated Import `RepoFullName` from `@edge-git/shared/utils` directly.
+  */
   public static normalizeOwner(owner: string): string {
     return RepoFullName.normalizeOwner(owner);
   }
 
-  /** @deprecated Import `RepoFullName` from `@edge-git/shared/utils` directly. */
+  /**
+  @deprecated Import `RepoFullName` from `@edge-git/shared/utils` directly.
+  */
   public static normalizeRepo(name: string): string {
     return RepoFullName.normalizeRepo(name);
   }

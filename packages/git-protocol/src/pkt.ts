@@ -281,7 +281,9 @@ export class PktLine {
     const length = Number.parseInt(hex, 16);
 
     if (Number.isNaN(length)) {
-      throw new TypeError(`Invalid hexadecimal length: ${hex}`);
+      // Plain Error (not TypeError) so pkt-line failures map consistently
+      // through the single error pipeline — callers translate to 400.
+      throw new Error(`Invalid hexadecimal length: ${hex}`);
     }
 
     if (length < 4) {

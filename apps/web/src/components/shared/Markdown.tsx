@@ -9,8 +9,7 @@ export function isSafeHref(href?: string): boolean {
   if (trimmed.startsWith('#') || trimmed.startsWith('/') || trimmed.startsWith('?')) {
     // Reject protocol-relative `//evil.com` which would otherwise inherit
     // https: and render as an external open-redirect.
-    if (trimmed.startsWith('//')) return false;
-    return true;
+    return !trimmed.startsWith('//');
   }
   if (trimmed.startsWith('//')) return false;
   try {

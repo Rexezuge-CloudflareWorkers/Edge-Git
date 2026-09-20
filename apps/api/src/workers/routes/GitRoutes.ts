@@ -40,7 +40,7 @@ function registerGitRoutes(app: GitApp): void {
     if (service !== 'git-upload-pack' && service !== 'git-receive-pack') {
       return c.text('Invalid service', 400);
     }
-    const auth = await gitAuthForRepo(c as never, owner, repoName, service);
+    const auth = await gitAuthForRepo(c, owner, repoName, service);
     if (auth instanceof Response) return auth;
     if (service === 'git-upload-pack') {
       return advertiseUploadPack();
@@ -60,7 +60,7 @@ function registerGitRoutes(app: GitApp): void {
         headers: { 'WWW-Authenticate': 'Basic realm="Edge-Git"' },
       });
     }
-    const auth = await gitAuthForRepo(c as never, owner, repoName, 'git-upload-pack');
+    const auth = await gitAuthForRepo(c, owner, repoName, 'git-upload-pack');
     if (auth instanceof Response) return auth;
     const maxFetchBodyBytes = ConfigurationManager.repo.getMaxFetchBodyBytes(c.env);
     const contentLength = Number(c.req.header('Content-Length'));
@@ -90,7 +90,7 @@ function registerGitRoutes(app: GitApp): void {
         headers: { 'WWW-Authenticate': 'Basic realm="Edge-Git"' },
       });
     }
-    const auth = await gitAuthForRepo(c as never, owner, repoName, 'git-receive-pack');
+    const auth = await gitAuthForRepo(c, owner, repoName, 'git-receive-pack');
     if (auth instanceof Response) return auth;
     const maxPackBytes = ConfigurationManager.repo.getMaxPackBytes(c.env);
     const contentLength = Number(c.req.header('Content-Length'));

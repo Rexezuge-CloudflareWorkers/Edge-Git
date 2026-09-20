@@ -18,9 +18,9 @@ function toForkJson(row: Parameters<typeof toRepoJson>[0], forksCount?: number):
 // Private forks are filtered unless the viewer has read+ on them.
 function registerForkRoutes(app: ForkApp): void {
   app.get('/repos/:owner/:repo/forks', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       const scope = createRequestScope(c.env);
-      const viewerEmail = await resolvePublicViewer(c as never);
+      const viewerEmail = await resolvePublicViewer(c);
       const permission = scope.get(Tokens.PermissionService);
       const forks = await scope.get(Tokens.ForkService).listForks(row.id, 100);
       const visible = [];
