@@ -19,6 +19,7 @@ class ConfigurationManager {
 
   public static readonly repo = {
     getMaxPerUser: (env: unknown): number => AppConfiguration.fromEnv(env).getMaxReposPerUser(),
+    getDoDeviceBytes: (env: unknown): number => AppConfiguration.fromEnv(env).getDoDeviceBytes(),
     getMaxPackObjects: (env: unknown): number => AppConfiguration.fromEnv(env).getMaxPackObjects(),
     getCacheTtlSeconds: (env: unknown): number => AppConfiguration.fromEnv(env).getGitCacheTtlSeconds(),
     getMaxFetchWants: (env: unknown): number => AppConfiguration.fromEnv(env).getMaxFetchWants(),

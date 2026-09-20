@@ -27,7 +27,7 @@ class RepoLifecycle {
   ) {}
 
   public ensureDeviceSize(): void {
-    setDofsDeviceSize(this.dofs, 5 * 1024 * 1024 * 1024);
+    setDofsDeviceSize(this.dofs, this.config.getDoDeviceBytes());
   }
 
   public async initRepo(): Promise<void> {
@@ -63,12 +63,23 @@ class RepoLifecycle {
       // missing HEAD → init below (memoized so concurrent fetch+RPC inits
       // share one init instead of double-init TOCTOU).
     }
-    if (!this.initPromise) {
-      this.initPromise = this.initRepo().finally(() => {
-        this.initPromise = null;
-      });
+    let current = this.initPromise;
+    if (!current) {
+      const started = this.initRepo();
+      const holder: { gate: Promise<void> | null } = { gate: null };
+      holder.gate = (async () => {
+        try {
+          await started;
+        } finally {
+          // Clear only our own generation so a retry that starts after a
+          // failure cannot be wiped by a stale finally from the previous run.
+          if (this.initPromise === holder.gate) this.initPromise = null;
+        }
+      })();
+      this.initPromise = holder.gate;
+      current = holder.gate;
     }
-    await this.initPromise;
+    await current;
   }
 
   public async prepare(): Promise<void> {

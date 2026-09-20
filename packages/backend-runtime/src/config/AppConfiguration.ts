@@ -260,6 +260,10 @@ class AppConfiguration {
     return this.repos.getMaxTokenRepoGrants();
   }
 
+  public getDoDeviceBytes(): number {
+    return this.repos.getDoDeviceBytes();
+  }
+
   public getMaxMirrorFailures(): number {
     return this.content.getMaxMirrorFailures();
   }

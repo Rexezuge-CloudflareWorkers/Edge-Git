@@ -799,16 +799,31 @@ describe('RepoWorker thin-facade routing', () => {
 
   it('setFullName validates, persists once, and fullName throws when unset', async () => {
     const put = vi.fn(async () => undefined);
-    const worker = makeWorker({ ctx: { storage: { put, get: vi.fn(async () => null) } } });
+    const clearCache = vi.fn();
+    const worker = makeWorker({
+      ctx: { storage: { put, get: vi.fn(async () => null) } },
+      git: { clearCache },
+    });
     expect(() => worker.fullName).toThrow('Repository full name is not set');
     await expect(worker.setFullName('no-slash')).rejects.toThrow('Invalid repository full name');
     await expect(worker.setFullName('a/.hidden')).rejects.toThrow('Invalid repository full name');
     await worker.setFullName('alice/repo');
     expect(worker.fullName).toBe('alice/repo');
     expect(put).toHaveBeenCalledWith('fullName', 'alice/repo');
-    await worker.setFullName('bob/other');
+    // BREAKING: renames update the binding (old first-writer-wins ignored
+    // renames and left storage drifting). Same-value sets stay idempotent.
+    await worker.setFullName('alice/repo');
     expect(put).toHaveBeenCalledTimes(1);
-    expect(worker.fullName).toBe('alice/repo');
+    await worker.setFullName('bob/other');
+    expect(put).toHaveBeenCalledTimes(2);
+    expect(put).toHaveBeenLastCalledWith('fullName', 'bob/other');
+    expect(worker.fullName).toBe('bob/other');
+    expect(clearCache).toHaveBeenCalledTimes(1);
+    // Case-correction within the same canonical key updates display case
+    // without clearing the ref cache.
+    await worker.setFullName('BOB/Other');
+    expect(worker.fullName).toBe('BOB/Other');
+    expect(clearCache).toHaveBeenCalledTimes(1);
   });
 
   it('deleteRepo delegates to the lifecycle and clears the cached name', async () => {

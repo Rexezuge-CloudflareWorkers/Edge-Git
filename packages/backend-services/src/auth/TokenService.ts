@@ -105,7 +105,7 @@ class TokenService {
     for (const entry of grants) {
       const owner = typeof (entry as { owner?: unknown }).owner === 'string' ? (entry as { owner: string }).owner.trim() : '';
       const rawName = typeof (entry as { name?: unknown }).name === 'string' ? (entry as { name: string }).name.trim() : '';
-      const name = rawName.endsWith('.git') ? rawName.slice(0, -4) : rawName;
+      const name = rawName.toLowerCase().endsWith('.git') ? rawName.slice(0, -4) : rawName;
       if (!owner || !name) throw new BadRequestError('Each repoGrant needs owner and name');
       const scope = (entry as { scope?: unknown }).scope;
       if (typeof scope !== 'string' || !(TOKEN_SCOPES as readonly string[]).includes(scope)) {

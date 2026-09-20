@@ -67,7 +67,6 @@
     "@edge-git/backend-errors": "workspace:*",
     "@edge-git/backend-runtime": "workspace:*",
     "@edge-git/git-protocol": "workspace:*",
-    "@edge-git/git-service": "workspace:*",
     "@edge-git/shared": "workspace:*",
     "jose": "6.2.12"
   },
