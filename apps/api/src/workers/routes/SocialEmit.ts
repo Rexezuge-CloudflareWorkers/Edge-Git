@@ -242,5 +242,5 @@ async function publishCheckUpdate(
   }
 }
 
-export { recordAndNotify, emitWebhookEvent, flushDueWebhookDeliveries, publishLiveUpdate, publishCheckUpdate };
+export { recordAndNotify, emitWebhookEvent, flushDueWebhookDeliveries, publishLiveUpdate, publishCheckUpdate, channelForRepoEvent };
 export type { SocialEmitInput, WebhookEmitInput, LiveUpdateInput };

@@ -317,4 +317,4 @@ function registerUserSettingsRoutes(app: UserApp): void {
   });
 }
 
-export { registerUserProfileRoutes, registerUserSettingsRoutes };
+export { registerUserProfileRoutes, registerUserSettingsRoutes, parseLimit, hasVisibleRepo };

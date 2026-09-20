@@ -328,5 +328,5 @@ function registerProjectUserRoutes(app: ProjectApp): void {
   });
 }
 
-export { registerProjectPublicRoutes, registerProjectUserRoutes };
+export { registerProjectPublicRoutes, registerProjectUserRoutes, parseProjectNumber };
 export type { ProjectApp };
