@@ -119,6 +119,9 @@ class PushHandler {
     }
 
     // Force-push detection runs after indexing so ancestry covers the new objects.
+    // Fail closed on transient ancestry errors: a failed `isAncestor` must not
+    // be treated as non-fast-forward (which would wrongly reject valid pushes).
+    // Instead return a transient unpack failure so the client retries.
     const forceBlocked = new Map<string, string>();
     for (const cmd of commands) {
       const rule = byRef.get(cmd.ref);
@@ -129,8 +132,12 @@ class PushHandler {
       let fastForward = false;
       try {
         fastForward = await git.isAncestor(cmd.oldOid, cmd.newOid);
-      } catch {
-        fastForward = false;
+      } catch (error) {
+        logger.error('(receive-pack) Ancestry check failed transiently: ', error);
+        await isoGitFs.promises.unlink(packFilePath).catch(() => undefined);
+        await isoGitFs.promises.unlink(packFilePath.replace(/\.pack$/, '.idx')).catch(() => undefined);
+        git.clearCache();
+        return buildReportStatus([{ ref: '*', ok: false, error: 'unpack failed: transient ancestry check, retry push' }], false);
       }
       if (!fastForward) {
         const branch = branchNameFromRef(cmd.ref) ?? cmd.ref;
@@ -140,11 +147,12 @@ class PushHandler {
     if (forceBlocked.size > 0) {
       logger.error(`(receive-pack) Rejected ${getFullName() ?? 'unknown repo'}: protected branch update declined`);
       // The pack was already indexed above (ancestry needs the new objects).
-      // Remove the orphaned pack file so repeated blocked force-pushes cannot
-      // fill the 5GB DO device. Indexed objects remain reachable only via
-      // their OIDs until GC; refs are untouched so atomicity holds. Clear
+      // Remove the orphaned pack + idx files so repeated blocked force-pushes
+      // cannot fill the 5GB DO device. Indexed objects remain reachable only
+      // via their OIDs until GC; refs are untouched so atomicity holds. Clear
       // caches so later reads cannot observe the rejected objects.
       await isoGitFs.promises.unlink(packFilePath).catch(() => undefined);
+      await isoGitFs.promises.unlink(packFilePath.replace(/\.pack$/, '.idx')).catch(() => undefined);
       git.clearCache();
       const results = commands.map((cmd) => ({
         ref: cmd.ref,

@@ -1,32 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import type { MergePreview, PullComment, PullDiff, PullRequest, PullReview } from '../../types';
-import {
-  getMergePreview,
-  getPull,
-  getPullDiff,
-  listPullComments,
-  listPullReviews,
-  mergePull,
-  updatePullStatus,
-} from '../../services/pullService';
+import { getPull, getPullDiff, getMergePreview, mergePull, updatePullStatus } from '../../services/pullService';
 import { isBlockedByReviews } from '../../lib/threads';
 import { PresenceDots } from '../../realtime/PresenceDots';
-import { usePullLive } from '../../realtime/usePullLive';
-import { PullChecks } from './PullChecks';
 import { PullComments } from './PullComments';
 import { PullReviews } from './PullReviews';
 import { PullThreads } from './PullThreads';
-import { fetchUpgraded, useUpgradeFetchState } from '../../lib/upgradeFetch';
 import { formatTimestamp } from '../../lib/format';
 import { Markdown } from '../shared/Markdown';
 import { headLabel } from './PullsTab';
-import { getPullMeta, setPullDraft } from '../../services/collabService';
+import { setPullDraft } from '../../services/collabService';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
-import { Select, Textarea } from '../ui/Input';
 import { Badge, PullStatusBadge } from '../ui/Badge';
+import { usePullDetailData } from './usePullDetailData';
+import { PullMergePanel } from './PullMergePanel';
 
 export function PullDetail({
   owner,
@@ -46,12 +35,23 @@ export function PullDetail({
   authorized?: boolean | null;
 }) {
   const { t } = useTranslation();
-  const [pull, setPull] = useState<PullRequest | null>(null);
-  const [comments, setComments] = useState<PullComment[]>([]);
-  const [reviews, setReviews] = useState<PullReview[]>([]);
-  const [diff, setDiff] = useState<PullDiff | null>(null);
-  const [preview, setPreview] = useState<MergePreview | null>(null);
-  const [status, setStatus] = useState<'loading' | 'ready' | 'missing'>('loading');
+  const {
+    pull,
+    setPull,
+    comments,
+    setComments,
+    reviews,
+    setReviews,
+    diff,
+    setDiff,
+    preview,
+    setPreview,
+    status,
+    metaLabels,
+    liveStatus,
+    viewers,
+    liveKey,
+  } = usePullDetailData({ owner, repo, number, authorized });
   const [toggling, setToggling] = useState(false);
   const [merging, setMerging] = useState(false);
   const [conflicts, setConflicts] = useState<string[]>([]);
@@ -59,90 +59,6 @@ export function PullDetail({
   const [mergeMessage, setMergeMessage] = useState('');
   const [deleteHead, setDeleteHead] = useState(false);
   const [strategy, setStrategy] = useState<'merge' | 'squash' | 'rebase'>('merge');
-  const [metaLabels, setMetaLabels] = useState<Array<{ name: string }>>([]);
-
-  const useAuthed = authorized === true;
-  // Single-flight reads across the auth upgrade (see upgradeFetch). Keys are
-  // marked only on success, so a public 404 (private repo) still retries
-  // authed. Post-mutation refreshes below bypass the helper and call services
-  // directly.
-  const pullStateRef = useUpgradeFetchState<PullRequest>();
-  const commentsStateRef = useUpgradeFetchState<PullComment[]>();
-  const reviewsStateRef = useUpgradeFetchState<PullReview[]>();
-  const diffStateRef = useUpgradeFetchState<PullDiff | null>();
-  const previewStateRef = useUpgradeFetchState<MergePreview | null>();
-
-  useEffect(() => {
-    const key = `${owner}/${repo}/${number}`;
-    const authOpt = useAuthed ? { isAuthed: true as const } : { isAuthed: false as const };
-    let cancelled = false;
-    const run = async () => {
-      let pullRes;
-      try {
-        pullRes = await fetchUpgraded(pullStateRef.current, key, () => getPull(owner, repo, number, authOpt));
-      } catch {
-        if (!cancelled) setStatus('missing');
-        return;
-      }
-      if (cancelled) return;
-      if (pullRes.status === 'loaded') {
-        setPull(pullRes.data);
-        setStatus('ready');
-      }
-      const [c, r, d] = await Promise.all([
-        fetchUpgraded(commentsStateRef.current, `${key}/comments`, () => listPullComments(owner, repo, number, authOpt))
-          .then((res) => (res.status === 'loaded' ? res.data : null))
-          .catch(() => [] as PullComment[]),
-        fetchUpgraded(reviewsStateRef.current, `${key}/reviews`, () => listPullReviews(owner, repo, number, authOpt))
-          .then((res) => (res.status === 'loaded' ? res.data : null))
-          .catch(() => [] as PullReview[]),
-        fetchUpgraded(diffStateRef.current, `${key}/diff`, () => getPullDiff(owner, repo, number, authOpt))
-          .then((res) => (res.status === 'loaded' ? res.data : null))
-          .catch(() => null),
-      ]);
-      if (cancelled) return;
-      if (c) setComments(c);
-      if (r) setReviews(r);
-      if (d) setDiff(d);
-      try {
-        const previewRes = await fetchUpgraded(previewStateRef.current, `${key}/preview`, () =>
-          getMergePreview(owner, repo, number, authOpt),
-        );
-        if (!cancelled && previewRes.status === 'loaded') setPreview(previewRes.data);
-      } catch {
-        // preview is best-effort
-      }
-    };
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [owner, repo, number, useAuthed]);
-
-  useEffect(() => {
-    if (!useAuthed) return;
-    let cancelled = false;
-    void getPullMeta(owner, repo, number)
-      .then((meta) => {
-        if (!cancelled) setMetaLabels(meta.labels ?? []);
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [owner, repo, number, useAuthed]);
-
-  // Live comments / reviews / threads (threads reload via `liveKey`).
-  const { liveStatus, viewers, liveKey } = usePullLive({
-    owner,
-    repo,
-    number,
-    useAuthed,
-    ready: status === 'ready',
-    setPull,
-    setComments,
-    setReviews,
-  });
 
   if (status === 'loading') {
     return (
@@ -289,78 +205,25 @@ export function PullDetail({
         )}
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('pulls.mergeStatus', 'Merge Status')}</CardTitle>
-        </CardHeader>
-        {preview ? (
-          <div className="space-y-2 text-sm">
-            <p className="text-[var(--color-text-secondary)]">
-              {preview.alreadyMerged
-                ? t('pulls.alreadyMerged', 'Branches Are Already Merged.')
-                : preview.canFastForward
-                  ? t('pulls.canFastForward', 'Can Be Fast-Forward Merged.')
-                  : t('pulls.needsMergeCommit', 'Requires A Merge Commit.')}
-            </p>
-            {preview.mergeBase && (
-              <p className="text-xs text-[var(--color-text-muted)] font-mono">
-                {t('pulls.mergeBase', 'Merge Base: {{oid}}', { oid: preview.mergeBase.slice(0, 7) })}
-              </p>
-            )}
-          </div>
-        ) : (
-          <p className="text-sm text-[var(--color-text-muted)]">{t('pulls.previewUnavailable', 'Merge Preview Unavailable.')}</p>
-        )}
-        {blockedByReview && (
-          <p className="mt-2 text-sm text-[var(--color-error-text)]">
-            {t('pulls.blockedByReview', 'Blocked: Unresolved Change Requests.')}
-          </p>
-        )}
-        <PullChecks owner={owner} repo={repo} headOid={pull.head_oid} authorized={authorized} />
-        {(conflicts.length > 0 || conflictReason) && (
-          <div className="mt-2 text-sm text-[var(--color-error-text)]">
-            <p>{t('pulls.mergeConflicts', 'Merge Conflicts. Resolve Them On Your Branch.')}</p>
-            {conflictReason && <p className="mt-1">{conflictReason}</p>}
-            {conflicts.length > 0 && (
-              <ul className="mt-1">
-                {conflicts.map((f) => (
-                  <li key={f} className="font-mono">
-                    {f}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
-        {canManage && pull.status === 'open' && (
-          <div className="mt-3 space-y-2">
-            <Textarea
-              placeholder={t('pulls.mergeMessagePlaceholder', 'Merge Message (Optional)')}
-              value={mergeMessage}
-              onChange={(e) => setMergeMessage(e.target.value)}
-              rows={2}
-            />
-            <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
-              <span>{t('pulls.strategy', 'Strategy')}</span>
-              <Select value={strategy} onChange={(e) => setStrategy(e.target.value as 'merge' | 'squash' | 'rebase')}>
-                <option value="merge">merge</option>
-                <option value="squash">squash</option>
-                <option value="rebase">rebase</option>
-              </Select>
-            </label>
-            {(pull.head_full_name ?? pull.full_name).toLowerCase() !== pull.full_name.toLowerCase() ||
-            pull.head_branch !== pull.base_branch ? (
-              <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
-                <input type="checkbox" checked={deleteHead} onChange={(e) => setDeleteHead(e.target.checked)} />
-                {t('pulls.deleteHeadAfterMerge', 'Delete Head Branch After Merge')}
-              </label>
-            ) : null}
-            <Button type="button" variant="primary" size="sm" loading={merging} disabled={blockedByReview} onClick={() => void doMerge()}>
-              {t('pulls.mergePull', 'Merge Pull Request')}
-            </Button>
-          </div>
-        )}
-      </Card>
+      <PullMergePanel
+        owner={owner}
+        repo={repo}
+        pull={pull}
+        preview={preview}
+        blockedByReview={blockedByReview}
+        conflicts={conflicts}
+        conflictReason={conflictReason}
+        mergeMessage={mergeMessage}
+        setMergeMessage={setMergeMessage}
+        strategy={strategy}
+        setStrategy={setStrategy}
+        deleteHead={deleteHead}
+        setDeleteHead={setDeleteHead}
+        merging={merging}
+        canManage={canManage}
+        authorized={authorized}
+        onMerge={() => void doMerge()}
+      />
 
       <Card>
         <CardHeader>

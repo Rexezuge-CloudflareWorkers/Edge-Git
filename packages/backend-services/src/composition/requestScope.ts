@@ -94,12 +94,28 @@ interface RequestKeys {
   masterKey: string;
 }
 
-// Table-driven DAO wiring (Otter pattern). Each entry is a lazy factory
-// thunk so `createRequestScope` never touches a DAO constructor eagerly —
-// unit tests with partial `vi.mock('@edge-git/backend-data/dao')` modules
-// keep working; only the DAOs a test actually resolves are constructed.
-// Factories stay memoized via `memoizeAsync` — D1 objects are cheap, but
-// Secrets Store round-trips (via `Tokens.Keys`) are not.
+// Table-driven DAO wiring (Otter pattern). Each entry is keyed by its typed
+// `Tokens.X` symbol directly — no stringly-typed lookup table and no
+// `(Tokens as Record<...>)` cast. Each factory thunk is lazy + memoized via
+// `memoizeAsync` so `createRequestScope` never touches a DAO constructor
+// eagerly: unit tests with partial `vi.mock('@edge-git/backend-data/dao')`
+// modules keep working; only the DAOs a test actually resolves are built.
+// D1 objects are cheap, but Secrets Store round-trips (via `Tokens.Keys`)
+// are not.
+
+// Single audited unsafe-cast location for service envs. Services declare
+// narrow `*Env` interfaces (e.g. `{ DB, MAX_* }`); the composition root holds
+// the minimal `RequestScopeEnv`. Centralizing `as never` here keeps ~30 call
+// sites readable and makes future `ServiceEnv` migration a one-line change.
+function asServiceEnv(env: RequestScopeEnv): never {
+  return env as never;
+}
+
+// Generic service factory (AWS `createService` pattern). Kills `new X(env)`
+// boilerplate repetition and keeps ctor-injection visible in one place.
+function createService<T, D>(Ctor: new (env: never, deps?: D) => T, env: RequestScopeEnv, deps?: D): T {
+  return new Ctor(asServiceEnv(env), deps);
+}
 
 // Composition root: builds a per-request child scope wiring DAOs → services.
 // Replaces the former scattered `new X(env)` / `new XDAO(env.DB)`
@@ -116,93 +132,90 @@ function createRequestScope(env: RequestScopeEnv): Container {
   const keys = memoizeAsync(async (): Promise<RequestKeys> => ({ masterKey: await masterKey() }));
   scope.bindValue(Tokens.Keys, keys);
 
-  const daoDefs: Array<[string, () => Promise<unknown>]> = [
-    ['UserDAO', () => Promise.resolve(new UserDAO(env.DB))],
-    ['RepositoryDAO', () => Promise.resolve(new RepositoryDAO(env.DB))],
-    ['UserAccessTokenDAO', () => Promise.resolve(new UserAccessTokenDAO(env.DB))],
-    ['IssueDAO', () => Promise.resolve(new IssueDAO(env.DB))],
-    ['PullRequestDAO', () => Promise.resolve(new PullRequestDAO(env.DB))],
-    ['PullThreadDAO', () => Promise.resolve(new PullThreadDAO(env.DB))],
-    ['NamespaceDAO', () => Promise.resolve(new NamespaceDAO(env.DB))],
-    ['OrganizationDAO', () => Promise.resolve(new OrganizationDAO(env.DB))],
-    ['OrganizationMemberDAO', () => Promise.resolve(new OrganizationMemberDAO(env.DB))],
-    ['RepoCollaboratorDAO', () => Promise.resolve(new RepoCollaboratorDAO(env.DB))],
-    ['BranchProtectionDAO', () => Promise.resolve(new BranchProtectionDAO(env.DB))],
-    ['CheckRunDAO', () => Promise.resolve(new CheckRunDAO(env.DB))],
-    ['CollaborationDAO', () => Promise.resolve(new CollaborationDAO(env.DB))],
-    ['SearchDAO', () => Promise.resolve(new SearchDAO(env.DB))],
-    ['StarDAO', () => Promise.resolve(new StarDAO(env.DB))],
-    ['WatchDAO', () => Promise.resolve(new WatchDAO(env.DB))],
-    ['EventDAO', () => Promise.resolve(new EventDAO(env.DB))],
-    ['NotificationDAO', () => Promise.resolve(new NotificationDAO(env.DB))],
-    ['WebhookDAO', () => Promise.resolve(new WebhookDAO(env.DB))],
-    ['WebhookDeliveryDAO', () => Promise.resolve(new WebhookDeliveryDAO(env.DB))],
-    ['ReleaseDAO', () => Promise.resolve(new ReleaseDAO(env.DB))],
-    ['ProjectDAO', () => Promise.resolve(new ProjectDAO(env.DB))],
-    ['DiscussionDAO', () => Promise.resolve(new DiscussionDAO(env.DB))],
-    ['WikiDAO', () => Promise.resolve(new WikiDAO(env.DB))],
-    ['SnippetDAO', () => Promise.resolve(new SnippetDAO(env.DB))],
-    ['TeamDAO', () => Promise.resolve(new TeamDAO(env.DB))],
-    ['TeamMemberDAO', () => Promise.resolve(new TeamMemberDAO(env.DB))],
-    ['TeamRepoGrantDAO', () => Promise.resolve(new TeamRepoGrantDAO(env.DB))],
-    ['AuditLogDAO', () => Promise.resolve(new AuditLogDAO(env.DB))],
-    ['ImportDAO', () => Promise.resolve(new ImportDAO(env.DB))],
-    ['MirrorDAO', () => Promise.resolve(new MirrorDAO(env.DB))],
-    ['DeployKeyDAO', () => Promise.resolve(new DeployKeyDAO(env.DB))],
-    ['TokenRepoGrantDAO', () => Promise.resolve(new TokenRepoGrantDAO(env.DB))],
-    ['SecuritySettingsDAO', () => Promise.resolve(new SecuritySettingsDAO(env.DB))],
+  const daoDefs: Array<[Token<() => Promise<unknown>>, () => Promise<unknown>]> = [
+    [Tokens.UserDAO, () => Promise.resolve(new UserDAO(env.DB))],
+    [Tokens.RepositoryDAO, () => Promise.resolve(new RepositoryDAO(env.DB))],
+    [Tokens.UserAccessTokenDAO, () => Promise.resolve(new UserAccessTokenDAO(env.DB))],
+    [Tokens.IssueDAO, () => Promise.resolve(new IssueDAO(env.DB))],
+    [Tokens.PullRequestDAO, () => Promise.resolve(new PullRequestDAO(env.DB))],
+    [Tokens.PullThreadDAO, () => Promise.resolve(new PullThreadDAO(env.DB))],
+    [Tokens.NamespaceDAO, () => Promise.resolve(new NamespaceDAO(env.DB))],
+    [Tokens.OrganizationDAO, () => Promise.resolve(new OrganizationDAO(env.DB))],
+    [Tokens.OrganizationMemberDAO, () => Promise.resolve(new OrganizationMemberDAO(env.DB))],
+    [Tokens.RepoCollaboratorDAO, () => Promise.resolve(new RepoCollaboratorDAO(env.DB))],
+    [Tokens.BranchProtectionDAO, () => Promise.resolve(new BranchProtectionDAO(env.DB))],
+    [Tokens.CheckRunDAO, () => Promise.resolve(new CheckRunDAO(env.DB))],
+    [Tokens.CollaborationDAO, () => Promise.resolve(new CollaborationDAO(env.DB))],
+    [Tokens.SearchDAO, () => Promise.resolve(new SearchDAO(env.DB))],
+    [Tokens.StarDAO, () => Promise.resolve(new StarDAO(env.DB))],
+    [Tokens.WatchDAO, () => Promise.resolve(new WatchDAO(env.DB))],
+    [Tokens.EventDAO, () => Promise.resolve(new EventDAO(env.DB))],
+    [Tokens.NotificationDAO, () => Promise.resolve(new NotificationDAO(env.DB))],
+    [Tokens.WebhookDAO, () => Promise.resolve(new WebhookDAO(env.DB))],
+    [Tokens.WebhookDeliveryDAO, () => Promise.resolve(new WebhookDeliveryDAO(env.DB))],
+    [Tokens.ReleaseDAO, () => Promise.resolve(new ReleaseDAO(env.DB))],
+    [Tokens.ProjectDAO, () => Promise.resolve(new ProjectDAO(env.DB))],
+    [Tokens.DiscussionDAO, () => Promise.resolve(new DiscussionDAO(env.DB))],
+    [Tokens.WikiDAO, () => Promise.resolve(new WikiDAO(env.DB))],
+    [Tokens.SnippetDAO, () => Promise.resolve(new SnippetDAO(env.DB))],
+    [Tokens.TeamDAO, () => Promise.resolve(new TeamDAO(env.DB))],
+    [Tokens.TeamMemberDAO, () => Promise.resolve(new TeamMemberDAO(env.DB))],
+    [Tokens.TeamRepoGrantDAO, () => Promise.resolve(new TeamRepoGrantDAO(env.DB))],
+    [Tokens.AuditLogDAO, () => Promise.resolve(new AuditLogDAO(env.DB))],
+    [Tokens.ImportDAO, () => Promise.resolve(new ImportDAO(env.DB))],
+    [Tokens.MirrorDAO, () => Promise.resolve(new MirrorDAO(env.DB))],
+    [Tokens.DeployKeyDAO, () => Promise.resolve(new DeployKeyDAO(env.DB))],
+    [Tokens.TokenRepoGrantDAO, () => Promise.resolve(new TokenRepoGrantDAO(env.DB))],
+    [Tokens.SecuritySettingsDAO, () => Promise.resolve(new SecuritySettingsDAO(env.DB))],
   ];
-  const daoFactories = {} as Record<string, () => Promise<unknown>>;
-  for (const [tokenName, create] of daoDefs) {
-    const factory = memoizeAsync(create);
-    daoFactories[tokenName] = factory;
-    scope.bindValue((Tokens as Record<string, Token<unknown>>)[tokenName], factory);
+  for (const [token, create] of daoDefs) {
+    scope.bindValue(token, memoizeAsync(create));
   }
-  const getDao = <T>(name: string): (() => Promise<T>) => daoFactories[name] as () => Promise<T>;
+  const getDao = <T>(token: Token<() => Promise<T>>): (() => Promise<T>) => scope.get(token);
 
-  const repositoryDAO = getDao<RepositoryDAO>('RepositoryDAO');
-  const issueDAO = getDao<IssueDAO>('IssueDAO');
-  const pullRequestDAO = getDao<PullRequestDAO>('PullRequestDAO');
-  const pullThreadDAO = getDao<PullThreadDAO>('PullThreadDAO');
-  const branchProtectionDAO = getDao<BranchProtectionDAO>('BranchProtectionDAO');
-  const userDAO = getDao<UserDAO>('UserDAO');
-  const organizationDAO = getDao<OrganizationDAO>('OrganizationDAO');
-  const organizationMemberDAO = getDao<OrganizationMemberDAO>('OrganizationMemberDAO');
-  const repoCollaboratorDAO = getDao<RepoCollaboratorDAO>('RepoCollaboratorDAO');
-  const namespaceDAO = getDao<NamespaceDAO>('NamespaceDAO');
-  const starDAO = getDao<StarDAO>('StarDAO');
-  const watchDAO = getDao<WatchDAO>('WatchDAO');
-  const eventDAO = getDao<EventDAO>('EventDAO');
-  const notificationDAO = getDao<NotificationDAO>('NotificationDAO');
-  const webhookDAO = getDao<WebhookDAO>('WebhookDAO');
-  const webhookDeliveryDAO = getDao<WebhookDeliveryDAO>('WebhookDeliveryDAO');
-  const releaseDAO = getDao<ReleaseDAO>('ReleaseDAO');
-  const projectDAO = getDao<ProjectDAO>('ProjectDAO');
-  const discussionDAO = getDao<DiscussionDAO>('DiscussionDAO');
-  const wikiDAO = getDao<WikiDAO>('WikiDAO');
-  const snippetDAO = getDao<SnippetDAO>('SnippetDAO');
-  const teamDAO = getDao<TeamDAO>('TeamDAO');
-  const teamMemberDAO = getDao<TeamMemberDAO>('TeamMemberDAO');
-  const teamGrantDAO = getDao<TeamRepoGrantDAO>('TeamRepoGrantDAO');
-  const auditLogDAO = getDao<AuditLogDAO>('AuditLogDAO');
-  const importDAO = getDao<ImportDAO>('ImportDAO');
-  const mirrorDAO = getDao<MirrorDAO>('MirrorDAO');
-  const deployKeyDAO = getDao<DeployKeyDAO>('DeployKeyDAO');
-  const tokenDAO = getDao<UserAccessTokenDAO>('UserAccessTokenDAO');
-  const checkRunDAO = getDao<CheckRunDAO>('CheckRunDAO');
-  const collaborationDAO = getDao<CollaborationDAO>('CollaborationDAO');
-  const searchDAO = getDao<SearchDAO>('SearchDAO');
-  const tokenGrantDAO = getDao<TokenRepoGrantDAO>('TokenRepoGrantDAO');
-  const securitySettingsDAO = getDao<SecuritySettingsDAO>('SecuritySettingsDAO');
+  const repositoryDAO = getDao<RepositoryDAO>(Tokens.RepositoryDAO);
+  const issueDAO = getDao<IssueDAO>(Tokens.IssueDAO);
+  const pullRequestDAO = getDao<PullRequestDAO>(Tokens.PullRequestDAO);
+  const pullThreadDAO = getDao<PullThreadDAO>(Tokens.PullThreadDAO);
+  const branchProtectionDAO = getDao<BranchProtectionDAO>(Tokens.BranchProtectionDAO);
+  const userDAO = getDao<UserDAO>(Tokens.UserDAO);
+  const organizationDAO = getDao<OrganizationDAO>(Tokens.OrganizationDAO);
+  const organizationMemberDAO = getDao<OrganizationMemberDAO>(Tokens.OrganizationMemberDAO);
+  const repoCollaboratorDAO = getDao<RepoCollaboratorDAO>(Tokens.RepoCollaboratorDAO);
+  const namespaceDAO = getDao<NamespaceDAO>(Tokens.NamespaceDAO);
+  const starDAO = getDao<StarDAO>(Tokens.StarDAO);
+  const watchDAO = getDao<WatchDAO>(Tokens.WatchDAO);
+  const eventDAO = getDao<EventDAO>(Tokens.EventDAO);
+  const notificationDAO = getDao<NotificationDAO>(Tokens.NotificationDAO);
+  const webhookDAO = getDao<WebhookDAO>(Tokens.WebhookDAO);
+  const webhookDeliveryDAO = getDao<WebhookDeliveryDAO>(Tokens.WebhookDeliveryDAO);
+  const releaseDAO = getDao<ReleaseDAO>(Tokens.ReleaseDAO);
+  const projectDAO = getDao<ProjectDAO>(Tokens.ProjectDAO);
+  const discussionDAO = getDao<DiscussionDAO>(Tokens.DiscussionDAO);
+  const wikiDAO = getDao<WikiDAO>(Tokens.WikiDAO);
+  const snippetDAO = getDao<SnippetDAO>(Tokens.SnippetDAO);
+  const teamDAO = getDao<TeamDAO>(Tokens.TeamDAO);
+  const teamMemberDAO = getDao<TeamMemberDAO>(Tokens.TeamMemberDAO);
+  const teamGrantDAO = getDao<TeamRepoGrantDAO>(Tokens.TeamRepoGrantDAO);
+  const auditLogDAO = getDao<AuditLogDAO>(Tokens.AuditLogDAO);
+  const importDAO = getDao<ImportDAO>(Tokens.ImportDAO);
+  const mirrorDAO = getDao<MirrorDAO>(Tokens.MirrorDAO);
+  const deployKeyDAO = getDao<DeployKeyDAO>(Tokens.DeployKeyDAO);
+  const tokenDAO = getDao<UserAccessTokenDAO>(Tokens.UserAccessTokenDAO);
+  const checkRunDAO = getDao<CheckRunDAO>(Tokens.CheckRunDAO);
+  const collaborationDAO = getDao<CollaborationDAO>(Tokens.CollaborationDAO);
+  const searchDAO = getDao<SearchDAO>(Tokens.SearchDAO);
+  const tokenGrantDAO = getDao<TokenRepoGrantDAO>(Tokens.TokenRepoGrantDAO);
+  const securitySettingsDAO = getDao<SecuritySettingsDAO>(Tokens.SecuritySettingsDAO);
 
-  scope.bind(Tokens.AccessAuthService, () => new AccessAuthService(env as never));
-  scope.bind(Tokens.TokenService, () => new TokenService(env as never, { tokenDAO, repositoryDAO, tokenGrantDAO }));
-  scope.bind(Tokens.CheckService, () => new CheckService(env as never, { checkRunDAO }));
-  scope.bind(Tokens.BranchProtectionService, () => new BranchProtectionService(env as never, { branchProtectionDAO }));
+  scope.bind(Tokens.AccessAuthService, () => createService(AccessAuthService, env));
+  scope.bind(Tokens.TokenService, () => createService(TokenService, env, { tokenDAO, repositoryDAO, tokenGrantDAO }));
+  scope.bind(Tokens.CheckService, () => createService(CheckService, env, { checkRunDAO }));
+  scope.bind(Tokens.BranchProtectionService, () => createService(BranchProtectionService, env, { branchProtectionDAO }));
   scope.bind(
     Tokens.ForkService,
     (container) =>
-      new ForkService(env as never, {
+      createService(ForkService, env, {
         repositoryDAO,
         userDAO,
         organizationDAO,
@@ -215,7 +228,7 @@ function createRequestScope(env: RequestScopeEnv): Container {
   scope.bind(
     Tokens.RepoService,
     (container) =>
-      new RepoService(env as never, {
+      createService(RepoService, env, {
         repositoryDAO,
         issueDAO,
         pullRequestDAO,
@@ -246,7 +259,7 @@ function createRequestScope(env: RequestScopeEnv): Container {
   scope.bind(
     Tokens.UserService,
     () =>
-      new UserService(env as never, {
+      createService(UserService, env, {
         userDAO,
         namespaceDAO,
         organizationDAO,
@@ -258,13 +271,13 @@ function createRequestScope(env: RequestScopeEnv): Container {
         webhookDAO,
       }),
   );
-  scope.bind(Tokens.IssueService, () => new IssueService(env as never, { issueDAO }));
-  scope.bind(Tokens.PullRequestService, () => new PullRequestService(env as never, { pullRequestDAO }));
-  scope.bind(Tokens.PullThreadService, () => new PullThreadService(env as never, { pullRequestDAO, pullThreadDAO }));
+  scope.bind(Tokens.IssueService, () => createService(IssueService, env, { issueDAO }));
+  scope.bind(Tokens.PullRequestService, () => createService(PullRequestService, env, { pullRequestDAO }));
+  scope.bind(Tokens.PullThreadService, () => createService(PullThreadService, env, { pullRequestDAO, pullThreadDAO }));
   scope.bind(
     Tokens.OrganizationService,
     () =>
-      new OrganizationService(env as never, {
+      createService(OrganizationService, env, {
         organizationDAO,
         organizationMemberDAO,
         namespaceDAO,
@@ -280,7 +293,7 @@ function createRequestScope(env: RequestScopeEnv): Container {
   scope.bind(
     Tokens.TeamService,
     () =>
-      new TeamService(env as never, {
+      createService(TeamService, env, {
         teamDAO,
         teamMemberDAO,
         teamGrantDAO,
@@ -290,14 +303,14 @@ function createRequestScope(env: RequestScopeEnv): Container {
         repositoryDAO,
       }),
   );
-  scope.bind(Tokens.AuditService, () => new AuditService(env as never, { auditLogDAO, organizationDAO, organizationMemberDAO }));
+  scope.bind(Tokens.AuditService, () => createService(AuditService, env, { auditLogDAO, organizationDAO, organizationMemberDAO }));
   // Single PermissionService binding (Otter pattern). Dependent services
   // resolve it lazily via the container instead of `new PermissionService`
   // per factory (previously 4 duplicated inline factories).
   scope.bind(
     Tokens.PermissionService,
     () =>
-      new PermissionService(env as never, {
+      createService(PermissionService, env, {
         organizationDAO,
         organizationMemberDAO,
         repoCollaboratorDAO,
@@ -310,43 +323,43 @@ function createRequestScope(env: RequestScopeEnv): Container {
   scope.bind(
     Tokens.SearchService,
     (container) =>
-      new SearchService(env as never, {
+      createService(SearchService, env, {
         searchDAO,
         repositoryDAO,
         issueDAO,
         permissionService: () => Promise.resolve(container.get(Tokens.PermissionService)),
       }),
   );
-  scope.bind(Tokens.StarService, () => new StarService(env as never, { starDAO }));
-  scope.bind(Tokens.CollaborationService, () => new CollaborationService(env as never, { collaborationDAO }));
-  scope.bind(Tokens.ReleaseService, () => new ReleaseService(env as never, { releaseDAO }));
+  scope.bind(Tokens.StarService, () => createService(StarService, env, { starDAO }));
+  scope.bind(Tokens.CollaborationService, () => createService(CollaborationService, env, { collaborationDAO }));
+  scope.bind(Tokens.ReleaseService, () => createService(ReleaseService, env, { releaseDAO }));
   scope.bind(
     Tokens.RealtimeService,
     (container) =>
-      new RealtimeService(env as never, {
+      createService(RealtimeService, env, {
         repositoryDAO,
         permissionService: () => Promise.resolve(container.get(Tokens.PermissionService)),
       }),
   );
-  scope.bind(Tokens.ProjectService, () => new ProjectService(env as never, { projectDAO }));
-  scope.bind(Tokens.DiscussionService, () => new DiscussionService(env as never, { discussionDAO }));
-  scope.bind(Tokens.WikiService, () => new WikiService(env as never, { wikiDAO }));
-  scope.bind(Tokens.SnippetService, () => new SnippetService(env as never, { snippetDAO }));
-  scope.bind(Tokens.WatchService, () => new WatchService(env as never, { watchDAO }));
-  scope.bind(Tokens.ImportService, () => new ImportService(env as never, { importDAO }));
-  scope.bind(Tokens.MirrorService, () => new MirrorService(env as never, { mirrorDAO }));
-  scope.bind(Tokens.DeployKeyService, () => new DeployKeyService(env as never, { deployKeyDAO }));
-  scope.bind(Tokens.SecuritySettingsService, () => new SecuritySettingsService(env as never, { settingsDAO: securitySettingsDAO }));
-  scope.bind(Tokens.ActivityService, () => new ActivityService(env as never, { eventDAO }));
-  scope.bind(Tokens.WebhookService, () => new WebhookService(env as never, { webhookDAO }));
+  scope.bind(Tokens.ProjectService, () => createService(ProjectService, env, { projectDAO }));
+  scope.bind(Tokens.DiscussionService, () => createService(DiscussionService, env, { discussionDAO }));
+  scope.bind(Tokens.WikiService, () => createService(WikiService, env, { wikiDAO }));
+  scope.bind(Tokens.SnippetService, () => createService(SnippetService, env, { snippetDAO }));
+  scope.bind(Tokens.WatchService, () => createService(WatchService, env, { watchDAO }));
+  scope.bind(Tokens.ImportService, () => createService(ImportService, env, { importDAO }));
+  scope.bind(Tokens.MirrorService, () => createService(MirrorService, env, { mirrorDAO }));
+  scope.bind(Tokens.DeployKeyService, () => createService(DeployKeyService, env, { deployKeyDAO }));
+  scope.bind(Tokens.SecuritySettingsService, () => createService(SecuritySettingsService, env, { settingsDAO: securitySettingsDAO }));
+  scope.bind(Tokens.ActivityService, () => createService(ActivityService, env, { eventDAO }));
+  scope.bind(Tokens.WebhookService, () => createService(WebhookService, env, { webhookDAO }));
   scope.bind(
     Tokens.WebhookDeliveryService,
-    () => new WebhookDeliveryService(env as never, { webhookDAO, deliveryDAO: webhookDeliveryDAO }),
+    () => createService(WebhookDeliveryService, env, { webhookDAO, deliveryDAO: webhookDeliveryDAO }),
   );
   scope.bind(
     Tokens.NotificationService,
     (container) =>
-      new NotificationService(env as never, {
+      createService(NotificationService, env, {
         notificationDAO,
         watchDAO,
         userDAO,

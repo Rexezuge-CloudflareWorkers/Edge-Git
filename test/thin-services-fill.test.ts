@@ -48,10 +48,12 @@ const lower = (value: unknown): string => String(value).toLowerCase();
 function removeInPlace(rows: Row[], predicate: (row: Row) => boolean): number {
   let removed = 0;
   for (let i = rows.length - 1; i >= 0; i -= 1) {
-    if (predicate(rows[i])) {
-      rows.splice(i, 1);
-      removed += 1;
+    if (!predicate(rows[i])) {
+      continue;
     }
+
+    rows.splice(i, 1);
+    removed += 1;
   }
   return removed;
 }
@@ -60,7 +62,7 @@ function createFakeDb(seed?: Partial<FakeState>): FakeDb {
   const state: FakeState = { ...emptyState(), ...seed };
 
   function statement(query: string, params: unknown[]) {
-    const q = query.replace(/\s+/g, ' ').trim();
+    const q = query.replaceAll(/\s+/g, ' ').trim();
     return {
       first<T>(): Promise<T | null> {
         // Organizations
@@ -136,7 +138,7 @@ function createFakeDb(seed?: Partial<FakeState>): FakeDb {
           const rows = state.repo_imports
             .filter((r) => r.repository_id === params[0])
             .sort((a, b) => b.created_at - a.created_at || (a.id < b.id ? 1 : -1));
-          return Promise.resolve(((rows[0] ?? null) as unknown) as T | null);
+          return Promise.resolve((rows[0] ?? null) as unknown as T | null);
         }
         if (q.includes('FROM repo_imports WHERE id = ?')) {
           const row = state.repo_imports.find((r) => r.id === params[0]);
@@ -203,13 +205,13 @@ function createFakeDb(seed?: Partial<FakeState>): FakeDb {
             const cursor = { created_at: params[1] as number, id: params[3] as string };
             rows = rows.filter((d) => d.created_at < cursor.created_at || (d.created_at === cursor.created_at && d.id < cursor.id));
           }
-          const pageSize = params[params.length - 1] as number;
+          const pageSize = params.at(-1) as number;
           return Promise.resolve({ results: rows.slice(0, pageSize) as T[] });
         }
         if (q.includes('FROM repo_imports WHERE')) {
           const rows = state.repo_imports
             .filter((r) => r.repository_id === params[1] || r.status === 'pending')
-            .slice(0, params[params.length - 1] as number);
+            .slice(0, params.at(-1) as number);
           return Promise.resolve({ results: rows as T[] });
         }
         return Promise.resolve({ results: [] });
@@ -218,7 +220,17 @@ function createFakeDb(seed?: Partial<FakeState>): FakeDb {
         // Teams
         if (q.startsWith('INSERT INTO teams (id, org_id, slug')) {
           const [id, orgId, slug, slugCi, name, description, createdBy, createdAt, updatedAt] = params as Array<string | number | null>;
-          state.teams.push({ id, org_id: orgId, slug, slug_ci: slugCi, name, description, created_by: createdBy, created_at: createdAt, updated_at: updatedAt });
+          state.teams.push({
+            id,
+            org_id: orgId,
+            slug,
+            slug_ci: slugCi,
+            name,
+            description,
+            created_by: createdBy,
+            created_at: createdAt,
+            updated_at: updatedAt,
+          });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE teams SET slug')) {
@@ -294,7 +306,7 @@ function createFakeDb(seed?: Partial<FakeState>): FakeDb {
         // Users
         if (q.startsWith('INSERT INTO users (email, created_at)')) {
           const [email, now] = params as Array<string | number>;
-          if (!state.users.some((u) => u.email === email)) {
+          if (state.users.every((u) => u.email !== email)) {
             state.users.push({ email, created_at: now, username: null, updated_at: null });
           }
           return Promise.resolve({ success: true, meta: { changes: 1 } });
@@ -320,7 +332,7 @@ function createFakeDb(seed?: Partial<FakeState>): FakeDb {
         // Namespaces (plain INSERT must throw on conflict like real D1)
         if (q.startsWith('INSERT OR IGNORE INTO namespaces')) {
           const [usernameCi, kind, userEmail, orgId, now] = params as Array<string | number | null>;
-          if (!state.namespaces.some((n) => n.username_ci === usernameCi)) {
+          if (state.namespaces.every((n) => n.username_ci !== usernameCi)) {
             state.namespaces.push({ username_ci: usernameCi, kind, user_email: userEmail, org_id: orgId, created_at: now });
           }
           return Promise.resolve({ success: true, meta: { changes: 1 } });
@@ -443,9 +455,7 @@ function createFakeDb(seed?: Partial<FakeState>): FakeDb {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('DELETE FROM webhook_deliveries WHERE id IN (')) {
-          const doomed = state.webhook_deliveries
-            .filter((d) => d.created_at < (params[0] as number))
-            .slice(0, params[1] as number);
+          const doomed = state.webhook_deliveries.filter((d) => d.created_at < (params[0] as number)).slice(0, params[1] as number);
           const doomedIds = new Set(doomed.map((d) => d.id));
           removeInPlace(state.webhook_deliveries, (d) => doomedIds.has(d.id));
           return Promise.resolve({ success: true, meta: { changes: doomed.length } });
@@ -473,22 +483,38 @@ function createFakeDb(seed?: Partial<FakeState>): FakeDb {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         // Repositories (rename cascade)
+        if (q.startsWith('UPDATE repositories SET owner = ?, owner_ci = ?, updated_at = ? WHERE owner_ci = ?')) {
+          for (const r of state.repositories) {
+            if (lower(r.owner_ci ?? r.owner) !== lower(params[3])) {
+              continue;
+            }
+
+            r.owner = params[0];
+            r.owner_ci = lower(params[1]);
+            r.updated_at = params[2];
+          }
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
         if (q.startsWith('UPDATE repositories SET owner = ?, owner_ci = ?, updated_at = ? WHERE lower(owner) = ?')) {
           for (const r of state.repositories) {
-            if (lower(r.owner) === lower(params[3])) {
-              r.owner = params[0];
-              r.owner_ci = lower(params[1]);
-              r.updated_at = params[2];
+            if (lower(r.owner) !== lower(params[3])) {
+              continue;
             }
+
+            r.owner = params[0];
+            r.owner_ci = lower(params[1]);
+            r.updated_at = params[2];
           }
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE repositories SET owner = ?, owner_ci = ? WHERE lower(owner) = ?')) {
           for (const r of state.repositories) {
-            if (lower(r.owner) === lower(params[2])) {
-              r.owner = params[0];
-              r.owner_ci = lower(params[1]);
+            if (lower(r.owner) !== lower(params[2])) {
+              continue;
             }
+
+            r.owner = params[0];
+            r.owner_ci = lower(params[1]);
           }
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
@@ -656,7 +682,16 @@ describe('TeamService grants', () => {
   it('enforces the per-team grant limit', async () => {
     const db = createFakeDb();
     seedAcme(db);
-    db.repositories.push({ id: 'r2', owner: 'acme', name: 'other', owner_email: 'o@x.co', description: null, is_private: 0, created_at: 1, updated_at: 1 });
+    db.repositories.push({
+      id: 'r2',
+      owner: 'acme',
+      name: 'other',
+      owner_email: 'o@x.co',
+      description: null,
+      is_private: 0,
+      created_at: 1,
+      updated_at: 1,
+    });
     const svc = new TeamService({ DB: db, MAX_TEAM_GRANTS: '1' });
     await svc.createTeam('acme', 'owner@x.co', { slug: 'frontend' });
     await svc.grantRepo('acme', 'frontend', 'owner@x.co', 'r1', 'read');
@@ -713,13 +748,13 @@ describe('ImportService', () => {
     const db = createFakeDb();
     expect(new ImportService({ DB: db }).transferLimits()).toEqual({
       maxRefs: 2000,
-      maxPackBytes: 52428800,
-      timeoutMs: 20000,
+      maxPackBytes: 52_428_800,
+      timeoutMs: 20_000,
       staleSeconds: 600,
     });
     expect(
       new ImportService({ DB: db, MAX_IMPORT_REFS: '5', MAX_IMPORT_BYTES: '7', IMPORT_CLAIM_STALE_SECONDS: '9' }).transferLimits(),
-    ).toEqual({ maxRefs: 5, maxPackBytes: 7, timeoutMs: 20000, staleSeconds: 9 });
+    ).toEqual({ maxRefs: 5, maxPackBytes: 7, timeoutMs: 20_000, staleSeconds: 9 });
   });
 
   it('validates import statuses and maps metadata refs', () => {
@@ -791,7 +826,16 @@ describe('UserService rename', () => {
   it('renames and keeps the old name reserved', async () => {
     const db = createFakeDb();
     seedAlice(db);
-    db.repositories.push({ id: 'repo1', owner: 'alice', name: 'demo', owner_email: 'alice@example.com', description: null, is_private: 0, created_at: 1, updated_at: 1 });
+    db.repositories.push({
+      id: 'repo1',
+      owner: 'alice',
+      name: 'demo',
+      owner_email: 'alice@example.com',
+      description: null,
+      is_private: 0,
+      created_at: 1,
+      updated_at: 1,
+    });
     const svc = new UserService({ DB: db });
     const renamed = await svc.renameUsername('alice@example.com', 'Alice2');
     expect(renamed).toEqual({ email: 'alice@example.com', username: 'Alice2' });
@@ -927,9 +971,9 @@ describe('WebhookDeliveryService statics', () => {
     expect(WebhookDeliveryService.backoffSecondsForAttempt(1)).toBe(60);
     expect(WebhookDeliveryService.backoffSecondsForAttempt(2)).toBe(600);
     expect(WebhookDeliveryService.backoffSecondsForAttempt(3)).toBe(3600);
-    expect(WebhookDeliveryService.backoffSecondsForAttempt(4)).toBe(21600);
-    expect(WebhookDeliveryService.backoffSecondsForAttempt(5)).toBe(86400);
-    expect(WebhookDeliveryService.backoffSecondsForAttempt(6)).toBe(86400);
+    expect(WebhookDeliveryService.backoffSecondsForAttempt(4)).toBe(21_600);
+    expect(WebhookDeliveryService.backoffSecondsForAttempt(5)).toBe(86_400);
+    expect(WebhookDeliveryService.backoffSecondsForAttempt(6)).toBe(86_400);
     expect(WebhookDeliveryService.backoffSecondsForAttempt(0)).toBe(60);
   });
 });
@@ -941,10 +985,12 @@ describe('WebhookDeliveryService attempt/process', () => {
     let posted = false;
     const svc = new WebhookDeliveryService(
       { DB: db },
-      { postJson: () => {
-        posted = true;
-        return Promise.resolve({ httpStatus: 200, error: null });
-      } },
+      {
+        postJson: () => {
+          posted = true;
+          return Promise.resolve({ httpStatus: 200, error: null });
+        },
+      },
     );
     const { enqueued } = await svc.enqueueForEvent({ repositoryId: 'r1', fullName: 'acme/demo', event: 'push', actorEmail: 'A@x.co' });
     expect(enqueued).toBe(1);
@@ -989,10 +1035,7 @@ describe('WebhookDeliveryService attempt/process', () => {
   it('marks successes and records hook outcomes', async () => {
     const db = createFakeDb();
     seedHook(db);
-    const svc = new WebhookDeliveryService(
-      { DB: db },
-      { postJson: () => Promise.resolve({ httpStatus: 200, error: null }) },
-    );
+    const svc = new WebhookDeliveryService({ DB: db }, { postJson: () => Promise.resolve({ httpStatus: 200, error: null }) });
     await svc.enqueueForEvent({ repositoryId: 'r1', fullName: 'acme/demo', event: 'push', actorEmail: 'a@x.co' });
     const result = await svc.processDue({ now: Math.floor(Date.now() / 1000) + 5 });
     expect(result).toEqual({ processed: 1, succeeded: 1, failed: 0 });
@@ -1007,13 +1050,10 @@ describe('WebhookDeliveryService attempt/process', () => {
     // Disabled hooks never fan out; the active hook fails inline on its
     // blocked URL so both processed rows end failed.
     seedHook(db, { id: 'blocked', url: 'http://localhost/evil' });
-    const svc = new WebhookDeliveryService(
-      { DB: db },
-      { postJson: () => Promise.resolve({ httpStatus: 200, error: null }) },
-    );
-    await expect(
-      svc.enqueueForEvent({ repositoryId: 'r1', fullName: 'acme/demo', event: 'push', actorEmail: 'a@x.co' }),
-    ).resolves.toEqual({ enqueued: 1 });
+    const svc = new WebhookDeliveryService({ DB: db }, { postJson: () => Promise.resolve({ httpStatus: 200, error: null }) });
+    await expect(svc.enqueueForEvent({ repositoryId: 'r1', fullName: 'acme/demo', event: 'push', actorEmail: 'a@x.co' })).resolves.toEqual({
+      enqueued: 1,
+    });
     // Orphan delivery pointing at a hook that does not exist.
     db.webhook_deliveries.push({
       id: 'orphan',
@@ -1039,10 +1079,7 @@ describe('WebhookDeliveryService attempt/process', () => {
   it('sends inline test pings', async () => {
     const db = createFakeDb();
     seedHook(db);
-    const svc = new WebhookDeliveryService(
-      { DB: db },
-      { postJson: () => Promise.resolve({ httpStatus: 200, error: null }) },
-    );
+    const svc = new WebhookDeliveryService({ DB: db }, { postJson: () => Promise.resolve({ httpStatus: 200, error: null }) });
     const ping = await svc.sendTestPing('h1', 'r1', 'acme/demo', 'owner@x.co');
     expect(ping.status).toBe('success');
     expect(ping.event).toBe('ping');
@@ -1058,15 +1095,15 @@ describe('WebhookDeliveryService fan-out/lifecycle', () => {
     seedHook(db, { id: 'other-event', events: '["issues"]' });
     seedHook(db, { id: 'bad-events', events: 'not-json' });
     const svc = new WebhookDeliveryService({ DB: db });
-    await expect(
-      svc.enqueueForEvent({ repositoryId: 'r1', fullName: 'acme/demo', event: 'push', actorEmail: 'a@x.co' }),
-    ).resolves.toEqual({ enqueued: 1 });
-    await expect(
-      svc.enqueueForEvent({ repositoryId: 'r1', fullName: 'acme/demo', event: 'star', actorEmail: 'a@x.co' }),
-    ).resolves.toEqual({ enqueued: 0 });
-    await expect(
-      svc.enqueueForEvent({ repositoryId: 'unknown', fullName: 'x/y', event: 'push', actorEmail: 'a@x.co' }),
-    ).resolves.toEqual({ enqueued: 0 });
+    await expect(svc.enqueueForEvent({ repositoryId: 'r1', fullName: 'acme/demo', event: 'push', actorEmail: 'a@x.co' })).resolves.toEqual({
+      enqueued: 1,
+    });
+    await expect(svc.enqueueForEvent({ repositoryId: 'r1', fullName: 'acme/demo', event: 'star', actorEmail: 'a@x.co' })).resolves.toEqual({
+      enqueued: 0,
+    });
+    await expect(svc.enqueueForEvent({ repositoryId: 'unknown', fullName: 'x/y', event: 'push', actorEmail: 'a@x.co' })).resolves.toEqual({
+      enqueued: 0,
+    });
   });
 
   it('lists, redelivers, and prunes deliveries', async () => {
