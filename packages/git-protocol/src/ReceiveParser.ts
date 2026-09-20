@@ -23,6 +23,13 @@ export function parseReceivePackRequest(data: Uint8Array): { commands: Command[]
     const lengthHex = PktLine.decodeText(data.slice(offset, offset + 4));
     const specialPackets = [PktLine.DELIM, PktLine.FLUSH, PktLine.RESPONSE_END];
     const packetLength = specialPackets.includes(lengthHex) ? 4 : Number.parseInt(lengthHex, 16);
+    // Fail closed on non-hex/truncated lengths: `PktLine.decode` above already
+    // validated the header it parsed, but this duplicate parse drives the
+    // cursor — NaN would silently terminate the loop (`NaN < n` is false) and
+    // mask a malformed push as `no commands`. Throw so callers return 400.
+    if (!Number.isSafeInteger(packetLength) || packetLength < 4 || packetLength > PktLine.MAX_PKT_SIZE) {
+      throw new Error(`Invalid pkt-line length: ${lengthHex}`);
+    }
 
     offset += packetLength;
 

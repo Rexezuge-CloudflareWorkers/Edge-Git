@@ -1,5 +1,6 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import type { AccessIdentityContext } from '@edge-git/backend-services/auth';
 import { emitWebhookEvent } from './SocialEmit';
 import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
@@ -26,7 +27,7 @@ function registerSnippetPublicRoutes(app: SnippetApp): void {
       try {
         viewerEmail = await createRequestScope(c.env)
           .get(Tokens.AccessAuthService)
-          .getAuthenticatedUserEmail(c.req.raw, c.executionCtx as never);
+          .getAuthenticatedUserEmail(c.req.raw, c.executionCtx as unknown as AccessIdentityContext);
       } catch {
         viewerEmail = null;
       }
@@ -46,7 +47,7 @@ function registerSnippetPublicRoutes(app: SnippetApp): void {
       try {
         viewerEmail = await createRequestScope(c.env)
           .get(Tokens.AccessAuthService)
-          .getAuthenticatedUserEmail(c.req.raw, c.executionCtx as never);
+          .getAuthenticatedUserEmail(c.req.raw, c.executionCtx as unknown as AccessIdentityContext);
       } catch {
         viewerEmail = null;
       }

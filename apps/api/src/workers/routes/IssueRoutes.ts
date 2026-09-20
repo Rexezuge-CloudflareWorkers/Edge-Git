@@ -14,7 +14,7 @@ function parseIssueNumber(raw: string | undefined): number | null {
 
 function registerIssueRoutes(app: IssueApp): void {
   app.get('/repos/:owner/:repo/issues', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       const scope = createRequestScope(c.env);
       const issues = await scope.get(Tokens.IssueService).listByRepo(row.id, 50);
       const label = c.req.query('label');
@@ -39,7 +39,7 @@ function registerIssueRoutes(app: IssueApp): void {
   });
 
   app.get('/repos/:owner/:repo/issues/:number', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       const number = parseIssueNumber(c.req.param('number'));
       if (number === null) return jsonError(c, 'Not found', 404);
       try {
@@ -52,7 +52,7 @@ function registerIssueRoutes(app: IssueApp): void {
   });
 
   app.get('/repos/:owner/:repo/issues/:number/comments', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       const number = parseIssueNumber(c.req.param('number'));
       if (number === null) return jsonError(c, 'Not found', 404);
       try {

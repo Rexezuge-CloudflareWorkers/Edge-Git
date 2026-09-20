@@ -91,6 +91,11 @@ export function parseCommand(data: Uint8Array): { command: string; args: string[
     const lengthHex = PktLine.decodeText(data.slice(offset, offset + 4));
     const specialPackets = [PktLine.DELIM, PktLine.FLUSH, PktLine.RESPONSE_END];
     const packetLength = specialPackets.includes(lengthHex) ? 4 : Number.parseInt(lengthHex, 16);
+    // Fail closed on non-hex/truncated lengths (see ReceiveParser): NaN would
+    // silently terminate negotiation instead of surfacing a 400.
+    if (!Number.isSafeInteger(packetLength) || packetLength < 4 || packetLength > PktLine.MAX_PKT_SIZE) {
+      throw new Error(`Invalid pkt-line length: ${lengthHex}`);
+    }
 
     offset += packetLength;
 
@@ -207,6 +212,10 @@ export function parseFetchRequest(_data: Uint8Array, args: string[]): FetchReque
 export function validateFetchRequestCounts(
   fetchRequest: Pick<FetchRequest, 'wants' | 'haves' | 'shallowOptions'>,
   limits: FetchCountLimits,
+  // Injectable clock seam (Otter `IClock` pattern): defaults to wall-clock so
+  // production call sites are unchanged; tests pass a fixed epoch to assert
+  // the future-skew bound deterministically.
+  nowSeconds: number = Math.trunc(Date.now() / 1000),
 ): string | null {
   if (fetchRequest.wants.length > limits.maxWants) {
     return `too many wants: ${fetchRequest.wants.length} > ${limits.maxWants}`;
@@ -231,7 +240,6 @@ export function validateFetchRequestCounts(
       if (!Number.isSafeInteger(deepenSince) || deepenSince < 0 || deepenSince > MAX_DEEPEN_SINCE) {
         return `invalid deepen-since: ${String(deepenSince)}`;
       }
-      const nowSeconds = Math.trunc(Date.now() / 1000);
       if (deepenSince > nowSeconds + DEEPEN_SINCE_FUTURE_SKEW_SECONDS) {
         return `invalid deepen-since: ${String(deepenSince)} is in the future`;
       }

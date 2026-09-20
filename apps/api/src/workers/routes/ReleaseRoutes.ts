@@ -31,9 +31,9 @@ async function tagExists(env: Env, fullName: string, tagName: string): Promise<b
 
 function registerReleasePublicRoutes(app: ReleaseApp): void {
   app.get('/repos/:owner/:repo/releases', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       try {
-        const viewerEmail = await resolvePublicViewer(c as never);
+        const viewerEmail = await resolvePublicViewer(c);
         const canSeeDrafts = await viewerCanSeeDrafts(c.env, viewerEmail, row.owner, row.name);
         const releases = await createRequestScope(c.env).get(Tokens.ReleaseService).listReleases(row.id);
         return c.json({ releases: canSeeDrafts ? releases : releases.filter((r) => !r.isDraft) });
@@ -44,12 +44,12 @@ function registerReleasePublicRoutes(app: ReleaseApp): void {
   });
 
   app.get('/repos/:owner/:repo/releases/:tag', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       try {
         const scope = createRequestScope(c.env);
         const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
         if (release.isDraft) {
-          const viewerEmail = await resolvePublicViewer(c as never);
+          const viewerEmail = await resolvePublicViewer(c);
           if (!(await viewerCanSeeDrafts(c.env, viewerEmail, row.owner, row.name))) return jsonError(c, 'Not found', 404);
         }
         const assets = await scope.get(Tokens.ReleaseService).listAssets(row.id, release.tagName);

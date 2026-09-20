@@ -1,39 +1,10 @@
 import { EnvParser } from './EnvParser';
-import {
-  DEFAULT_AUDIT_LOG_RETENTION_DAYS,
-  DEFAULT_BACKGROUND_TASK_RUN_RETENTION_DAYS,
-  DEFAULT_CHECK_CUSTOMJS_ENABLED,
-  DEFAULT_CHECK_CUSTOMJS_MAX_CPU_MS,
-  DEFAULT_CHECK_CUSTOMJS_MAX_FETCHES,
-  DEFAULT_CHECK_CUSTOMJS_MAX_SCRIPT_BYTES,
-  DEFAULT_CHECK_CUSTOMJS_MEMORY_MB,
-  DEFAULT_CHECK_RETENTION_DAYS,
-  DEFAULT_CHECK_TIMEOUT_SECONDS,
-  DEFAULT_DEBUG_MODE,
-  DEFAULT_IMPORT_CLAIM_STALE_SECONDS,
-  DEFAULT_MAX_DEPLOY_KEYS_PER_REPO,
-  DEFAULT_MAX_EXPORT_BYTES,
-  DEFAULT_MAX_ASSETS_PER_RELEASE,
-  DEFAULT_MAX_ASSET_BYTES,
-  DEFAULT_MAX_CARDS_PER_COLUMN,
-  DEFAULT_MAX_CHECKS_PER_SHA,
-  DEFAULT_MAX_COLUMNS_PER_PROJECT,
-  DEFAULT_MAX_DISCUSSIONS_PER_REPO,
-  DEFAULT_MAX_IMPORT_BYTES,
-  DEFAULT_MAX_IMPORT_REFS,
-  DEFAULT_MAX_MIRROR_FAILURES,
-  DEFAULT_MAX_PROJECTS_PER_REPO,
-  DEFAULT_MAX_RELEASES_PER_REPO,
-  DEFAULT_MAX_WIKI_BODY_BYTES,
-  DEFAULT_MAX_WIKI_PAGES_PER_REPO,
-  DEFAULT_SEARCH_BACKFILL_FILES_PER_REPO,
-  DEFAULT_SEARCH_BACKFILL_INTERVAL_SECONDS,
-  DEFAULT_SEARCH_BACKFILL_REPOS_PER_TICK,
-  DEFAULT_SITE_URL,
-} from './ConfigurationDefaults';
+import { DEFAULT_DEBUG_MODE, DEFAULT_SITE_URL } from './ConfigurationDefaults';
 
 import { AuthConfig } from './sections/AuthConfig';
+import { ContentLimits } from './sections/ContentLimits';
 import { GitLimits } from './sections/GitLimits';
+import { RetentionLimits } from './sections/RetentionLimits';
 import { RealtimeLimits } from './sections/RealtimeLimits';
 import { RepoLimits } from './sections/RepoLimits';
 import { WebhookLimits } from './sections/WebhookLimits';
@@ -42,16 +13,23 @@ import { WebhookLimits } from './sections/WebhookLimits';
  * Injectable instance view over Edge-Git environment configuration.
  *
  * Composed of focused section objects (`RepoLimits`, `GitLimits`,
- * `WebhookLimits`, `RealtimeLimits`, `AuthConfig`) so the god-file stays a
- * thin facade. `ConfigurationManager` statics delegate here for backward
- * compatibility. New code should accept `AppConfiguration` via constructor
- * injection so env parsing is stubbable.
+ * `WebhookLimits`, `RealtimeLimits`, `ContentLimits`, `RetentionLimits`,
+ * `AuthConfig`) so the god-file stays a thin facade. `ConfigurationManager`
+ * statics delegate here for backward compatibility. New code should accept
+ * `AppConfiguration` via constructor injection so env parsing is stubbable.
+ *
+ * NOTE: the remaining one-line delegates are intentional — they are the
+ * injectable seam backing `ConfigurationManager` statics and unit-test
+ * doubles. They carry no branching (cognitive complexity ~0); do not
+ * re-inline `EnvParser` calls at call sites to "shrink" this file.
  */
 class AppConfiguration {
   private readonly repos: RepoLimits;
   private readonly git: GitLimits;
   private readonly webhooks: WebhookLimits;
   private readonly realtime: RealtimeLimits;
+  private readonly content: ContentLimits;
+  private readonly retention: RetentionLimits;
   private readonly auth: AuthConfig;
 
   constructor(private readonly env: unknown) {
@@ -59,6 +37,8 @@ class AppConfiguration {
     this.git = new GitLimits(env);
     this.webhooks = new WebhookLimits(env);
     this.realtime = new RealtimeLimits(env);
+    this.content = new ContentLimits(env);
+    this.retention = new RetentionLimits(env);
     this.auth = new AuthConfig(env);
   }
 
@@ -80,6 +60,14 @@ class AppConfiguration {
 
   public get realtimeLimits(): RealtimeLimits {
     return this.realtime;
+  }
+
+  public get contentLimits(): ContentLimits {
+    return this.content;
+  }
+
+  public get retentionLimits(): RetentionLimits {
+    return this.retention;
   }
 
   public get authConfig(): AuthConfig {
@@ -149,23 +137,23 @@ class AppConfiguration {
   }
 
   public getTaskRunRetentionDays(): number {
-    return EnvParser.positiveInt(this.env, 'BACKGROUND_TASK_RUN_RETENTION_DAYS', DEFAULT_BACKGROUND_TASK_RUN_RETENTION_DAYS);
+    return this.retention.getTaskRunRetentionDays();
   }
 
   public getSearchBackfillIntervalSeconds(): number {
-    return EnvParser.positiveInt(this.env, 'SEARCH_BACKFILL_INTERVAL_SECONDS', DEFAULT_SEARCH_BACKFILL_INTERVAL_SECONDS);
+    return this.retention.getSearchBackfillIntervalSeconds();
   }
 
   public getSearchBackfillReposPerTick(): number {
-    return EnvParser.positiveInt(this.env, 'SEARCH_BACKFILL_REPOS_PER_TICK', DEFAULT_SEARCH_BACKFILL_REPOS_PER_TICK);
+    return this.retention.getSearchBackfillReposPerTick();
   }
 
   public getSearchBackfillFilesPerRepo(): number {
-    return EnvParser.positiveInt(this.env, 'SEARCH_BACKFILL_FILES_PER_REPO', DEFAULT_SEARCH_BACKFILL_FILES_PER_REPO);
+    return this.retention.getSearchBackfillFilesPerRepo();
   }
 
   public getAuditLogRetentionDays(): number {
-    return EnvParser.positiveInt(this.env, 'AUDIT_LOG_RETENTION_DAYS', DEFAULT_AUDIT_LOG_RETENTION_DAYS);
+    return this.retention.getAuditLogRetentionDays();
   }
 
   public getMaxHooksPerRepo(): number {
@@ -193,39 +181,39 @@ class AppConfiguration {
   }
 
   public getMaxReleasesPerRepo(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_RELEASES_PER_REPO', DEFAULT_MAX_RELEASES_PER_REPO);
+    return this.content.getMaxReleasesPerRepo();
   }
 
   public getMaxAssetsPerRelease(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_ASSETS_PER_RELEASE', DEFAULT_MAX_ASSETS_PER_RELEASE);
+    return this.content.getMaxAssetsPerRelease();
   }
 
   public getMaxAssetBytes(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_ASSET_BYTES', DEFAULT_MAX_ASSET_BYTES);
+    return this.content.getMaxAssetBytes();
   }
 
   public getMaxProjectsPerRepo(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_PROJECTS_PER_REPO', DEFAULT_MAX_PROJECTS_PER_REPO);
+    return this.content.getMaxProjectsPerRepo();
   }
 
   public getMaxColumnsPerProject(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_COLUMNS_PER_PROJECT', DEFAULT_MAX_COLUMNS_PER_PROJECT);
+    return this.content.getMaxColumnsPerProject();
   }
 
   public getMaxCardsPerColumn(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_CARDS_PER_COLUMN', DEFAULT_MAX_CARDS_PER_COLUMN);
+    return this.content.getMaxCardsPerColumn();
   }
 
   public getMaxDiscussionsPerRepo(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_DISCUSSIONS_PER_REPO', DEFAULT_MAX_DISCUSSIONS_PER_REPO);
+    return this.content.getMaxDiscussionsPerRepo();
   }
 
   public getMaxWikiPagesPerRepo(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_WIKI_PAGES_PER_REPO', DEFAULT_MAX_WIKI_PAGES_PER_REPO);
+    return this.content.getMaxWikiPagesPerRepo();
   }
 
   public getMaxWikiBodyBytes(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_WIKI_BODY_BYTES', DEFAULT_MAX_WIKI_BODY_BYTES);
+    return this.content.getMaxWikiBodyBytes();
   }
 
   public getMaxSnippetsPerUser(): number {
@@ -253,19 +241,19 @@ class AppConfiguration {
   }
 
   public getMaxImportBytes(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_IMPORT_BYTES', DEFAULT_MAX_IMPORT_BYTES);
+    return this.content.getMaxImportBytes();
   }
 
   public getMaxImportRefs(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_IMPORT_REFS', DEFAULT_MAX_IMPORT_REFS);
+    return this.content.getMaxImportRefs();
   }
 
   public getMaxExportBytes(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_EXPORT_BYTES', DEFAULT_MAX_EXPORT_BYTES);
+    return this.content.getMaxExportBytes();
   }
 
   public getMaxDeployKeysPerRepo(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_DEPLOY_KEYS_PER_REPO', DEFAULT_MAX_DEPLOY_KEYS_PER_REPO);
+    return this.content.getMaxDeployKeysPerRepo();
   }
 
   public getMaxTokenRepoGrants(): number {
@@ -273,43 +261,43 @@ class AppConfiguration {
   }
 
   public getMaxMirrorFailures(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_MIRROR_FAILURES', DEFAULT_MAX_MIRROR_FAILURES);
+    return this.content.getMaxMirrorFailures();
   }
 
   public getImportClaimStaleSeconds(): number {
-    return EnvParser.positiveInt(this.env, 'IMPORT_CLAIM_STALE_SECONDS', DEFAULT_IMPORT_CLAIM_STALE_SECONDS);
+    return this.content.getImportClaimStaleSeconds();
   }
 
   public getMaxChecksPerSha(): number {
-    return EnvParser.positiveInt(this.env, 'MAX_CHECKS_PER_SHA', DEFAULT_MAX_CHECKS_PER_SHA);
+    return this.content.getMaxChecksPerSha();
   }
 
   public getCheckTimeoutSeconds(): number {
-    return EnvParser.positiveInt(this.env, 'CHECK_TIMEOUT_SECONDS', DEFAULT_CHECK_TIMEOUT_SECONDS);
+    return this.content.getCheckTimeoutSeconds();
   }
 
   public getCheckRetentionDays(): number {
-    return EnvParser.positiveInt(this.env, 'CHECK_RETENTION_DAYS', DEFAULT_CHECK_RETENTION_DAYS);
+    return this.content.getCheckRetentionDays();
   }
 
   public isCheckCustomJsEnabled(): boolean {
-    return EnvParser.boolean(this.env, 'CHECK_CUSTOMJS_ENABLED', DEFAULT_CHECK_CUSTOMJS_ENABLED);
+    return this.content.isCheckCustomJsEnabled();
   }
 
   public getCheckCustomJsMaxCpuMs(): number {
-    return EnvParser.positiveInt(this.env, 'CHECK_CUSTOMJS_MAX_CPU_MS', DEFAULT_CHECK_CUSTOMJS_MAX_CPU_MS);
+    return this.content.getCheckCustomJsMaxCpuMs();
   }
 
   public getCheckCustomJsMaxScriptBytes(): number {
-    return EnvParser.positiveInt(this.env, 'CHECK_CUSTOMJS_MAX_SCRIPT_BYTES', DEFAULT_CHECK_CUSTOMJS_MAX_SCRIPT_BYTES);
+    return this.content.getCheckCustomJsMaxScriptBytes();
   }
 
   public getCheckCustomJsMaxFetches(): number {
-    return EnvParser.positiveInt(this.env, 'CHECK_CUSTOMJS_MAX_FETCHES', DEFAULT_CHECK_CUSTOMJS_MAX_FETCHES);
+    return this.content.getCheckCustomJsMaxFetches();
   }
 
   public getCheckCustomJsMemoryMb(): number {
-    return EnvParser.positiveInt(this.env, 'CHECK_CUSTOMJS_MEMORY_MB', DEFAULT_CHECK_CUSTOMJS_MEMORY_MB);
+    return this.content.getCheckCustomJsMemoryMb();
   }
 
   public isDemoMode(): boolean {

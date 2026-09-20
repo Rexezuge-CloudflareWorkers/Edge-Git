@@ -40,12 +40,12 @@ function downloadResponse(bytes: Uint8Array, contentType: string, filename: stri
 
 function registerReleaseAssetPublicRoutes(app: ReleaseAssetApp): void {
   app.get('/repos/:owner/:repo/releases/:tag/assets', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       try {
         const scope = createRequestScope(c.env);
         const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
         if (release.isDraft) {
-          const viewerEmail = await resolvePublicViewer(c as never);
+          const viewerEmail = await resolvePublicViewer(c);
           if (!(await viewerCanSeeDrafts(c.env, viewerEmail, row.owner, row.name))) return jsonError(c, 'Not found', 404);
         }
         const assets = await scope.get(Tokens.ReleaseService).listAssets(row.id, release.tagName);
@@ -57,12 +57,12 @@ function registerReleaseAssetPublicRoutes(app: ReleaseAssetApp): void {
   });
 
   app.get('/repos/:owner/:repo/releases/:tag/assets/:assetId/download', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       try {
         const scope = createRequestScope(c.env);
         const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
         if (release.isDraft) {
-          const viewerEmail = await resolvePublicViewer(c as never);
+          const viewerEmail = await resolvePublicViewer(c);
           if (!(await viewerCanSeeDrafts(c.env, viewerEmail, row.owner, row.name))) return jsonError(c, 'Not found', 404);
         }
         const asset = await scope.get(Tokens.ReleaseService).getAsset(row.id, release.tagName, c.req.param('assetId'));

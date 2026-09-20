@@ -6,7 +6,7 @@ import type { CollabApp } from './CollabHelpers';
 
 function registerCollabBlamePublicRoutes(app: CollabApp): void {
   app.get('/repos/:owner/:repo/blame', async (c) => {
-    return withPublicRepo(c as never, async (_row, fullName) => {
+    return withPublicRepo(c, async (_row, fullName) => {
       const ref = c.req.query('ref') || 'HEAD';
       const path = c.req.query('path') || '';
       if (!path) return jsonError(c, 'path is required', 400);

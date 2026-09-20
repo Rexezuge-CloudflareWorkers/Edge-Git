@@ -32,7 +32,7 @@ function registerSearchRoutes(app: SearchApp): void {
 
     let viewerEmail: string | null = null;
     try {
-      viewerEmail = await resolvePublicViewer(c as never as RequestContext);
+      viewerEmail = await resolvePublicViewer(c);
     } catch {
       viewerEmail = null;
     }

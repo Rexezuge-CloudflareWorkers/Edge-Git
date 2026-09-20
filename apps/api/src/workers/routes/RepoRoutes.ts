@@ -20,8 +20,8 @@ type RepoApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress:
 // unless the caller presents Access identity or a PAT for the owner).
 function registerRepoRoutes(app: RepoApp): void {
   app.get('/repos/:owner/:repo', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
-      const forksCount = await getScope(c as never)
+    return withPublicRepo(c, async (row) => {
+      const forksCount = await getScope(c)
         .get(Tokens.ForkService)
         .countForks(row.id)
         .catch(() => 0);
@@ -30,15 +30,15 @@ function registerRepoRoutes(app: RepoApp): void {
   });
 
   app.get('/repos/:owner/:repo/branches', async (c) => {
-    return withPublicRepo(c as never, async (_row, fullName) => c.json(await getRepoStub(c.env, fullName).getBranches()));
+    return withPublicRepo(c, async (_row, fullName) => c.json(await getRepoStub(c.env, fullName).getBranches()));
   });
 
   app.get('/repos/:owner/:repo/tags', async (c) => {
-    return withPublicRepo(c as never, async (_row, fullName) => c.json(await getRepoStub(c.env, fullName).getTags()));
+    return withPublicRepo(c, async (_row, fullName) => c.json(await getRepoStub(c.env, fullName).getTags()));
   });
 
   app.get('/repos/:owner/:repo/tree', async (c) => {
-    return withPublicRepo(c as never, async (_row, fullName) => {
+    return withPublicRepo(c, async (_row, fullName) => {
       const url = new URL(c.req.url);
       return c.json(
         await getRepoStub(c.env, fullName).getTree({
@@ -51,7 +51,7 @@ function registerRepoRoutes(app: RepoApp): void {
   });
 
   app.get('/repos/:owner/:repo/blob', async (c) => {
-    return withPublicRepo(c as never, async (_row, fullName) => {
+    return withPublicRepo(c, async (_row, fullName) => {
       const url = new URL(c.req.url);
       return c.json(
         await getRepoStub(c.env, fullName).getBlob({
@@ -63,7 +63,7 @@ function registerRepoRoutes(app: RepoApp): void {
   });
 
   app.get('/repos/:owner/:repo/commits', async (c) => {
-    return withPublicRepo(c as never, async (_row, fullName) => {
+    return withPublicRepo(c, async (_row, fullName) => {
       const url = new URL(c.req.url);
       return c.json(
         await getRepoStub(c.env, fullName).getCommits({
@@ -77,7 +77,7 @@ function registerRepoRoutes(app: RepoApp): void {
   // Aggregate code-page read: branches + tags + fast tree + commits + README
   // in one DO RPC. Replaces 5 sequential granular calls on owner/repo load.
   app.get('/repos/:owner/:repo/overview', async (c) => {
-    return withPublicRepo(c as never, async (_row, fullName) => {
+    return withPublicRepo(c, async (_row, fullName) => {
       const url = new URL(c.req.url);
       return c.json(await getRepoStub(c.env, fullName).getOverview(parseOverviewArgs(url.searchParams)));
     });
@@ -86,7 +86,7 @@ function registerRepoRoutes(app: RepoApp): void {
   app.get('/repos/:owner/:repo/commits/:oid', async (c) => {
     const oid = c.req.param('oid');
     if (!/^[0-9a-f]{40}$/i.test(oid)) return jsonError(c, 'Invalid commit oid', 400);
-    return withPublicRepo(c as never, async (_row, fullName) => {
+    return withPublicRepo(c, async (_row, fullName) => {
       const diff = (await getRepoStub(c.env, fullName).getCommitDiff(oid)) as { commit: unknown } | null;
       if (!diff || !diff.commit) return jsonError(c, 'Not found', 404);
       return c.json(diff);
@@ -94,7 +94,7 @@ function registerRepoRoutes(app: RepoApp): void {
   });
 
   app.get('/repos/:owner/:repo/compare', async (c) => {
-    return withPublicRepo(c as never, async (_row, fullName) => {
+    return withPublicRepo(c, async (_row, fullName) => {
       const url = new URL(c.req.url);
       const baseRef = sanitizeRefParam(url.searchParams.get('base')) ?? '';
       const headRef = sanitizeRefParam(url.searchParams.get('head')) ?? '';
@@ -111,7 +111,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
   app.get('/user/me', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     try {
-      const profile = await getScope(c as never)
+      const profile = await getScope(c)
         .get(Tokens.UserService)
         .getProfileByEmail(email);
       return c.json({ email: profile.email, username: profile.username });
@@ -221,7 +221,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
       return jsonError(c, 'Nothing to update', 400);
     }
     try {
-      const updated = await getScope(c as never)
+      const updated = await getScope(c)
         .get(Tokens.RepoService)
         .updateRepo(owner, repoName, email, patch);
       return c.json({ ...(toRepoJson(updated) as Record<string, unknown>), viewerCanManage: true });
@@ -235,7 +235,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoService.normalizeRepo(c.req.param('repo'));
     try {
-      const { id } = await getScope(c as never)
+      const { id } = await getScope(c)
         .get(Tokens.RepoService)
         .deleteRepo(owner, repoName, email);
       // Purge git objects from the Durable Object (best-effort; D1 is source of truth).
@@ -246,7 +246,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
         console.error('Failed to purge repo DO', fullName, error);
       }
       try {
-        await getScope(c as never)
+        await getScope(c)
           .get(Tokens.SearchService)
           .clearRepo(id);
       } catch (error) {

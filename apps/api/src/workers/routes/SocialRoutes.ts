@@ -26,9 +26,9 @@ async function getCounts(env: Env, repoId: string): Promise<{ starsCount: number
 // best-effort and default to false for anonymous visitors.
 function registerSocialRoutes(app: SocialApp): void {
   app.get('/repos/:owner/:repo/stars', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       const scope = createRequestScope(c.env);
-      const viewerEmail = await resolvePublicViewer(c as never);
+      const viewerEmail = await resolvePublicViewer(c);
       const [starsCount, viewerStarred] = await Promise.all([
         scope
           .get(Tokens.StarService)
@@ -46,9 +46,9 @@ function registerSocialRoutes(app: SocialApp): void {
   });
 
   app.get('/repos/:owner/:repo/watches', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       const scope = createRequestScope(c.env);
-      const viewerEmail = await resolvePublicViewer(c as never);
+      const viewerEmail = await resolvePublicViewer(c);
       const [watchersCount, viewerWatching] = await Promise.all([
         scope
           .get(Tokens.WatchService)
@@ -66,7 +66,7 @@ function registerSocialRoutes(app: SocialApp): void {
   });
 
   app.get('/repos/:owner/:repo/activity', async (c) => {
-    return withPublicRepo(c as never, async (row) => {
+    return withPublicRepo(c, async (row) => {
       const url = new URL(c.req.url);
       const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 30, 1), 100);
       const cursor = url.searchParams.get('cursor') ?? undefined;

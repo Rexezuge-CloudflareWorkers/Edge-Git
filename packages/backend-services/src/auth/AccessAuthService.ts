@@ -30,7 +30,7 @@ function demoModeStrategy(env: AccessAuthEnv): Promise<string | null> {
 
 function isValidAuthEmail(raw: string): boolean {
   if (!raw || raw.length > 254 || /\s/.test(raw)) return false;
-  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(raw);
+  return /^[^@\s]+@[^\s@][^\s.@]*\.[^\s@]+$/.test(raw);
 }
 
 function devEmailStrategy(env: AccessAuthEnv): Promise<string | null> {
@@ -45,7 +45,14 @@ function devEmailStrategy(env: AccessAuthEnv): Promise<string | null> {
 
 async function accessJwtStrategy(env: AccessAuthEnv, request: Request): Promise<string | null> {
   if (env.TEAM_DOMAIN && env.POLICY_AUD) {
-    return AccessAuthService.verifyAccessJwt(request, env.TEAM_DOMAIN, env.POLICY_AUD);
+    // Fail soft so the `ctx.access` fallback stays reachable when the JWT is
+    // missing/invalid. `getAuthenticatedUserEmail` throws once no strategy
+    // matches — a single throw site instead of one per strategy.
+    try {
+      return await AccessAuthService.verifyAccessJwt(request, env.TEAM_DOMAIN, env.POLICY_AUD);
+    } catch {
+      return null;
+    }
   }
   return null;
 }
@@ -101,7 +108,9 @@ class AccessAuthService {
         return email;
       }
     }
-    return AccessAuthService.verifyAccessJwt(request, this.env.TEAM_DOMAIN, this.env.POLICY_AUD);
+    // Single throw site: the JWT strategy already attempted verification and
+    // failed soft, so re-verifying here would only double the JWK fetch.
+    throw new UnauthorizedError('Cloudflare Access authentication failed.');
   }
 
   public static async verifyAccessJwt(request: Request, teamDomain?: string, policyAud?: string): Promise<string> {
