@@ -1,8 +1,9 @@
-import { IssueDAO } from '@edge-git/backend-data/dao';
+import { IssueDAO, NumberingDAO } from '@edge-git/backend-data/dao';
 import type { CommentRow, IssueRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
+import { allocateNumberWithFallback } from '../numbering/numberAllocator';
 
 interface IssueServiceEnv {
   DB: D1Queryable;
@@ -10,6 +11,7 @@ interface IssueServiceEnv {
 
 interface IssueServiceDeps {
   issueDAO?: () => Promise<IssueDAO>;
+  numberingDAO?: () => Promise<NumberingDAO>;
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -26,6 +28,7 @@ class IssueService {
   ) {
     this.deps = {
       issueDAO: () => Promise.resolve(new IssueDAO(env.DB)),
+      numberingDAO: () => Promise.resolve(new NumberingDAO(env.DB)),
       ...deps,
     };
   }
@@ -48,11 +51,14 @@ class IssueService {
     const body = input.body?.trim() ? input.body.trim() : null;
     if (body && body.length > 10_000) throw new BadRequestError('body must be at most 10000 characters');
     const dao = await this.deps.issueDAO();
+    // Atomic allocator first (single UPSERT ... RETURNING stays distinct
+    // under concurrency); legacy MAX+1 loop on fallback. The UNIQUE index +
+    // retry below stays as the backstop either way.
     // Retry on UNIQUE(repository_id, number) races from concurrent POSTs:
     // re-read MAX(number)+1 after a conflict (3 attempts, then surface).
     let lastError: unknown = null;
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      const number = await dao.nextNumber(input.repositoryId);
+      const number = await allocateNumberWithFallback(this.deps.numberingDAO, () => dao.nextNumber(input.repositoryId), input.repositoryId, 'issue');
       const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
       const id = UUIDUtil.getRandomUUID();
       try {

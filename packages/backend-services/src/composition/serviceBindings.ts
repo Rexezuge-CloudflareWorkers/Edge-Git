@@ -46,6 +46,7 @@ import type {
   MirrorDAO,
   NamespaceDAO,
   NotificationDAO,
+  NumberingDAO,
   OrganizationDAO,
   OrganizationMemberDAO,
   ProjectDAO,
@@ -92,6 +93,7 @@ function bindServiceBindings(scope: Container, env: RequestScopeEnv): void {
   const organizationMemberDAO = getDao<OrganizationMemberDAO>(Tokens.OrganizationMemberDAO);
   const repoCollaboratorDAO = getDao<RepoCollaboratorDAO>(Tokens.RepoCollaboratorDAO);
   const namespaceDAO = getDao<NamespaceDAO>(Tokens.NamespaceDAO);
+  const numberingDAO = getDao<NumberingDAO>(Tokens.NumberingDAO);
   const starDAO = getDao<StarDAO>(Tokens.StarDAO);
   const watchDAO = getDao<WatchDAO>(Tokens.WatchDAO);
   const eventDAO = getDao<EventDAO>(Tokens.EventDAO);
@@ -180,8 +182,8 @@ function bindServiceBindings(scope: Container, env: RequestScopeEnv): void {
         webhookDAO,
       }),
   );
-  scope.bind(Tokens.IssueService, () => createService(IssueService, env, { issueDAO }));
-  scope.bind(Tokens.PullRequestService, () => createService(PullRequestService, env, { pullRequestDAO }));
+  scope.bind(Tokens.IssueService, () => createService(IssueService, env, { issueDAO, numberingDAO }));
+  scope.bind(Tokens.PullRequestService, () => createService(PullRequestService, env, { pullRequestDAO, numberingDAO }));
   scope.bind(Tokens.PullThreadService, () => createService(PullThreadService, env, { pullRequestDAO, pullThreadDAO }));
   scope.bind(
     Tokens.OrganizationService,
@@ -227,6 +229,9 @@ function bindServiceBindings(scope: Container, env: RequestScopeEnv): void {
         teamMemberDAO,
         teamGrantDAO,
         teamDAO,
+        // Production D1 has every migration: a missing table is deploy skew,
+        // not a legacy DB — fail closed instead of degrading to public-read.
+        strictSchema: !AppConfiguration.fromEnv(env).isBypassAllowed(),
       }),
   );
   scope.bind(
@@ -250,8 +255,8 @@ function bindServiceBindings(scope: Container, env: RequestScopeEnv): void {
         permissionService: () => Promise.resolve(container.get(Tokens.PermissionService)),
       }),
   );
-  scope.bind(Tokens.ProjectService, () => createService(ProjectService, env, { projectDAO }));
-  scope.bind(Tokens.DiscussionService, () => createService(DiscussionService, env, { discussionDAO }));
+  scope.bind(Tokens.ProjectService, () => createService(ProjectService, env, { projectDAO, numberingDAO }));
+  scope.bind(Tokens.DiscussionService, () => createService(DiscussionService, env, { discussionDAO, numberingDAO }));
   scope.bind(Tokens.WikiService, () => createService(WikiService, env, { wikiDAO }));
   scope.bind(Tokens.SnippetService, () => createService(SnippetService, env, { snippetDAO }));
   scope.bind(Tokens.WatchService, () => createService(WatchService, env, { watchDAO }));

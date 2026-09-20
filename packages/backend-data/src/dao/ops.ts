@@ -1,4 +1,6 @@
 export { BaseDAO } from './BaseDAO';
+export { NumberingDAO } from './NumberingDAO';
+export type { NumberedEntity } from './NumberingDAO';
 export { AuditLogDAO } from './AuditLogDAO';
 export { CheckRunDAO } from './CheckRunDAO';
 export { ImportDAO } from './ImportDAO';

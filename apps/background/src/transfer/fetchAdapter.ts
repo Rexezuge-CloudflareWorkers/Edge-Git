@@ -18,8 +18,15 @@ function isRedirect(status: number): boolean {
 async function fetchNoAutoRedirect(url: string, init: RequestInit): Promise<Response> {
   let current = url;
   let currentInit: RequestInit = { ...init, redirect: 'manual' };
+  // Cycle detection: A→B→A redirect loops otherwise burn all 3 hops before
+  // surfacing as a generic limit error. Fail fast with a clear message.
+  const visited = new Set<string>();
   for (let hop = 0; hop <= MAX_REDIRECT_HOPS; hop += 1) {
     assertPublicFinalUrl(current.split('?', 1)[0]);
+    if (visited.has(current)) {
+      throw new Error(`redirect loop detected at ${current.split('?', 1)[0]}`);
+    }
+    visited.add(current);
     const res = await fetch(current, currentInit);
     if (!isRedirect(res.status)) return res;
     const location = res.headers.get('location');
