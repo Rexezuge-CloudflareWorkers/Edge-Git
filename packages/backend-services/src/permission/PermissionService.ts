@@ -27,6 +27,12 @@ interface PermissionServiceDeps {
   teamDAO?: () => Promise<TeamDAO>;
   teamMemberDAO?: () => Promise<TeamMemberDAO>;
   teamGrantDAO?: () => Promise<TeamRepoGrantDAO>;
+  // Fail-closed schema mode: when true, missing-table/column errors throw
+  // DatabaseError instead of degrading to public-read/collaborator fallbacks.
+  // Wired to true in production (all migrations applied; a missing table is
+  // deploy skew, not a legacy DB). Non-prod keeps the legacy degrade for
+  // old D1 databases and unit fakes.
+  strictSchema?: boolean;
 }
 
 const ROLE_RANK: Record<RepoPermission, number> = { read: 1, write: 2, admin: 3 };
@@ -46,8 +52,20 @@ class PermissionService {
       teamDAO: () => Promise.resolve(new TeamDAO(env.DB)),
       teamMemberDAO: () => Promise.resolve(new TeamMemberDAO(env.DB)),
       teamGrantDAO: () => Promise.resolve(new TeamRepoGrantDAO(env.DB)),
+      strictSchema: false,
       ...deps,
     };
+  }
+
+  /**
+   * Whether a missing-table/column error may degrade to a fallback.
+   * Centralizes the fail-open guard: every `catch` in `getRole`/`getTeamRole`
+   * routes through here so strict mode (production) fails closed with
+   * DatabaseError instead of silently treating outage/skew as public-read.
+   */
+  private isTolerableSchemaError(error: unknown): boolean {
+    if (this.deps.strictSchema) return false;
+    return isMissingSchemaError(error);
   }
 
   public static rank(role: RepoPermission): number {
@@ -80,8 +98,9 @@ class PermissionService {
     const viewer = viewerEmail.toLowerCase();
 
     // Resolve org (0002 path with graceful fallback for legacy DBs/fakes).
-    // Fail closed: only missing-table errors degrade; genuine D1 failures
-    // throw DatabaseError instead of falling through to public-read.
+    // Fail closed: only missing-table errors degrade — and only when
+    // `strictSchema` is off (non-prod). Genuine D1 failures throw
+    // DatabaseError instead of falling through to public-read.
     let orgId: string | null = null;
     try {
       const ownerType = PermissionService.ownerTypeOf(repo);
@@ -102,12 +121,12 @@ class PermissionService {
           const maybeOrg = await orgDAO.getByUsernameCi(PermissionService.ownerCiOf(repo));
           if (maybeOrg && (repo.org_id === maybeOrg.id || repo.owner_type === 'org')) orgId = maybeOrg.id;
         } catch (error) {
-          if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to resolve organization: ${error instanceof Error ? error.message : String(error)}`);
+          if (!this.isTolerableSchemaError(error)) throw new DatabaseError(`Failed to resolve organization: ${error instanceof Error ? error.message : String(error)}`);
           // ignore — legacy DB without organizations table
         }
       }
     } catch (error) {
-      if (!isMissingSchemaError(error)) throw error instanceof DatabaseError ? error : new DatabaseError(`Failed to resolve permission: ${error instanceof Error ? error.message : String(error)}`);
+      if (!this.isTolerableSchemaError(error)) throw error instanceof DatabaseError ? error : new DatabaseError(`Failed to resolve permission: ${error instanceof Error ? error.message : String(error)}`);
       orgId = null;
     }
 
@@ -117,7 +136,7 @@ class PermissionService {
         const membership = await memberDAO.get(orgId, viewer);
         if (membership?.role === 'owner') return 'admin';
       } catch (error) {
-        if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to check org membership: ${error instanceof Error ? error.message : String(error)}`);
+        if (!this.isTolerableSchemaError(error)) throw new DatabaseError(`Failed to check org membership: ${error instanceof Error ? error.message : String(error)}`);
         // missing table → fall through to collaborator/public checks
       }
       let best: RepoPermission | null = null;
@@ -126,7 +145,7 @@ class PermissionService {
         const grant = await collabDAO.get(repo.id, viewer);
         if (grant) best = grant.role;
       } catch (error) {
-        if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to check collaborator grant: ${error instanceof Error ? error.message : String(error)}`);
+        if (!this.isTolerableSchemaError(error)) throw new DatabaseError(`Failed to check collaborator grant: ${error instanceof Error ? error.message : String(error)}`);
       }
       // Team-derived grants (org repos only): max of direct + team grants.
       // Missing team tables (legacy DBs/fakes) fall through silently.
@@ -134,7 +153,7 @@ class PermissionService {
         const teamBest = await this.getTeamRole(orgId, repo.id, viewer);
         if (teamBest && (!best || ROLE_RANK[teamBest] > ROLE_RANK[best])) best = teamBest;
       } catch (error) {
-        if (!isMissingSchemaError(error)) throw error instanceof DatabaseError ? error : new DatabaseError(`Failed to check team grants: ${error instanceof Error ? error.message : String(error)}`);
+        if (!this.isTolerableSchemaError(error)) throw error instanceof DatabaseError ? error : new DatabaseError(`Failed to check team grants: ${error instanceof Error ? error.message : String(error)}`);
       }
       if (best) return best;
       return isPrivate ? null : 'read';
@@ -148,7 +167,7 @@ class PermissionService {
       const grant = await collabDAO.get(repo.id, viewer);
       if (grant) return grant.role;
     } catch (error) {
-      if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to check collaborator grant: ${error instanceof Error ? error.message : String(error)}`);
+      if (!this.isTolerableSchemaError(error)) throw new DatabaseError(`Failed to check collaborator grant: ${error instanceof Error ? error.message : String(error)}`);
     }
     return isPrivate ? null : 'read';
   }
@@ -168,7 +187,7 @@ class PermissionService {
     try {
       grants = await grantDAO.listByRepo(repoId);
     } catch (error) {
-      if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to list team grants: ${error instanceof Error ? error.message : String(error)}`);
+      if (!this.isTolerableSchemaError(error)) throw new DatabaseError(`Failed to list team grants: ${error instanceof Error ? error.message : String(error)}`);
       return null;
     }
     if (grants.length === 0) return null;
@@ -179,7 +198,7 @@ class PermissionService {
       try {
         return await op;
       } catch (error) {
-        if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to resolve team role: ${error instanceof Error ? error.message : String(error)}`);
+        if (!this.isTolerableSchemaError(error)) throw new DatabaseError(`Failed to resolve team role: ${error instanceof Error ? error.message : String(error)}`);
         return null;
       }
     };
