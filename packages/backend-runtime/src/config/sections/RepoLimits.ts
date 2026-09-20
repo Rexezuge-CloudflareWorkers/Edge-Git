@@ -1,6 +1,7 @@
 import { EnvParser } from '../EnvParser';
 import {
   DEFAULT_MAX_REPOS_PER_USER,
+  DEFAULT_DO_DEVICE_BYTES,
   DEFAULT_MAX_RULES_PER_REPO,
   DEFAULT_MAX_TOKENS_PER_USER,
   DEFAULT_MAX_TOKEN_EXPIRY_DAYS,
@@ -59,6 +60,10 @@ class RepoLimits {
 
   public getMaxSnippetBytes(): number {
     return EnvParser.positiveInt(this.env, 'MAX_SNIPPET_BYTES', DEFAULT_MAX_SNIPPET_BYTES);
+  }
+
+  public getDoDeviceBytes(): number {
+    return EnvParser.positiveInt(this.env, 'DO_DEVICE_BYTES', DEFAULT_DO_DEVICE_BYTES);
   }
 }
 

@@ -304,9 +304,6 @@ importers:
       '@edge-git/git-protocol':
         specifier: workspace:*
         version: link:../git-protocol
-      '@edge-git/git-service':
-        specifier: workspace:*
-        version: link:../git-service
       '@edge-git/shared':
         specifier: workspace:*
         version: link:../shared

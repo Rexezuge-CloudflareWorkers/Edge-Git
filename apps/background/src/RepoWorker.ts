@@ -11,7 +11,7 @@ import type { ReleaseAssetStore } from './ReleaseAssetStore';
 import type { RepoLifecycle } from './RepoLifecycle';
 import type { RepoReadRpc } from './RepoReadRpc';
 import { createRepoWorkerDeps } from './RepoWorkerFactory';
-import { RepoFullName } from '@edge-git/shared/utils';
+import { RepoFullName, repoDoKeyForFullName } from '@edge-git/shared/utils';
 
 // NOTE: intentionally still extends the real `DurableObject` rather than
 // `AbstractDurableObjectWorker` (see return notes): the abstract base does
@@ -88,12 +88,20 @@ class RepoWorker extends DurableObject<Env> {
   }
 
   public async setFullName(fullName: string): Promise<void> {
-    if (this.fullNameValue) return;
+    // BREAKING: display-case is updated when the canonical DO key changes
+    // (rename or case-correction). The old first-writer-wins guard ignored
+    // renames and left `ctx.storage.fullName` drifting from D1.
+    if (this.fullNameValue === fullName) return;
     const [owner, ...rest] = fullName.split('/');
     const name = rest.join('/');
     if (!owner || !name || !RepoFullName.tryParse(owner, name)) throw new Error('Invalid repository full name');
+    const previousKey = this.fullNameValue ? repoDoKeyForFullName(this.fullNameValue) : null;
     this.fullNameValue = fullName;
     await this.ctx.storage.put('fullName', fullName);
+    // A rename onto this isolate must not serve the previous repo's refs.
+    if (previousKey !== null && previousKey !== repoDoKeyForFullName(fullName)) {
+      (this as unknown as { git?: { clearCache?: () => void } }).git?.clearCache?.();
+    }
   }
 
   public override async fetch(request: Request): Promise<Response> {

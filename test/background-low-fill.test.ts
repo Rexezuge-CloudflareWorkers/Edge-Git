@@ -1068,14 +1068,16 @@ describe('background-low-fill RepoWorker fetch routing', () => {
   it('setFullName validates, persists once, and deleteRepo clears the cache', async () => {
     const storage = repoStorage();
     const deleteRepo = vi.fn(async () => undefined);
-    const worker = makeRepoWorker({ ctx: { storage }, lifecycle: { deleteRepo } });
+    const worker = makeRepoWorker({ ctx: { storage }, lifecycle: { deleteRepo }, git: { clearCache: vi.fn() } });
     expect(() => worker.fullName).toThrow('Repository full name is not set');
     await expect(worker.setFullName('no-slash')).rejects.toThrow('Invalid repository full name');
     await worker.setFullName('alice/repo');
     expect(worker.fullName).toBe('alice/repo');
     expect(storage.put).toHaveBeenCalledWith('fullName', 'alice/repo');
+    // BREAKING: renames update the binding instead of being ignored.
     await worker.setFullName('bob/other');
-    expect(storage.put).toHaveBeenCalledTimes(1);
+    expect(storage.put).toHaveBeenCalledTimes(2);
+    expect(worker.fullName).toBe('bob/other');
     await worker.deleteRepo();
     expect(deleteRepo).toHaveBeenCalledTimes(1);
     expect(() => worker.fullName).toThrow('Repository full name is not set');

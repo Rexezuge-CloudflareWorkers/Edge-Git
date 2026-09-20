@@ -2,7 +2,8 @@ import { AbstractEntrypointWorker } from '@edge-git/backend-runtime/base';
 import { fromHono } from 'chanfana';
 import type { HonoOpenAPIRouterType } from 'chanfana';
 import { Hono } from 'hono';
-import { MiddlewareHandlers, rateLimit, securityHeaders } from '@/middleware';
+import { MiddlewareHandlers, securityHeaders } from '@/middleware';
+import { registerGitRateLimits, registerUserRateLimits } from '@/middleware/rateLimitConfig';
 import { scopeMiddleware } from '@/middleware/scopeMiddleware';
 import { RESERVED_NAMESPACE_NAMES } from '@edge-git/shared/constants';
 import { SPA_HTML } from '@/generated/spa-shell';
@@ -83,11 +84,9 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     app.use('*', scopeMiddleware);
     // Minimal abuse guards (per-isolate token buckets; cron/DOs are the
     // cross-isolate backstop). Generous limits so legitimate use never 429s.
-    app.use('/:owner/:repo/git-upload-pack', rateLimit({ windowMs: 60_000, max: 300, keyPrefix: 'git-fetch' }));
-    app.use('/:owner/:repo/git-receive-pack', rateLimit({ windowMs: 60_000, max: 60, keyPrefix: 'git-push' }));
-    // Anonymous credential-oracle guard: info/refs distinguishes 401/403 and
-    // is cheap to poll, so cap it separately from pack POSTs.
-    app.use('/:owner/:repo/info/refs', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'git-refs' }));
+    // Table-driven in `middleware/rateLimitConfig.ts` (Otter route-helpers
+    // pattern) — tune there, not here.
+    registerGitRateLimits(app);
     // Immediate webhook dispatch runs after mutating handlers via
     // `waitUntil` (cron retries the rest). Registered before the routes so
     // Hono executes the middleware first.
@@ -122,58 +121,8 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     app.use('/user/*', MiddlewareHandlers.activityAudit());
     app.use('/user/*', MiddlewareHandlers.userAuthentication());
     app.use('/user/*', MiddlewareHandlers.webhookFlush());
-    app.use('/user/tokens*', rateLimit({ windowMs: 60_000, max: 30, keyPrefix: 'tokens' }));
-    app.use('/user/realtime/*', rateLimit({ windowMs: 60_000, max: 60, keyPrefix: 'realtime' }));
-    // Repo creation + expensive search (x3 over-fetch + visibility filter)
-    // are abuse-prone: cap creation tightly, search generously.
-    app.use('/user/repos', rateLimit({ windowMs: 60_000, max: 30, keyPrefix: 'repo-create' }));
-    app.use('/search', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'search' }));
-    // Public read-model enumeration guard: username/org profiles + public
-    // repo metadata are cheap to scrape, so cap them separately.
-    app.use('/users/*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'public-users' }));
-    app.use('/repos/*', rateLimit({ windowMs: 60_000, max: 300, keyPrefix: 'public-repos' }));
-    // Username rename is destructive (frees the old name immediately) —
-    // cap it tightly like repo creation.
-    app.use('/user/me/username', rateLimit({ windowMs: 60_000, max: 10, keyPrefix: 'username-rename' }));
-    app.use('/user/orgs*', rateLimit({ windowMs: 60_000, max: 60, keyPrefix: 'org-mutate' }));
-    // Abuse-prone mutating surfaces: imports/mirrors fan out to third-party
-    // hosts (SSRF amplification), webhook test/redeliver triggers outbound
-    // fetch, file-write drives DO I/O. Per-isolate buckets; cron/DOs remain
-    // the cross-isolate backstop.
-    app.use('/user/repos/:owner/:repo/import*', rateLimit({ windowMs: 60_000, max: 10, keyPrefix: 'import' }));
-    app.use('/user/repos/:owner/:repo/mirror*', rateLimit({ windowMs: 60_000, max: 20, keyPrefix: 'mirror' }));
-    app.use('/user/repos/:owner/:repo/hooks*', rateLimit({ windowMs: 60_000, max: 30, keyPrefix: 'webhook-mutate' }));
-    app.use('/user/repos/:owner/:repo/contents*', rateLimit({ windowMs: 60_000, max: 60, keyPrefix: 'file-write' }));
-    // Comment/issue/pull write surfaces: per-repo buckets so one hot repo
-    // cannot exhaust a global bucket for everyone else.
-    app.use('/user/repos/:owner/:repo/issues*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'issues' }));
-    app.use('/user/repos/:owner/:repo/pulls*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'pulls' }));
-    app.use('/user/repos/:owner/:repo/comments*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'comments' }));
-    // Previously uncapped list/mutating surfaces (D1/DO burn via enumeration):
-    // audit readers, notifications/social, checks/keys, releases/assets,
-    // collab surfaces, labels/milestones/threads/reviews, fork/sync, branches.
-    app.use('/user/audit*', rateLimit({ windowMs: 60_000, max: 60, keyPrefix: 'audit-read' }));
-    app.use('/user/orgs/*/audit*', rateLimit({ windowMs: 60_000, max: 60, keyPrefix: 'audit-org' }));
-    app.use('/user/notifications*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'notifications' }));
-    app.use('/user/repos/:owner/:repo/branches*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'branches' }));
-    app.use('/user/repos/:owner/:repo/rules*', rateLimit({ windowMs: 60_000, max: 60, keyPrefix: 'rules' }));
-    app.use('/user/repos/:owner/:repo/collaborators*', rateLimit({ windowMs: 60_000, max: 60, keyPrefix: 'collabs' }));
-    app.use('/user/repos/:owner/:repo/checks*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'checks' }));
-    app.use('/user/repos/:owner/:repo/keys*', rateLimit({ windowMs: 60_000, max: 60, keyPrefix: 'deploy-keys' }));
-    app.use('/user/repos/:owner/:repo/releases*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'releases' }));
-    app.use('/user/repos/:owner/:repo/projects*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'projects' }));
-    app.use('/user/repos/:owner/:repo/discussions*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'discussions' }));
-    app.use('/user/repos/:owner/:repo/wiki*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'wiki' }));
-    app.use('/user/repos/:owner/:repo/snippets*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'snippets' }));
-    app.use('/user/repos/:owner/:repo/labels*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'labels' }));
-    app.use('/user/repos/:owner/:repo/milestones*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'milestones' }));
-    app.use('/user/repos/:owner/:repo/threads*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'threads' }));
-    app.use('/user/repos/:owner/:repo/reviews*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'reviews' }));
-    app.use('/user/repos/:owner/:repo/fork*', rateLimit({ windowMs: 60_000, max: 30, keyPrefix: 'fork' }));
-    app.use('/user/repos/:owner/:repo/star*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'social-mutate' }));
-    app.use('/user/repos/:owner/:repo/watch*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'social-mutate' }));
-    app.use('/user/stars*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'social-read' }));
-    app.use('/user/watches*', rateLimit({ windowMs: 60_000, max: 120, keyPrefix: 'social-read' }));
+    // Abuse-prone mutating + enumeration guards (table-driven; see above).
+    registerUserRateLimits(app);
 
     registerUserRepoRoutes(app);
     registerUserSettingsRoutes(app);

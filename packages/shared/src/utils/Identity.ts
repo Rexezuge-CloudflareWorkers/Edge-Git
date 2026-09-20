@@ -66,7 +66,7 @@ class RepoFullName {
 
   public static normalizeRepo(name: string): string {
     const trimmed = name.trim();
-    return trimmed.endsWith('.git') ? trimmed.slice(0, -4) : trimmed;
+    return trimmed.toLowerCase().endsWith('.git') ? trimmed.slice(0, -4) : trimmed;
   }
 
   public static parse(owner: string, name: string): RepoFullName {
@@ -104,6 +104,49 @@ class RepoFullName {
   public ownerCi(): string {
     return this.owner.toLowerCase();
   }
+
+  /**
+   * Canonical Durable Object routing key for `REPO.getByName()`.
+   *
+   * BREAKING: DO names are now case-insensitive (`Foo/Bar` and `foo/bar`
+   * resolve to the same isolate). D1 already matches via `owner_ci/name_ci`;
+   * the old case-sensitive `getByName(fullName)` forked two DOs for the same
+   * repo. Callers must route via `toDoKey()` / `repoDoKey()` and persist the
+   * display-case `toString()` only inside the DO.
+   */
+  public toDoKey(): string {
+    return `${this.owner.toLowerCase()}/${this.name.toLowerCase()}`;
+  }
+
+  public toStringWithCase(): string {
+    return this.toString();
+  }
 }
 
 export { EmailAddress, RepoFullName, OWNER_PATTERN, REPO_PATTERN };
+
+/**
+ * Canonical `REPO.getByName()` key for an `owner/name` pair without throwing.
+ * Falls back to trimmed `owner.toLowerCase()/name(.git-stripped).toLowerCase()`
+ * when validation fails so routing never throws on malformed input — callers
+ * validate separately via `RepoFullName.tryParse`.
+ */
+function repoDoKey(owner: string, name: string): string {
+  const parsed = RepoFullName.tryParse(owner, name);
+  if (parsed) return parsed.toDoKey();
+  const fallbackOwner = owner.trim().toLowerCase();
+  const trimmed = name.trim();
+  const stripped = trimmed.toLowerCase().endsWith('.git') ? trimmed.slice(0, -4) : trimmed;
+  return `${fallbackOwner}/${stripped.toLowerCase()}`;
+}
+
+/**
+ * Canonical `REPO.getByName()` key for an already-joined `owner/name` string.
+ */
+function repoDoKeyForFullName(fullName: string): string {
+  const slash = fullName.indexOf('/');
+  if (slash === -1) return fullName.trim().toLowerCase();
+  return repoDoKey(fullName.slice(0, slash), fullName.slice(slash + 1));
+}
+
+export { repoDoKey, repoDoKeyForFullName };
