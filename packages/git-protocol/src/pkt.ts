@@ -281,10 +281,7 @@ export class PktLine {
     const length = Number.parseInt(hex, 16);
 
     if (Number.isNaN(length)) {
-      // TypeError is mandated by `unicorn/prefer-type-error` (error). It
-      // extends Error, so the single error pipeline still catches it and
-      // callers translate pkt-line failures to 400 — see ReceiveParser.
-      throw new TypeError(`Invalid hexadecimal length: ${hex}`);
+      throw new Error(`Invalid hexadecimal length: ${hex}`);
     }
 
     if (length < 4) {

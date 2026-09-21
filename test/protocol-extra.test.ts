@@ -50,16 +50,15 @@ describe('receive-pack parsing', () => {
     expect(capabilities).toEqual(['report-status', 'atomic']);
   });
 
-  it('drops command lines that do not split into exactly three parts', () => {
+  it('rejects command lines that do not split into exactly three parts', () => {
     const zero = '0'.repeat(40);
     const buf = PktLine.mergeLines([
       PktLine.encode(`${zero} ${'1'.repeat(40)} refs/heads/has space\0report-status\n`),
       PktLine.encodeFlush(),
     ]);
-    const { commands } = parseReceivePackRequest(buf);
-    // Ref names cannot contain spaces: fail closed instead of updating the
-    // truncated `refs/heads/has`.
-    expect(commands).toHaveLength(0);
+    // Ref names cannot contain spaces: throw (400) instead of silently
+    // treating the push as a no-op success with zero commands.
+    expect(() => parseReceivePackRequest(buf)).toThrow(/Malformed receive-pack line/);
   });
 
   it('reports unpack failure', async () => {
@@ -104,7 +103,7 @@ describe('upload-pack parsing', () => {
     expect(req.waitForDone).toBe(true);
   });
 
-  it('falls back to regex command extraction', () => {
+  it('returns empty command when no command line is present (no payload spoof)', () => {
     const framed = PktLine.mergeLines([PktLine.encode('command=fetch\n'), PktLine.encodeFlush()]);
     expect(parseCommand(framed).command).toBe('fetch');
     const noCommand = PktLine.mergeLines([PktLine.encode('hello\n'), PktLine.encodeFlush()]);

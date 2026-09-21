@@ -242,9 +242,10 @@ class TokenService {
     const tokens = await dao.getByUserEmail(normalized);
     const existing = tokens.find((t) => t.tokenId === tokenId);
     if (!existing) throw new NotFoundError('Token not found');
+    const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
+    if (existing.expiresAt <= now) throw new BadRequestError('Token has expired and cannot be rotated; create a new token');
     const maxExpiry = ConfigurationManager.token.getMaxExpiryDays(this.env);
     const lifetimeDays = Math.min(Math.max(Math.round((existing.expiresAt - existing.createdAt) / 86_400), 1), maxExpiry);
-    const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const raw = UUIDUtil.getRandomUUIDNoDash() + UUIDUtil.getRandomUUIDNoDash();
     const rotated = await dao.rotate(
       tokenId,

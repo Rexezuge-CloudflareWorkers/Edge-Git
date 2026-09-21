@@ -45,17 +45,17 @@ export function parseReceivePackRequest(data: Uint8Array): { commands: Command[]
       const caps = nullIdx === -1 ? [] : line.slice(Math.max(0, nullIdx + 1)).split(' ');
 
       const parts = refLine.split(' ');
-      // Strict split: ref names cannot contain spaces, so a line with extra
-      // parts is malformed (e.g. `... refs/heads/has space`). Dropping it
-      // fails closed (`no commands`) instead of silently updating a truncated
-      // ref that passes validation but was never requested.
-      if (parts.length === 3) {
-        commands.push({
-          oldOid: parts[0],
-          newOid: parts[1],
-          ref: parts[2],
-        });
+      // Strict split: ref names cannot contain spaces, so a line that does not
+      // split into exactly 3 parts is malformed — throw so callers return 400
+      // instead of silently treating a push as a no-op success.
+      if (parts.length !== 3) {
+        throw new Error(`Malformed receive-pack line: expected 3 parts, got ${parts.length}`);
       }
+      commands.push({
+        oldOid: parts[0],
+        newOid: parts[1],
+        ref: parts[2],
+      });
 
       if (caps.length > 0 && capabilities.length === 0) {
         capabilities = caps;

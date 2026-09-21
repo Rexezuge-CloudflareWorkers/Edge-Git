@@ -157,7 +157,8 @@ export class IsoGitFs {
         this.dofs.readlink(normalizedPath);
         isSymlink = true;
       } catch (error) {
-        if (error instanceof Error && error.message === 'ENOENT') {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message === 'ENOENT' || message.includes('ENOENT') || message.includes('EINVAL') || message.includes('ENOTDIR')) {
           isSymlink = false;
         } else {
           return this.normalizer.annotateAndReject(error, 'lstat', normalizedPath);
@@ -215,19 +216,21 @@ export class IsoGitFs {
   }
 
   readlink(path: string): Promise<string> {
+    const normalizedPath = normalizePath(path);
     try {
-      return Promise.resolve(this.dofs.readlink(path));
+      return Promise.resolve(this.dofs.readlink(normalizedPath));
     } catch (error) {
-      return this.normalizer.annotateAndReject(error, 'readlink', path);
+      return this.normalizer.annotateAndReject(error, 'readlink', normalizedPath);
     }
   }
 
   symlink(target: string, path: string): Promise<void> {
+    const normalizedPath = normalizePath(path);
     try {
-      this.dofs.symlink(target, path);
+      this.dofs.symlink(target, normalizedPath);
       return Promise.resolve();
     } catch (error) {
-      return this.normalizer.annotateAndReject(error, 'symlink', path);
+      return this.normalizer.annotateAndReject(error, 'symlink', normalizedPath);
     }
   }
 }

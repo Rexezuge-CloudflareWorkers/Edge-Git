@@ -6,7 +6,6 @@ import {
   MAX_CLIENT_FRAMES_PER_MINUTE,
   MAX_MESSAGE_BYTES,
   buildEnvelope,
-  inboxTagForHash,
   isChannel,
   isShard,
   normalizeChannels,
@@ -15,15 +14,12 @@ import {
 import type { RealtimeEnvelope } from '@edge-git/shared/realtime';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 import { pickEvictionCandidate, pruneFrameTimes, shouldRateLimit } from './RealtimePolicy';
+import { RealtimeTicketStore } from './RealtimeTicketStore';
+import type { TicketRecord, TicketStorage } from './RealtimeTicketStore';
+import { buildChannelEnvelope, inboxTagsFor } from './RealtimePublisher';
+import type { PublishInput } from './RealtimePublisher';
 
 const logger = createLogger('RealtimeWorker');
-
-interface TicketRecord {
-  shard: string;
-  channels: string[];
-  viewer: string;
-  expiresAt: number;
-}
 
 interface SocketAttachment {
   viewer: string;
@@ -37,18 +33,6 @@ interface IssueTicketInput {
   channels: string[];
   viewer?: string;
   ttlSeconds?: number;
-}
-
-interface PublishInput {
-  channel: string;
-  type: string;
-  actor?: string;
-  title?: string;
-  subjectType?: string | null;
-  subjectNumber?: number | null;
-  sha?: string | null;
-  extra?: Record<string, unknown>;
-  recipientHashes?: string[];
 }
 
 // Live-update fan-out: one hibernatable-WebSocket DO per repo shard
@@ -78,13 +62,8 @@ class RealtimeWorker extends DurableObject<Env> {
       if (channels.length === 0) return { error: 'no channels' };
       const viewer = typeof input.viewer === 'string' && input.viewer.length > 0 ? input.viewer.slice(0, 320) : 'anonymous';
       const ttl = this.ticketTtlSeconds();
-      const expiresAt = TimestampUtil.getCurrentUnixTimestampInSeconds() + ttl;
-      const ticket = UUIDUtil.getRandomUUIDNoDash();
-      const existing = ((await this.ctx.storage.get<string[]>('ticketIds')) ?? []).filter((id) => typeof id === 'string');
-      await this.ctx.storage.put(`ticket:${ticket}`, { shard: input.shard, channels, viewer, expiresAt } satisfies TicketRecord);
-      await this.ctx.storage.put('ticketIds', [...existing, ticket].slice(-200));
-      await this.ctx.storage.setAlarm(Date.now() + ttl * 1000 + 5000).catch(() => undefined);
-      return { ticket, expiresAt };
+      const store = new RealtimeTicketStore(this.ctx.storage as unknown as TicketStorage);
+      return await store.mint(input.shard, channels, viewer, ttl);
     } catch (error) {
       logger.error('RealtimeWorker: issueTicket failed', error);
       return { error: 'unavailable' };
@@ -102,18 +81,7 @@ class RealtimeWorker extends DurableObject<Env> {
       if (input.channel.startsWith('inbox:')) {
         return Promise.resolve({ delivered: this.publishInbox(input) });
       }
-      const envelope = buildEnvelope({
-        id: UUIDUtil.getRandomUUID(),
-        ts: TimestampUtil.getCurrentUnixTimestampInSeconds(),
-        channel: input.channel,
-        type: input.type,
-        actor: typeof input.actor === 'string' ? input.actor : '',
-        title: typeof input.title === 'string' ? input.title : '',
-        subjectType: input.subjectType,
-        subjectNumber: input.subjectNumber,
-        sha: input.sha,
-        extra: input.extra,
-      });
+      const envelope = buildChannelEnvelope(input, input.channel);
       if (!envelope) return Promise.resolve({ delivered: 0 });
       return Promise.resolve({ delivered: this.broadcast(input.channel, envelope) });
     } catch (error) {
@@ -125,27 +93,9 @@ class RealtimeWorker extends DurableObject<Env> {
   // One envelope per recipient tag so each inbox socket only ever sees its
   // own user's pings. Hashes are validated — forged tags never match.
   private publishInbox(input: PublishInput): number {
-    const hashes = Array.isArray(input.recipientHashes) ? input.recipientHashes : [];
-    const seen = new Set<string>();
     let delivered = 0;
-    for (const hash of hashes) {
-      if (typeof hash !== 'string' || seen.has(hash)) continue;
-      seen.add(hash);
-      if (seen.size > 500) break;
-      const tag = inboxTagForHash(hash);
-      if (!isChannel(tag)) continue;
-      const envelope = buildEnvelope({
-        id: UUIDUtil.getRandomUUID(),
-        ts: TimestampUtil.getCurrentUnixTimestampInSeconds(),
-        channel: tag,
-        type: input.type,
-        actor: typeof input.actor === 'string' ? input.actor : '',
-        title: typeof input.title === 'string' ? input.title : '',
-        subjectType: input.subjectType,
-        subjectNumber: input.subjectNumber,
-        sha: input.sha,
-        extra: input.extra,
-      });
+    for (const tag of inboxTagsFor(input)) {
+      const envelope = buildChannelEnvelope(input, tag);
       if (envelope) delivered += this.broadcast(tag, envelope);
     }
     return delivered;
@@ -161,19 +111,8 @@ class RealtimeWorker extends DurableObject<Env> {
 
   public override async alarm(): Promise<void> {
     try {
-      const ids = (await this.ctx.storage.get<string[]>('ticketIds')) ?? [];
-      if (ids.length === 0) return;
-      const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
-      const live: string[] = [];
-      for (const id of ids) {
-        const record = await this.ctx.storage.get<TicketRecord>(`ticket:${id}`).catch(() => null);
-        if (record && record.expiresAt > now) {
-          live.push(id);
-        } else {
-          await this.ctx.storage.delete(`ticket:${id}`).catch(() => undefined);
-        }
-      }
-      await this.ctx.storage.put('ticketIds', live.slice(-200)).catch(() => undefined);
+      const store = new RealtimeTicketStore(this.ctx.storage as unknown as TicketStorage);
+      await store.collectGarbage();
     } catch (error) {
       logger.error('RealtimeWorker: alarm GC failed', error);
     }

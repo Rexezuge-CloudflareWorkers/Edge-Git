@@ -6,7 +6,7 @@ function makeEnv() {
 }
 
 function makeTokenRow(tokenId: string, userEmail: string) {
-  const now = 1_700_000_000;
+  const now = Math.trunc(Date.now() / 1000);
   return {
     tokenId,
     userEmail,
@@ -95,5 +95,16 @@ describe('TokenService scoped-grant fail-closed', () => {
     const out = await svc.rotateToken('tid-9', 'User@Example.COM');
     expect(out.token).toBeTruthy();
     expect(seen.every((e) => e === 'user@example.com')).toBe(true);
+  });
+
+  it('rotateToken refuses expired tokens instead of re-animating them', async () => {
+    const now = Math.trunc(Date.now() / 1000);
+    const expired = { ...makeTokenRow('tid-old', 'user@example.com'), createdAt: now - 90 * 86_400, expiresAt: now - 10 };
+    const svc = new TokenService(makeEnv(), {
+      tokenDAO: () => Promise.resolve({ getByUserEmail: async () => [expired], rotate: async () => true } as never),
+      tokenGrantDAO: () => Promise.resolve({} as never),
+      repositoryDAO: () => Promise.resolve({} as never),
+    });
+    await expect(svc.rotateToken('tid-old', 'user@example.com')).rejects.toThrow(/expired/i);
   });
 });

@@ -18,9 +18,12 @@ interface DofsFsOptions {
 const DEFAULT_CHUNK_SIZE = 512 * 1024;
 
 function createDofsFs(ctx: unknown, env: unknown, options: DofsFsOptions = {}): DofsFs {
+  const { chunkSize = DEFAULT_CHUNK_SIZE } = options;
+  if (!Number.isSafeInteger(chunkSize) || chunkSize <= 0 || chunkSize > 8 * 1024 * 1024) {
+    throw new Error(`Invalid chunkSize: ${String(chunkSize)} (must be 1..8388608)`);
+  }
   return new Fs(ctx as ConstructorParameters<typeof Fs>[0], env as ConstructorParameters<typeof Fs>[1], {
-    chunkSize: DEFAULT_CHUNK_SIZE,
-    ...options,
+    chunkSize,
   });
 }
 

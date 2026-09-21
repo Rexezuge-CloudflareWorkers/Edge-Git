@@ -122,9 +122,7 @@ export function parseCommand(data: Uint8Array): { command: string; args: string[
   }
 
   if (!command) {
-    const text = PktLine.decodeText(data);
-    const match = /command=([a-z-]+)/.exec(text);
-    command = match?.[1] ?? '';
+    return { command, args };
   }
 
   return { command, args };
@@ -177,9 +175,11 @@ export function parseFetchRequest(_data: Uint8Array, args: string[]): FetchReque
     if (arg.startsWith('shallow ')) {
       shallow.push(arg.slice('shallow '.length));
     } else if (arg.startsWith('deepen ')) {
-      deepen = Math.trunc(Number(arg.slice('deepen '.length)));
+      const raw = arg.slice('deepen '.length).trim();
+      deepen = /^\d+$/.test(raw) ? Math.trunc(Number(raw)) : Number.NaN;
     } else if (arg.startsWith('deepen-since ')) {
-      deepenSince = Math.trunc(Number(arg.slice('deepen-since '.length)));
+      const raw = arg.slice('deepen-since '.length).trim();
+      deepenSince = /^\d+$/.test(raw) ? Math.trunc(Number(raw)) : Number.NaN;
     } else if (arg.startsWith('deepen-not ')) {
       deepenNot.push(arg.slice('deepen-not '.length));
     } else if (arg.startsWith('filter ')) {

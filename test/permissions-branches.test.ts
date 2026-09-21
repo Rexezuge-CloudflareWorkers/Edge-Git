@@ -11,10 +11,11 @@ describe('PermissionService edge branches', () => {
       repoCollaboratorDAO: async () => ({ get: async () => null }) as never,
     });
     await expect(svc.getRole('a@x.co', null)).resolves.toBeNull();
-    // owner_type org but org row gone: public falls back to read, private to null.
+    // owner_type org but org row gone (deleted org): hide existence for
+    // everyone (public and private) so deleted-org repos never leak.
     const ghostPub = { id: 'g1', owner: 'ghost', owner_ci: 'ghost', name: 'r', owner_type: 'org', org_id: null, is_private: 0 } as never;
     const ghostPriv = { ...ghostPub, is_private: 1 } as never;
-    await expect(svc.getRole('a@x.co', ghostPub)).resolves.toBe('read');
+    await expect(svc.getRole('a@x.co', ghostPub)).resolves.toBeNull();
     await expect(svc.getRole('a@x.co', ghostPriv)).resolves.toBeNull();
     // org_id direct path with owner member.
     const withOrg = new PermissionService({ DB: {} } as never, {

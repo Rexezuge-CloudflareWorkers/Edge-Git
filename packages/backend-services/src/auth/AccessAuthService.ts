@@ -79,9 +79,14 @@ class AccessAuthService {
   private static readonly jwksCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 
   private static jwksFor(teamDomain: string): ReturnType<typeof createRemoteJWKSet> {
-    const cached = this.jwksCache.get(teamDomain);
-    if (cached) return cached;
-    const created = createRemoteJWKSet(new URL(`${teamDomain}/cdn-cgi/access/certs`));
+    const normalized = teamDomain.trim().toLowerCase().replace(/\/+$/, '');
+    const cached = this.jwksCache.get(normalized);
+    if (cached) {
+      this.jwksCache.delete(normalized);
+      this.jwksCache.set(normalized, cached);
+      return cached;
+    }
+    const created = createRemoteJWKSet(new URL(`${normalized}/cdn-cgi/access/certs`));
     // Bound the cache so distinct team domains cannot grow it without limit.
     // Evict the oldest entry (LRU-ish) instead of clearing everything so an
     // attacker cycling domains cannot flush legitimate entries (DoS).
@@ -89,7 +94,7 @@ class AccessAuthService {
       const oldest = this.jwksCache.keys().next().value;
       if (oldest !== undefined) this.jwksCache.delete(oldest);
     }
-    this.jwksCache.set(teamDomain, created);
+    this.jwksCache.set(normalized, created);
     return created;
   }
   private readonly strategies: readonly AccessAuthStrategy[];
@@ -123,11 +128,12 @@ class AccessAuthService {
       throw new UnauthorizedError('Missing required JWT verification configuration.');
     }
 
-    let normalizedTeamDomainEnd: number = teamDomain.length;
-    while (normalizedTeamDomainEnd > 0 && teamDomain.charAt(normalizedTeamDomainEnd - 1) === '/') {
+    let normalizedTeamDomainEnd: number = teamDomain.trim().length;
+    const trimmedDomain = teamDomain.trim();
+    while (normalizedTeamDomainEnd > 0 && trimmedDomain.charAt(normalizedTeamDomainEnd - 1) === '/') {
       normalizedTeamDomainEnd -= 1;
     }
-    const normalizedTeamDomain: string = teamDomain.slice(0, normalizedTeamDomainEnd);
+    const normalizedTeamDomain: string = trimmedDomain.slice(0, normalizedTeamDomainEnd).toLowerCase();
     const normalizedPolicyAud: string = policyAud.trim();
     if (!normalizedPolicyAud) {
       throw new UnauthorizedError('Missing required JWT verification configuration.');

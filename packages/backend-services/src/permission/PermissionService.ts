@@ -111,8 +111,9 @@ class PermissionService {
           const orgDAO = await this.deps.organizationDAO();
           const org = await orgDAO.getByUsernameCi(PermissionService.ownerCiOf(repo));
           if (org) orgId = org.id;
-          // owner_type says org but row missing (deleted org): treat as no-access except public read.
-          if (!orgId) return isPrivate ? null : 'read';
+          // owner_type says org but row missing (deleted org): hide existence
+          // for everyone (private and public) so deleted-org repos never leak.
+          if (!orgId) return null;
         }
       } else {
         // User-owned fast path may still be an org repo on legacy rows: check registry once.

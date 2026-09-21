@@ -6,25 +6,48 @@ import { readJsonBody } from './BodyParser';
 
 type UserApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
+const PROFILE_REPO_SCAN_CAP = 200;
+
 function parseLimit(url: string): number {
-  const raw = new URL(url).searchParams.get('limit');
-  // Invalid values fall back to a safe default (20), never to the max:
-  // `?limit=abc` must not silently become a 100-row over-fetch.
-  if (raw === null || raw.trim() === '') return 20;
-  const n = Number(raw);
-  if (!Number.isFinite(n)) return 20;
-  return Math.min(100, Math.max(1, Math.floor(n)));
+  try {
+    const raw = new URL(url).searchParams.get('limit');
+    // Invalid values fall back to a safe default (20), never to the max:
+    // `?limit=abc` must not silently become a 100-row over-fetch.
+    // Numeric out-of-range values clamp (0→1, 500→100); non-numeric →20.
+    if (raw === null || raw.trim() === '') return 20;
+    const trimmed = raw.trim();
+    if (!/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(trimmed)) return 20;
+    const n = Number(trimmed);
+    if (!Number.isFinite(n)) return 20;
+    return Math.min(100, Math.max(1, Math.floor(n)));
+  } catch {
+    return 20;
+  }
+}
+
+async function filterVisibleRepos(
+  repos: RepositoryRow[],
+  getRole: (repo: RepositoryRow) => Promise<string | null>,
+  limit: number,
+): Promise<Array<{ row: RepositoryRow; role: string }>> {
+  const scanned = repos.slice(0, PROFILE_REPO_SCAN_CAP);
+  const roles = await Promise.all(scanned.map((repo) => getRole(repo).catch(() => null)));
+  const visible: Array<{ row: RepositoryRow; role: string }> = [];
+  for (let i = 0; i < scanned.length; i += 1) {
+    const role = roles[i];
+    if (role) visible.push({ row: scanned[i], role });
+    if (visible.length >= limit) break;
+  }
+  return visible;
 }
 
 async function hasVisibleRepo(
   repos: RepositoryRow[],
   getRole: (repo: RepositoryRow) => Promise<string | null>,
 ): Promise<boolean> {
-  for (const repo of repos) {
-    const role = await getRole(repo);
-    if (role) return true;
-  }
-  return false;
+  const scanned = repos.slice(0, 20);
+  const roles = await Promise.all(scanned.map((repo) => getRole(repo)));
+  return roles.some((role) => role !== null);
 }
 
 function registerUserProfileRoutes(app: UserApp): void {
@@ -44,13 +67,9 @@ function registerUserProfileRoutes(app: UserApp): void {
       let viewerIsSelf = false;
       try {
         const repoDao = await scope.get(Tokens.RepositoryDAO)();
-        const rows = await repoDao.listByOwner(user.username, 200).catch(() => []);
-        let visible = 0;
-        for (const row of rows) {
-          const role = await permission.getRole(viewerEmail, row).catch(() => null);
-          if (role) visible += 1;
-        }
-        repoCount = visible;
+        const rows = await repoDao.listByOwner(user.username, PROFILE_REPO_SCAN_CAP).catch(() => []);
+        const visible = await filterVisibleRepos(rows, (row) => permission.getRole(viewerEmail, row), PROFILE_REPO_SCAN_CAP);
+        repoCount = visible.length;
       } catch {
         repoCount = 0;
       }
@@ -114,12 +133,12 @@ function registerUserProfileRoutes(app: UserApp): void {
       const byOwner = await repoDao.listByOwner(org.username, 200).catch(() => []);
       const seen = new Map<string, (typeof byOrg)[number]>();
       for (const row of [...byOrg, ...byOwner]) seen.set(row.id, row);
-      let visible = 0;
-      for (const row of seen.values()) {
-        const role = await permission.getRole(viewerEmail, row).catch(() => null);
-        if (role) visible += 1;
-      }
-      repoCount = visible;
+      const visible = await filterVisibleRepos(
+        Array.from(seen.values()),
+        (row) => permission.getRole(viewerEmail, row),
+        PROFILE_REPO_SCAN_CAP,
+      );
+      repoCount = visible.length;
     } catch {
       repoCount = 0;
     }
@@ -164,18 +183,13 @@ function registerUserProfileRoutes(app: UserApp): void {
       .catch(() => null);
     if (user?.username) {
       const repoDao = await scope.get(Tokens.RepositoryDAO)();
-      const rows = await repoDao.listByOwner(user.username, 200).catch(() => []);
-      const repos: unknown[] = [];
-      for (const row of rows) {
-        const role = await permission.getRole(viewerEmail, row).catch(() => null);
-        if (!role) continue;
-        if (viewerEmail) {
-          repos.push({ ...(toRepoJson(row, role) as Record<string, unknown>), viewerCanManage: role === 'admin', viewerRole: role });
-        } else {
-          repos.push(toRepoJson(row));
-        }
-        if (repos.length >= limit) break;
-      }
+      const rows = await repoDao.listByOwner(user.username, PROFILE_REPO_SCAN_CAP).catch(() => []);
+      const visible = await filterVisibleRepos(rows, (row) => permission.getRole(viewerEmail, row), limit);
+      const repos: unknown[] = visible.map(({ row, role }) =>
+        viewerEmail
+          ? { ...(toRepoJson(row, role) as Record<string, unknown>), viewerCanManage: role === 'admin', viewerRole: role }
+          : toRepoJson(row),
+      );
       return c.json({ type: 'user', username: user.username, repos });
     }
     const org = await scope
@@ -189,17 +203,12 @@ function registerUserProfileRoutes(app: UserApp): void {
     const seen = new Map<string, (typeof byOrg)[number]>();
     for (const row of [...byOrg, ...byOwner]) seen.set(row.id, row);
     const ordered = Array.from(seen.values()).sort((a, b) => (b.updated_at ?? 0) - (a.updated_at ?? 0));
-    const repos: unknown[] = [];
-    for (const row of ordered) {
-      const role = await permission.getRole(viewerEmail, row).catch(() => null);
-      if (!role) continue;
-      if (viewerEmail) {
-        repos.push({ ...(toRepoJson(row, role) as Record<string, unknown>), viewerCanManage: role === 'admin', viewerRole: role });
-      } else {
-        repos.push(toRepoJson(row));
-      }
-      if (repos.length >= limit) break;
-    }
+    const visible = await filterVisibleRepos(ordered, (row) => permission.getRole(viewerEmail, row), limit);
+    const repos: unknown[] = visible.map(({ row, role }) =>
+      viewerEmail
+        ? { ...(toRepoJson(row, role) as Record<string, unknown>), viewerCanManage: role === 'admin', viewerRole: role }
+        : toRepoJson(row),
+    );
     return c.json({ type: 'org', username: org.username, repos });
   });
 
@@ -317,4 +326,4 @@ function registerUserSettingsRoutes(app: UserApp): void {
   });
 }
 
-export { registerUserProfileRoutes, registerUserSettingsRoutes, parseLimit, hasVisibleRepo };
+export { registerUserProfileRoutes, registerUserSettingsRoutes, parseLimit, hasVisibleRepo, filterVisibleRepos };

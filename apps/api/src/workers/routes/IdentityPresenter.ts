@@ -21,8 +21,12 @@ function usernameFor(map: Map<string, string>, email: string | null | undefined)
 async function resolveFilterEmail(scope: Scope, input: string | undefined): Promise<string | undefined> {
   if (!input) return undefined;
   const raw = input.trim();
-  if (!raw) return undefined;
-  if (raw.includes('@')) return raw.toLowerCase();
+  if (!raw || raw.length > 254) return undefined;
+  if (raw.includes('@')) {
+    const normalized = raw.toLowerCase();
+    if (!/^[^@\s]+@[^\s@]+\.[^\s@]+$/.test(normalized)) return '__unknown_user__';
+    return normalized;
+  }
   try {
     const email = await scope.get(Tokens.IdentityResolver).resolveEmail(raw);
     // Unknown username filters to a sentinel that matches nothing instead of
@@ -55,10 +59,13 @@ function collectEmails(rows: Array<Record<string, unknown> | object>): string[] 
       const v = row[key];
       if (typeof v === 'string' && v) out.push(v);
     }
-    const nested = row['comments'];
-    if (Array.isArray(nested)) {
-      for (const n of nested) {
-        if (n && typeof n === 'object') scan(n as Record<string, unknown>);
+    const nestedKeys = ['comments', 'reviews', 'threads', 'discussions', 'replies', 'children'] as const;
+    for (const key of nestedKeys) {
+      const nested = row[key];
+      if (Array.isArray(nested)) {
+        for (const n of nested) {
+          if (n && typeof n === 'object') scan(n as Record<string, unknown>);
+        }
       }
     }
   };
@@ -119,7 +126,7 @@ function presentOne(row: Record<string, unknown>, map: Map<string, string>): Rec
   }
   if ('created_by' in out) {
     const v = out['created_by'];
-    out['createdBy'] = typeof v === 'string' && v ? usernameFor(map, v) : v;
+    out['createdBy'] = typeof v === 'string' && v ? usernameFor(map, v) : null;
     delete out['created_by'];
   }
   if (typeof out['createdBy'] === 'string' && out['createdBy'].includes('@')) {
