@@ -1,5 +1,5 @@
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { getCheckRunnerStub } from '../checkStub';
+import { getCheckRunnerStub } from '../doStubs';
 import { publishCheckUpdate } from './SocialEmit';
 
 // Shared trigger: match the branch protection rule for `branch`, report a

@@ -14,7 +14,7 @@ import type { OrganizationRow, OrgMemberRole } from '@edge-git/backend-data/dao'
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError, ForbiddenError, NotFoundError } from '@edge-git/backend-errors';
 import { isReservedNamespaceName } from '@edge-git/shared/constants';
-import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
+import { SLUG_RE, TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 import { cascadeOwnerRepos } from '../repo/repoRenameCascade';
 
 interface OrganizationServiceEnv {
@@ -34,7 +34,9 @@ interface OrganizationServiceDeps {
   webhookDAO?: () => Promise<WebhookDAO>;
 }
 
-const ORG_NAME_RE = /^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$/i;
+// Canonical slug lives in `@edge-git/shared/utils` (Layer 0).
+// Re-exported here for backward compatibility.
+export { SLUG_RE as ORG_NAME_RE } from '@edge-git/shared/utils';
 
 class OrganizationService {
   private readonly deps: Required<OrganizationServiceDeps>;
@@ -59,7 +61,7 @@ class OrganizationService {
   }
 
   public static validateOrgName(username: string): void {
-    if (!ORG_NAME_RE.test(username)) {
+    if (!SLUG_RE.test(username)) {
       throw new BadRequestError('Invalid organization name');
     }
     if (isReservedNamespaceName(username)) {

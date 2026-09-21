@@ -1,5 +1,7 @@
 import * as git from 'isomorphic-git';
 import type { IsoGitFs } from './IsoGitFs';
+import { GitCache } from './GitCache';
+import { PackLimitError, checkObjectBudget, maxVisitedFor } from './PackLimits';
 
 const logger = {
   warn: (...args: unknown[]): void => console.warn('[WARN] [GitService]', ...args),
@@ -7,20 +9,18 @@ const logger = {
   error: (...args: unknown[]): void => console.error('[ERROR] [GitService]', ...args),
 };
 
-export class PackLimitError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'PackLimitError';
-  }
-}
+export { PackLimitError } from './PackLimits';
 
 type PromiseFsClient = ReturnType<IsoGitFs['getPromiseFsClient']>;
 
 export class PackCollector {
   private readonly fs: PromiseFsClient;
   private readonly gitdir: string;
-  private cache: object = {};
-  private cacheCreatedAt = Date.now();
+  private readonly cacheHolder = new GitCache();
+
+  private get cache(): object {
+    return this.cacheHolder.getCache();
+  }
 
   constructor(fs: PromiseFsClient, gitdir: string) {
     this.fs = fs;
@@ -28,15 +28,11 @@ export class PackCollector {
   }
 
   public clearCache(): void {
-    this.cache = {};
-    this.cacheCreatedAt = Date.now();
+    this.cacheHolder.clearCache();
   }
 
   public ensureFreshCache(ttlSeconds: number): void {
-    if (!Number.isFinite(ttlSeconds) || ttlSeconds <= 0) return;
-    if (Date.now() - this.cacheCreatedAt > ttlSeconds * 1000) {
-      this.clearCache();
-    }
+    this.cacheHolder.ensureFreshCache(ttlSeconds);
   }
 
   async indexPack(filePath: string) {
@@ -76,14 +72,9 @@ export class PackCollector {
     });
     const since = opts.since;
     const maxObjects = opts.maxObjects;
-    const maxVisited = (maxObjects ?? 10_000) * 4 + 1000;
+    const maxVisited = maxVisitedFor(maxObjects);
     const assertObjectBudget = (): void => {
-      if (maxObjects !== undefined && objectsToSend.size > maxObjects) {
-        throw new PackLimitError(`too many objects: limit is ${maxObjects}`);
-      }
-      if (visited.size > maxVisited || objectsToSend.size > maxVisited) {
-        throw new PackLimitError('rev-walk too large');
-      }
+      checkObjectBudget({ objectsToSend: objectsToSend.size, visited: visited.size, maxObjects, maxVisited });
     };
     const filter = opts.filter?.trim() ?? '';
     const filterBlobs = filter === 'blob:none';

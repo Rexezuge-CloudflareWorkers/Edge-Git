@@ -122,20 +122,6 @@ class RepoService {
     });
   }
 
-  /**
-  @deprecated Import `RepoFullName` from `@edge-git/shared/utils` directly.
-  */
-  public static normalizeOwner(owner: string): string {
-    return RepoFullName.normalizeOwner(owner);
-  }
-
-  /**
-  @deprecated Import `RepoFullName` from `@edge-git/shared/utils` directly.
-  */
-  public static normalizeRepo(name: string): string {
-    return RepoFullName.normalizeRepo(name);
-  }
-
   public static validateNames(owner: string, name: string): void {
     try {
       RepoFullName.parse(owner, name);
@@ -176,7 +162,7 @@ class RepoService {
     isPrivate: boolean,
     opts: { forkedFromRepoId?: string | null; forkedFromFullName?: string | null } = {},
   ): Promise<{ id: string }> {
-    const normalizedOwner = RepoService.normalizeOwner(owner);
+    const normalizedOwner = RepoFullName.normalizeOwner(owner);
     const dao = await this.deps.repositoryDAO();
     RepoService.validateNames(normalizedOwner, name);
     const existing = await dao.getByOwnerAndName(normalizedOwner, name);

@@ -2,6 +2,7 @@ import * as git from 'isomorphic-git';
 import type { IsoGitFs } from './IsoGitFs';
 import { diffText } from './DiffHunks';
 import type { DiffHunk } from './DiffHunks';
+import { GitCache } from './GitCache';
 import { TreeReader } from './TreeReader';
 
 const logger = {
@@ -32,26 +33,25 @@ export interface FileDiffWithHunks {
 export class HistoryService {
   private readonly fs: PromiseFsClient;
   private readonly gitdir: string;
-  private cache: object = {};
-  private cacheCreatedAt = Date.now();
+  private readonly cacheHolder = new GitCache();
   private readonly trees: TreeReader;
+
+  private get cache(): object {
+    return this.cacheHolder.getCache();
+  }
 
   constructor(fs: PromiseFsClient, gitdir: string) {
     this.fs = fs;
     this.gitdir = gitdir;
-    this.trees = new TreeReader(fs, gitdir, () => this.cache);
+    this.trees = new TreeReader(fs, gitdir, () => this.cacheHolder.getCache());
   }
 
   public clearCache(): void {
-    this.cache = {};
-    this.cacheCreatedAt = Date.now();
+    this.cacheHolder.clearCache();
   }
 
   public ensureFreshCache(ttlSeconds: number): void {
-    if (!Number.isFinite(ttlSeconds) || ttlSeconds <= 0) return;
-    if (Date.now() - this.cacheCreatedAt > ttlSeconds * 1000) {
-      this.clearCache();
-    }
+    this.cacheHolder.ensureFreshCache(ttlSeconds);
   }
 
   async getLastCommit(branch: string): Promise<git.ReadCommitResult | undefined> {

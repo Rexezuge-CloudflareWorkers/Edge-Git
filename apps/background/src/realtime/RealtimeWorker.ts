@@ -14,6 +14,7 @@ import {
 } from '@edge-git/shared/realtime';
 import type { RealtimeEnvelope } from '@edge-git/shared/realtime';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
+import { pickEvictionCandidate, pruneFrameTimes, shouldRateLimit } from './RealtimePolicy';
 
 const logger = createLogger('RealtimeWorker');
 
@@ -319,11 +320,12 @@ class RealtimeWorker extends DurableObject<Env> {
   }
 
   // Per-socket token bucket over the last 60s. Mutates the attachment so the
-  // window survives hibernation evictions.
+  // window survives hibernation evictions. Pure window math lives in
+  // `./RealtimePolicy.ts` (unit testable without DO hibernation).
   private checkRateLimit(ws: WebSocket, attachment: SocketAttachment): boolean {
     const now = Date.now();
-    const windowed = attachment.frameTimes.filter((time) => now - time < 60_000);
-    if (windowed.length >= MAX_CLIENT_FRAMES_PER_MINUTE) {
+    const windowed = pruneFrameTimes(attachment.frameTimes, now);
+    if (shouldRateLimit(attachment.frameTimes, now, MAX_CLIENT_FRAMES_PER_MINUTE)) {
       try {
         ws.close(4408, 'rate limited');
       } catch {
@@ -341,7 +343,8 @@ class RealtimeWorker extends DurableObject<Env> {
   }
 
   // Connection caps bound free-plan duration. Anonymous sockets yield to
-  // authenticated viewers when a shard is full.
+  // authenticated viewers when a shard is full. Victim selection lives in
+  // `./RealtimePolicy.ts` (pure, unit testable).
   private makeRoom(viewer: string): boolean {
     let sockets: WebSocket[];
     try {
@@ -350,19 +353,16 @@ class RealtimeWorker extends DurableObject<Env> {
       return false;
     }
     const max = this.maxConnections();
-    if (sockets.length < max) return true;
-    if (viewer !== 'anonymous') {
-      const victim = sockets.find((socket) => this.readAttachment(socket)?.viewer === 'anonymous');
-      if (victim) {
-        try {
-          victim.close(4409, 'evicted for authenticated viewer');
-        } catch {
-          // already gone — room freed anyway
-        }
-        return true;
-      }
+    const attachments = sockets.map((socket) => ({ viewer: this.readAttachment(socket)?.viewer ?? 'anonymous' }));
+    const victim = pickEvictionCandidate(attachments, viewer, max);
+    if (victim === -2) return true;
+    if (victim === -1) return false;
+    try {
+      sockets[victim]?.close(4409, 'evicted for authenticated viewer');
+    } catch {
+      // already gone — room freed anyway
     }
-    return false;
+    return true;
   }
 
   private isRealtimeEnabled(): boolean {

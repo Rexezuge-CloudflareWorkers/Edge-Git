@@ -1,5 +1,5 @@
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { recordAndNotify } from './SocialEmit';
 import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
@@ -19,7 +19,7 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
   app.post('/user/repos/:owner/:repo/projects', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     if (!(await requireWriteRole(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
@@ -47,7 +47,7 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
   app.patch('/user/repos/:owner/:repo/projects/:number', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     if (!(await requireWriteRole(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
@@ -82,7 +82,7 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
   app.delete('/user/repos/:owner/:repo/projects/:number', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     if (!(await requireWriteRole(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
@@ -99,7 +99,7 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
   app.post('/user/repos/:owner/:repo/projects/:number/columns', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     if (!(await requireWriteRole(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
@@ -120,7 +120,7 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
   app.patch('/user/repos/:owner/:repo/projects/:number/columns/:columnId', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     if (!(await requireWriteRole(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
@@ -141,7 +141,7 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
   app.delete('/user/repos/:owner/:repo/projects/:number/columns/:columnId', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     if (!(await requireWriteRole(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
@@ -158,7 +158,7 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
   app.post('/user/repos/:owner/:repo/projects/:number/cards', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     if (!(await requireWriteRole(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
@@ -184,7 +184,7 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
   app.patch('/user/repos/:owner/:repo/projects/:number/cards/:cardId/move', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     if (!(await requireWriteRole(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
@@ -203,7 +203,7 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
   app.patch('/user/repos/:owner/:repo/projects/:number/cards/:cardId', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     if (!(await requireWriteRole(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
@@ -224,7 +224,7 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
   app.delete('/user/repos/:owner/:repo/projects/:number/cards/:cardId', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     if (!(await requireWriteRole(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);

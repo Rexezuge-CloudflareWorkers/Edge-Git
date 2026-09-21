@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 
 describe('RepoService naming', () => {
   it('strips .git suffix', () => {
-    expect(RepoService.normalizeRepo('myrepo.git')).toBe('myrepo');
-    expect(RepoService.normalizeRepo('myrepo')).toBe('myrepo');
+    expect(RepoFullName.normalizeRepo('myrepo.git')).toBe('myrepo');
+    expect(RepoFullName.normalizeRepo('myrepo')).toBe('myrepo');
   });
 
   it('validates owner/repo names', () => {

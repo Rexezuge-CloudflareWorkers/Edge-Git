@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { SecuritySettingsService } from '@edge-git/backend-services/security';
 import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
@@ -14,7 +14,7 @@ function registerSecurityRoutes(app: SecurityApp): void {
   app.get('/user/repos/:owner/:repo/security', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     try {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'read');
@@ -28,7 +28,7 @@ function registerSecurityRoutes(app: SecurityApp): void {
   app.patch('/user/repos/:owner/:repo/security', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const { malformed, body } = await readJsonBody<{ secretScanMode?: unknown }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (body.secretScanMode === undefined) return jsonError(c, 'secretScanMode is required', 400);

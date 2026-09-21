@@ -1,9 +1,9 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { runImportJob } from '@edge-git/background/transfer/ImportRunner';
-import { getRepoStub } from '../repoStub';
+import { getRepoStub } from '../doStubs';
 import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
@@ -28,7 +28,7 @@ function registerImportRoutes(app: TransferApp): void {
   app.post('/user/repos/:owner/:repo/import', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const { malformed, body } = await readJsonBody<{ sourceUrl?: string }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.sourceUrl !== 'string' || !body.sourceUrl.trim()) return jsonError(c, 'sourceUrl is required', 400);
@@ -48,7 +48,7 @@ function registerImportRoutes(app: TransferApp): void {
   app.get('/user/repos/:owner/:repo/import', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     try {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'read');
@@ -63,7 +63,7 @@ function registerImportRoutes(app: TransferApp): void {
   app.post('/user/repos/:owner/:repo/import/:jobId/cancel', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     try {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
@@ -80,7 +80,7 @@ function registerImportRoutes(app: TransferApp): void {
   app.get('/user/repos/:owner/:repo/export', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     try {
       const scope = createRequestScope(c.env);
       await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'read');

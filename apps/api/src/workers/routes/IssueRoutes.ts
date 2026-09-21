@@ -2,7 +2,7 @@ import type { Hono } from 'hono';
 import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { parsePositiveInt } from '@edge-git/shared/validation';
 import { readJsonBody } from './BodyParser';
 
@@ -68,7 +68,7 @@ function registerIssueRoutes(app: IssueApp): void {
 function registerUserIssueRoutes(app: IssueApp): void {
   app.get('/user/repos/:owner/:repo/issues', async (c) => {
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, c.get('AuthenticatedUserEmailAddress'));
     if (!row) return jsonError(c, 'Not found', 404);
     const scope = createRequestScope(c.env);
@@ -96,7 +96,7 @@ function registerUserIssueRoutes(app: IssueApp): void {
   app.post('/user/repos/:owner/:repo/issues', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     const { malformed, body } = await readJsonBody<{ title?: string; body?: string }>(c);
@@ -127,7 +127,7 @@ function registerUserIssueRoutes(app: IssueApp): void {
   app.get('/user/repos/:owner/:repo/issues/:number', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parseIssueNumber(c.req.param('number'));
@@ -143,7 +143,7 @@ function registerUserIssueRoutes(app: IssueApp): void {
   app.patch('/user/repos/:owner/:repo/issues/:number', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     // Write+ (collaborator write, org member with grant, or admin/owner) may triage issues.
@@ -179,7 +179,7 @@ function registerUserIssueRoutes(app: IssueApp): void {
   app.get('/user/repos/:owner/:repo/issues/:number/comments', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parseIssueNumber(c.req.param('number'));
@@ -195,7 +195,7 @@ function registerUserIssueRoutes(app: IssueApp): void {
   app.post('/user/repos/:owner/:repo/issues/:number/comments', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parseIssueNumber(c.req.param('number'));

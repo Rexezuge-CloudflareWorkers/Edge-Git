@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { runMirrorSync } from '@edge-git/background/transfer/MirrorRunner';
 import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
@@ -25,7 +25,7 @@ function registerMirrorRoutes(app: MirrorApp): void {
   app.get('/user/repos/:owner/:repo/mirror', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     try {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'read');
@@ -40,7 +40,7 @@ function registerMirrorRoutes(app: MirrorApp): void {
   app.put('/user/repos/:owner/:repo/mirror', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const { malformed, body } = await readJsonBody<{ sourceUrl?: string; intervalMinutes?: number }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.sourceUrl !== 'string' || !body.sourceUrl.trim()) return jsonError(c, 'sourceUrl is required', 400);
@@ -58,7 +58,7 @@ function registerMirrorRoutes(app: MirrorApp): void {
   app.post('/user/repos/:owner/:repo/mirror/sync', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     try {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
@@ -81,7 +81,7 @@ function registerMirrorRoutes(app: MirrorApp): void {
   app.post('/user/repos/:owner/:repo/mirror/enable', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const { malformed, body } = await readJsonBody<{ enabled?: boolean }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.enabled !== 'boolean') return jsonError(c, 'enabled is required', 400);
@@ -98,7 +98,7 @@ function registerMirrorRoutes(app: MirrorApp): void {
   app.delete('/user/repos/:owner/:repo/mirror', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     try {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');

@@ -1,8 +1,8 @@
 import type { Hono } from 'hono';
-import { getRepoStub } from '../repoStub';
+import { getRepoStub } from '../doStubs';
 import { jsonError, requireVisibleRepo, toErrorBody, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { readJsonBody } from './BodyParser';
 
 type RepoApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -43,7 +43,7 @@ function registerBranchRoutes(app: RepoApp): void {
   app.post('/user/repos/:owner/:repo/branches', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const { malformed, body } = await readJsonBody<{ name?: string; from?: string }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const name = (body.name ?? '').trim();
@@ -63,7 +63,7 @@ function registerBranchRoutes(app: RepoApp): void {
   app.delete('/user/repos/:owner/:repo/branches', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const branch = (new URL(c.req.url).searchParams.get('branch') ?? '').trim();
     if (!branch) return jsonError(c, 'branch query param is required', 400);
     try {
@@ -92,7 +92,7 @@ function registerBranchRoutes(app: RepoApp): void {
   app.patch('/user/repos/:owner/:repo/branches/default', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const { malformed, body } = await readJsonBody<{ branch?: string }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const branch = (body.branch ?? '').trim();

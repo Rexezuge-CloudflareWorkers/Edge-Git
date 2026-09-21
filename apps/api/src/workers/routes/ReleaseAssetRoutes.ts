@@ -1,9 +1,9 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { assetNameSchema, decodeBase64Strict, normalizeAssetContentType } from '@edge-git/shared/validation';
-import { getRepoStub } from '../repoStub';
+import { getRepoStub } from '../doStubs';
 import { jsonError, requireVisibleRepo, resolvePublicViewer, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { viewerCanSeeDrafts } from './ReleaseRoutes';
 import { readJsonBody } from './BodyParser';
@@ -83,7 +83,7 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
   app.get('/user/repos/:owner/:repo/releases/:tag/assets', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
@@ -100,7 +100,7 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
   app.post('/user/repos/:owner/:repo/releases/:tag/assets', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
@@ -153,7 +153,7 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
   app.get('/user/repos/:owner/:repo/releases/:tag/assets/:assetId/download', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
@@ -172,7 +172,7 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
   app.delete('/user/repos/:owner/:repo/releases/:tag/assets/:assetId', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {

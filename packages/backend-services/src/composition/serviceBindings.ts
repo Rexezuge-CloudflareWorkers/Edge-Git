@@ -13,7 +13,7 @@ import { PullRequestService } from '@edge-git/backend-services/pull';
 import { PullThreadService } from '@edge-git/backend-services/pull/PullThreadService';
 import { OrganizationService } from '@edge-git/backend-services/org';
 import { TeamService } from '@edge-git/backend-services/team';
-import { AuditService } from '@edge-git/backend-services/audit';
+import { AuditObserverRegistry, AuditService } from '@edge-git/backend-services/audit';
 import { PermissionService } from '@edge-git/backend-services/permission';
 import { SearchService } from '@edge-git/backend-services/search';
 import { ActivityService } from '@edge-git/backend-services/social/ActivityService';
@@ -214,7 +214,17 @@ function bindServiceBindings(scope: Container, env: RequestScopeEnv): void {
         repositoryDAO,
       }),
   );
-  scope.bind(Tokens.AuditService, () => createService(AuditService, env, { auditLogDAO, organizationDAO, organizationMemberDAO }));
+  scope.bind(Tokens.AuditObserverRegistry, () => AuditObserverRegistry.withDefaults(auditLogDAO));
+  scope.bind(
+    Tokens.AuditService,
+    (container) =>
+      createService(AuditService, env, {
+        auditLogDAO,
+        organizationDAO,
+        organizationMemberDAO,
+        observers: container.get(Tokens.AuditObserverRegistry),
+      }),
+  );
   // Single PermissionService binding (Otter pattern). Dependent services
   // resolve it lazily via the container instead of `new PermissionService`
   // per factory (previously 4 duplicated inline factories).

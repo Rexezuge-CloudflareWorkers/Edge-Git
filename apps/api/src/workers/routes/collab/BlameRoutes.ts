@@ -1,7 +1,7 @@
 import { jsonError, toSafeErrorMessage, withPublicRepo } from '../PublicViewerResolver';
 import { requireVisibleRepo } from '../PublicViewerResolver';
-import { RepoService } from '@edge-git/backend-services/repo';
-import { getRepoStub } from '../../repoStub';
+import { RepoFullName } from '@edge-git/shared/utils';
+import { getRepoStub } from '../../doStubs';
 import type { CollabApp } from './CollabHelpers';
 
 function registerCollabBlamePublicRoutes(app: CollabApp): void {
@@ -24,7 +24,7 @@ function registerCollabBlamePublicRoutes(app: CollabApp): void {
 function registerCollabBlameUserRoutes(app: CollabApp): void {
   app.get('/user/repos/:owner/:repo/blame', async (c) => {
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, c.get('AuthenticatedUserEmailAddress'));
     if (!row) return jsonError(c, 'Not found', 404);
     const ref = c.req.query('ref') || 'HEAD';

@@ -5,7 +5,7 @@ import { mapRepoEventToWebhookEvent } from '@edge-git/backend-services/webhook';
 import { INBOX_SHARD, isChannel, repoShardFor } from '@edge-git/shared/realtime';
 import type { WebhookEventName } from '@edge-git/shared';
 import type { RepoEventType } from '@edge-git/backend-data/dao';
-import { getRealtimeStub } from '../realtimeStub';
+import { getRealtimeStub } from '../doStubs';
 
 interface SocialEmitInput {
   repositoryId: string;

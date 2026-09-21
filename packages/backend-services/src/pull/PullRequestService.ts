@@ -2,8 +2,10 @@ import { NumberingDAO, PullRequestDAO } from '@edge-git/backend-data/dao';
 import type { PullRequestCommentRow, PullRequestReviewRow, PullRequestRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
-import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
+import { TimestampUtil, UUIDUtil, isValidBranchName } from '@edge-git/shared/utils';
 import { allocateNumberWithFallback } from '../numbering/numberAllocator';
+import { isBlockedByReviews } from './PullReviewGate';
+import type { ReviewGateInput } from './PullReviewGate';
 
 interface PullRequestServiceEnv {
   DB: D1Queryable;
@@ -16,37 +18,7 @@ interface PullRequestServiceDeps {
 
 type ReviewState = 'approved' | 'changes_requested' | 'commented';
 
-interface ReviewGateInput {
-  author_email: string;
-  state: string;
-  dismissed?: number | null;
-}
-
-function isDismissed(review: ReviewGateInput): boolean {
-  return review.dismissed === 1;
-}
-
 const REVIEW_STATES: ReadonlySet<string> = new Set(['approved', 'changes_requested', 'commented']);
-
-const BRANCH_SEGMENT_RE = /^[\w.-]+$/;
-
-function hasIllegalBranchChar(branch: string): boolean {
-  for (const ch of branch) {
-    const code = ch.codePointAt(0) ?? 0;
-    if (code <= 0x20) return true;
-    if (code === 0x5c) return true;
-    if ('~^:?*[@{['.includes(ch)) return true;
-  }
-  return false;
-}
-
-function isValidBranchName(branch: string): boolean {
-  if (!branch || branch.length > 255) return false;
-  if (branch.startsWith('/') || branch.endsWith('/') || branch.endsWith('.')) return false;
-  if (branch.includes('..') || branch.includes('//')) return false;
-  if (hasIllegalBranchChar(branch)) return false;
-  return branch.split('/').every((seg) => seg.length > 0 && seg !== '.' && seg !== '..' && seg !== '@' && BRANCH_SEGMENT_RE.test(seg));
-}
 
 class PullRequestService {
   private readonly deps: Required<PullRequestServiceDeps>;
@@ -64,21 +36,11 @@ class PullRequestService {
 
   /**
    * A pull request is merge-blocked when any reviewer's latest review requests
-   * changes. List order is oldest-first, so the last entry per author wins
-   * (same-second reviews share `created_at`, making timestamp comparison
-   * unreliable — insertion order is the tiebreak). Dismissed reviews never
-   * block (they remain visible for audit).
+   * changes. Delegates to the pure `PullReviewGate` helper (see
+   * `./PullReviewGate.ts`) so the rule is unit testable without D1.
    */
   public static isBlockedByReviews(reviews: ReviewGateInput[]): boolean {
-    const latestByAuthor = new Map<string, ReviewGateInput>();
-    for (const review of reviews) {
-      if (isDismissed(review)) continue;
-      latestByAuthor.set(review.author_email.toLowerCase(), review);
-    }
-    for (const review of latestByAuthor.values()) {
-      if (review.state === 'changes_requested') return true;
-    }
-    return false;
+    return isBlockedByReviews(reviews);
   }
 
   public static isValidBranchName(branch: string): boolean {

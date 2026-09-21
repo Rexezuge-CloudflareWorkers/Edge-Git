@@ -1,5 +1,6 @@
 import * as git from 'isomorphic-git';
 import type { IsoGitFs } from './IsoGitFs';
+import { GitCache } from './GitCache';
 
 const logger = {
   warn: (...args: unknown[]): void => console.warn('[WARN] [GitService]', ...args),
@@ -12,8 +13,11 @@ type PromiseFsClient = ReturnType<IsoGitFs['getPromiseFsClient']>;
 export class ObjectReader {
   private readonly fs: PromiseFsClient;
   private readonly gitdir: string;
-  private cache: object = {};
-  private cacheCreatedAt = Date.now();
+  private readonly cacheHolder = new GitCache();
+
+  private get cache(): object {
+    return this.cacheHolder.getCache();
+  }
 
   constructor(fs: PromiseFsClient, gitdir: string) {
     this.fs = fs;
@@ -21,15 +25,11 @@ export class ObjectReader {
   }
 
   public clearCache(): void {
-    this.cache = {};
-    this.cacheCreatedAt = Date.now();
+    this.cacheHolder.clearCache();
   }
 
   public ensureFreshCache(ttlSeconds: number): void {
-    if (!Number.isFinite(ttlSeconds) || ttlSeconds <= 0) return;
-    if (Date.now() - this.cacheCreatedAt > ttlSeconds * 1000) {
-      this.clearCache();
-    }
+    this.cacheHolder.ensureFreshCache(ttlSeconds);
   }
 
   async readObject(oid: string) {

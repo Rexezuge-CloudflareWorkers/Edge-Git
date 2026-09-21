@@ -9,7 +9,7 @@ import {
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
-import { EmailAddress } from '@edge-git/shared/utils';
+import { EmailAddress, RepoFullName } from '@edge-git/shared/utils';
 import { PermissionService } from '../permission/PermissionService';
 import { RepoService } from '../repo/RepoService';
 
@@ -112,8 +112,8 @@ class ForkService {
 
     const destOwner = (dest.owner ?? '').trim() || (await this.resolveDefaultOwner(forkerEmail));
     const destName = (dest.name ?? '').trim() || source.name;
-    const normalizedName = RepoService.normalizeRepo(destName);
-    RepoService.validateNames(RepoService.normalizeOwner(destOwner), normalizedName);
+    const normalizedName = RepoFullName.normalizeRepo(destName);
+    RepoService.validateNames(RepoFullName.normalizeOwner(destOwner), normalizedName);
 
     const sourceFullName = `${source.owner}/${source.name}`;
     const destFullName = `${destOwner}/${normalizedName}`;

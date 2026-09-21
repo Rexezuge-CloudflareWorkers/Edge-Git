@@ -1,5 +1,7 @@
 import * as git from 'isomorphic-git';
 import type { IsoGitFs } from './IsoGitFs';
+import { GitCache } from './GitCache';
+import { isValidBranchName as sharedIsValidBranchName } from '@edge-git/shared/utils';
 
 const logger = {
   warn: (...args: unknown[]): void => console.warn('[WARN] [MergeService]', ...args),
@@ -27,31 +29,20 @@ interface MergePreview {
   canFastForward: boolean;
 }
 
-const BRANCH_SEGMENT_RE = /^[\w.-]+$/;
-
-function hasIllegalBranchChar(branch: string): boolean {
-  for (const ch of branch) {
-    const code = ch.codePointAt(0) ?? 0;
-    if (code <= 0x20) return true;
-    if (code === 0x5c) return true;
-    if ('~^:?*[@{['.includes(ch)) return true;
-  }
-  return false;
-}
-
-export function isValidBranchName(branch: string): boolean {
-  if (!branch || branch.length > 255) return false;
-  if (branch.startsWith('/') || branch.endsWith('/') || branch.endsWith('.')) return false;
-  if (branch.includes('..') || branch.includes('//')) return false;
-  if (hasIllegalBranchChar(branch)) return false;
-  return branch.split('/').every((seg) => seg.length > 0 && seg !== '.' && seg !== '..' && seg !== '@' && BRANCH_SEGMENT_RE.test(seg));
-}
+// Canonical validator lives in `@edge-git/shared/utils` (Layer 0) so
+// `backend-services` can share it without importing `git-service`.
+// Re-exported here for backward compatibility (`RefService`, `WriteService`).
+export { isValidBranchName } from '@edge-git/shared/utils';
 
 export class MergeService {
   private readonly fs: PromiseFsClient;
   private readonly gitdir: string;
   private readonly dir: string;
-  private cache: object = {};
+  private readonly cacheHolder = new GitCache();
+
+  private get cache(): object {
+    return this.cacheHolder.getCache();
+  }
 
   constructor(fs: PromiseFsClient, gitdir: string, dir = '/tmp-merge-wd') {
     this.fs = fs;
@@ -60,7 +51,7 @@ export class MergeService {
   }
 
   public clearCache(): void {
-    this.cache = {};
+    this.cacheHolder.clearCache();
   }
 
   private async removeWorkdir(workdir: string): Promise<void> {
@@ -128,7 +119,7 @@ export class MergeService {
   }
 
   public async deleteBranch(branch: string): Promise<void> {
-    if (!isValidBranchName(branch)) throw new Error(`invalid branch name: ${branch}`);
+    if (!sharedIsValidBranchName(branch)) throw new Error(`invalid branch name: ${branch}`);
     await git.deleteBranch({ fs: this.fs, gitdir: this.gitdir, ref: branch });
   }
 
@@ -142,7 +133,7 @@ export class MergeService {
    * why GitHub offers it alongside merge commits.
    */
   public async squashMerge(input: { baseBranch: string; headOid: string; author: MergeAuthor; message?: string }): Promise<MergeOutcome> {
-    if (!isValidBranchName(input.baseBranch)) throw new Error(`invalid base branch: ${input.baseBranch}`);
+    if (!sharedIsValidBranchName(input.baseBranch)) throw new Error(`invalid base branch: ${input.baseBranch}`);
     if (!/^[0-9a-f]{40}$/.test(input.headOid)) throw new Error('invalid head oid');
     const baseRef = `refs/heads/${input.baseBranch}`;
     const baseOid = await this.resolveRef(baseRef);
@@ -179,7 +170,7 @@ export class MergeService {
    * rather than risking an incorrect tree replay.
    */
   public async rebaseMerge(input: { baseBranch: string; headOid: string; author: MergeAuthor }): Promise<MergeOutcome> {
-    if (!isValidBranchName(input.baseBranch)) throw new Error(`invalid base branch: ${input.baseBranch}`);
+    if (!sharedIsValidBranchName(input.baseBranch)) throw new Error(`invalid base branch: ${input.baseBranch}`);
     if (!/^[0-9a-f]{40}$/.test(input.headOid)) throw new Error('invalid head oid');
     const baseRef = `refs/heads/${input.baseBranch}`;
     const baseOid = await this.resolveRef(baseRef);
@@ -231,7 +222,7 @@ export class MergeService {
   }
 
   public async mergeBranches(input: { baseBranch: string; headOid: string; author: MergeAuthor; message?: string }): Promise<MergeOutcome> {
-    if (!isValidBranchName(input.baseBranch)) throw new Error(`invalid base branch: ${input.baseBranch}`);
+    if (!sharedIsValidBranchName(input.baseBranch)) throw new Error(`invalid base branch: ${input.baseBranch}`);
     if (!/^[0-9a-f]{40}$/.test(input.headOid)) throw new Error('invalid head oid');
     const baseRef = `refs/heads/${input.baseBranch}`;
     const baseOid = await this.resolveRef(baseRef);

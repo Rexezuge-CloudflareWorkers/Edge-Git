@@ -1,11 +1,11 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RealtimeService } from '@edge-git/backend-services/realtime';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { isShard } from '@edge-git/shared/realtime';
 import { repoNameSchema, usernameSchema } from '@edge-git/shared/validation';
-import { getRealtimeStub } from '../realtimeStub';
+import { getRealtimeStub } from '../doStubs';
 import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
@@ -67,7 +67,7 @@ function registerRealtimeUserRoutes(app: RealtimeApp): void {
         .authorizeRepoChannels({
           viewerEmail: email,
           owner: body.owner,
-          repo: RepoService.normalizeRepo(body.repo),
+          repo: RepoFullName.normalizeRepo(body.repo),
           channels: body.channels,
         });
     } catch (error) {

@@ -1,4 +1,4 @@
-import { getRepoStub } from '../repoStub';
+import { getRepoStub } from '../doStubs';
 import { jsonError, requireVisibleRepo, toErrorBody, toErrorType, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
@@ -6,7 +6,7 @@ import { Tokens, createRequestScope } from '@edge-git/backend-services/compositi
 import { CheckService } from '@edge-git/backend-services/checks';
 import { PullRequestService } from '@edge-git/backend-services/pull';
 import { BranchProtectionService } from '@edge-git/backend-services/protection';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { getCrossRepoPreview, isPackLimitError, resolveHeadRepo } from './CrossFork';
 import { parsePullNumber } from './PullShared';
 import type { MergePreviewShape, PullApp } from './PullShared';
@@ -135,7 +135,7 @@ function registerUserPullMergeRoutes(app: PullApp): void {
   app.post('/user/repos/:owner/:repo/pulls/:number/merge', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {

@@ -12,7 +12,7 @@ import type { OrganizationRow, RepoRole, TeamMemberRole, TeamRow } from '@edge-g
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError, ForbiddenError, NotFoundError } from '@edge-git/backend-errors';
 import { AppConfiguration } from '@edge-git/backend-runtime/config';
-import { EmailAddress, TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
+import { EmailAddress, SLUG_RE, TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 
 interface TeamServiceEnv {
   DB: D1Queryable;
@@ -33,7 +33,9 @@ interface TeamServiceDeps {
   config?: AppConfiguration;
 }
 
-const TEAM_SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$/i;
+// Canonical slug lives in `@edge-git/shared/utils` (Layer 0).
+// Re-exported here for backward compatibility.
+export { SLUG_RE as TEAM_SLUG_RE } from '@edge-git/shared/utils';
 
 class TeamService {
   private readonly deps: Required<TeamServiceDeps>;
@@ -57,7 +59,7 @@ class TeamService {
   }
 
   public static validateTeamSlug(slug: string): void {
-    if (!TEAM_SLUG_RE.test(slug)) {
+    if (!SLUG_RE.test(slug)) {
       throw new BadRequestError('Invalid team name');
     }
   }

@@ -2,6 +2,7 @@ import * as git from 'isomorphic-git';
 import type { IsoGitFs } from './IsoGitFs';
 import type { RefUpdateResult } from '@edge-git/git-protocol';
 import { isValidBranchName } from './MergeService';
+import { parseSymbolicHead } from './RefParsers';
 
 const logger = {
   warn: (...args: unknown[]): void => console.warn('[WARN] [GitService]', ...args),
@@ -37,11 +38,7 @@ export class RefService {
       const headContent = await this.fs.promises.readFile('/repo/HEAD', {
         encoding: 'utf8',
       });
-      const headStr = typeof headContent === 'string' ? headContent : new TextDecoder().decode(headContent);
-      const match = /^ref:\s*(\S.*)$/.exec(headStr.trim());
-      if (match) {
-        symbolicHead = match[1];
-      }
+      symbolicHead = parseSymbolicHead(headContent);
     } catch {
       logger.warn('(read-head-file) No HEAD found in repository.');
     }

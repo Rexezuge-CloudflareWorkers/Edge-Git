@@ -1,7 +1,7 @@
-import { getRepoStub } from '../repoStub';
+import { getRepoStub } from '../doStubs';
 import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { ensureHeadObjects, getCrossRepoPreview, isPackLimitError, resolveHeadRepo } from './CrossFork';
 import { parsePullNumber } from './PullShared';
 import type { MergePreviewShape, PullApp } from './PullShared';
@@ -9,7 +9,7 @@ import type { MergePreviewShape, PullApp } from './PullShared';
 function registerUserPullReadRoutes(app: PullApp): void {
   app.get('/user/repos/:owner/:repo/pulls', async (c) => {
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, c.get('AuthenticatedUserEmailAddress'));
     if (!row) return jsonError(c, 'Not found', 404);
     const scope = createRequestScope(c.env);
@@ -40,7 +40,7 @@ function registerUserPullReadRoutes(app: PullApp): void {
   app.get('/user/repos/:owner/:repo/pulls/:number', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parsePullNumber(c.req.param('number'));
@@ -57,7 +57,7 @@ function registerUserPullReadRoutes(app: PullApp): void {
   app.get('/user/repos/:owner/:repo/pulls/:number/comments', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parsePullNumber(c.req.param('number'));
@@ -74,7 +74,7 @@ function registerUserPullReadRoutes(app: PullApp): void {
   app.get('/user/repos/:owner/:repo/pulls/:number/reviews', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parsePullNumber(c.req.param('number'));
@@ -91,7 +91,7 @@ function registerUserPullReadRoutes(app: PullApp): void {
   app.get('/user/repos/:owner/:repo/pulls/:number/diff', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parsePullNumber(c.req.param('number'));
@@ -125,7 +125,7 @@ function registerUserPullReadRoutes(app: PullApp): void {
   app.get('/user/repos/:owner/:repo/pulls/:number/preview', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parsePullNumber(c.req.param('number'));

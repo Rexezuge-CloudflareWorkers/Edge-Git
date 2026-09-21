@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
@@ -13,7 +13,7 @@ function registerRuleRoutes(app: RuleApp): void {
   app.get('/user/repos/:owner/:repo/rules', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     try {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'read');
@@ -27,7 +27,7 @@ function registerRuleRoutes(app: RuleApp): void {
   app.post('/user/repos/:owner/:repo/rules', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const { malformed, body } = await readJsonBody<{
       pattern?: string;
       requirePr?: boolean;
@@ -60,7 +60,7 @@ function registerRuleRoutes(app: RuleApp): void {
   app.delete('/user/repos/:owner/:repo/rules/:id', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const id = c.req.param('id');
     try {
       const scope = createRequestScope(c.env);

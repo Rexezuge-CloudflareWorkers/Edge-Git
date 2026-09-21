@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 import { gitAuthForRepo } from '@/middleware';
-import { getRepoStub } from '../repoStub';
+import { getRepoStub } from '../doStubs';
 import { RepoFullName } from '@edge-git/shared/utils';
 import {
   advertiseUploadPack,
@@ -14,7 +14,6 @@ import type { BranchProtectionRuleMetadata } from '@edge-git/shared';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { BranchProtectionService } from '@edge-git/backend-services/protection';
 import { scanBytes } from '@edge-git/backend-services/security';
-import { RepoService } from '@edge-git/backend-services/repo';
 import { recordAndNotify } from './SocialEmit';
 import { triggerRequiredChecks } from './TriggerChecks';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
@@ -26,7 +25,7 @@ function registerGitRoutes(app: GitApp): void {
   app.get('/:owner/:repo/info/refs', async (c) => {
     const owner = c.req.param('owner');
     const repoParam = c.req.param('repo');
-    const repoName = RepoService.normalizeRepo(repoParam);
+    const repoName = RepoFullName.normalizeRepo(repoParam);
     // Reject malformed owner/name before D1/DO sharding (weird names must
     // never reach `REPO.getByName`). 401 (not 404/400) preserves the
     // private-repo existence oracle guard.
@@ -53,7 +52,7 @@ function registerGitRoutes(app: GitApp): void {
   app.post('/:owner/:repo/git-upload-pack', async (c) => {
     const owner = c.req.param('owner');
     const repoParam = c.req.param('repo');
-    const repoName = RepoService.normalizeRepo(repoParam);
+    const repoName = RepoFullName.normalizeRepo(repoParam);
     if (!RepoFullName.tryParse(owner, repoName)) {
       return new Response('Unauthorized', {
         status: 401,
@@ -83,7 +82,7 @@ function registerGitRoutes(app: GitApp): void {
   app.post('/:owner/:repo/git-receive-pack', async (c) => {
     const owner = c.req.param('owner');
     const repoParam = c.req.param('repo');
-    const repoName = RepoService.normalizeRepo(repoParam);
+    const repoName = RepoFullName.normalizeRepo(repoParam);
     if (!RepoFullName.tryParse(owner, repoName)) {
       return new Response('Unauthorized', {
         status: 401,

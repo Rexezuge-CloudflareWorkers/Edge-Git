@@ -1,4 +1,4 @@
-import { getRepoStub } from '../repoStub';
+import { getRepoStub } from '../doStubs';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import type { MergePreviewShape } from './PullShared';
