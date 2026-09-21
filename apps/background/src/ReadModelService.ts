@@ -149,6 +149,32 @@ class ReadModelService {
   }
 
   /**
+   * Resolve the overview's read ref: explicit `ref` (exact, no fallback),
+   * else HEAD with fallback to the current branch name and then the first
+   * branch so a repo whose HEAD dangles still reports its real content.
+   */
+  private async resolveOverviewRef(
+    ref: string | undefined,
+    branches: string[],
+    currentBranch: string | null,
+  ): Promise<{ oid: string | null; refForLog: string }> {
+    const head = ref ?? 'HEAD';
+    const oid = await this.git.resolveRef(head);
+    if (oid || ref) return { oid, refForLog: head };
+    const candidates: string[] = [];
+    if (currentBranch) candidates.push(`refs/heads/${currentBranch}`);
+    for (const branch of branches) {
+      const candidate = `refs/heads/${branch}`;
+      if (!candidates.includes(candidate)) candidates.push(candidate);
+    }
+    for (const candidate of candidates) {
+      const fallbackOid = await this.git.resolveRef(candidate);
+      if (fallbackOid) return { oid: fallbackOid, refForLog: candidate };
+    }
+    return { oid: null, refForLog: 'HEAD' };
+  }
+
+  /**
    * Aggregate read for the repo code page: branches + tags + fast tree
    * (no per-file last-commit) + recent commits + root README, sharing one
    * ref resolution. Replaces 5 sequential DO RPCs (branches, tags,
@@ -170,10 +196,14 @@ class ReadModelService {
     const branches = await this.git.listBranches();
     const currentBranch = (await this.git.currentBranch()) ?? null;
     const tags = args.includeTags === false ? [] : await this.getTags();
-    const resolvedRef = await this.git.resolveRef(ref ?? 'HEAD');
-    if (!resolvedRef) {
+    // Default reads follow HEAD, but a fresh repo's HEAD can dangle (init
+    // defaults to `main` while the first push landed on another branch, e.g.
+    // `master`). An explicit `ref` keeps exact semantics (no fallback).
+    const resolved = await this.resolveOverviewRef(ref, branches, currentBranch);
+    if (!resolved.oid) {
       return { branches, currentBranch, resolvedRef: null, tags, tree: [], commits: [], readme: null };
     }
+    const { oid: resolvedRef, refForLog } = resolved;
     const rawTree = (await this.git.getTree(resolvedRef, dir)) as Array<{
       path: string;
       type: string;
@@ -181,7 +211,6 @@ class ReadModelService {
       oid: string;
     }>;
     const tree = rawTree.map((item) => ({ ...item, lastCommit: null }));
-    const refForLog = ref ?? 'HEAD';
     const latestCommit = (await this.git.getLastCommit(refForLog)) as { oid: string } | null | undefined;
     const commits = latestCommit ? await this.git.getLog({ ref: refForLog, depth }) : [];
     let readme: ({ path: string } & Record<string, unknown>) | null = null;

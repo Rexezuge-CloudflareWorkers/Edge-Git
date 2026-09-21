@@ -380,6 +380,43 @@ describe('slice1: PushHandler uncovered branches', () => {
   });
 });
 
+describe('PushHandler first-push default branch', () => {
+  function handler(git: Record<string, unknown>) {
+    return new PushHandler({
+      isoGitFs: { promises: { writeFile: vi.fn().mockResolvedValue(undefined), unlink: vi.fn().mockResolvedValue(undefined) } } as never,
+      git: git as never,
+      getFullName: () => 'a/b',
+    });
+  }
+
+  function firstPushGit(headOid: string | null) {
+    return {
+      indexPack: vi.fn().mockResolvedValue(undefined),
+      isAncestor: vi.fn().mockResolvedValue(true),
+      applyRefUpdates: vi.fn().mockResolvedValue([{ ref: 'refs/heads/master', ok: true }]),
+      resolveRef: vi.fn().mockResolvedValue(headOid),
+      setDefaultBranch: vi.fn().mockResolvedValue({ ok: true, defaultBranch: 'master' }),
+      clearCache: vi.fn(),
+    };
+  }
+
+  it('points HEAD at the first created branch while HEAD dangles', async () => {
+    const git = firstPushGit(null);
+    const create = { oldOid: '0'.repeat(40), newOid: WANT, ref: 'refs/heads/master' };
+    const res = await handler(git).receivePack(pushPayload([create]), { maxCommands: 100, maxPackBytes: 100000 }, []);
+    expect(res.status).toBe(200);
+    expect(git.setDefaultBranch).toHaveBeenCalledWith('master');
+  });
+
+  it('leaves HEAD alone when it already resolves', async () => {
+    const git = firstPushGit(WANT);
+    const create = { oldOid: '0'.repeat(40), newOid: WANT, ref: 'refs/heads/feature' };
+    const res = await handler(git).receivePack(pushPayload([create]), { maxCommands: 100, maxPackBytes: 100000 }, []);
+    expect(res.status).toBe(200);
+    expect(git.setDefaultBranch).not.toHaveBeenCalled();
+  });
+});
+
 describe('slice1: GitRoutes early rejects (no D1)', () => {
   const CTX = { waitUntil: () => undefined, passThroughOnException: () => undefined };
 

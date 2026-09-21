@@ -29,6 +29,17 @@ async function copyRepoGit(env: Env, sourceFullName: string, targetFullName: str
   const exported = await source.exportPack(heads.map((r) => r.oid));
   if (!exported.pack) return { refs: [], objects: 0, empty: true };
   const { importedRefs } = await target.importPack(exported.pack, heads);
+  // Preserve the source default branch: the fresh target's HEAD points at
+  // `main`, which dangles when the source lives on another branch (e.g.
+  // `master`). Best-effort — refs are already copied.
+  try {
+    const head = listed.symbolicHead;
+    if (head && head.startsWith('refs/heads/') && importedRefs.includes(head)) {
+      await target.setDefaultBranch(head.slice('refs/heads/'.length));
+    }
+  } catch {
+    // ignore — default reads fall back to the first branch anyway
+  }
   return { refs: importedRefs, objects: exported.oids.length, empty: false };
 }
 
