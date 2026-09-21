@@ -17,8 +17,8 @@ export interface PullRequest {
   base_oid: string | null;
   head_oid: string | null;
   merge_base_oid: string | null;
-  creator_email: string;
-  merged_by: string | null;
+  creator: string;
+  mergedBy: string | null;
   merged_at: number | null;
   created_at: number;
   updated_at: number;
@@ -29,13 +29,13 @@ export interface PullRequest {
 export interface PullReview {
   id: string;
   pull_request_id: string;
-  author_email: string;
+  author: string;
   state: 'approved' | 'changes_requested' | 'commented';
   body: string | null;
   commit_oid: string | null;
   created_at: number;
   dismissed?: number | null;
-  dismissed_by?: string | null;
+  dismissedBy?: string | null;
   dismissed_at?: number | null;
   dismiss_reason?: string | null;
 }
@@ -43,7 +43,7 @@ export interface PullReview {
 export interface PullComment {
   id: string;
   pull_request_id: string;
-  author_email: string;
+  author: string;
   body: string;
   created_at: number;
 }
@@ -51,7 +51,7 @@ export interface PullComment {
 export interface PullThreadComment {
   id: string;
   thread_id: string;
-  author_email: string;
+  author: string;
   body: string;
   created_at: number;
 }
@@ -64,9 +64,9 @@ export interface PullReviewThread {
   side: 'old' | 'new';
   commit_oid: string | null;
   status: 'open' | 'resolved';
-  author_email: string;
+  author: string;
   created_at: number;
-  resolved_by: string | null;
+  resolvedBy: string | null;
   resolved_at: number | null;
   comments: PullThreadComment[];
 }

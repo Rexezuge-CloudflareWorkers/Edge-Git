@@ -205,6 +205,8 @@ describe('createRequestScope', () => {
     expect(scope.get(Tokens.RepoService)).toBe(scope.get(Tokens.RepoService));
     expect(scope.get(Tokens.RepoService)).toBeInstanceOf(RepoService);
     expect(scope.get(Tokens.IssueService)).toBeInstanceOf(IssueService);
+    // Identity: email stays the store key, username resolves at read time.
+    expect(scope.get(Tokens.IdentityResolver)).toBe(scope.get(Tokens.IdentityResolver));
   });
 
   it('isolates singletons between scopes', () => {

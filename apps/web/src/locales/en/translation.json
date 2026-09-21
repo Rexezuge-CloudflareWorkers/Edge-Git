@@ -716,7 +716,7 @@
   "audit": {
     "title": "Audit Log",
     "search": "Search",
-    "userPlaceholder": "User Email",
+    "userPlaceholder": "Username",
     "actionPlaceholder": "Action, e.g. PUSH",
     "path": "Path",
     "resource": "Resource",

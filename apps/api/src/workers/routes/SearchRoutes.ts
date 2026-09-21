@@ -1,5 +1,6 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { presentMany } from './IdentityPresenter';
 import { SearchService } from '@edge-git/backend-services/search';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { jsonError, requireVisibleRepo, resolvePublicViewer, toRepoJson, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
@@ -46,11 +47,11 @@ function registerSearchRoutes(app: SearchApp): void {
         if (!row) return jsonError(c, 'Not found', 404);
         if (type === 'issues') {
           const issues = await svc.searchIssues(q, viewerEmail, { limit, repoId: row.id });
-          return c.json({ type, query: q, issues });
+          return c.json({ type, query: q, issues: await presentMany(scope, issues) });
         }
         if (type === 'pulls') {
           const pulls = await svc.searchPulls(q, viewerEmail, { limit, repoId: row.id });
-          return c.json({ type, query: q, pulls });
+          return c.json({ type, query: q, pulls: await presentMany(scope, pulls) });
         }
         if (type === 'code') {
           const code = await svc.searchCode(q, viewerEmail, { limit, repoId: row.id });
@@ -58,22 +59,22 @@ function registerSearchRoutes(app: SearchApp): void {
         }
         if (type === 'discussions') {
           const discussions = await svc.searchDiscussions(q, viewerEmail, { limit, repoId: row.id });
-          return c.json({ type, query: q, discussions });
+          return c.json({ type, query: q, discussions: await presentMany(scope, discussions) });
         }
         if (type === 'snippets') {
           const snippets = await svc.searchSnippets(q, { limit });
-          return c.json({ type, query: q, snippets });
+          return c.json({ type, query: q, snippets: await presentMany(scope, snippets) });
         }
         const repos = await svc.searchRepos(q, viewerEmail, limit);
         return c.json({ type, query: q, repos: repos.filter((r) => r.id === row.id).map((r) => toRepoJson(r)) });
       }
       if (type === 'issues') {
         const issues = await svc.searchIssues(q, viewerEmail, { limit });
-        return c.json({ type, query: q, issues });
+        return c.json({ type, query: q, issues: await presentMany(scope, issues) });
       }
       if (type === 'pulls') {
         const pulls = await svc.searchPulls(q, viewerEmail, { limit });
-        return c.json({ type, query: q, pulls });
+        return c.json({ type, query: q, pulls: await presentMany(scope, pulls) });
       }
       if (type === 'code') {
         const code = await svc.searchCode(q, viewerEmail, { limit });
@@ -81,7 +82,7 @@ function registerSearchRoutes(app: SearchApp): void {
       }
       if (type === 'discussions') {
         const discussions = await svc.searchDiscussions(q, viewerEmail, { limit });
-        return c.json({ type, query: q, discussions });
+        return c.json({ type, query: q, discussions: await presentMany(scope, discussions) });
       }
       if (type === 'snippets') {
         const snippets = await svc.searchSnippets(q, { limit });

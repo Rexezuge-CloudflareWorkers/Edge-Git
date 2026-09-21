@@ -4,6 +4,7 @@ import { Tokens, createRequestScope } from '@edge-git/backend-services/compositi
 import { RepoFullName } from '@edge-git/shared/utils';
 import { ensureHeadObjects, getCrossRepoPreview, isPackLimitError, resolveHeadRepo } from './CrossFork';
 import { parsePullNumber } from './PullShared';
+import { presentMany, presentSingle } from './IdentityPresenter';
 import type { MergePreviewShape, PullApp } from './PullShared';
 
 function registerUserPullReadRoutes(app: PullApp): void {
@@ -22,7 +23,7 @@ function registerUserPullReadRoutes(app: PullApp): void {
       : null;
     if (!pulls) pulls = await scope.get(Tokens.PullRequestService).listByRepo(row.id, 50);
     const label = c.req.query('label');
-    if (!label) return c.json({ pulls });
+    if (!label) return c.json({ pulls: await presentMany(scope, pulls) });
     try {
       const collab = scope.get(Tokens.CollaborationService);
       const filtered = [];
@@ -30,9 +31,9 @@ function registerUserPullReadRoutes(app: PullApp): void {
         const meta = await collab.getPullMeta(pull.id).catch(() => ({ labels: [] }));
         if ((meta.labels as Array<{ name: string }>).some((l) => l.name.toLowerCase() === label.toLowerCase())) filtered.push(pull);
       }
-      return c.json({ pulls: filtered });
+      return c.json({ pulls: await presentMany(scope, filtered) });
     } catch {
-      return c.json({ pulls });
+      return c.json({ pulls: await presentMany(scope, pulls) });
     }
   });
 
@@ -46,8 +47,9 @@ function registerUserPullReadRoutes(app: PullApp): void {
     const number = parsePullNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
     try {
-      const pull = await createRequestScope(c.env).get(Tokens.PullRequestService).getByNumber(row.id, number);
-      return c.json({ pull });
+      const scope = createRequestScope(c.env);
+      const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
+      return c.json({ pull: await presentSingle(scope, pull) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
@@ -63,8 +65,9 @@ function registerUserPullReadRoutes(app: PullApp): void {
     const number = parsePullNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
     try {
-      const comments = await createRequestScope(c.env).get(Tokens.PullRequestService).listComments(row.id, number);
-      return c.json({ comments });
+      const scope = createRequestScope(c.env);
+      const comments = await scope.get(Tokens.PullRequestService).listComments(row.id, number);
+      return c.json({ comments: await presentMany(scope, comments) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
@@ -80,8 +83,9 @@ function registerUserPullReadRoutes(app: PullApp): void {
     const number = parsePullNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
     try {
-      const reviews = await createRequestScope(c.env).get(Tokens.PullRequestService).listReviews(row.id, number);
-      return c.json({ reviews });
+      const scope = createRequestScope(c.env);
+      const reviews = await scope.get(Tokens.PullRequestService).listReviews(row.id, number);
+      return c.json({ reviews: await presentMany(scope, reviews) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }

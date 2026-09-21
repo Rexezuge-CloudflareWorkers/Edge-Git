@@ -229,7 +229,7 @@ export function WikiTab({
             <ul className="mt-4 space-y-1 text-xs text-[var(--color-text-muted)]">
               {revisions.map((r) => (
                 <li key={r.id}>
-                  r{r.revision} · {r.authorEmail}
+                  r{r.revision} · {r.author}
                 </li>
               ))}
             </ul>

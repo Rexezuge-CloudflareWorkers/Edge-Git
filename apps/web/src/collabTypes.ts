@@ -30,7 +30,7 @@ export interface RepoEvent {
   id: string;
   repository_id: string;
   full_name: string;
-  actor_email: string;
+  actor: string;
   type: RepoEventType;
   subject_type: string | null;
   subject_number: number | null;
@@ -41,10 +41,10 @@ export interface RepoEvent {
 
 export interface NotificationItem {
   id: string;
-  user_email: string;
+  username: string;
   repository_id: string | null;
   full_name: string;
-  actor_email: string;
+  actor: string;
   type: string;
   title: string;
   subject_type: string | null;
@@ -83,7 +83,7 @@ export interface RepoWebhook {
   consecutiveFailures: number;
   lastDeliveryAt: number | null;
   lastDeliveryStatus: 'success' | 'failure' | null;
-  creatorEmail: string;
+  creator: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -110,7 +110,7 @@ export interface Project {
   title: string;
   description: string | null;
   status: 'open' | 'closed';
-  creatorEmail: string;
+  creator: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -134,7 +134,7 @@ export interface ProjectCard {
   pullRequestId: string | null;
   position: number;
   archived: boolean;
-  creatorEmail: string;
+  creator: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -162,7 +162,7 @@ export interface Discussion {
   number: number;
   title: string;
   body: string | null;
-  authorEmail: string;
+  author: string;
   status: 'open' | 'locked' | 'answered';
   createdAt: number;
   updatedAt: number;
@@ -171,7 +171,7 @@ export interface Discussion {
 export interface DiscussionComment {
   id: string;
   discussionId: string;
-  authorEmail: string;
+  author: string;
   body: string;
   createdAt: number;
   updatedAt: number;
@@ -194,13 +194,13 @@ export interface WikiRevision {
   pageId: string;
   revision: number;
   body: string;
-  authorEmail: string;
+  author: string;
   createdAt: number;
 }
 
 export interface Snippet {
   id: string;
-  ownerEmail: string;
+  owner: string;
   title: string;
   visibility: 'public' | 'secret';
   createdAt: number;

@@ -22,9 +22,9 @@ export function OrgAuditLogCard({ org, showNotice }: { org: string; showNotice: 
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [userEmail, setUserEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [action, setAction] = useState('');
-  const [applied, setApplied] = useState({ userEmail: '', action: '' });
+  const [applied, setApplied] = useState({ username: '', action: '' });
   const [reloadKey, setReloadKey] = useState(0);
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -33,7 +33,7 @@ export function OrgAuditLogCard({ org, showNotice }: { org: string; showNotice: 
     const run = async () => {
       try {
         const data = await loadOrgAudit(org, {
-          userEmail: applied.userEmail.trim() || undefined,
+          username: applied.username.trim() || undefined,
           action: applied.action.trim() || undefined,
           limit: PAGE_SIZE,
         });
@@ -58,7 +58,7 @@ export function OrgAuditLogCard({ org, showNotice }: { org: string; showNotice: 
     setLoadingMore(true);
     try {
       const data = await loadOrgAudit(org, {
-        userEmail: applied.userEmail.trim() || undefined,
+        username: applied.username.trim() || undefined,
         action: applied.action.trim() || undefined,
         limit: PAGE_SIZE,
         cursor: nextCursor,
@@ -77,7 +77,7 @@ export function OrgAuditLogCard({ org, showNotice }: { org: string; showNotice: 
     setLoading(true);
     setLogs([]);
     setNextCursor(null);
-    setApplied({ userEmail, action });
+    setApplied({ username, action });
   };
 
   return (
@@ -94,7 +94,7 @@ export function OrgAuditLogCard({ org, showNotice }: { org: string; showNotice: 
       </CardHeader>
       <form onSubmit={search} className="flex gap-3 flex-wrap mb-4">
         <div className="flex-1 min-w-48">
-          <Input placeholder={t('audit.userPlaceholder', 'User Email')} value={userEmail} onChange={(e) => setUserEmail(e.target.value)} />
+          <Input placeholder={t('audit.userPlaceholder', 'Username')} value={username} onChange={(e) => setUsername(e.target.value)} />
         </div>
         <div className="flex-1 min-w-48">
           <Input
@@ -118,7 +118,7 @@ export function OrgAuditLogCard({ org, showNotice }: { org: string; showNotice: 
               <span className="text-xs text-[var(--color-text-muted)] shrink-0 w-36 truncate">
                 {new Date(log.timestamp * 1000).toLocaleString()}
               </span>
-              <span className="text-sm text-[var(--color-text-primary)] truncate flex-1 min-w-0">{log.userEmail}</span>
+              <span className="text-sm text-[var(--color-text-primary)] truncate flex-1 min-w-0">{log.username}</span>
               <span className="text-sm font-medium shrink-0">{log.action}</span>
               <Badge variant={statusVariant(log.statusCode)}>{log.statusCode}</Badge>
             </button>

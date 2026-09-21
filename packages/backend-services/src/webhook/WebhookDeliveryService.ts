@@ -29,7 +29,11 @@ interface EnqueueEventInput {
   repositoryId: string;
   fullName: string;
   event: WebhookEventName;
-  actorEmail: string;
+  actorUsername?: string;
+  /**
+  @deprecated Transitional fallback mapped into `sender.username`. Prefer `actorUsername`.
+  */
+  actorEmail?: string;
   eventId?: string | null;
   subjectType?: string | null;
   subjectNumber?: number | null;
@@ -136,11 +140,12 @@ class WebhookDeliveryService {
       if (matching.length === 0) return { enqueued: 0 };
       const maxBytes = ConfigurationManager.webhooks.getMaxPayloadBytes(this.env);
       const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
+      const senderUsername = input.actorUsername ?? input.actorEmail?.toLowerCase() ?? 'ghost';
       const payload = JSON.stringify(
         buildWebhookPayload({
           event: input.event,
           fullName: input.fullName,
-          actorEmail: input.actorEmail.toLowerCase(),
+          actorUsername: senderUsername,
           eventId: input.eventId,
           subjectType: input.subjectType,
           subjectNumber: input.subjectNumber,
@@ -206,14 +211,14 @@ class WebhookDeliveryService {
 
   // Attempt one delivery end-to-end (used by the /test route for inline
   // feedback). Creates a ping delivery row, POSTs once, settles the row.
-  public async sendTestPing(hookId: string, repositoryId: string, fullName: string, actorEmail: string): Promise<WebhookDeliveryMetadata> {
+  public async sendTestPing(hookId: string, repositoryId: string, fullName: string, actorUsername: string): Promise<WebhookDeliveryMetadata> {
     const webhookDAO = await this.deps.webhookDAO();
     const hook = await webhookDAO.getByIdAndRepo(hookId, repositoryId).catch(() => null);
     if (!hook) throw new NotFoundError('Webhook not found.');
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const maxBytes = ConfigurationManager.webhooks.getMaxPayloadBytes(this.env);
     const payload = JSON.stringify(
-      buildWebhookPayload({ event: 'ping', fullName, actorEmail: actorEmail.toLowerCase(), action: 'test', processedAt: now }),
+      buildWebhookPayload({ event: 'ping', fullName, actorUsername, action: 'test', processedAt: now }),
     ).slice(0, maxBytes);
     const deliveryDAO = await this.deps.deliveryDAO();
     const id = UUIDUtil.getRandomUUID();

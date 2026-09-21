@@ -5,6 +5,7 @@ import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus } fr
 import { readJsonBody } from './BodyParser';
 import { parseProjectNumber } from './ProjectRouteParsers';
 import type { ProjectApp } from './ProjectRouteParsers';
+import { presentSingle } from './IdentityPresenter';
 
 async function requireWriteRole(env: Env, owner: string, repoName: string, email: string): Promise<boolean> {
   try {
@@ -38,7 +39,7 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
         subjectNumber: project.number,
         payload: { number: project.number, title: project.title },
       });
-      return c.json({ project }, 201);
+      return c.json({ project: await presentSingle(scope, project) }, 201);
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to create project'), toServiceStatus(error));
     }
@@ -73,7 +74,7 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
           payload: { number: project.number },
         });
       }
-      return c.json({ project });
+      return c.json({ project: await presentSingle(scope, project) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to update project'), toServiceStatus(error));
     }
@@ -174,8 +175,9 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
     }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const card = await createRequestScope(c.env).get(Tokens.ProjectService).createCard(row.id, number, body, email);
-      return c.json({ card }, 201);
+      const scope = createRequestScope(c.env);
+      const card = await scope.get(Tokens.ProjectService).createCard(row.id, number, body, email);
+      return c.json({ card: await presentSingle(scope, card) }, 201);
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to create card'), toServiceStatus(error));
     }
@@ -193,8 +195,9 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
     const { malformed, body } = await readJsonBody<{ toColumnId: unknown; position?: unknown }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const card = await createRequestScope(c.env).get(Tokens.ProjectService).moveCard(row.id, number, c.req.param('cardId'), body);
-      return c.json({ card });
+      const scope = createRequestScope(c.env);
+      const card = await scope.get(Tokens.ProjectService).moveCard(row.id, number, c.req.param('cardId'), body);
+      return c.json({ card: await presentSingle(scope, card) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to move card'), toServiceStatus(error));
     }
@@ -212,10 +215,11 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
     const { malformed, body } = await readJsonBody<{ archived?: unknown }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const card = await createRequestScope(c.env)
+      const scope = createRequestScope(c.env);
+      const card = await scope
         .get(Tokens.ProjectService)
         .setCardArchived(row.id, number, c.req.param('cardId'), body.archived);
-      return c.json({ card });
+      return c.json({ card: await presentSingle(scope, card) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to update card'), toServiceStatus(error));
     }

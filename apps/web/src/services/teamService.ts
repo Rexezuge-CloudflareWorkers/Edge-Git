@@ -71,10 +71,10 @@ export async function revokeTeamRepo(org: string, team: string, owner: string, r
 
 export async function loadOrgAudit(
   org: string,
-  params: { userEmail?: string; action?: string; repo?: string; limit?: number; cursor?: string } = {},
+  params: { username?: string; userEmail?: string; action?: string; repo?: string; limit?: number; cursor?: string } = {},
 ): Promise<{ logs: AuditLogEntry[]; nextCursor: string | null }> {
   const query: Record<string, string | undefined> = {
-    userEmail: params.userEmail || undefined,
+    username: params.username ?? params.userEmail ?? undefined,
     action: params.action || undefined,
     repo: params.repo || undefined,
     limit: params.limit === undefined ? undefined : String(params.limit),

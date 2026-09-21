@@ -150,7 +150,7 @@ export function PullReviews({
                 </Badge>
                 {r.dismissed === 1 && <Badge variant="neutral">{t('pulls.dismissed', 'Dismissed')}</Badge>}
                 <span className="text-xs text-[var(--color-text-muted)]">
-                  {r.author_email} · {formatTimestamp(r.created_at)}
+                  {r.author} · {formatTimestamp(r.created_at)}
                 </span>
                 {canManage && isOpen && r.dismissed !== 1 && (
                   <button

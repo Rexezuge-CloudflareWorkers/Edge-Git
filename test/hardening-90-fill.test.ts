@@ -138,7 +138,7 @@ describe('harden-90 webhook payload allowlist', () => {
     });
     expect(payload.event).toBe('push');
     expect(payload.repository).toEqual({ full_name: 'a/b' });
-    expect(payload.sender).toEqual({ email: 'x@y.z' });
+    expect(payload.sender).toEqual({ username: 'x@y.z' });
     expect(payload.processed_at).toBe(1);
     expect(payload.custom).toBe('ok');
   });

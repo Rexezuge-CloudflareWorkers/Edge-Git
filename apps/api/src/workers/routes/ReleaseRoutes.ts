@@ -1,5 +1,6 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { presentMany, presentSingle } from './IdentityPresenter';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { getRepoStub } from '../doStubs';
 import { recordAndNotify } from './SocialEmit';
@@ -35,8 +36,10 @@ function registerReleasePublicRoutes(app: ReleaseApp): void {
       try {
         const viewerEmail = await resolvePublicViewer(c);
         const canSeeDrafts = await viewerCanSeeDrafts(c.env, viewerEmail, row.owner, row.name);
-        const releases = await createRequestScope(c.env).get(Tokens.ReleaseService).listReleases(row.id);
-        return c.json({ releases: canSeeDrafts ? releases : releases.filter((r) => !r.isDraft) });
+        const scope = createRequestScope(c.env);
+        const releases = await scope.get(Tokens.ReleaseService).listReleases(row.id);
+        const visible = canSeeDrafts ? releases : releases.filter((r) => !r.isDraft);
+        return c.json({ releases: await presentMany(scope, visible) });
       } catch {
         return c.json({ releases: [] });
       }
@@ -53,7 +56,7 @@ function registerReleasePublicRoutes(app: ReleaseApp): void {
           if (!(await viewerCanSeeDrafts(c.env, viewerEmail, row.owner, row.name))) return jsonError(c, 'Not found', 404);
         }
         const assets = await scope.get(Tokens.ReleaseService).listAssets(row.id, release.tagName);
-        return c.json({ release, assets });
+        return c.json({ release: await presentSingle(scope, release), assets: await presentMany(scope, assets) });
       } catch (error) {
         return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
       }
@@ -72,7 +75,8 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
       const scope = createRequestScope(c.env);
       const releases = await scope.get(Tokens.ReleaseService).listReleases(row.id);
       const canSeeDrafts = await viewerCanSeeDrafts(c.env, email, owner, repoName);
-      return c.json({ releases: canSeeDrafts ? releases : releases.filter((r) => !r.isDraft) });
+      const visible = canSeeDrafts ? releases : releases.filter((r) => !r.isDraft);
+      return c.json({ releases: await presentMany(scope, visible) });
     } catch {
       return c.json({ releases: [] });
     }
@@ -124,7 +128,7 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
         subjectOid: null,
         payload: { tag: release.tagName, draft: release.isDraft },
       });
-      return c.json({ release }, 201);
+      return c.json({ release: await presentSingle(scope, release) }, 201);
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to create release'), toServiceStatus(error));
     }
@@ -141,7 +145,7 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
       const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
       if (release.isDraft && !(await viewerCanSeeDrafts(c.env, email, owner, repoName))) return jsonError(c, 'Not found', 404);
       const assets = await scope.get(Tokens.ReleaseService).listAssets(row.id, release.tagName);
-      return c.json({ release, assets });
+      return c.json({ release: await presentSingle(scope, release), assets: await presentMany(scope, assets) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
@@ -183,7 +187,7 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
           payload: { tag: release.tagName, prerelease: release.isPrerelease },
         });
       }
-      return c.json({ release });
+      return c.json({ release: await presentSingle(scope, release) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to update release'), toServiceStatus(error));
     }

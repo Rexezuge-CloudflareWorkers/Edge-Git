@@ -188,7 +188,7 @@ export function IssueDetail({
         </div>
         <p className="mt-1 text-xs text-[var(--color-text-muted)]">
           {t('issues.openedBy', 'Opened By {{email}} · {{date}}', {
-            email: issue.creator_email,
+            username: issue.creator,
             date: formatTimestamp(issue.created_at),
           })}
         </p>
@@ -218,7 +218,7 @@ export function IssueDetail({
               <li key={c.id} className="py-3 first:pt-0 last:pb-0">
                 <p className="text-xs text-[var(--color-text-muted)]">
                   {t('issues.openedBy', 'Opened By {{email}} · {{date}}', {
-                    email: c.author_email,
+                    username: c.author,
                     date: formatTimestamp(c.created_at),
                   })}
                 </p>

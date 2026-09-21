@@ -1,10 +1,11 @@
-import { WebhookDAO } from '@edge-git/backend-data/dao';
+import { UserDAO, WebhookDAO } from '@edge-git/backend-data/dao';
 import type { RepoWebhookRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import type { RepoWebhookMetadata, WebhookEventName } from '@edge-git/shared';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
+import { GHOST_USERNAME } from '../identity/IdentityResolver';
 import { generateHookSecret, maskUrl, normalizeEvents, secretSuffix, validateWebhookUrl } from './WebhookEvents';
 
 interface WebhookServiceEnv {
@@ -15,6 +16,7 @@ interface WebhookServiceEnv {
 
 interface WebhookServiceDeps {
   webhookDAO?: () => Promise<WebhookDAO>;
+  userDAO?: () => Promise<UserDAO>;
 }
 
 function requireProductionHttps(env: WebhookServiceEnv, url: string): void {
@@ -64,10 +66,23 @@ function toPublic(row: RepoWebhookRow): RepoWebhookMetadata {
     consecutiveFailures: row.consecutive_failures,
     lastDeliveryAt: row.last_delivery_at,
     lastDeliveryStatus: toDeliveryStatus(row.last_delivery_status),
-    creatorEmail: row.creator_email,
+    // Sync fallback keeps the `creator` key (never `creatorEmail`) when no
+    // DB resolution is available. Instance methods prefer
+    // `resolveCreator` → username/ghost below.
+    creator: row.creator_email,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+async function resolveCreator(getUserDAO: () => Promise<UserDAO>, creatorEmail: string): Promise<string> {
+  try {
+    const userDAO = await getUserDAO();
+    const user = await userDAO.getByEmail(creatorEmail);
+    return user?.username ?? GHOST_USERNAME;
+  } catch {
+    return GHOST_USERNAME;
+  }
 }
 
 function normalizeSecret(input: unknown): string {
@@ -88,6 +103,7 @@ class WebhookService {
   ) {
     this.deps = {
       webhookDAO: () => Promise.resolve(new WebhookDAO(env.DB)),
+      userDAO: () => Promise.resolve(new UserDAO(env.DB)),
       ...deps,
     };
   }
@@ -96,17 +112,25 @@ class WebhookService {
     return toPublic(row);
   }
 
+  private async toPublicResolved(row: RepoWebhookRow): Promise<RepoWebhookMetadata> {
+    const base = toPublic(row);
+    base.creator = await resolveCreator(this.deps.userDAO, row.creator_email);
+    return base;
+  }
+
   public async listHooks(repositoryId: string): Promise<RepoWebhookMetadata[]> {
     const dao = await this.deps.webhookDAO();
     const rows = await dao.listByRepo(repositoryId);
-    return rows.map(toPublic);
+    const out: RepoWebhookMetadata[] = [];
+    for (const row of rows) out.push(await this.toPublicResolved(row));
+    return out;
   }
 
   public async getHook(hookId: string, repositoryId: string): Promise<RepoWebhookMetadata> {
     const dao = await this.deps.webhookDAO();
     const row = await dao.getByIdAndRepo(hookId, repositoryId).catch(() => null);
     if (!row) throw new NotFoundError('Webhook not found.');
-    return toPublic(row);
+    return this.toPublicResolved(row);
   }
 
   public async createHook(input: {
@@ -161,7 +185,7 @@ class WebhookService {
       consecutiveFailures: 0,
       lastDeliveryAt: null,
       lastDeliveryStatus: null,
-      creatorEmail: input.creatorEmail.toLowerCase(),
+      creator: await resolveCreator(this.deps.userDAO, input.creatorEmail.toLowerCase()),
       createdAt: now,
       updatedAt: now,
     };
@@ -203,7 +227,7 @@ class WebhookService {
     await dao.update(hookId, repositoryId, { url, urlPrefix, eventsJson, isActive: patch.isActive, now });
     const updated = await dao.getByIdAndRepo(hookId, repositoryId);
     if (!updated) throw new NotFoundError('Webhook not found.');
-    return toPublic(updated);
+    return this.toPublicResolved(updated);
   }
 
   public async rotateHookSecret(hookId: string, repositoryId: string): Promise<{ hook: RepoWebhookMetadata; secret: string }> {
@@ -217,7 +241,7 @@ class WebhookService {
     await dao.rotateSecret(hookId, repositoryId, secret, secretSuffix(secret), now);
     const updated = await dao.getByIdAndRepo(hookId, repositoryId);
     if (!updated) throw new NotFoundError('Webhook not found.');
-    return { hook: toPublic(updated), secret };
+    return { hook: await this.toPublicResolved(updated), secret };
   }
 
   public async deleteHook(hookId: string, repositoryId: string): Promise<void> {

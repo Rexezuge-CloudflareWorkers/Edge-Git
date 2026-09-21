@@ -5,6 +5,16 @@ import { RepoFullName } from '@edge-git/shared/utils';
 import { parsePullNumber } from './PullShared';
 import type { PullApp } from './PullShared';
 import { readJsonBody } from './BodyParser';
+import { presentMany, presentSingle } from './IdentityPresenter';
+
+type RequestScope = ReturnType<typeof createRequestScope>;
+
+// Threads carry nested `comments[]` with their own `author_email`s; `presentOne`
+// already recurses, but keep the explicit pass for legacy rows.
+async function presentThreads(scope: RequestScope, threads: unknown[]): Promise<Array<Record<string, unknown>>> {
+  const presented = await presentMany(scope, threads);
+  return presented;
+}
 
 function registerPullThreadRoutes(app: PullApp): void {
   app.get('/repos/:owner/:repo/pulls/:number/threads', async (c) => {
@@ -15,7 +25,7 @@ function registerPullThreadRoutes(app: PullApp): void {
         const scope = createRequestScope(c.env);
         const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
         const threads = await scope.get(Tokens.PullThreadService).listThreads(pull.id);
-        return c.json({ threads });
+        return c.json({ threads: await presentThreads(scope, threads as unknown[]) });
       } catch (error) {
         return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
       }
@@ -36,7 +46,7 @@ function registerUserPullThreadRoutes(app: PullApp): void {
       const scope = createRequestScope(c.env);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
       const threads = await scope.get(Tokens.PullThreadService).listThreads(pull.id);
-      return c.json({ threads });
+      return c.json({ threads: await presentThreads(scope, threads as unknown[]) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
@@ -82,7 +92,8 @@ function registerUserPullThreadRoutes(app: PullApp): void {
         participantEmails: [pull.creator_email],
         mentionText: body.body ?? null,
       });
-      return c.json({ thread }, 201);
+      const [presented] = await presentThreads(scope, [thread]);
+      return c.json({ thread: presented }, 201);
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to open thread'), toServiceStatus(error));
     }
@@ -118,7 +129,7 @@ function registerUserPullThreadRoutes(app: PullApp): void {
         participantEmails: [pull.creator_email],
         mentionText: body.body ?? null,
       });
-      return c.json({ comment }, 201);
+      return c.json({ comment: await presentSingle(scope, comment) }, 201);
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to reply'), toServiceStatus(error));
     }
@@ -155,7 +166,7 @@ function registerUserPullThreadRoutes(app: PullApp): void {
         resolvedBy: email,
         resolved: body.resolved,
       });
-      return c.json({ thread: updated });
+      return c.json({ thread: await presentSingle(scope, updated) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to update thread'), toServiceStatus(error));
     }
@@ -195,7 +206,7 @@ function registerUserPullThreadRoutes(app: PullApp): void {
       } catch {
         // best-effort reviewer status reset
       }
-      return c.json({ review });
+      return c.json({ review: await presentSingle(scope, review) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to dismiss review'), toServiceStatus(error));
     }

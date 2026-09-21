@@ -1,6 +1,7 @@
 import type { Hono } from 'hono';
 import { jsonError } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { usernameFor, usernameMap } from './IdentityPresenter';
 
 type NotificationApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -25,7 +26,13 @@ function registerUserNotificationRoutes(app: NotificationApp): void {
       scope.get(Tokens.NotificationService).listByUser(email, limit, cursor, unreadOnly),
       scope.get(Tokens.NotificationService).unreadCount(email),
     ]);
-    return c.json({ notifications, nextCursor, unreadCount });
+    const map = await usernameMap(scope, notifications.map((n) => n.actor_email));
+    const presented = notifications.map(({ actor_email, ...rest }) => {
+      const kept = { ...(rest as Record<string, unknown>) };
+      delete kept['user_email'];
+      return { ...kept, actor: usernameFor(map, actor_email) };
+    });
+    return c.json({ notifications: presented, nextCursor, unreadCount });
   });
 
   app.get('/user/notifications/unread-count', async (c) => {

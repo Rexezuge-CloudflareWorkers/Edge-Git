@@ -152,7 +152,7 @@ export function ActivityTab({
           {events.map((event) => (
             <li key={event.id} className="py-3 first:pt-0 last:pb-0">
               <p className="text-sm text-[var(--color-text-primary)]">
-                <span className="font-medium">{event.actor_email}</span>{' '}
+                <span className="font-medium">{event.actor}</span>{' '}
                 <span className="text-[var(--color-text-secondary)]">
                   {t(`social.events.${event.type}`, EVENT_LABELS[event.type] ?? event.type)}
                 </span>{' '}

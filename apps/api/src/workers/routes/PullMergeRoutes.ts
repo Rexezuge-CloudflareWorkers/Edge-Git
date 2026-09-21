@@ -3,6 +3,7 @@ import { jsonError, requireVisibleRepo, toErrorBody, toErrorType, toSafeErrorMes
 import { recordAndNotify } from './SocialEmit';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { presentSingle } from './IdentityPresenter';
 import { CheckService } from '@edge-git/backend-services/checks';
 import { PullRequestService } from '@edge-git/backend-services/pull';
 import { BranchProtectionService } from '@edge-git/backend-services/protection';
@@ -313,7 +314,7 @@ function registerUserPullMergeRoutes(app: PullApp): void {
         subjectOid: outcome.commitOid ?? headOid,
         participantEmails: [pull.creator_email],
       });
-      return c.json({ pull: merged, merge: outcome });
+      return c.json({ pull: await presentSingle(scope, merged), merge: outcome });
     } catch (error) {
       const status = toServiceStatus(error);
       if (status === 500) return jsonError(c, 'Failed to record merge', 400);

@@ -207,7 +207,7 @@ export function SnippetsView({
                     {s.title || s.id.slice(0, 8)}
                   </button>
                   <span className="text-xs text-[var(--color-text-muted)]">
-                    {s.visibility} · {s.ownerEmail}
+                    {s.visibility} · {s.owner}
                   </span>
                   {signedIn && tab === 'mine' && (
                     <>

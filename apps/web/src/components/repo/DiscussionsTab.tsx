@@ -217,7 +217,7 @@ export function DiscussionsTab({
                   <span className="text-xs text-[var(--color-text-muted)]">#{d.number}</span>
                 </div>
                 <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                  {d.authorEmail} · {formatTimestamp(d.createdAt)}
+                  {d.author} · {formatTimestamp(d.createdAt)}
                 </p>
               </li>
             ))}
@@ -288,7 +288,7 @@ export function DiscussionsTab({
             {detail.comments.map((c) => (
               <div key={c.id} className="rounded border border-[var(--color-border)] p-2 text-sm">
                 <p className="text-xs text-[var(--color-text-muted)]">
-                  {c.authorEmail} · {formatTimestamp(c.createdAt)}
+                  {c.author} · {formatTimestamp(c.createdAt)}
                 </p>
                 <Markdown content={c.body} />
                 {canWrite && (

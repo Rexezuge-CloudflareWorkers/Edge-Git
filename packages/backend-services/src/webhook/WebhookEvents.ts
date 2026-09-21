@@ -230,7 +230,11 @@ async function verifyDeliverySignature(secret: string, body: string, signature: 
 interface WebhookPayloadInput {
   event: string;
   fullName: string;
-  actorEmail: string;
+  actorUsername?: string;
+  /**
+  @deprecated Transitional fallback: resolved to `sender.username` when `actorUsername` is absent.
+  */
+  actorEmail?: string;
   eventId?: string | null;
   subjectType?: string | null;
   subjectNumber?: number | null;
@@ -249,10 +253,14 @@ function buildWebhookPayload(input: WebhookPayloadInput): Record<string, unknown
   delete safeExtra.repository;
   delete safeExtra.sender;
   delete safeExtra.processed_at;
+  // Public payloads expose only the username — never the stored email.
+  // `actorEmail` remains as a deprecated input fallback so legacy callers
+  // keep compiling; its value is mapped into `sender.username`.
+  const senderUsername = input.actorUsername ?? input.actorEmail ?? 'ghost';
   return {
     event: input.event,
     repository: { full_name: input.fullName },
-    sender: { email: input.actorEmail },
+    sender: { username: senderUsername },
     ...(input.eventId && { delivery_source_id: input.eventId }),
     ...(input.subjectType && { subject_type: input.subjectType }),
     ...(input.subjectNumber !== undefined && input.subjectNumber !== null && { subject_number: input.subjectNumber }),

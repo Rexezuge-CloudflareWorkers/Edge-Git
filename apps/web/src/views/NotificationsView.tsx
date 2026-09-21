@@ -173,7 +173,7 @@ export function NotificationsView({ showNotice }: { showNotice: (type: 'success'
                         {item.full_name}
                       </Link>
                       {' · '}
-                      {item.actor_email} · {formatTimestamp(item.created_at)}
+                      {item.actor} · {formatTimestamp(item.created_at)}
                     </p>
                   </div>
                   {item.is_read === 0 && (

@@ -3,6 +3,7 @@
 // dependent groups resolve it lazily via the container.
 import { AccessAuthService, TokenService } from '@edge-git/backend-services/auth';
 import { AuditObserverRegistry, AuditService } from '@edge-git/backend-services/audit';
+import { IdentityResolver } from '@edge-git/backend-services/identity';
 import { OrganizationService } from '@edge-git/backend-services/org';
 import { PermissionService } from '@edge-git/backend-services/permission';
 import { TeamService } from '@edge-git/backend-services/team';
@@ -61,6 +62,7 @@ function bindCoreServices(scope: Container, { env, daos }: ServiceGroupContext):
     }),
   );
   scope.bind(Tokens.AuditObserverRegistry, () => AuditObserverRegistry.withDefaults(daos.auditLogDAO));
+  scope.bind(Tokens.IdentityResolver, () => createService(IdentityResolver, env, { userDAO: daos.userDAO }));
   scope.bind(Tokens.AuditService, (container) =>
     createService(AuditService, env, {
       auditLogDAO: daos.auditLogDAO,
