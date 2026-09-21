@@ -26,6 +26,12 @@ export function useSocialState({
   const [watching, setWatching] = useState(false);
   const [busy, setBusy] = useState<'star' | 'watch' | null>(null);
 
+  // `true` only for signed-in viewers: `null` (resolving) and `false` share
+  // the public path so null->false never refetches, while null/false->true
+  // refetches to resolve viewerStarred/viewerWatching (public endpoints
+  // resolve the viewer best-effort via Access/PAT).
+  const useAuthed = authorized === true;
+
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
@@ -37,20 +43,24 @@ export function useSocialState({
         setWatchersCount(watches.watchersCount ?? watches.count ?? 0);
         setWatching(watches.viewerWatching);
       } catch {
-        // counts stay zero on public-load failure; buttons remain usable
+        // counts stay zero on public-load failure; buttons remain usable.
+        // A private-repo 404 while anonymous retries after auth upgrade via
+        // `useAuthed`.
       }
     };
     void run();
     return () => {
       cancelled = true;
     };
-  }, [owner, repo]);
+  }, [owner, repo, useAuthed]);
 
   const refreshCounts = useCallback(async () => {
     try {
       const [stars, watches] = await Promise.all([getStarState(owner, repo), getWatchState(owner, repo)]);
       setStarsCount(stars.starsCount ?? stars.count ?? 0);
+      setStarred(stars.viewerStarred);
       setWatchersCount(watches.watchersCount ?? watches.count ?? 0);
+      setWatching(watches.viewerWatching);
     } catch {
       // best-effort
     }
