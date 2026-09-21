@@ -7,6 +7,14 @@ export interface RealtimeTicket {
   channels: string[];
 }
 
+export const REALTIME_DISABLED_MESSAGE = 'Realtime is disabled';
+
+export function isRealtimeDisabledError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const normalized = error.message.trim().replace(/\.$/, '');
+  return normalized === REALTIME_DISABLED_MESSAGE;
+}
+
 export async function fetchRepoTicket(owner: string, repo: string, channels: string[]): Promise<RealtimeTicket> {
   return apiPost<RealtimeTicket>('/user/realtime/ticket', { owner, repo, channels });
 }

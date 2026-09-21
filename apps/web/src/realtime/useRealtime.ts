@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { isRealtimeEnvelope, presenceFromEnvelope } from './protocol';
 import type { RealtimeEnvelope } from './protocol';
-import { fetchInboxTicket, fetchRepoTicket, realtimeWsUrl } from '../services/realtimeService';
+import { fetchInboxTicket, fetchRepoTicket, isRealtimeDisabledError, realtimeWsUrl } from '../services/realtimeService';
 import type { RealtimeTicket } from '../services/realtimeService';
 
 export type RealtimeStatus = 'live' | 'connecting' | 'offline';
@@ -10,6 +10,21 @@ export type TicketRequest = { kind: 'repo'; owner: string; repo: string; channel
 const BACKOFF_MS = [1000, 2000, 5000, 15_000, 30_000];
 const FALLBACK_RETRY_MS = 30_000;
 const TYPING_VISIBLE_MS = 6000;
+
+// Once the API reports `REALTIME_ENABLED=false` (503 `Realtime is disabled`),
+// remember it for the session. Ticket issuance stays disabled server-side, so
+// further mints would only repeat the same 503 — stay permanently `offline`
+// and keep the polling/manual-refresh fallback instead of retrying every 30s.
+// A reload clears the flag, picking up a later enable without a code change.
+const realtimeAvailability = { disabled: false };
+
+export function isRealtimeDisabled(): boolean {
+  return realtimeAvailability.disabled;
+}
+
+export function resetRealtimeDisabledForTesting(): void {
+  realtimeAvailability.disabled = false;
+}
 
 function ticketKeyFor(ticket: TicketRequest): string {
   if (ticket.kind === 'inbox') return 'inbox';
@@ -24,12 +39,15 @@ function backoffDelay(attempts: number): number {
 }
 
 async function mintTicket(request: TicketRequest): Promise<RealtimeTicket | null> {
+  if (realtimeAvailability.disabled) return null;
   if (request.kind === 'repo' && request.channels.length === 0) return null;
   try {
     if (request.kind === 'inbox') return await fetchInboxTicket();
     return await fetchRepoTicket(request.owner, request.repo, request.channels);
-  } catch {
-    // 403/404/503 or signed-out: caller stays on polling fallback.
+  } catch (error) {
+    // Disabled backends stay permanently offline (no retry); other failures
+    // (403/404/transient 503 or signed-out) keep the polling fallback retry.
+    if (isRealtimeDisabledError(error)) realtimeAvailability.disabled = true;
     return null;
   }
 }
@@ -56,6 +74,10 @@ function clearRetry(state: ConnectionState): void {
 
 function scheduleReconnect(state: ConnectionState, ticket: TicketRequest, callbacks: ConnectionCallbacks): void {
   if (state.cancelled) return;
+  if (realtimeAvailability.disabled) {
+    callbacks.onStatus('offline');
+    return;
+  }
   callbacks.onStatus('connecting');
   const delay = backoffDelay(state.attempts);
   state.attempts += 1;
@@ -116,12 +138,17 @@ function attachSocket(state: ConnectionState, ticket: TicketRequest, callbacks: 
 
 async function openConnection(state: ConnectionState, ticket: TicketRequest, callbacks: ConnectionCallbacks): Promise<void> {
   if (state.cancelled) return;
+  if (realtimeAvailability.disabled) {
+    callbacks.onStatus('offline');
+    return;
+  }
   callbacks.onStatus('connecting');
   const grant = await mintTicket(ticket);
   if (state.cancelled) return;
   if (!grant) {
     callbacks.onStatus('offline');
     clearRetry(state);
+    if (realtimeAvailability.disabled) return;
     state.retryTimer = setTimeout(() => {
       void openConnection(state, ticket, callbacks);
     }, FALLBACK_RETRY_MS);
@@ -200,6 +227,8 @@ function createCallbacks(
 // Shared live-update subscription. Fetches a fresh single-use ticket per
 // (re)connect, reconnects with backoff, and degrades to `offline` (callers
 // keep their existing polling/manual refresh) when tickets or sockets fail.
+// A `Realtime is disabled` ticket failure latches session-wide: later mounts
+// stay `offline` without minting or retrying.
 export function useRealtimeSubscription(options: { enabled: boolean; ticket: TicketRequest; onEvent: (event: RealtimeEnvelope) => void }): {
   status: RealtimeStatus;
   viewers: string[];
