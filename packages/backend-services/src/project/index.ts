@@ -1,2 +1,2 @@
-export { ProjectService } from './ProjectService';
-export type { ProjectServiceDeps, ProjectServiceEnv } from './ProjectService';
+export { ProjectService, ProjectBoardService } from './ProjectService';
+export type { ProjectServiceDeps, ProjectServiceEnv } from './projectShared';
