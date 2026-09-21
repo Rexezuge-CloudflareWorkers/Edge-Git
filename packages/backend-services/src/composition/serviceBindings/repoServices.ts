@@ -1,0 +1,87 @@
+// Repo-domain bindings: repos, forks, branch protection, checks, search,
+// realtime, notifications. Services needing authorization resolve the single
+// shared PermissionService via the container (never `new`).
+import { BranchProtectionService } from '@edge-git/backend-services/protection';
+import { CheckService } from '@edge-git/backend-services/checks';
+import { ForkService } from '@edge-git/backend-services/fork';
+import { NotificationService } from '@edge-git/backend-services/social/NotificationService';
+import { RealtimeService } from '@edge-git/backend-services/realtime';
+import { RepoService } from '@edge-git/backend-services/repo';
+import { SearchService } from '@edge-git/backend-services/search';
+import { AppConfiguration } from '@edge-git/backend-runtime/config';
+import type { Container } from '@edge-git/backend-runtime/di';
+import { Tokens } from '../tokens';
+import { createService } from '../serviceFactory';
+import type { ServiceGroupContext } from './daoThunks';
+
+function bindRepoServices(scope: Container, { env, daos }: ServiceGroupContext): void {
+  scope.bind(Tokens.CheckService, () => createService(CheckService, env, { checkRunDAO: daos.checkRunDAO }));
+  scope.bind(Tokens.BranchProtectionService, () =>
+    createService(BranchProtectionService, env, { branchProtectionDAO: daos.branchProtectionDAO }),
+  );
+  scope.bind(Tokens.ForkService, (container) =>
+    createService(ForkService, env, {
+      repositoryDAO: daos.repositoryDAO,
+      userDAO: daos.userDAO,
+      organizationDAO: daos.organizationDAO,
+      organizationMemberDAO: daos.organizationMemberDAO,
+      repoCollaboratorDAO: daos.repoCollaboratorDAO,
+      namespaceDAO: daos.namespaceDAO,
+      permissionService: () => Promise.resolve(container.get(Tokens.PermissionService)),
+    }),
+  );
+  scope.bind(Tokens.RepoService, (container) =>
+    createService(RepoService, env, {
+      repositoryDAO: daos.repositoryDAO,
+      issueDAO: daos.issueDAO,
+      pullRequestDAO: daos.pullRequestDAO,
+      pullThreadDAO: daos.pullThreadDAO,
+      branchProtectionDAO: daos.branchProtectionDAO,
+      userDAO: daos.userDAO,
+      organizationDAO: daos.organizationDAO,
+      organizationMemberDAO: daos.organizationMemberDAO,
+      repoCollaboratorDAO: daos.repoCollaboratorDAO,
+      namespaceDAO: daos.namespaceDAO,
+      starDAO: daos.starDAO,
+      watchDAO: daos.watchDAO,
+      eventDAO: daos.eventDAO,
+      notificationDAO: daos.notificationDAO,
+      releaseDAO: daos.releaseDAO,
+      projectDAO: daos.projectDAO,
+      discussionDAO: daos.discussionDAO,
+      wikiDAO: daos.wikiDAO,
+      importDAO: daos.importDAO,
+      mirrorDAO: daos.mirrorDAO,
+      deployKeyDAO: daos.deployKeyDAO,
+      tokenGrantDAO: daos.tokenGrantDAO,
+      securitySettingsDAO: daos.securitySettingsDAO,
+      permissionService: () => Promise.resolve(container.get(Tokens.PermissionService)),
+      config: AppConfiguration.fromEnv(env),
+    }),
+  );
+  scope.bind(Tokens.SearchService, (container) =>
+    createService(SearchService, env, {
+      searchDAO: daos.searchDAO,
+      repositoryDAO: daos.repositoryDAO,
+      issueDAO: daos.issueDAO,
+      permissionService: () => Promise.resolve(container.get(Tokens.PermissionService)),
+    }),
+  );
+  scope.bind(Tokens.RealtimeService, (container) =>
+    createService(RealtimeService, env, {
+      repositoryDAO: daos.repositoryDAO,
+      permissionService: () => Promise.resolve(container.get(Tokens.PermissionService)),
+    }),
+  );
+  scope.bind(Tokens.NotificationService, (container) =>
+    createService(NotificationService, env, {
+      notificationDAO: daos.notificationDAO,
+      watchDAO: daos.watchDAO,
+      userDAO: daos.userDAO,
+      repositoryDAO: daos.repositoryDAO,
+      permissionService: () => Promise.resolve(container.get(Tokens.PermissionService)),
+    }),
+  );
+}
+
+export { bindRepoServices };

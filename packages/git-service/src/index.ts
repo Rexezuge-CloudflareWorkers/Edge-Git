@@ -5,6 +5,17 @@ export type { DofsFs, DofsFsOptions } from './DofsFsAdapter';
 export { ErrorNormalizer, ErrorWithCode, normalizePath } from './ErrorNormalizer';
 export { GitService } from './GitService';
 export { RefService } from './RefService';
+export {
+  ZERO_OID,
+  isCommitOid,
+  isZeroOid,
+  isValidBranchName as isValidRefBranchName,
+  branchRefFor,
+  isDeleteCommand,
+  isCreateCommand,
+  classifyRefCommand,
+} from './RefValidation';
+export type { RefCommand } from './RefValidation';
 export { parseSymbolicHead } from './RefParsers';
 export { ObjectReader } from './ObjectReader';
 export { PackCollector } from './PackCollector';
