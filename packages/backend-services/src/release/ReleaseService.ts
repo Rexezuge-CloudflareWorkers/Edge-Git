@@ -5,6 +5,16 @@ import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import type { ReleaseAssetMetadata, ReleaseMetadata } from '@edge-git/shared';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
+import {
+  TAG_NAME_RE,
+  isValidTagName,
+  normalizeAssetName,
+  normalizeAssetSha256,
+  normalizeContentType,
+  normalizeReleaseBody,
+  normalizeReleaseName,
+  normalizeTagName,
+} from './ReleaseValidation';
 
 interface ReleaseServiceEnv {
   DB: D1Queryable;
@@ -16,13 +26,6 @@ interface ReleaseServiceEnv {
 interface ReleaseServiceDeps {
   releaseDAO?: () => Promise<ReleaseDAO>;
 }
-
-const TAG_NAME_RE = /^[\w./-]{1,100}$/;
-const TAG_FORBIDDEN_RE = /[~^:?*[\]\\@{ \t\n]/;
-const ASSET_NAME_RE = /^\w[\w. ()-]{0,254}$/;
-const MAX_RELEASE_NAME = 100;
-const MAX_RELEASE_BODY = 10_000;
-const MAX_CONTENT_TYPE = 127;
 
 function toReleaseMetadata(row: ReleaseRow): ReleaseMetadata {
   return {
@@ -53,47 +56,6 @@ function toAssetMetadata(row: ReleaseAssetRow): ReleaseAssetMetadata {
   };
 }
 
-function normalizeTagName(raw: unknown): string {
-  if (typeof raw !== 'string') throw new BadRequestError('tagName is required');
-  const tag = raw.trim().replace(/\.git$/i, '');
-  if (!TAG_NAME_RE.test(tag)) throw new BadRequestError('tagName must be 1-100 chars of letters, digits, `.`, `-`, `_`, `/`');
-  if (TAG_FORBIDDEN_RE.test(tag) || tag.includes('..') || tag.includes('//')) {
-    throw new BadRequestError('tagName must not contain `..`, `//`, spaces, or `~^:?*[\\@{`');
-  }
-  if (tag.startsWith('/') || tag.endsWith('/') || tag.endsWith('.'))
-    throw new BadRequestError('tagName must not start with `/` or end with `/` or `.`');
-  return tag;
-}
-
-function normalizeReleaseName(raw: unknown): string {
-  if (raw === undefined || raw === null) return '';
-  if (typeof raw !== 'string') throw new BadRequestError('name must be a string');
-  const name = raw.trim().slice(0, MAX_RELEASE_NAME);
-  return name;
-}
-
-function normalizeReleaseBody(raw: unknown): string {
-  if (raw === undefined || raw === null) return '';
-  if (typeof raw !== 'string') throw new BadRequestError('body must be a string');
-  return raw.slice(0, MAX_RELEASE_BODY);
-}
-
-function normalizeAssetName(raw: unknown): string {
-  if (typeof raw !== 'string' || !raw.trim()) throw new BadRequestError('asset name is required');
-  const name = raw.trim();
-  if (name.length > 255 || !ASSET_NAME_RE.test(name)) throw new BadRequestError('asset name must be 1-255 safe path chars');
-  if (name.includes('..') || name.includes('/') || name.includes('\\')) throw new BadRequestError('asset name must be a plain file name');
-  return name;
-}
-
-function normalizeContentType(raw: unknown): string {
-  if (raw === undefined || raw === null) return 'application/octet-stream';
-  if (typeof raw !== 'string' || !raw.trim()) return 'application/octet-stream';
-  const value = raw.trim().slice(0, MAX_CONTENT_TYPE).toLowerCase();
-  if (!/^[\w.+-]+\/[\w.+-]+$/.test(value)) throw new BadRequestError('contentType must be a valid MIME type');
-  return value;
-}
-
 class ReleaseService {
   private readonly deps: Required<ReleaseServiceDeps>;
 
@@ -108,12 +70,7 @@ class ReleaseService {
   }
 
   public static isValidTagName(tag: string): boolean {
-    try {
-      normalizeTagName(tag);
-      return true;
-    } catch {
-      return false;
-    }
+    return isValidTagName(tag);
   }
 
   public async createRelease(
@@ -233,12 +190,11 @@ class ReleaseService {
     const row = await this.getReleaseRow(repositoryId, tagName);
     const name = normalizeAssetName(input.name);
     const contentType = normalizeContentType(input.contentType);
+    const sha256 = normalizeAssetSha256(input.sha256);
     const maxBytes = ConfigurationManager.releases.getMaxAssetBytes(this.env);
     const byteCount = input.size;
     if (!Number.isSafeInteger(byteCount) || byteCount <= 0 || byteCount > maxBytes)
       throw new BadRequestError(`asset size must be 1-${maxBytes} bytes`);
-    if (typeof input.sha256 !== 'string' || !/^[0-9a-f]{64}$/i.test(input.sha256))
-      throw new BadRequestError('sha256 must be a 64-char hex string');
     const dao = await this.deps.releaseDAO();
     const existing = await dao.getAssetByName(row.id, name).catch(() => null);
     if (existing) throw new BadRequestError('an asset with this name already exists');
@@ -254,7 +210,7 @@ class ReleaseService {
       name,
       size: input.size,
       contentType,
-      sha256: input.sha256.toLowerCase(),
+      sha256,
       createdBy: creatorEmail.toLowerCase(),
       now,
     });
@@ -265,7 +221,7 @@ class ReleaseService {
       name,
       size: input.size,
       contentType,
-      sha256: input.sha256.toLowerCase(),
+      sha256,
       createdBy: creatorEmail.toLowerCase(),
       createdAt: now,
     };

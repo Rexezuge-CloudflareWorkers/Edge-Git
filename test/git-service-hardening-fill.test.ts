@@ -15,7 +15,7 @@ import { splitFilePath } from '../packages/git-service/src/WriteService';
 
 const AUTHOR = { name: 'tester', email: 'tester@example.com' };
 
-/** Redirect the hardcoded `/repo` gitdir onto a tmp gitdir for RefService internals. */
+/** Legacy redirect shim: `applyRefUpdates` used to hardcode `/repo`; it now honors `this.gitdir`. Kept so older branches calling with `/repo` still resolve onto tmp. */
 function redirectClient(tmpGitdir: string): { promises: unknown } {
   const target = fs.promises as unknown as Record<string, unknown>;
   const promises = new Proxy(target, {

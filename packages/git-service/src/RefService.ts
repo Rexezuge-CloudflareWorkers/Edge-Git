@@ -1,7 +1,7 @@
 import * as git from 'isomorphic-git';
 import type { IsoGitFs } from './IsoGitFs';
 import type { RefUpdateResult } from '@edge-git/git-protocol';
-import { isValidBranchName } from './MergeService';
+import { branchRefFor, classifyRefCommand, isValidBranchName, ZERO_OID } from './RefValidation';
 import { parseSymbolicHead } from './RefParsers';
 
 const logger = {
@@ -145,7 +145,7 @@ export class RefService {
     if (!isValidBranchName(name)) {
       return { ok: false, error: `invalid branch name: ${name}`, status: 400 };
     }
-    const ref = `refs/heads/${name}`;
+    const ref = branchRefFor(name);
     try {
       await git.resolveRef({ fs: this.fs, gitdir: this.gitdir, ref });
     } catch {
@@ -169,12 +169,12 @@ export class RefService {
       return { ok: false, error: `invalid branch name: ${name}`, status: 400 };
     }
     try {
-      await git.resolveRef({ fs: this.fs, gitdir: this.gitdir, ref: `refs/heads/${name}` });
+      await git.resolveRef({ fs: this.fs, gitdir: this.gitdir, ref: branchRefFor(name) });
     } catch {
       return { ok: false, error: 'branch not found', status: 404 };
     }
     try {
-      await git.writeRef({ fs: this.fs, gitdir: this.gitdir, ref: 'HEAD', value: `refs/heads/${name}`, force: true, symbolic: true });
+      await git.writeRef({ fs: this.fs, gitdir: this.gitdir, ref: 'HEAD', value: branchRefFor(name), force: true, symbolic: true });
     } catch (error) {
       logger.warn(`(set-default-branch) Failed to point HEAD at ${name}: ${String(error)}`);
       return { ok: false, error: 'failed to update default branch', status: 400 };
@@ -229,18 +229,18 @@ export class RefService {
 
   async applyRefUpdates(commands: Array<{ oldOid: string; newOid: string; ref: string }>, atomic: boolean): Promise<RefUpdateResult[]> {
     const results: RefUpdateResult[] = [];
-    const ZERO_OID = '0'.repeat(40);
 
     for (const cmd of commands) {
-      const isDelete = cmd.newOid === ZERO_OID;
-      const isCreate = cmd.oldOid === ZERO_OID;
+      const kind = classifyRefCommand(cmd);
+      const isDelete = kind === 'delete';
+      const isCreate = kind === 'create';
 
       try {
         let currentOid: string | null = null;
         try {
           currentOid = await git.resolveRef({
             fs: this.fs,
-            gitdir: '/repo',
+            gitdir: this.gitdir,
             ref: cmd.ref,
           });
         } catch {
@@ -288,7 +288,7 @@ export class RefService {
 
           const isFF = await git.isDescendent({
             fs: this.fs,
-            gitdir: '/repo',
+            gitdir: this.gitdir,
             oid: cmd.newOid,
             ancestor: currentOid,
           });
@@ -323,19 +323,19 @@ export class RefService {
     for (const [i, cmd] of commands.entries()) {
       if (!results[i].ok) continue;
 
-      const isDelete = cmd.newOid === ZERO_OID;
+      const isDelete = classifyRefCommand(cmd) === 'delete';
 
       try {
         if (isDelete) {
           await git.deleteRef({
             fs: this.fs,
-            gitdir: '/repo',
+            gitdir: this.gitdir,
             ref: cmd.ref,
           });
         } else {
           await git.writeRef({
             fs: this.fs,
-            gitdir: '/repo',
+            gitdir: this.gitdir,
             ref: cmd.ref,
             value: cmd.newOid,
             force: true,

@@ -1,0 +1,88 @@
+// Core identity/governance bindings: auth, users, orgs, teams, audit,
+// permissions. Single PermissionService binding lives here (Otter pattern);
+// dependent groups resolve it lazily via the container.
+import { AccessAuthService, TokenService } from '@edge-git/backend-services/auth';
+import { AuditObserverRegistry, AuditService } from '@edge-git/backend-services/audit';
+import { OrganizationService } from '@edge-git/backend-services/org';
+import { PermissionService } from '@edge-git/backend-services/permission';
+import { TeamService } from '@edge-git/backend-services/team';
+import { UserService } from '@edge-git/backend-services/user';
+import { AppConfiguration } from '@edge-git/backend-runtime/config';
+import type { Container } from '@edge-git/backend-runtime/di';
+import { Tokens } from '../tokens';
+import { createService } from '../serviceFactory';
+import type { ServiceGroupContext } from './daoThunks';
+
+function bindCoreServices(scope: Container, { env, daos }: ServiceGroupContext): void {
+  scope.bind(Tokens.AccessAuthService, () => createService(AccessAuthService, env));
+  scope.bind(Tokens.TokenService, () =>
+    createService(TokenService, env, {
+      tokenDAO: daos.tokenDAO,
+      repositoryDAO: daos.repositoryDAO,
+      tokenGrantDAO: daos.tokenGrantDAO,
+    }),
+  );
+  scope.bind(Tokens.UserService, () =>
+    createService(UserService, env, {
+      userDAO: daos.userDAO,
+      namespaceDAO: daos.namespaceDAO,
+      organizationDAO: daos.organizationDAO,
+      repositoryDAO: daos.repositoryDAO,
+      issueDAO: daos.issueDAO,
+      pullRequestDAO: daos.pullRequestDAO,
+      eventDAO: daos.eventDAO,
+      notificationDAO: daos.notificationDAO,
+      webhookDAO: daos.webhookDAO,
+    }),
+  );
+  scope.bind(Tokens.OrganizationService, () =>
+    createService(OrganizationService, env, {
+      organizationDAO: daos.organizationDAO,
+      organizationMemberDAO: daos.organizationMemberDAO,
+      namespaceDAO: daos.namespaceDAO,
+      userDAO: daos.userDAO,
+      repositoryDAO: daos.repositoryDAO,
+      issueDAO: daos.issueDAO,
+      pullRequestDAO: daos.pullRequestDAO,
+      eventDAO: daos.eventDAO,
+      notificationDAO: daos.notificationDAO,
+      webhookDAO: daos.webhookDAO,
+    }),
+  );
+  scope.bind(Tokens.TeamService, () =>
+    createService(TeamService, env, {
+      teamDAO: daos.teamDAO,
+      teamMemberDAO: daos.teamMemberDAO,
+      teamGrantDAO: daos.teamGrantDAO,
+      organizationDAO: daos.organizationDAO,
+      organizationMemberDAO: daos.organizationMemberDAO,
+      userDAO: daos.userDAO,
+      repositoryDAO: daos.repositoryDAO,
+    }),
+  );
+  scope.bind(Tokens.AuditObserverRegistry, () => AuditObserverRegistry.withDefaults(daos.auditLogDAO));
+  scope.bind(Tokens.AuditService, (container) =>
+    createService(AuditService, env, {
+      auditLogDAO: daos.auditLogDAO,
+      organizationDAO: daos.organizationDAO,
+      organizationMemberDAO: daos.organizationMemberDAO,
+      observers: container.get(Tokens.AuditObserverRegistry),
+    }),
+  );
+  scope.bind(Tokens.PermissionService, () =>
+    createService(PermissionService, env, {
+      organizationDAO: daos.organizationDAO,
+      organizationMemberDAO: daos.organizationMemberDAO,
+      repoCollaboratorDAO: daos.repoCollaboratorDAO,
+      namespaceDAO: daos.namespaceDAO,
+      teamMemberDAO: daos.teamMemberDAO,
+      teamGrantDAO: daos.teamGrantDAO,
+      teamDAO: daos.teamDAO,
+      // Production D1 has every migration: a missing table is deploy skew,
+      // not a legacy DB — fail closed instead of degrading to public-read.
+      strictSchema: !AppConfiguration.fromEnv(env).isBypassAllowed(),
+    }),
+  );
+}
+
+export { bindCoreServices };

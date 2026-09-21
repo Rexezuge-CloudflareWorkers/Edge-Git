@@ -1,0 +1,62 @@
+// Content/collaboration bindings: issues, pulls, threads, collab surfaces,
+// releases, projects, wiki, snippets, social, webhooks, transfer, keys.
+import { CollaborationService } from '@edge-git/backend-services/collab';
+import { DeployKeyService } from '@edge-git/backend-services/deploykey';
+import { DiscussionService } from '@edge-git/backend-services/discussion';
+import { IssueService } from '@edge-git/backend-services/issue';
+import { ProjectService } from '@edge-git/backend-services/project';
+import { PullRequestService } from '@edge-git/backend-services/pull';
+import { PullThreadService } from '@edge-git/backend-services/pull/PullThreadService';
+import { ReleaseService } from '@edge-git/backend-services/release';
+import { SecuritySettingsService } from '@edge-git/backend-services/security';
+import { ActivityService } from '@edge-git/backend-services/social/ActivityService';
+import { StarService } from '@edge-git/backend-services/social/StarService';
+import { WatchService } from '@edge-git/backend-services/social/WatchService';
+import { SnippetService } from '@edge-git/backend-services/snippet';
+import { ImportService } from '@edge-git/backend-services/transfer/ImportService';
+import { MirrorService } from '@edge-git/backend-services/transfer/MirrorService';
+import { WebhookDeliveryService } from '@edge-git/backend-services/webhook/WebhookDeliveryService';
+import { WebhookService } from '@edge-git/backend-services/webhook/WebhookService';
+import { WikiService } from '@edge-git/backend-services/wiki';
+import { AppConfiguration } from '@edge-git/backend-runtime/config';
+import type { Container } from '@edge-git/backend-runtime/di';
+import { Tokens } from '../tokens';
+import { createService } from '../serviceFactory';
+import type { ServiceGroupContext } from './daoThunks';
+
+function bindContentServices(scope: Container, { env, daos }: ServiceGroupContext): void {
+  scope.bind(Tokens.IssueService, () => createService(IssueService, env, { issueDAO: daos.issueDAO, numberingDAO: daos.numberingDAO }));
+  scope.bind(Tokens.PullRequestService, () =>
+    createService(PullRequestService, env, { pullRequestDAO: daos.pullRequestDAO, numberingDAO: daos.numberingDAO }),
+  );
+  scope.bind(Tokens.PullThreadService, () =>
+    createService(PullThreadService, env, { pullRequestDAO: daos.pullRequestDAO, pullThreadDAO: daos.pullThreadDAO }),
+  );
+  scope.bind(Tokens.StarService, () => createService(StarService, env, { starDAO: daos.starDAO }));
+  scope.bind(Tokens.WatchService, () => createService(WatchService, env, { watchDAO: daos.watchDAO }));
+  scope.bind(Tokens.ActivityService, () => createService(ActivityService, env, { eventDAO: daos.eventDAO }));
+  scope.bind(Tokens.CollaborationService, () => createService(CollaborationService, env, { collaborationDAO: daos.collaborationDAO }));
+  scope.bind(Tokens.ReleaseService, () => createService(ReleaseService, env, { releaseDAO: daos.releaseDAO }));
+  scope.bind(Tokens.ProjectService, () => createService(ProjectService, env, { projectDAO: daos.projectDAO, numberingDAO: daos.numberingDAO }));
+  scope.bind(Tokens.DiscussionService, () =>
+    createService(DiscussionService, env, { discussionDAO: daos.discussionDAO, numberingDAO: daos.numberingDAO }),
+  );
+  scope.bind(Tokens.WikiService, () => createService(WikiService, env, { wikiDAO: daos.wikiDAO }));
+  scope.bind(Tokens.SnippetService, () => createService(SnippetService, env, { snippetDAO: daos.snippetDAO }));
+  scope.bind(Tokens.ImportService, () => createService(ImportService, env, { importDAO: daos.importDAO }));
+  scope.bind(Tokens.MirrorService, () => createService(MirrorService, env, { mirrorDAO: daos.mirrorDAO }));
+  scope.bind(Tokens.DeployKeyService, () => createService(DeployKeyService, env, { deployKeyDAO: daos.deployKeyDAO }));
+  scope.bind(Tokens.SecuritySettingsService, () =>
+    createService(SecuritySettingsService, env, { settingsDAO: daos.securitySettingsDAO }),
+  );
+  scope.bind(Tokens.WebhookService, () => createService(WebhookService, env, { webhookDAO: daos.webhookDAO }));
+  scope.bind(Tokens.WebhookDeliveryService, () =>
+    createService(WebhookDeliveryService, env, { webhookDAO: daos.webhookDAO, deliveryDAO: daos.webhookDeliveryDAO }),
+  );
+  // Lazy bind so unit tests mocking `@edge-git/backend-runtime/config` with
+  // only `ConfigurationManager` keep working; the factory only touches the
+  // mocked module when the token is actually resolved.
+  scope.bind(Tokens.AppConfig, () => AppConfiguration.fromEnv(env));
+}
+
+export { bindContentServices };
