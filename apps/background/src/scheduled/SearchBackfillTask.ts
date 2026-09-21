@@ -2,6 +2,7 @@ import { Tokens, createRequestScope } from '@edge-git/backend-services/compositi
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { createLogger } from '@edge-git/backend-runtime/logger';
 import type { SearchService } from '@edge-git/backend-services/search';
+import { repoDoKeyForFullName } from '@edge-git/shared/utils';
 import { BaseScheduledTask } from './IScheduledTask';
 
 const logger = createLogger('SearchBackfill');
@@ -79,7 +80,7 @@ class SearchBackfillTask extends BaseScheduledTask {
     repo: { id: string; owner: string; name: string },
     maxFiles: number,
   ): Promise<{ indexed: number; skipped: number }> {
-    const stub = env.REPO.getByName(`${repo.owner}/${repo.name}`) as unknown as {
+    const stub = env.REPO.getByName(repoDoKeyForFullName(`${repo.owner}/${repo.name}`)) as unknown as {
       listAllFiles(args: { maxFiles?: number }): Promise<Array<{ path: string; oid: string }>>;
       getBlob(args: { filepath: string }): Promise<IndexedBlob | null>;
     };

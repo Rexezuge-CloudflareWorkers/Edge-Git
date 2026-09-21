@@ -411,6 +411,29 @@ describe('SearchBackfillTask catch-up', () => {
     await new SearchBackfillTask().run(env);
     expect(tables.codeIndex).toHaveLength(1);
   });
+
+  it('routes repo reads via the canonical lowercase DO key', async () => {
+    const tables = seedTables({ repos: [repoRow({ id: 'r1', owner: 'PublicMirror', name: 'AWS-AccessBridge' })] });
+    const db = createFakeDb(tables);
+    const seen: string[] = [];
+    const env = {
+      DB: db,
+      REPO: {
+        getByName: (key: string) => {
+          seen.push(key);
+          return {
+            listAllFiles: async () => [{ path: 'README.md', oid: OLD }],
+            getBlob: async () => textBlob('hi'),
+          };
+        },
+      },
+    } as unknown as Env;
+    await new SearchBackfillTask().run(env);
+    // Mixed-case repos must index the same canonical isolate that API reads
+    // address, or search silently indexes an orphaned (empty) DO.
+    expect(seen).toEqual(['publicmirror/aws-accessbridge']);
+    expect(tables.codeIndex).toHaveLength(1);
+  });
 });
 
 describe('SearchBackfill scheduling', () => {
