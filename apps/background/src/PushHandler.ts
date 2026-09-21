@@ -165,6 +165,22 @@ class PushHandler {
     const results = await git.applyRefUpdates(commands, capabilities.includes('atomic'));
     git.clearCache();
 
+    // First-push default: a fresh repo's HEAD points at `main`, but the first
+    // push may land on another branch (e.g. `master`). Like GitHub, point
+    // HEAD at the first newly created branch while it still dangles so
+    // clones advertise a valid symref and default reads resolve.
+    try {
+      const headOid = await git.resolveRef('HEAD');
+      if (!headOid) {
+        const created = commands.find((cmd, index) => results[index]?.ok && isZeroOid(cmd.oldOid) && cmd.ref.startsWith('refs/heads/'));
+        const branch = created ? branchNameFromRef(created.ref) : null;
+        if (branch) await git.setDefaultBranch(branch);
+      }
+    } catch {
+      // Best-effort: refs are already applied; a dangling HEAD only affects
+      // default-branch resolution, never data.
+    }
+
     return buildReportStatus(results, true);
   }
 }

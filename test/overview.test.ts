@@ -76,4 +76,37 @@ describe('ReadModelService.getOverview', () => {
     expect(overview.readme).toMatchObject({ path: 'README.md', truncated: true });
     expect((overview.readme as { contentBase64?: string }).contentBase64).toBeUndefined();
   });
+
+  it('falls back to the first branch when HEAD dangles (first push to non-main)', async () => {
+    const masterOid = 'c'.repeat(40);
+    const git = fakeGit({
+      listBranches: async () => ['master'],
+      currentBranch: async () => 'main',
+      resolveRef: async (ref = 'HEAD') => {
+        if (ref === 'HEAD' || ref === 'refs/heads/main') return null;
+        if (ref === 'refs/heads/master') return masterOid;
+        return null;
+      },
+      getTree: async () => [{ path: 'file.txt', type: 'blob', mode: '100644', oid: 'd'.repeat(40) }],
+      getLastCommit: async () => ({ oid: masterOid }),
+      getLog: async () => [{ oid: masterOid }],
+    });
+    const svc = new ReadModelService(git as never);
+    const overview = await svc.getOverview({});
+    expect(overview.resolvedRef).toBe(masterOid);
+    expect(overview.tree).toEqual([{ path: 'file.txt', type: 'blob', mode: '100644', oid: 'd'.repeat(40), lastCommit: null }]);
+    expect(overview.commits).toEqual([{ oid: masterOid }]);
+  });
+
+  it('keeps exact semantics for an explicit unresolvable ref (no fallback)', async () => {
+    const git = fakeGit({ resolveRef: async () => null, getLastCommit: async () => undefined });
+    const svc = new ReadModelService(git as never);
+    await expect(svc.getOverview({ ref: 'ghost' })).resolves.toMatchObject({
+      branches: ['main'],
+      resolvedRef: null,
+      tree: [],
+      commits: [],
+      readme: null,
+    });
+  });
 });
