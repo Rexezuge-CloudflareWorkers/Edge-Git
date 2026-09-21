@@ -4,6 +4,7 @@ import type { GitCommit, OverviewResponse, Repo, TagInfo, TreeEntry } from '../.
 import { decodeBlobContent, loadBlob, loadOverview, loadTree } from '../../services/repoService';
 import { readParam, writeParams } from '../../lib/urlParams';
 import { resolveSelectedRef, mergeEnrichedEntries } from './useCodeTabOverview';
+import { findReadmeEntry, isEditableSize } from './codeTabUtils';
 import { Card } from '../ui/Card';
 import { Markdown } from '../shared/Markdown';
 import { useSocialState } from './SocialButtons';
@@ -11,10 +12,6 @@ import { BlobView } from './BlobView';
 import { FileBrowser } from './FileBrowser';
 import { CodeTabToolbar } from './CodeTabToolbar';
 import { CodeTabSidebar } from './CodeTabSidebar';
-
-const README_NAMES = new Set(['README.md', 'README.markdown', 'README.mdown', 'README.txt', 'README']);
-// Upper bound for in-browser editing; larger files stay git-only.
-const MAX_EDIT_CHARS = 262_144;
 
 export function CodeTab({
   owner,
@@ -89,7 +86,7 @@ export function CodeTab({
   const visibleBlobBinary = blobSettled ? blobBinary : false;
   // Edit unlocks only once this file's bytes arrive: opening the editor on
   // a blank buffer could save empty content over the real file.
-  const editableFile = editable && blobSettled && !visibleBlobBinary && (visibleBlobText ?? '').length <= MAX_EDIT_CHARS;
+  const editableFile = editable && blobSettled && !visibleBlobBinary && isEditableSize((visibleBlobText ?? '').length);
 
   // `true` only for signed-in viewers: `null` (resolving) and `false`
   // share the public path so null->false never refetches.
@@ -218,7 +215,7 @@ export function CodeTab({
     };
   }, [owner, repo, ref, path, showNotice, reloadKey, useAuthed]);
 
-  const readmeEntry = path === '' ? entries.find((e) => e.type === 'blob' && README_NAMES.has(e.path)) : undefined;
+  const readmeEntry = findReadmeEntry(entries, path);
 
   const visibleReadme = readmeEntry && readme && readme.path === readmeEntry.path ? readme.text : null;
 
