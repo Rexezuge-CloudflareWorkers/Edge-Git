@@ -27,9 +27,9 @@ export default defineConfig({
       include: ['apps/api/src/**/*.ts', 'apps/background/src/**/*.ts', 'packages/**/src/**/*.ts'],
       exclude: ['**/*.test.ts', '**/*.d.ts', '**/index.ts', '**/types.d.ts', '**/model/**'],
       thresholds: {
-        statements: 83,
-        branches: 74,
-        functions: 82,
+        statements: 85,
+        branches: 75,
+        functions: 85,
         lines: 88,
       },
     },
