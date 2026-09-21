@@ -9,37 +9,14 @@ import { listForks } from '../../services/forkService';
 import { formatTimestamp } from '../../lib/format';
 import { readParam, writeParams } from '../../lib/urlParams';
 import { Button } from '../ui/Button';
+import { headLabel as headLabelFn, mergeHeadRepoOptions } from './pullHeadOptions';
+
+export { headLabel } from './pullHeadOptions';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Input, Select, Textarea } from '../ui/Input';
 import { PullStatusBadge } from '../ui/Badge';
 import { RefreshButton } from '../shared/RefreshButton';
 import { Markdown } from '../shared/Markdown';
-
-export function headLabel(pull: PullRequest): string {
-  return pull.head_full_name && pull.head_full_name.toLowerCase() !== pull.full_name.toLowerCase()
-    ? `${pull.head_full_name}:${pull.head_branch}`
-    : pull.head_branch;
-}
-
-function sameRepoName(a: string, b: string): boolean {
-  return a.toLowerCase() === b.toLowerCase();
-}
-
-function mergeHeadRepoOptions(
-  currentFull: string,
-  parent: string | null | undefined,
-  forks: Repo[],
-  prev: string,
-): { options: string[]; selected: string } {
-  const options = [currentFull];
-  if (parent && options.every((o) => !sameRepoName(o, parent))) {
-    options.push(parent);
-  }
-  for (const f of forks) {
-    if (options.every((o) => !sameRepoName(o, f.fullName))) options.push(f.fullName);
-  }
-  return { options, selected: options.some((o) => sameRepoName(o, prev)) ? prev : currentFull };
-}
 
 export function PullsTab({
   owner,
@@ -289,7 +266,7 @@ export function PullsTab({
                   </Link>
                   <span className="text-xs text-[var(--color-text-muted)]">#{p.number}</span>
                   <span className="text-xs text-[var(--color-text-muted)] font-mono">
-                    {p.base_branch} ← {headLabel(p)}
+                    {p.base_branch} ← {headLabelFn(p)}
                   </span>
                 </div>
                 {p.body && (
