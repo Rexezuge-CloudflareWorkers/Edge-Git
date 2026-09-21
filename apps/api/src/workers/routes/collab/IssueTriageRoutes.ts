@@ -1,7 +1,7 @@
 import { jsonError, toSafeErrorMessage, toServiceStatus } from '../PublicViewerResolver';
 import { requireVisibleRepo } from '../PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { getIssueMetaSafe, needWrite, parseNumber } from './CollabHelpers';
 import type { CollabApp } from './CollabHelpers';
 import { readJsonBody } from '../BodyParser';
@@ -10,7 +10,7 @@ function registerCollabIssueTriageRoutes(app: CollabApp): void {
   // Issue triage: labels / assignees / milestone + meta
   app.get('/user/repos/:owner/:repo/issues/:number/meta', async (c) => {
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, c.get('AuthenticatedUserEmailAddress'));
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parseNumber(c.req.param('number'));
@@ -28,7 +28,7 @@ function registerCollabIssueTriageRoutes(app: CollabApp): void {
     app.put(`/user/repos/:owner/:repo/issues/:number/${kind}`, async (c) => {
       const email = c.get('AuthenticatedUserEmailAddress');
       const owner = c.req.param('owner');
-      const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+      const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
       const row = await requireVisibleRepo(c.env, owner, repoName, email);
       if (!row) return jsonError(c, 'Not found', 404);
       if (!(await needWrite(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);

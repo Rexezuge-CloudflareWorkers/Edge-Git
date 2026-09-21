@@ -1,7 +1,7 @@
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { matchCodeowners, parseCodeowners } from '@edge-git/backend-services/collab';
 import { normalizeCodeownerHandle, parseCodeownerTeam } from '@edge-git/backend-services/collab';
-import { getRepoStub } from '../repoStub';
+import { getRepoStub } from '../doStubs';
 
 interface CodeownerRule {
   pattern: string;

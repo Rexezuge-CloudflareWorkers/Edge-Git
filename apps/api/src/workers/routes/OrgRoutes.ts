@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
@@ -185,7 +185,7 @@ function registerOrgRoutes(app: OrgApp): void {
   app.get('/user/repos/:owner/:repo/collaborators', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     try {
       const scope = createRequestScope(c.env);
       await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
@@ -202,7 +202,7 @@ function registerOrgRoutes(app: OrgApp): void {
   app.put('/user/repos/:owner/:repo/collaborators/:member', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const member = decodeURIComponent(c.req.param('member'));
     const { malformed, body } = await readJsonBody<{ role?: string }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
@@ -224,7 +224,7 @@ function registerOrgRoutes(app: OrgApp): void {
   app.delete('/user/repos/:owner/:repo/collaborators/:member', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const member = decodeURIComponent(c.req.param('member'));
     try {
       const scope = createRequestScope(c.env);

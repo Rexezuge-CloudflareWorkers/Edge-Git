@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { SearchService } from '@edge-git/backend-services/search';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { jsonError, requireVisibleRepo, resolvePublicViewer, toRepoJson, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import type { RequestContext } from '@/middleware';
 
@@ -41,7 +41,7 @@ function registerSearchRoutes(app: SearchApp): void {
       const scope = createRequestScope(c.env);
       const svc = scope.get(Tokens.SearchService);
       if (owner && repoParam) {
-        const repoName = RepoService.normalizeRepo(repoParam);
+        const repoName = RepoFullName.normalizeRepo(repoParam);
         const row = await requireVisibleRepo(c.env, owner, repoName, viewerEmail);
         if (!row) return jsonError(c, 'Not found', 404);
         if (type === 'issues') {

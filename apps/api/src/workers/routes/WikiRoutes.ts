@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { recordAndNotify } from './SocialEmit';
 import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
@@ -41,7 +41,7 @@ function registerWikiPublicRoutes(app: WikiApp): void {
 function registerWikiUserRoutes(app: WikiApp): void {
   app.get('/user/repos/:owner/:repo/wiki', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
+    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoFullName.normalizeRepo(c.req.param('repo')), email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
       const url = new URL(c.req.url);
@@ -57,7 +57,7 @@ function registerWikiUserRoutes(app: WikiApp): void {
   app.post('/user/repos/:owner/:repo/wiki', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
@@ -87,7 +87,7 @@ function registerWikiUserRoutes(app: WikiApp): void {
 
   app.get('/user/repos/:owner/:repo/wiki/:slug', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
+    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoFullName.normalizeRepo(c.req.param('repo')), email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
       const page = await createRequestScope(c.env).get(Tokens.WikiService).getPage(row.id, c.req.param('slug'));
@@ -99,7 +99,7 @@ function registerWikiUserRoutes(app: WikiApp): void {
 
   app.get('/user/repos/:owner/:repo/wiki/:slug/revisions', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
+    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoFullName.normalizeRepo(c.req.param('repo')), email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
       const revisions = await createRequestScope(c.env).get(Tokens.WikiService).listRevisions(row.id, c.req.param('slug'));
@@ -112,7 +112,7 @@ function registerWikiUserRoutes(app: WikiApp): void {
   app.put('/user/repos/:owner/:repo/wiki/:slug', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
@@ -148,7 +148,7 @@ function registerWikiUserRoutes(app: WikiApp): void {
   app.delete('/user/repos/:owner/:repo/wiki/:slug', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {

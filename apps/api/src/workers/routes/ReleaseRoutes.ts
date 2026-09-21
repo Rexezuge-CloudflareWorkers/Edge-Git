@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { RepoService } from '@edge-git/backend-services/repo';
-import { getRepoStub } from '../repoStub';
+import { RepoFullName } from '@edge-git/shared/utils';
+import { getRepoStub } from '../doStubs';
 import { recordAndNotify } from './SocialEmit';
 import { jsonError, requireVisibleRepo, resolvePublicViewer, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
@@ -65,7 +65,7 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
   app.get('/user/repos/:owner/:repo/releases', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
@@ -81,7 +81,7 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
   app.post('/user/repos/:owner/:repo/releases', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
@@ -133,7 +133,7 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
   app.get('/user/repos/:owner/:repo/releases/:tag', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
@@ -150,7 +150,7 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
   app.patch('/user/repos/:owner/:repo/releases/:tag', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
@@ -192,7 +192,7 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
   app.delete('/user/repos/:owner/:repo/releases/:tag', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {

@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { RepoService } from '@edge-git/backend-services/repo';
-import { getCheckRunnerStub } from '../checkStub';
+import { RepoFullName } from '@edge-git/shared/utils';
+import { getCheckRunnerStub } from '../doStubs';
 import { emitWebhookEvent, publishCheckUpdate } from './SocialEmit';
 import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
@@ -71,7 +71,7 @@ function registerCheckUserRoutes(app: CheckApp): void {
   app.get('/user/repos/:owner/:repo/commits/:sha/checks', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
@@ -87,7 +87,7 @@ function registerCheckUserRoutes(app: CheckApp): void {
   app.post('/user/repos/:owner/:repo/checks', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
@@ -150,7 +150,7 @@ function registerCheckUserRoutes(app: CheckApp): void {
   app.patch('/user/repos/:owner/:repo/checks/:id', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {

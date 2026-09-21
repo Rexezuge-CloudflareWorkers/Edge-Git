@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { DeployKeyService } from '@edge-git/backend-services/deploykey';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
@@ -14,7 +14,7 @@ function registerDeployKeyRoutes(app: DeployKeyApp): void {
   app.get('/user/repos/:owner/:repo/keys', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     try {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
@@ -28,7 +28,7 @@ function registerDeployKeyRoutes(app: DeployKeyApp): void {
   app.post('/user/repos/:owner/:repo/keys', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const { malformed, body } = await readJsonBody<{ name?: string; permission?: unknown; expiresInDays?: number }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.name !== 'string' || !body.name.trim()) return jsonError(c, 'name is required', 400);
@@ -47,7 +47,7 @@ function registerDeployKeyRoutes(app: DeployKeyApp): void {
   app.delete('/user/repos/:owner/:repo/keys/:id', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     try {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');

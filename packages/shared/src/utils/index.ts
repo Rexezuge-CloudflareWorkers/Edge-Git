@@ -4,5 +4,7 @@ export { CryptoUtil } from './CryptoUtil';
 export { err, getOrThrow, isOk, mapResult, ok } from './Result';
 export type { Err, Ok, Result } from './Result';
 export { EmailAddress, RepoFullName, OWNER_PATTERN, REPO_PATTERN, repoDoKey, repoDoKeyForFullName } from './Identity';
+export { BRANCH_SEGMENT_RE, hasIllegalBranchChar, isValidBranchName } from './BranchValidation';
+export { SLUG_RE, isValidSlug, validateSlug } from './SlugValidation';
 export { canonicalizeLanguageTag } from './LanguageTag';
 export { ErrorSanitizationUtil } from './ErrorSanitizationUtil';

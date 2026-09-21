@@ -6,6 +6,7 @@ import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import type { WebhookDeliveryMetadata, WebhookEventName } from '@edge-git/shared';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 import { buildWebhookPayload, signDelivery, validateWebhookUrl } from './WebhookEvents';
+import { backoffSecondsForAttempt, isRetryableHttpStatus } from './WebhookRetryPolicy';
 
 interface WebhookDeliveryServiceEnv {
   DB: D1Queryable;
@@ -38,18 +39,7 @@ interface EnqueueEventInput {
   extra?: Record<string, unknown>;
 }
 
-// Retry on 429/5xx + network/timeout failures. Other 4xx are terminal
-// (the receiver rejected the payload — retrying never helps).
-function isRetryableHttpStatus(status: number | null): boolean {
-  if (status === null) return true;
-  return status === 429 || (status >= 500 && status <= 599);
-}
-
-// Linear-ish backoff in seconds by 1-based attempt: 1m, 10m, 1h, 6h, 24h.
-function backoffSecondsForAttempt(attempt: number): number {
-  const schedule = [60, 600, 3600, 21_600, 86_400];
-  return schedule[Math.min(Math.max(attempt, 1), schedule.length) - 1];
-}
+// Retry policy lives in `./WebhookRetryPolicy.ts` (pure, unit testable).
 
 async function defaultPostJson(
   url: string,

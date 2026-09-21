@@ -1,6 +1,6 @@
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { repoShardFor } from '@edge-git/shared/realtime';
-import { ensureRepo, getRepoStub } from '../repoStub';
+import { ensureRepo, getRepoStub } from '../doStubs';
 import { getRealtimeStub } from '../doStubs';
 import { copyRepoGit } from './CrossFork';
 

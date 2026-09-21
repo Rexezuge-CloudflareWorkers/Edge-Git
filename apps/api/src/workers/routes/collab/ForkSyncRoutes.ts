@@ -1,7 +1,7 @@
 import { jsonError, toSafeErrorMessage, toServiceStatus } from '../PublicViewerResolver';
 import { requireVisibleRepo } from '../PublicViewerResolver';
-import { RepoService } from '@edge-git/backend-services/repo';
-import { getRepoStub } from '../../repoStub';
+import { RepoFullName } from '@edge-git/shared/utils';
+import { getRepoStub } from '../../doStubs';
 import { needWrite } from './CollabHelpers';
 import type { CollabApp } from './CollabHelpers';
 import { readJsonBody } from '../BodyParser';
@@ -11,11 +11,11 @@ function registerCollabForkSyncRoutes(app: CollabApp): void {
   app.get('/user/repos/:owner/:repo/sync-preview', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     const upstreamOwner = c.req.query('upstreamOwner') || '';
-    const upstreamRepo = c.req.query('upstreamRepo') ? RepoService.normalizeRepo(c.req.query('upstreamRepo') as string) : '';
+    const upstreamRepo = c.req.query('upstreamRepo') ? RepoFullName.normalizeRepo(c.req.query('upstreamRepo') as string) : '';
     const upstreamBranch = c.req.query('upstreamBranch') || 'main';
     const branch = c.req.query('branch') || 'main';
     if (!upstreamOwner || !upstreamRepo) return jsonError(c, 'upstreamOwner and upstreamRepo are required', 400);
@@ -54,7 +54,7 @@ function registerCollabForkSyncRoutes(app: CollabApp): void {
   app.post('/user/repos/:owner/:repo/sync', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     if (!(await needWrite(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
@@ -66,7 +66,7 @@ function registerCollabForkSyncRoutes(app: CollabApp): void {
     }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const upstreamOwner = body.upstreamOwner?.trim() || '';
-    const upstreamRepo = body.upstreamRepo ? RepoService.normalizeRepo(body.upstreamRepo) : '';
+    const upstreamRepo = body.upstreamRepo ? RepoFullName.normalizeRepo(body.upstreamRepo) : '';
     if (!upstreamOwner || !upstreamRepo) return jsonError(c, 'upstreamOwner and upstreamRepo are required', 400);
     const upstreamRow = await requireVisibleRepo(c.env, upstreamOwner, upstreamRepo, email);
     if (!upstreamRow) return jsonError(c, 'Not found', 404);

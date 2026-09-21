@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { BadRequestError } from '@edge-git/backend-errors';
 import { clampAuditLimit, truncateAuditFilter } from '@edge-git/shared/validation';
 import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
@@ -101,7 +101,7 @@ function registerAuditRoutes(app: AuditApp): void {
       let repoId: string | undefined;
       if (query.repo) {
         const name = query.repo.includes('/') ? (query.repo.split('/').at(-1) ?? query.repo) : query.repo;
-        const repo = await scope.get(Tokens.RepoService).getByOwnerAndName(c.req.param('org'), RepoService.normalizeRepo(name));
+        const repo = await scope.get(Tokens.RepoService).getByOwnerAndName(c.req.param('org'), RepoFullName.normalizeRepo(name));
         if (!repo) return jsonError(c, 'Repository not found', 404);
         repoId = repo.id;
       }

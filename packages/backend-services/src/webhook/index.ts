@@ -17,3 +17,4 @@ export { WebhookService } from './WebhookService';
 export type { WebhookServiceDeps, WebhookServiceEnv } from './WebhookService';
 export { WebhookDeliveryService } from './WebhookDeliveryService';
 export type { WebhookDeliveryServiceDeps, WebhookDeliveryServiceEnv, EnqueueEventInput } from './WebhookDeliveryService';
+export { WEBHOOK_BACKOFF_SCHEDULE_SECONDS, backoffSecondsForAttempt, isRetryableHttpStatus } from './WebhookRetryPolicy';

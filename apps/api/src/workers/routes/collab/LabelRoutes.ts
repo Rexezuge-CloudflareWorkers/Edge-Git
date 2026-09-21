@@ -2,7 +2,7 @@ import { jsonError, withPublicRepo } from '../PublicViewerResolver';
 import { toSafeErrorMessage, toServiceStatus } from '../PublicViewerResolver';
 import { requireVisibleRepo } from '../PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { needAdmin, resolveRepoRow } from './CollabHelpers';
 import type { CollabApp } from './CollabHelpers';
 import { readJsonBody } from '../BodyParser';
@@ -35,7 +35,7 @@ function registerCollabLabelUserRoutes(app: CollabApp): void {
   app.post('/user/repos/:owner/:repo/labels', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     if (!(await needAdmin(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
@@ -54,7 +54,7 @@ function registerCollabLabelUserRoutes(app: CollabApp): void {
   app.delete('/user/repos/:owner/:repo/labels/:id', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     if (!(await needAdmin(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);

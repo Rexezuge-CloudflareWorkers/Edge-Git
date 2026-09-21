@@ -1,10 +1,10 @@
-import { getRepoStub } from '../repoStub';
+import { getRepoStub } from '../doStubs';
 import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
 import { triggerRequiredChecks } from './TriggerChecks';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { PullRequestService } from '@edge-git/backend-services/pull';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { openCrossForkPull } from './PullMergeRoutes';
 import { parsePullNumber } from './PullShared';
 import type { MergePreviewShape, PullApp } from './PullShared';
@@ -19,7 +19,7 @@ function registerUserPullWriteRoutes(app: PullApp): void {
   app.post('/user/repos/:owner/:repo/pulls', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     const { malformed, body } = await readJsonBody<{
@@ -38,7 +38,7 @@ function registerUserPullWriteRoutes(app: PullApp): void {
       return jsonError(c, 'invalid branch name', 400);
     }
     const headOwnerRaw = body.headOwner?.trim() || '';
-    const headRepoRaw = body.headRepo ? RepoService.normalizeRepo(body.headRepo).trim() : '';
+    const headRepoRaw = body.headRepo ? RepoFullName.normalizeRepo(body.headRepo).trim() : '';
     if ((headOwnerRaw === '') !== (headRepoRaw === '')) return jsonError(c, 'headOwner and headRepo must be provided together', 400);
     const fullName = `${owner}/${repoName}`;
     const baseBranch = body.baseBranch.trim();
@@ -129,7 +129,7 @@ function registerUserPullWriteRoutes(app: PullApp): void {
   app.patch('/user/repos/:owner/:repo/pulls/:number', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
@@ -165,7 +165,7 @@ function registerUserPullWriteRoutes(app: PullApp): void {
   app.post('/user/repos/:owner/:repo/pulls/:number/comments', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parsePullNumber(c.req.param('number'));
@@ -203,7 +203,7 @@ function registerUserPullWriteRoutes(app: PullApp): void {
   app.post('/user/repos/:owner/:repo/pulls/:number/reviews', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parsePullNumber(c.req.param('number'));

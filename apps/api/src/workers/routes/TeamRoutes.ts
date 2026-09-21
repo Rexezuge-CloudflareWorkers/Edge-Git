@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
@@ -165,7 +165,7 @@ function registerTeamRoutes(app: TeamApp): void {
       const scope = createRequestScope(c.env);
       const repo = await scope
         .get(Tokens.RepoService)
-        .getByOwnerAndName(c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')));
+        .getByOwnerAndName(c.req.param('owner'), RepoFullName.normalizeRepo(c.req.param('repo')));
       if (!repo) return jsonError(c, 'Repository not found', 404);
       await scope.get(Tokens.TeamService).grantRepo(c.req.param('org'), c.req.param('team'), email, repo.id, role);
       return c.json({ ok: true });
@@ -180,7 +180,7 @@ function registerTeamRoutes(app: TeamApp): void {
       const scope = createRequestScope(c.env);
       const repo = await scope
         .get(Tokens.RepoService)
-        .getByOwnerAndName(c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')));
+        .getByOwnerAndName(c.req.param('owner'), RepoFullName.normalizeRepo(c.req.param('repo')));
       if (!repo) return jsonError(c, 'Repository not found', 404);
       await scope.get(Tokens.TeamService).revokeGrant(c.req.param('org'), c.req.param('team'), email, repo.id);
       return c.json({ ok: true });

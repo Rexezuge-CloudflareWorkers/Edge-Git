@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { parsePositiveInt } from '@edge-git/shared/validation';
 import { recordAndNotify } from './SocialEmit';
 import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
@@ -55,7 +55,7 @@ function registerDiscussionPublicRoutes(app: DiscussionApp): void {
 function registerDiscussionUserRoutes(app: DiscussionApp): void {
   app.get('/user/repos/:owner/:repo/discussions/categories', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
+    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoFullName.normalizeRepo(c.req.param('repo')), email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
       const categories = await createRequestScope(c.env).get(Tokens.DiscussionService).listCategories(row.id);
@@ -67,7 +67,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
 
   app.get('/user/repos/:owner/:repo/discussions', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
+    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoFullName.normalizeRepo(c.req.param('repo')), email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
       const url = new URL(c.req.url);
@@ -82,7 +82,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
 
   app.post('/user/repos/:owner/:repo/discussions', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
+    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoFullName.normalizeRepo(c.req.param('repo')), email);
     if (!row) return jsonError(c, 'Not found', 404);
     const { malformed, body } = await readJsonBody<{ title: unknown; body?: unknown; categorySlug?: unknown }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
@@ -107,7 +107,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
 
   app.get('/user/repos/:owner/:repo/discussions/:number', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
+    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoFullName.normalizeRepo(c.req.param('repo')), email);
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parseNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Invalid discussion number', 400);
@@ -122,7 +122,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
   app.patch('/user/repos/:owner/:repo/discussions/:number', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parseNumber(c.req.param('number'));
@@ -170,7 +170,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
   app.delete('/user/repos/:owner/:repo/discussions/:number', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parseNumber(c.req.param('number'));
@@ -193,7 +193,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
 
   app.post('/user/repos/:owner/:repo/discussions/:number/comments', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
+    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoFullName.normalizeRepo(c.req.param('repo')), email);
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parseNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Invalid discussion number', 400);
@@ -223,7 +223,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
   app.delete('/user/repos/:owner/:repo/discussions/:number/comments/:commentId', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parseNumber(c.req.param('number'));

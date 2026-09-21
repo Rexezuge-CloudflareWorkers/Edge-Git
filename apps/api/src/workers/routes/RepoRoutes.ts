@@ -1,10 +1,10 @@
 import type { Hono } from 'hono';
-import { getRepoStub, ensureRepo } from '../repoStub';
+import { getRepoStub, ensureRepo } from '../doStubs';
 import { getScope, jsonError, requireVisibleRepo, toRepoJson, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
 import { Tokens } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
-import { EmailAddress } from '@edge-git/shared/utils';
+import { EmailAddress, RepoFullName } from '@edge-git/shared/utils';
 import { readJsonBody } from './BodyParser';
 import {
   parseOverviewArgs,
@@ -155,9 +155,9 @@ function registerUserRepoRoutes(app: RepoApp): void {
     const name = (body.name ?? '').trim();
     if (!name) return jsonError(c, 'name is required', 400);
     try {
-      RepoService.validateNames(owner, RepoService.normalizeRepo(name));
+      RepoService.validateNames(owner, RepoFullName.normalizeRepo(name));
       const svc = scope.get(Tokens.RepoService);
-      const normalized = RepoService.normalizeRepo(name);
+      const normalized = RepoFullName.normalizeRepo(name);
       const { id } = await svc.createRepo(email, owner, normalized, body.description ?? null, body.isPrivate ?? false);
       const created = await svc.getByOwnerAndName(owner, normalized);
       const canonicalOwner = created?.owner ?? owner;
@@ -190,7 +190,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
   app.get('/user/repos/:owner/:repo', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const scope = getScope(c);
-    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email, scope);
+    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoFullName.normalizeRepo(c.req.param('repo')), email, scope);
     if (!row) return jsonError(c, 'Not found', 404);
     const role = await scope
       .get(Tokens.PermissionService)
@@ -211,7 +211,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
   app.patch('/user/repos/:owner/:repo', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const { malformed, body } = await readJsonBody<{ description?: string | null; isPrivate?: boolean }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const patch: { description?: string | null; isPrivate?: boolean } = {};
@@ -233,7 +233,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
   app.delete('/user/repos/:owner/:repo', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     try {
       const { id } = await getScope(c)
         .get(Tokens.RepoService)

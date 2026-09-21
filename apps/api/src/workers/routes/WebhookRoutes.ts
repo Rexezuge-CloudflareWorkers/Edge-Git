@@ -1,14 +1,14 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { WEBHOOK_EVENTS } from '@edge-git/backend-services/webhook';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type WebhookApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
 function repoParams(c: { req: { param(name: string): string } }): { owner: string; repoName: string } {
-  return { owner: c.req.param('owner'), repoName: RepoService.normalizeRepo(c.req.param('repo')) };
+  return { owner: c.req.param('owner'), repoName: RepoFullName.normalizeRepo(c.req.param('repo')) };
 }
 
 // Repo webhooks — list/get/deliveries need `read+`, all mutations need

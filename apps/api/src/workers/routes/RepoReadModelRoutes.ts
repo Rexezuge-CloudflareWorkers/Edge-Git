@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
-import { getRepoStub } from '../repoStub';
+import { getRepoStub } from '../doStubs';
 import { jsonError, withVisibleRepo } from './PublicViewerResolver';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import type { RequestContext } from '@/middleware';
 import {
   parseOverviewArgs,
@@ -28,19 +28,19 @@ async function withVisibleRepoLocal(
 function registerUserRepoReadModelRoutes(app: RepoApp): void {
   app.get('/user/repos/:owner/:repo/branches', async (c) => {
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     return withVisibleRepoLocal(c, owner, repoName, async (fullName) => c.json(await getRepoStub(c.env, fullName).getBranches()));
   });
 
   app.get('/user/repos/:owner/:repo/tags', async (c) => {
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     return withVisibleRepoLocal(c, owner, repoName, async (fullName) => c.json(await getRepoStub(c.env, fullName).getTags()));
   });
 
   app.get('/user/repos/:owner/:repo/tree', async (c) => {
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const url = new URL(c.req.url);
     return withVisibleRepoLocal(c, owner, repoName, async (fullName) =>
       c.json(
@@ -55,7 +55,7 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
 
   app.get('/user/repos/:owner/:repo/blob', async (c) => {
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const url = new URL(c.req.url);
     const filepath = sanitizePathParam(url.searchParams.get('path')) ?? '';
     return withVisibleRepoLocal(c, owner, repoName, async (fullName) =>
@@ -65,7 +65,7 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
 
   app.get('/user/repos/:owner/:repo/commits', async (c) => {
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const url = new URL(c.req.url);
     return withVisibleRepoLocal(c, owner, repoName, async (fullName) =>
       c.json(
@@ -81,7 +81,7 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
     const oid = c.req.param('oid');
     if (!/^[0-9a-f]{40}$/i.test(oid)) return jsonError(c, 'Invalid commit oid', 400);
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     return withVisibleRepoLocal(c, owner, repoName, async (fullName) => {
       const diff = (await getRepoStub(c.env, fullName).getCommitDiff(oid)) as { commit: unknown } | null;
       if (!diff || !diff.commit) return jsonError(c, 'Not found', 404);
@@ -91,7 +91,7 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
 
   app.get('/user/repos/:owner/:repo/compare', async (c) => {
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const url = new URL(c.req.url);
     const baseRef = sanitizeRefParam(url.searchParams.get('base')) ?? '';
     const headRef = sanitizeRefParam(url.searchParams.get('head')) ?? '';
@@ -105,7 +105,7 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
 
   app.get('/user/repos/:owner/:repo/overview', async (c) => {
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const url = new URL(c.req.url);
     const args = parseOverviewArgs(url.searchParams);
     return withVisibleRepoLocal(c, owner, repoName, async (fullName) =>
@@ -115,5 +115,3 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
 }
 
 export { registerUserRepoReadModelRoutes };
-// Re-exported so granule helpers stay importable from one read-model module.
-export { parseOptionalFlag } from './RepoParamParsers';

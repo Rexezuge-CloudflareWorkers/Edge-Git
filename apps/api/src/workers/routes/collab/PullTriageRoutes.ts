@@ -2,7 +2,7 @@ import { jsonError, toSafeErrorMessage, toServiceStatus } from '../PublicViewerR
 import { requireVisibleRepo } from '../PublicViewerResolver';
 import { recordAndNotify } from '../SocialEmit';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { suggestCodeownerHandles } from '../CodeownerHelpers';
 import { needWrite, parseNumber } from './CollabHelpers';
 import type { CollabApp } from './CollabHelpers';
@@ -12,7 +12,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
   // Pull triage: labels / assignees / milestone + meta
   app.get('/user/repos/:owner/:repo/pulls/:number/meta', async (c) => {
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, c.get('AuthenticatedUserEmailAddress'));
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parseNumber(c.req.param('number'));
@@ -36,7 +36,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
     app.put(`/user/repos/:owner/:repo/pulls/:number/${kind}`, async (c) => {
       const email = c.get('AuthenticatedUserEmailAddress');
       const owner = c.req.param('owner');
-      const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+      const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
       const row = await requireVisibleRepo(c.env, owner, repoName, email);
       if (!row) return jsonError(c, 'Not found', 404);
       if (!(await needWrite(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
@@ -61,7 +61,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
   // Reviewers + drafts + CODEOWNERS suggestions
   app.get('/user/repos/:owner/:repo/pulls/:number/reviewers', async (c) => {
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, c.get('AuthenticatedUserEmailAddress'));
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parseNumber(c.req.param('number'));
@@ -82,7 +82,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
   app.post('/user/repos/:owner/:repo/pulls/:number/reviewers', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     if (!(await needWrite(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
@@ -114,7 +114,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
   app.delete('/user/repos/:owner/:repo/pulls/:number/reviewers/:reviewer', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     if (!(await needWrite(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
@@ -133,7 +133,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
   app.patch('/user/repos/:owner/:repo/pulls/:number/draft', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     if (!(await needWrite(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
@@ -152,7 +152,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
 
   app.get('/user/repos/:owner/:repo/pulls/:number/codeowners', async (c) => {
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, c.get('AuthenticatedUserEmailAddress'));
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parseNumber(c.req.param('number'));

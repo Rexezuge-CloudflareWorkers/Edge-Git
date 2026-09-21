@@ -1,7 +1,7 @@
 import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { parsePullNumber } from './PullShared';
 import type { PullApp } from './PullShared';
 import { readJsonBody } from './BodyParser';
@@ -27,7 +27,7 @@ function registerUserPullThreadRoutes(app: PullApp): void {
   app.get('/user/repos/:owner/:repo/pulls/:number/threads', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parsePullNumber(c.req.param('number'));
@@ -46,7 +46,7 @@ function registerUserPullThreadRoutes(app: PullApp): void {
   app.post('/user/repos/:owner/:repo/pulls/:number/threads', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parsePullNumber(c.req.param('number'));
@@ -91,7 +91,7 @@ function registerUserPullThreadRoutes(app: PullApp): void {
   app.post('/user/repos/:owner/:repo/pulls/:number/threads/:threadId/replies', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parsePullNumber(c.req.param('number'));
@@ -128,7 +128,7 @@ function registerUserPullThreadRoutes(app: PullApp): void {
   app.patch('/user/repos/:owner/:repo/pulls/:number/threads/:threadId', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parsePullNumber(c.req.param('number'));
@@ -166,7 +166,7 @@ function registerUserPullThreadRoutes(app: PullApp): void {
   app.post('/user/repos/:owner/:repo/pulls/:number/reviews/:reviewId/dismiss', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {

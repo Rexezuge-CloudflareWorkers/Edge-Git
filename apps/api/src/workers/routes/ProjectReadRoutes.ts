@@ -1,5 +1,5 @@
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { parseProjectNumber } from './ProjectRouteParsers';
 import type { ProjectApp } from './ProjectRouteParsers';
@@ -33,7 +33,7 @@ function registerProjectPublicRoutes(app: ProjectApp): void {
 function registerProjectUserReadRoutes(app: ProjectApp): void {
   app.get('/user/repos/:owner/:repo/projects', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
+    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoFullName.normalizeRepo(c.req.param('repo')), email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
       const projects = await createRequestScope(c.env).get(Tokens.ProjectService).listProjects(row.id);
@@ -45,7 +45,7 @@ function registerProjectUserReadRoutes(app: ProjectApp): void {
 
   app.get('/user/repos/:owner/:repo/projects/:number', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoService.normalizeRepo(c.req.param('repo')), email);
+    const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoFullName.normalizeRepo(c.req.param('repo')), email);
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parseProjectNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Invalid project number', 400);

@@ -1,9 +1,9 @@
 import type { Hono } from 'hono';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
-import { getRepoStub } from '../repoStub';
+import { getRepoStub } from '../doStubs';
 import { jsonError, requireVisibleRepo, toErrorBody, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { branchNameSchema, decodeBase64Strict, sanitizeCommitMessage } from '@edge-git/shared/validation';
 import { scanBytes } from '@edge-git/backend-services/security';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
@@ -153,7 +153,7 @@ function registerFileWriteRoutes(app: RepoApp): void {
   app.post('/user/repos/:owner/:repo/contents', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const { malformed, body } = await readJsonBody<{
       branch?: string;
       path?: string;
@@ -225,7 +225,7 @@ function registerFileWriteRoutes(app: RepoApp): void {
   app.delete('/user/repos/:owner/:repo/contents', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const params = new URL(c.req.url).searchParams;
     const branch = (params.get('branch') ?? '').trim();
     if (!branch) return jsonError(c, 'branch query param is required', 400);

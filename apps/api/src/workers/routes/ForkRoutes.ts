@@ -1,8 +1,8 @@
 import type { Hono } from 'hono';
-import { ensureRepo, getRepoStub } from '../repoStub';
+import { ensureRepo, getRepoStub } from '../doStubs';
 import { jsonError, requireVisibleRepo, resolvePublicViewer, toRepoJson, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { copyRepoGit, isPackLimitError } from './CrossFork';
 import { recordAndNotify } from './SocialEmit';
 import { readJsonBody } from './BodyParser';
@@ -39,7 +39,7 @@ function registerUserForkRoutes(app: ForkApp): void {
   app.post('/user/repos/:owner/:repo/forks', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const { malformed, body } = await readJsonBody<{
       owner?: string;
       name?: string;
@@ -98,7 +98,7 @@ function registerUserForkRoutes(app: ForkApp): void {
   app.get('/user/repos/:owner/:repo/forks', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
-    const repoName = RepoService.normalizeRepo(c.req.param('repo'));
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     const scope = createRequestScope(c.env);
