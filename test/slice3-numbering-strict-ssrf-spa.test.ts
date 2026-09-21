@@ -8,6 +8,7 @@ import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { allocateNumberWithFallback } from '@edge-git/backend-services/numbering/numberAllocator';
 import { workerFetchAdapter } from '@edge-git/background/transfer/fetchAdapter';
 import { EdgeGitWorker } from '@/workers/EdgeGitWorker';
+import { SPA_HTML } from '@/generated/spa-shell';
 import { resetRateLimitForTests } from '@/middleware/rateLimit';
 
 // --- NumberingDAO -----------------------------------------------------------
@@ -279,11 +280,16 @@ describe('slice3: SPA catch-all route table', () => {
     return worker.onRequest(new Request(`https://git.example.com${path}`), env as Env, CTX);
   }
 
+  // Compares against the imported shell constant instead of a hardcoded
+  // marker: `spa-shell.ts` is gitignored and generated — CI runs against the
+  // empty postinstall stub while local checkouts may hold a built shell.
+  // What this suite locks is the ROUTE TABLE (shell vs 404 vs auth gate),
+  // not the build artifact body.
   async function expectShell(path: string, env: Record<string, unknown> = {}): Promise<void> {
     const res = await get(path, env);
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('text/html');
-    expect(await res.text()).toContain('<div id="root">');
+    expect(await res.text()).toBe(SPA_HTML);
   }
 
   it('serves the shell for app roots and repo pages', async () => {
