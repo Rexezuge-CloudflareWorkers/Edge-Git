@@ -123,13 +123,11 @@ class FetchHandler {
       if (shouldSendPackfile) {
         try {
           // deepen-not entries may be ref names; resolve to oids for exclusion.
-          // Bound count/length first so a flood of entries cannot fan out into
-          // unbounded `resolveRef` git I/O, and validate each entry shape.
+          // Count is already bounded by `validateFetchRequestCounts` above;
+          // validate each entry shape here so a flood of entries cannot fan
+          // out into unbounded `resolveRef` git I/O.
           const excludeOids: string[] = [];
           const deepenNot = fetchRequest.shallowOptions?.deepenNot ?? [];
-          if (deepenNot.length > limits.maxHaves) {
-            throw new PackLimitError(`too many deepen-not entries: limit is ${limits.maxHaves}`);
-          }
           const OID_OR_REF_RE = /^(?:[0-9a-f]{40}|refs\/[\w./-]{1,250})$/i;
           for (const entry of deepenNot) {
             if (entry.length > 255 || !OID_OR_REF_RE.test(entry)) {
