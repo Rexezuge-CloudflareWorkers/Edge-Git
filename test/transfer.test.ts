@@ -56,11 +56,25 @@ describe('normalizePublicGitUrl', () => {
 
 describe('parseUploadPackAdvertisement', () => {
   it('extracts heads and tags, skips service header and non-branch refs', () => {
-    const refs = parseUploadPackAdvertisement(advertisementBytes(), 100);
+    const { refs, symbolicHead } = parseUploadPackAdvertisement(advertisementBytes(), 100);
     expect(refs).toEqual([
       { ref: 'refs/heads/main', oid: OID_A },
       { ref: 'refs/tags/v1.0.0^{}', oid: OID_B },
     ]);
+    expect(symbolicHead).toBeNull();
+  });
+
+  it('captures the advertised HEAD symref target', () => {
+    const ad = PktLine.mergeLines([
+      PktLine.encode('# service=git-upload-pack\n'),
+      PktLine.encodeFlush(),
+      PktLine.encode(`${OID_A} HEAD\0symref=HEAD:refs/heads/master multi_ack\n`),
+      PktLine.encode(`${OID_A} refs/heads/master\n`),
+      PktLine.encodeFlush(),
+    ]);
+    const { refs, symbolicHead } = parseUploadPackAdvertisement(ad, 100);
+    expect(refs).toEqual([{ ref: 'refs/heads/master', oid: OID_A }]);
+    expect(symbolicHead).toBe('refs/heads/master');
   });
 
   it('enforces the ref cap', () => {

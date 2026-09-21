@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { headLabel, mergeHeadRepoOptions, sameRepoName } from '../apps/web/src/components/repo/pullHeadOptions';
 import { splitRepo } from '../apps/web/src/components/org/teamRepoInput';
 import { MAX_EDIT_CHARS, findReadmeEntry, isEditableSize, isReadmePath } from '../apps/web/src/components/repo/codeTabUtils';
+import { mergeEnrichedEntries, resolveSelectedRef } from '../apps/web/src/components/repo/useCodeTabOverview';
 import type { PullRequest, Repo, TreeEntry } from '../apps/web/src/types';
 
 function pull(overrides: Partial<PullRequest> = {}): PullRequest {
@@ -80,5 +81,38 @@ describe('slice4: codeTabUtils', () => {
     expect(isEditableSize(MAX_EDIT_CHARS)).toBe(true);
     expect(isEditableSize(MAX_EDIT_CHARS + 1)).toBe(false);
     expect(isEditableSize(10, 9)).toBe(false);
+  });
+});
+
+describe('slice4: code tab dangling-HEAD selection', () => {
+  it('keeps explicit known refs (branches and tags)', () => {
+    expect(resolveSelectedRef('feature', ['main', 'feature'], 'main', new Set())).toBe('feature');
+    expect(resolveSelectedRef('refs/tags/v1', ['main'], 'main', new Set(['refs/tags/v1']))).toBe('refs/tags/v1');
+  });
+
+  it('follows the default branch when it exists', () => {
+    expect(resolveSelectedRef('', ['main', 'feature'], 'main', new Set())).toBe('main');
+  });
+
+  it('falls back to the first branch when HEAD dangles (mirror of a master upstream)', () => {
+    expect(resolveSelectedRef('', ['master', 'test'], 'main', new Set())).toBe('master');
+    expect(resolveSelectedRef('main', ['master'], 'main', new Set())).toBe('master');
+  });
+
+  it('falls back to HEAD for truly empty repos', () => {
+    expect(resolveSelectedRef('', [], 'main', new Set())).toBe('HEAD');
+    expect(resolveSelectedRef('', [], null, new Set())).toBe('HEAD');
+  });
+
+  it('never wipes entries when enrichment comes back empty', () => {
+    const prev = [entry('README.md')];
+    expect(mergeEnrichedEntries(prev, [])).toBe(prev);
+    expect(mergeEnrichedEntries([], [])).toEqual([]);
+  });
+
+  it('still merges last-commit enrichment by path+oid', () => {
+    const prev = [{ path: 'a.txt', oid: 'o1', lastCommit: null } as TreeEntry];
+    const enriched = [{ path: 'a.txt', oid: 'o1', lastCommit: { oid: 'c1' } } as unknown as TreeEntry];
+    expect(mergeEnrichedEntries(prev, enriched)).toEqual([{ path: 'a.txt', oid: 'o1', lastCommit: { oid: 'c1' } }]);
   });
 });
