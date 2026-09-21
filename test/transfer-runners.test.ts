@@ -307,6 +307,53 @@ describe('runImportJob', () => {
     expect(seen).toEqual(['alice/empty']);
     expect(db.data.imports[0].status).toBe('done');
   });
+
+  it('points HEAD at the upstream default branch when it lands off main', async () => {
+    const db = createRunnerDb({
+      imports: [
+        {
+          id: 'j-head',
+          repository_id: 'r1',
+          source_url: 'https://github.com/o/r',
+          status: 'pending',
+          error: null,
+          refs_json: null,
+          imported_refs: 0,
+          created_by: 'a@b.c',
+          created_at: 0,
+          updated_at: 0,
+        },
+      ],
+    });
+    const importPack = vi.fn(async () => ({ importedRefs: ['refs/heads/master'] }));
+    const setDefaultBranch = vi.fn(async () => ({ ok: true }));
+    const stub = { listRefs: async () => ({ refs: [], symbolicHead: null }), importPack, setDefaultBranch };
+    const env = { DB: db, REPO: { getByName: () => stub } } as unknown as Env;
+    const ad = PktLine.mergeLines([
+      PktLine.encode('# service=git-upload-pack\n'),
+      PktLine.encodeFlush(),
+      PktLine.encode(`${NEW} HEAD\0symref=HEAD:refs/heads/master multi_ack\n`),
+      PktLine.encode(`${NEW} refs/heads/master\n`),
+      PktLine.encodeFlush(),
+    ]);
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: string) => {
+      if (String(url).includes('/info/refs')) {
+        return new Response(ad as unknown as BodyInit, {
+          status: 200,
+          headers: { 'Content-Type': 'application/x-git-upload-pack-advertisement' },
+        });
+      }
+      return new Response(packResponse() as unknown as BodyInit, { status: 200 });
+    }) as typeof fetch;
+    try {
+      await runImportJob(env, 'alice/empty', 'j-head');
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+    expect(db.data.imports[0].status).toBe('done');
+    expect(setDefaultBranch).toHaveBeenCalledWith('master');
+  });
 });
 
 describe('runMirrorSync', () => {
@@ -537,5 +584,63 @@ describe('runMirrorSync', () => {
     // DO and the overview stays empty (live PublicMirror incident).
     expect(seen).toEqual(['publicmirror/aws-accessbridge']);
     expect(db.data.mirrors[0].last_status).toBe('ok');
+  });
+
+  it('points HEAD at the upstream default branch while it dangles', async () => {
+    const db = createRunnerDb({
+      repos: [{ id: 'r1', owner: 'alice', name: 'demo' }],
+      mirrors: [
+        {
+          repository_id: 'r1',
+          source_url: 'https://github.com/o/r',
+          interval_minutes: 60,
+          enabled: 1,
+          last_run_at: null,
+          last_status: null,
+          last_error: null,
+          consecutive_failures: 0,
+          created_by: 'a@b.c',
+          created_at: 0,
+          updated_at: 0,
+        },
+      ],
+    });
+    const updateRefs = vi.fn(async () => ({ updated: [] as string[] }));
+    const setDefaultBranch = vi.fn(async () => ({ ok: true }));
+    const stub = {
+      listRefs: async () => ({ refs: [], symbolicHead: 'refs/heads/main' }),
+      importPack: async () => ({ importedRefs: [] as string[] }),
+      isAncestor: async () => true,
+      updateRefs,
+      setDefaultBranch,
+    };
+    const ad = PktLine.mergeLines([
+      PktLine.encode('# service=git-upload-pack\n'),
+      PktLine.encodeFlush(),
+      PktLine.encode(`${NEW} HEAD\0symref=HEAD:refs/heads/master multi_ack\n`),
+      PktLine.encode(`${NEW} refs/heads/master\n`),
+      PktLine.encodeFlush(),
+    ]);
+    const pack = new Uint8Array([...new TextEncoder().encode('PACK'), 0, 0, 0, 2, 0, 0, 0, 1, 7, 8, 9, 10, 11]);
+    const packBody = PktLine.mergeLines([PktLine.encodeSideband(1, pack)]);
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: string) => {
+      if (String(url).includes('/info/refs')) {
+        return new Response(ad as unknown as BodyInit, {
+          status: 200,
+          headers: { 'Content-Type': 'application/x-git-upload-pack-advertisement' },
+        });
+      }
+      return new Response(packBody as unknown as BodyInit, { status: 200 });
+    }) as typeof fetch;
+    try {
+      await runMirrorSync(mirrorEnv(db, stub), 'r1');
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+    expect(db.data.mirrors[0].last_status).toBe('ok');
+    // Fresh-repo HEAD dangles at main while the upstream lives on master:
+    // the sync adopts the upstream default so clones and default reads land.
+    expect(setDefaultBranch).toHaveBeenCalledWith('master');
   });
 });

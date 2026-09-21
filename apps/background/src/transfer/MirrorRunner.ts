@@ -13,6 +13,7 @@ interface MirrorStub {
   importPack(pack: Uint8Array): Promise<{ importedRefs: string[] }>;
   isAncestor(ancestor: string, oid: string): Promise<boolean>;
   updateRefs(updates: Array<{ ref: string; oldOid: string; newOid: string }>): Promise<{ updated: string[] }>;
+  setDefaultBranch(branch: string): Promise<unknown>;
 }
 
 // Sync one mirror: fetch the remote advertisement + pack, index objects,
@@ -46,7 +47,7 @@ async function runMirrorSync(env: Env, repositoryId: string): Promise<void> {
     const local = await stub.listRefs().catch(() => null);
     const localByRef = new Map((local?.refs ?? []).map((r) => [r.ref, r.oid]));
     const limits = scope.get(Tokens.ImportService).transferLimits();
-    const { refs: remoteRefs, pack } = await fetchRemotePack(workerFetchAdapter(), mirror.source_url, {
+    const { refs: remoteRefs, pack, symbolicHead } = await fetchRemotePack(workerFetchAdapter(), mirror.source_url, {
       maxRefs: limits.maxRefs,
       maxPackBytes: limits.maxPackBytes,
       timeoutMs: limits.timeoutMs,
@@ -71,6 +72,16 @@ async function runMirrorSync(env: Env, repositoryId: string): Promise<void> {
     }
     if (updates.length > 0) {
       await stub.updateRefs(updates).catch(() => ({ updated: [] }));
+    }
+    // Preserve the upstream default branch: a fresh repo's HEAD points at
+    // `main`, which dangles when the source lives elsewhere (e.g. `master`).
+    // Best-effort and self-healing — the next sync repairs older mirrors too.
+    if (symbolicHead && symbolicHead.startsWith('refs/heads/')) {
+      const branch = symbolicHead.slice('refs/heads/'.length);
+      const landed = new Set([...localByRef.keys(), ...updates.map((u) => u.ref)]);
+      if (landed.has(symbolicHead)) {
+        await stub.setDefaultBranch(branch).catch(() => undefined);
+      }
     }
     await mirrorDAO.recordRun(repositoryId, true, null, now, maxFailures).catch(() => undefined);
     logger.info(`Mirror sync for ${fullName} ok: ${updates.length} refs updated, ${skipped} diverged skipped`);

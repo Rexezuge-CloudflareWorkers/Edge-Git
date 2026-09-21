@@ -4,10 +4,21 @@ import { decodeBlobContent, loadOverview, loadTree } from '../../services/repoSe
 
 function resolveSelectedRef(ref: string, branches: string[], currentBranch: string | null, tagRefs: Set<string>): string {
   const isKnownRef = (ref.startsWith('refs/tags/') && tagRefs.has(ref)) || (ref !== '' && branches.includes(ref));
-  return isKnownRef ? ref : (currentBranch ?? branches[0] ?? 'HEAD');
+  if (isKnownRef) return ref;
+  // The default branch can dangle (fresh repos init HEAD to `main` while the
+  // first push / mirror landed elsewhere, e.g. `master`). Never select a ref
+  // that is not in the branch list — it resolves to nothing, shows an empty
+  // tree, and lets enrichment wipe the fallback content. Fall back to the
+  // first branch so the home load always shows real content.
+  if (currentBranch && branches.includes(currentBranch)) return currentBranch;
+  return branches[0] ?? 'HEAD';
 }
 
 function mergeEnrichedEntries(prev: TreeEntry[], enriched: TreeEntry[]): TreeEntry[] {
+  // Enrichment re-reads the same ref+dir with last-commit data; when it comes
+  // back empty while we hold entries (dangling-ref read, or a delete racing
+  // the two calls), keep the stale list instead of flashing "Empty Repository".
+  if (enriched.length === 0 && prev.length > 0) return prev;
   if (prev.length !== enriched.length) return enriched;
   const byKey = new Map(enriched.map((e) => [`${e.oid}:${e.path}`, e.lastCommit ?? null]));
   let changed = false;
