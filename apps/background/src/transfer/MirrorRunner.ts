@@ -1,7 +1,7 @@
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { createLogger } from '@edge-git/backend-runtime/logger';
 import { fetchRemotePack } from '@edge-git/git-protocol';
-import { TimestampUtil } from '@edge-git/shared/utils';
+import { TimestampUtil, repoDoKeyForFullName } from '@edge-git/shared/utils';
 import { workerFetchAdapter } from './fetchAdapter';
 
 const logger = createLogger('MirrorRunner');
@@ -40,7 +40,9 @@ async function runMirrorSync(env: Env, repositoryId: string): Promise<void> {
       return;
     }
     const fullName = `${repo.owner}/${repo.name}`;
-    const stub = env.REPO.getByName(fullName) as unknown as MirrorStub;
+    // Route via the canonical lowercase DO key (see doStubs.getRepoStub):
+    // raw-case getByName forks a second isolate that reads never see.
+    const stub = env.REPO.getByName(repoDoKeyForFullName(fullName)) as unknown as MirrorStub;
     const local = await stub.listRefs().catch(() => null);
     const localByRef = new Map((local?.refs ?? []).map((r) => [r.ref, r.oid]));
     const limits = scope.get(Tokens.ImportService).transferLimits();

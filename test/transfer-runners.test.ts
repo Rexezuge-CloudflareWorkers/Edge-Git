@@ -257,6 +257,56 @@ describe('runImportJob', () => {
     } as unknown as Env;
     await expect(runImportJob(env, 'alice/empty', 'missing')).resolves.toBeUndefined();
   });
+
+  it('routes the repo stub via the canonical lowercase DO key', async () => {
+    const db = createRunnerDb({
+      imports: [
+        {
+          id: 'j-key',
+          repository_id: 'r1',
+          source_url: 'https://github.com/o/r',
+          status: 'pending',
+          error: null,
+          refs_json: null,
+          imported_refs: 0,
+          created_by: 'a@b.c',
+          created_at: 0,
+          updated_at: 0,
+        },
+      ],
+    });
+    const importPack = vi.fn(async () => ({ importedRefs: ['refs/heads/main'] }));
+    const stub = { listRefs: async () => ({ refs: [], symbolicHead: null }), importPack };
+    const seen: string[] = [];
+    const env = {
+      DB: db,
+      REPO: {
+        getByName: (key: string) => {
+          seen.push(key);
+          return stub;
+        },
+      },
+    } as unknown as Env;
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: string) => {
+      if (String(url).includes('/info/refs')) {
+        return new Response(advertisement() as unknown as BodyInit, {
+          status: 200,
+          headers: { 'Content-Type': 'application/x-git-upload-pack-advertisement' },
+        });
+      }
+      return new Response(packResponse() as unknown as BodyInit, { status: 200 });
+    }) as typeof fetch;
+    try {
+      await runImportJob(env, 'Alice/Empty', 'j-key');
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+    // Mixed-case display name must still address the canonical isolate that
+    // API reads (getRepoStub) use, or the import lands where nobody reads.
+    expect(seen).toEqual(['alice/empty']);
+    expect(db.data.imports[0].status).toBe('done');
+  });
 });
 
 describe('runMirrorSync', () => {
@@ -430,5 +480,62 @@ describe('runMirrorSync', () => {
     expect(db.data.mirrors[0].last_status).toBe('failed');
     expect(db.data.mirrors[0].consecutive_failures).toBe(1);
     expect(db.data.mirrors[0].enabled).toBe(1);
+  });
+
+  it('routes the repo stub via the canonical lowercase DO key', async () => {
+    const db = createRunnerDb({
+      repos: [{ id: 'r1', owner: 'PublicMirror', name: 'AWS-AccessBridge' }],
+      mirrors: [
+        {
+          repository_id: 'r1',
+          source_url: 'https://github.com/o/r',
+          interval_minutes: 60,
+          enabled: 1,
+          last_run_at: null,
+          last_status: null,
+          last_error: null,
+          consecutive_failures: 0,
+          created_by: 'a@b.c',
+          created_at: 0,
+          updated_at: 0,
+        },
+      ],
+    });
+    const stub = {
+      listRefs: async () => ({ refs: [], symbolicHead: null }),
+      importPack: async () => ({ importedRefs: [] as string[] }),
+      isAncestor: async () => true,
+      updateRefs: async () => ({ updated: [] as string[] }),
+    };
+    const seen: string[] = [];
+    const env = {
+      DB: db,
+      REPO: {
+        getByName: (key: string) => {
+          seen.push(key);
+          return stub;
+        },
+      },
+    } as unknown as Env;
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: string) => {
+      if (String(url).includes('/info/refs')) {
+        return new Response(advertisement() as unknown as BodyInit, {
+          status: 200,
+          headers: { 'Content-Type': 'application/x-git-upload-pack-advertisement' },
+        });
+      }
+      return new Response(packResponse() as unknown as BodyInit, { status: 200 });
+    }) as typeof fetch;
+    try {
+      await runMirrorSync(env, 'r1');
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+    // Mixed-case repos must sync into the same canonical isolate that API
+    // reads (getRepoStub) address — otherwise the sync populates an orphaned
+    // DO and the overview stays empty (live PublicMirror incident).
+    expect(seen).toEqual(['publicmirror/aws-accessbridge']);
+    expect(db.data.mirrors[0].last_status).toBe('ok');
   });
 });

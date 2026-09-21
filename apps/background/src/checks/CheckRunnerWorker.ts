@@ -3,7 +3,7 @@ import type { CheckRunDAO } from '@edge-git/backend-data/dao';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { isBuiltInCheckContext } from '@edge-git/backend-services/checks';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
-import { TimestampUtil } from '@edge-git/shared/utils';
+import { TimestampUtil, repoDoKeyForFullName } from '@edge-git/shared/utils';
 import { createLogger } from '@edge-git/backend-runtime/logger';
 import { loadCheckDefinition, loadCheckScript } from './CheckDefinition';
 import type { CustomCheckDefinition, LoadedDefinition } from './CheckDefinition';
@@ -27,7 +27,7 @@ interface PendingItem extends EnqueueChecksInput {
 
 const MAX_ATTEMPTS = 3;
 
-// CI check executor: one DO per repo (`CHECK_RUNNER.getByName(fullName)`).
+// CI check executor: one DO per repo (`CHECK_RUNNER.getByName(repoDoKeyForFullName(fullName))`).
 // Facade over CheckStepExecutor (built-in deterministic steps) + CustomJsSandbox
 // (repo-defined custom-js): this DO owns only queue/alarm/routing + D1 status
 // transitions so it stays under the god-file guard.
@@ -94,7 +94,9 @@ class CheckRunnerWorker extends DurableObject<Env> {
     // Composition root (never `new XDAO(env.DB)` inline per AGENTS).
     const dao = await createRequestScope(this.env as never).get(Tokens.CheckRunDAO)();
     const fullName = await this.resolveFullName(item.repositoryId);
-    const repoStub = this.env.REPO.getByName(fullName ?? item.repositoryId) as unknown as RepoStubShape;
+    // Canonical lowercase DO key (see doStubs.getRepoStub); the repositoryId
+    // fallback is already opaque and never a display-case name.
+    const repoStub = this.env.REPO.getByName(fullName ? repoDoKeyForFullName(fullName) : item.repositoryId) as unknown as RepoStubShape;
     // Definitions load once per batch; absent means every custom context in
     // this item stays queued for external runners.
     let definition: LoadedDefinition | null = null;

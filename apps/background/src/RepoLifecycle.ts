@@ -38,7 +38,7 @@ class RepoLifecycle {
     // Targeted purge: remove repo content + release assets + name binding but
     // preserve the dofs schema tables (`dofs_files/dofs_chunks/dofs_meta`).
     // `ctx.storage.deleteAll()` also drops those tables while the warm DO
-    // isolate (reused via `REPO.getByName(fullName)`) keeps its `Fs` instance,
+    // isolate (reused via canonical-key `REPO.getByName`) keeps its `Fs` instance,
     // whose schema bootstrap runs only once in the constructor — a later
     // recreate of the same name then fails with `no such table: dofs_files`.
     for (const path of ['/repo', '/release-assets']) {

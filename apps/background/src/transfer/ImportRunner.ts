@@ -1,7 +1,7 @@
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { createLogger } from '@edge-git/backend-runtime/logger';
 import { fetchRemotePack } from '@edge-git/git-protocol';
-import { TimestampUtil } from '@edge-git/shared/utils';
+import { TimestampUtil, repoDoKeyForFullName } from '@edge-git/shared/utils';
 import { workerFetchAdapter } from './fetchAdapter';
 
 const logger = createLogger('ImportRunner');
@@ -25,7 +25,9 @@ async function runImportJob(env: Env, fullName: string, jobId: string): Promise<
     await importDAO.markFailed(jobId, message, TimestampUtil.getCurrentUnixTimestampInSeconds()).catch(() => undefined);
   };
   try {
-    const stub = env.REPO.getByName(fullName) as unknown as RepoStub;
+    // Route via the canonical lowercase DO key (see doStubs.getRepoStub):
+    // raw-case getByName forks a second isolate that reads never see.
+    const stub = env.REPO.getByName(repoDoKeyForFullName(fullName)) as unknown as RepoStub;
     const local = await stub.listRefs().catch(() => null);
     if (local && (local.refs ?? []).length > 0) {
       await fail('repository is not empty; imports only target empty repositories');
