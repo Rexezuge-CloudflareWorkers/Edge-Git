@@ -1,5 +1,5 @@
 import type { Repo, RepoEvent } from '../types';
-import { apiDelete, apiGet, apiPost } from '../lib/api';
+import { apiDelete, apiGet, apiPut } from '../lib/api';
 
 function authedBase(owner: string, repo: string): string {
   return `/user/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
@@ -30,7 +30,7 @@ export async function getWatchState(owner: string, repo: string): Promise<WatchS
 }
 
 export async function starRepo(owner: string, repo: string): Promise<StarState & { starred: boolean }> {
-  return apiPost(`${authedBase(owner, repo)}/star`);
+  return apiPut(`${authedBase(owner, repo)}/star`);
 }
 
 export async function unstarRepo(owner: string, repo: string): Promise<StarState & { starred: boolean }> {
@@ -38,7 +38,7 @@ export async function unstarRepo(owner: string, repo: string): Promise<StarState
 }
 
 export async function watchRepo(owner: string, repo: string): Promise<WatchState & { watching: boolean }> {
-  return apiPost(`${authedBase(owner, repo)}/watch`);
+  return apiPut(`${authedBase(owner, repo)}/watch`);
 }
 
 export async function unwatchRepo(owner: string, repo: string): Promise<WatchState & { watching: boolean }> {
