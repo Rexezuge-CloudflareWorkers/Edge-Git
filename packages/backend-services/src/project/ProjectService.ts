@@ -1,8 +1,10 @@
 import { ProjectDAO } from '@edge-git/backend-data/dao';
+import { NumberingDAO } from '@edge-git/backend-data/dao';
 import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import type { ProjectCardMetadata, ProjectColumnMetadata, ProjectMetadata } from '@edge-git/shared';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
+import { allocateNumberWithFallback } from '../numbering/numberAllocator';
 import { ProjectBoardService } from './ProjectBoardService';
 import { MAX_DESCRIPTION, isUniqueViolation, normalizeTitle, toMetadata } from './projectShared';
 import type { ProjectServiceDeps, ProjectServiceEnv } from './projectShared';
@@ -19,7 +21,8 @@ class ProjectService {
     deps: ProjectServiceDeps = {},
   ) {
     const daoThunk = deps.projectDAO ?? (() => Promise.resolve(new ProjectDAO(env.DB)));
-    this.deps = { projectDAO: daoThunk };
+    const numberingThunk = deps.numberingDAO ?? (() => Promise.resolve(new NumberingDAO(env.DB)));
+    this.deps = { projectDAO: daoThunk, numberingDAO: numberingThunk };
     this.board = new ProjectBoardService(env, { projectDAO: daoThunk });
   }
 
@@ -41,12 +44,13 @@ class ProjectService {
     const max = ConfigurationManager.collabSurfaces.getMaxProjectsPerRepo(this.env);
     const count = await dao.countByRepo(repositoryId).catch(() => 0);
     if (count >= max) throw new BadRequestError(`Maximum ${max} projects per repository`);
+    // Atomic allocator first; legacy nextNumber on fallback (see IssueService).
     // Retry on UNIQUE(repository_id, number) races from concurrent POSTs.
     let lastError: unknown = null;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
       const id = UUIDUtil.getRandomUUID();
-      const number = await dao.nextNumber(repositoryId);
+      const number = await allocateNumberWithFallback(this.deps.numberingDAO, () => dao.nextNumber(repositoryId), repositoryId, 'project');
       try {
         await dao.createProject({ id, repositoryId, number, title, description, creatorEmail: creatorEmail.toLowerCase(), now });
         // Seed the canonical three columns so boards are usable immediately.

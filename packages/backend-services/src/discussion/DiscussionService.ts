@@ -1,10 +1,11 @@
-import { DiscussionDAO } from '@edge-git/backend-data/dao';
+import { DiscussionDAO, NumberingDAO } from '@edge-git/backend-data/dao';
 import type { DiscussionCommentRow, DiscussionRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import type { DiscussionCategoryMetadata, DiscussionCommentMetadata, DiscussionMetadata } from '@edge-git/shared';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
+import { allocateNumberWithFallback } from '../numbering/numberAllocator';
 
 interface DiscussionServiceEnv {
   DB: D1Queryable;
@@ -13,6 +14,7 @@ interface DiscussionServiceEnv {
 
 interface DiscussionServiceDeps {
   discussionDAO?: () => Promise<DiscussionDAO>;
+  numberingDAO?: () => Promise<NumberingDAO>;
 }
 
 const MAX_TITLE = 200;
@@ -94,6 +96,7 @@ class DiscussionService {
   ) {
     this.deps = {
       discussionDAO: () => Promise.resolve(new DiscussionDAO(env.DB)),
+      numberingDAO: () => Promise.resolve(new NumberingDAO(env.DB)),
       ...deps,
     };
   }
@@ -127,13 +130,14 @@ class DiscussionService {
       if (!category) throw new BadRequestError('unknown category');
       categoryId = category.id;
     }
+    // Atomic allocator first; legacy MAX+1 loop on fallback (see IssueService).
     // Retry on UNIQUE(repository_id, number) races from concurrent POSTs:
     // re-read MAX(number)+1 after a conflict (3 attempts, then surface).
     let lastError: unknown = null;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const id = UUIDUtil.getRandomUUID();
       const attemptNow = TimestampUtil.getCurrentUnixTimestampInSeconds();
-      const number = await dao.nextNumber(repositoryId);
+      const number = await allocateNumberWithFallback(this.deps.numberingDAO, () => dao.nextNumber(repositoryId), repositoryId, 'discussion');
       try {
         await dao.createDiscussion({ id, repositoryId, categoryId, number, title, body, authorEmail: authorEmail.toLowerCase(), now: attemptNow });
         const row = await dao.getByNumber(repositoryId, number);

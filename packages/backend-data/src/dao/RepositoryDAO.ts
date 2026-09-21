@@ -124,6 +124,9 @@ class RepositoryDAO extends BaseDAO {
     // Indexed case-insensitive lookup first: `owner_ci/name_ci` are indexed
     // (migration 0002). `lower(owner)` cannot use those indexes (full scan),
     // so it is only a fallback for legacy rows lacking the ci columns.
+    // Non-schema failures wrap as DatabaseError (never raw): git auth maps
+    // DatabaseError → 503 (outage, retryable) vs 401 (bad credentials), so a
+    // raw D1 error must not leak through as a confusing 500.
     const ownerCi = owner.toLowerCase();
     const nameCi = name.toLowerCase();
     try {
@@ -133,17 +136,26 @@ class RepositoryDAO extends BaseDAO {
         .first<RepositoryRow>();
       if (indexed) return indexed;
     } catch (error) {
-      if (!isMissingSchemaError(error)) throw error;
+      if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to look up repository: ${error instanceof Error ? error.message : String(error)}`);
     }
-    const ci = await this.database
-      .prepare('SELECT * FROM repositories WHERE lower(owner) = ? AND lower(name) = ? LIMIT 1')
-      .bind(ownerCi, nameCi)
-      .first<RepositoryRow>();
+    let ci: RepositoryRow | null = null;
+    try {
+      ci = await this.database
+        .prepare('SELECT * FROM repositories WHERE lower(owner) = ? AND lower(name) = ? LIMIT 1')
+        .bind(ownerCi, nameCi)
+        .first<RepositoryRow>();
+    } catch (error) {
+      if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to look up repository: ${error instanceof Error ? error.message : String(error)}`);
+    }
     if (ci) return ci;
-    return this.database
-      .prepare('SELECT * FROM repositories WHERE owner = ? AND name = ? LIMIT 1')
-      .bind(owner, name)
-      .first<RepositoryRow>();
+    try {
+      return await this.database
+        .prepare('SELECT * FROM repositories WHERE owner = ? AND name = ? LIMIT 1')
+        .bind(owner, name)
+        .first<RepositoryRow>();
+    } catch (error) {
+      throw new DatabaseError(`Failed to look up repository: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   public async getById(id: string): Promise<RepositoryRow | null> {

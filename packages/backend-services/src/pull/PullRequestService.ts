@@ -1,8 +1,9 @@
-import { PullRequestDAO } from '@edge-git/backend-data/dao';
+import { NumberingDAO, PullRequestDAO } from '@edge-git/backend-data/dao';
 import type { PullRequestCommentRow, PullRequestReviewRow, PullRequestRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
+import { allocateNumberWithFallback } from '../numbering/numberAllocator';
 
 interface PullRequestServiceEnv {
   DB: D1Queryable;
@@ -10,6 +11,7 @@ interface PullRequestServiceEnv {
 
 interface PullRequestServiceDeps {
   pullRequestDAO?: () => Promise<PullRequestDAO>;
+  numberingDAO?: () => Promise<NumberingDAO>;
 }
 
 type ReviewState = 'approved' | 'changes_requested' | 'commented';
@@ -55,6 +57,7 @@ class PullRequestService {
   ) {
     this.deps = {
       pullRequestDAO: () => Promise.resolve(new PullRequestDAO(env.DB)),
+      numberingDAO: () => Promise.resolve(new NumberingDAO(env.DB)),
       ...deps,
     };
   }
@@ -122,10 +125,11 @@ class PullRequestService {
       throw new BadRequestError('headFullName must differ from the base repository for cross-fork pull requests');
     }
     const dao = await this.deps.pullRequestDAO();
+    // Atomic allocator first; legacy MAX+1 loop on fallback (see IssueService).
     // Retry on UNIQUE(repository_id, number) races from concurrent POSTs.
     let lastError: unknown = null;
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      const number = await dao.nextNumber(input.repositoryId);
+      const number = await allocateNumberWithFallback(this.deps.numberingDAO, () => dao.nextNumber(input.repositoryId), input.repositoryId, 'pull');
       const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
       const id = UUIDUtil.getRandomUUID();
       try {

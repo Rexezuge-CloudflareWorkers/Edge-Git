@@ -2,6 +2,7 @@ import type { ProjectCardRow, ProjectColumnRow, ProjectRow } from '@edge-git/bac
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError } from '@edge-git/backend-errors';
 import type { ProjectDAO } from '@edge-git/backend-data/dao';
+import type { NumberingDAO } from '@edge-git/backend-data/dao';
 import type { ProjectCardMetadata, ProjectColumnMetadata, ProjectMetadata } from '@edge-git/shared';
 
 interface ProjectServiceEnv {
@@ -13,6 +14,7 @@ interface ProjectServiceEnv {
 
 interface ProjectServiceDeps {
   projectDAO?: () => Promise<ProjectDAO>;
+  numberingDAO?: () => Promise<NumberingDAO>;
 }
 
 const MAX_TITLE = 100;
