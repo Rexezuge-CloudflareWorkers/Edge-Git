@@ -150,10 +150,16 @@ export function CodeTab({
         }
         st.key = key;
         setBranches(overview.branches);
-        setDefaultBranch(overview.currentBranch ?? overview.branches[0] ?? null);
+        // Prefer a branch that exists: a dangling HEAD (fresh repo defaulting
+        // to `main`, mirror of a `master` upstream) must not become the
+        // selection, or the tree resolves to nothing.
+        const fallbackBranch = overview.currentBranch && overview.branches.includes(overview.currentBranch)
+          ? overview.currentBranch
+          : (overview.branches[0] ?? null);
+        setDefaultBranch(fallbackBranch);
         setTags(overview.tags);
         const tagRefs = new Set(overview.tags.map((tg) => tg.ref));
-        const resolvedRef = resolveSelectedRef(ref, overview.branches, overview.currentBranch ?? overview.branches[0] ?? null, tagRefs);
+        const resolvedRef = resolveSelectedRef(ref, overview.branches, fallbackBranch, tagRefs);
         if (ref !== '' && resolvedRef !== ref) {
           // Unknown `?ref=` (e.g. a deleted branch in a pasted link) folds
           // back to the default branch, and the URL follows.

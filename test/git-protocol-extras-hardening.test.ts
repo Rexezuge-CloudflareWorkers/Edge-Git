@@ -63,7 +63,7 @@ describe('upload-pack request/response hardening', () => {
       PktLine.encode(`${oid} refs/pull/1/head\n`),
       PktLine.encodeFlush(),
     ];
-    const refs = parseUploadPackAdvertisement(PktLine.mergeLines(lines), 10);
+    const { refs } = parseUploadPackAdvertisement(PktLine.mergeLines(lines), 10);
     expect(refs).toEqual([{ ref: 'refs/heads/main', oid }]);
   });
 

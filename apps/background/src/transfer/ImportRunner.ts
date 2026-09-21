@@ -9,6 +9,7 @@ const logger = createLogger('ImportRunner');
 interface RepoStub {
   listRefs(): Promise<{ refs: Array<{ ref: string; oid: string }>; symbolicHead: string | null }>;
   importPack(pack: Uint8Array, refs?: Array<{ ref: string; oid: string }>): Promise<{ importedRefs: string[] }>;
+  setDefaultBranch(branch: string): Promise<unknown>;
 }
 
 // Execute one import job: refuse non-empty repos, fetch the remote pack
@@ -34,12 +35,17 @@ async function runImportJob(env: Env, fullName: string, jobId: string): Promise<
       return;
     }
     const limits = scope.get(Tokens.ImportService).transferLimits();
-    const { refs, pack } = await fetchRemotePack(workerFetchAdapter(), job.source_url, {
+    const { refs, pack, symbolicHead } = await fetchRemotePack(workerFetchAdapter(), job.source_url, {
       maxRefs: limits.maxRefs,
       maxPackBytes: limits.maxPackBytes,
       timeoutMs: limits.timeoutMs,
     });
     const { importedRefs } = await stub.importPack(pack, refs);
+    // Preserve the upstream default branch so clones and default reads land
+    // on real content when the source lives off `main`. Best-effort.
+    if (symbolicHead && symbolicHead.startsWith('refs/heads/') && importedRefs.includes(symbolicHead)) {
+      await stub.setDefaultBranch(symbolicHead.slice('refs/heads/'.length)).catch(() => undefined);
+    }
     await importDAO.markDone(jobId, JSON.stringify(refs), importedRefs.length, now).catch(() => undefined);
     logger.info(`Import ${jobId} for ${fullName} done: ${importedRefs.length} refs`);
   } catch (error) {

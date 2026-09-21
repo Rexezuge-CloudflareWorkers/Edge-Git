@@ -49,6 +49,8 @@ interface RemoteRef {
 interface RemotePack {
   refs: RemoteRef[];
   pack: Uint8Array;
+  // Advertised `HEAD` symref target (e.g. `refs/heads/main`), if present.
+  symbolicHead: string | null;
 }
 
 /**
@@ -158,17 +160,24 @@ function readPackets(body: Uint8Array): Uint8Array[] {
 
 /**
  * Parse a Smart HTTP `info/refs?service=git-upload-pack` advertisement
- * into ref→oid pairs (heads + tags only). Skips the `# service=` header
- * and capability suffixes after NUL.
+ * into ref→oid pairs (heads + tags only) plus the advertised `HEAD` symref
+ * target, if any. Skips the `# service=` header and capability suffixes
+ * after NUL. The symref lets import/mirror preserve the upstream default
+ * branch instead of leaving HEAD dangling at the fresh-repo `main`.
  */
-function parseUploadPackAdvertisement(body: Uint8Array, maxRefs: number): RemoteRef[] {
+function parseUploadPackAdvertisement(body: Uint8Array, maxRefs: number): { refs: RemoteRef[]; symbolicHead: string | null } {
   const refs: RemoteRef[] = [];
+  let symbolicHead: string | null = null;
   for (const payload of readPackets(body)) {
     const text = PktLine.decodeText(payload);
     if (text.startsWith('# service=')) continue;
     if (text === 'NAK\n' || text === 'NAK') continue;
     const nul = text.indexOf('\0');
     const line = (nul === -1 ? text : text.slice(0, nul)).trim();
+    if (nul !== -1 && symbolicHead === null && /^[0-9a-f]{40} HEAD\s*$/.test(line)) {
+      const symref = /symref=HEAD:(refs\/heads\/\S+)/.exec(text.slice(nul + 1));
+      if (symref) symbolicHead = symref[1];
+    }
     const match = /^([0-9a-f]{40}) (refs\/\S+)\s*$/.exec(line);
     if (!match) continue;
     const [, oid, ref] = match;
@@ -177,7 +186,7 @@ function parseUploadPackAdvertisement(body: Uint8Array, maxRefs: number): Remote
     refs.push({ ref, oid });
     if (refs.length > maxRefs) throw new Error(`remote advertises too many refs (limit ${maxRefs})`);
   }
-  return refs;
+  return { refs, symbolicHead };
 }
 
 /**
@@ -267,7 +276,7 @@ async function fetchRemotePack(
   ) {
     throw new Error('remote is not a git Smart HTTP endpoint');
   }
-  const refs = parseUploadPackAdvertisement(advertised.body, opts.maxRefs);
+  const { refs, symbolicHead } = parseUploadPackAdvertisement(advertised.body, opts.maxRefs);
   if (refs.length === 0) throw new Error('remote has no branches or tags to import');
   const packSignal = AbortSignal.timeout(opts.timeoutMs);
   const oids = [...new Set(refs.map((r) => r.oid))];
@@ -279,7 +288,7 @@ async function fetchRemotePack(
   );
   if (fetched.status !== 200) throw new Error(`remote upload-pack failed with HTTP ${fetched.status}`);
   const { pack } = decodeUploadPackResponse(fetched.body, opts.maxPackBytes);
-  return { refs, pack };
+  return { refs, pack, symbolicHead };
 }
 
 export { fetchRemotePack, parseUploadPackAdvertisement, buildUploadPackRequest, decodeUploadPackResponse, normalizePublicGitUrl, resolveRedirectUrl, MAX_REDIRECTS };
