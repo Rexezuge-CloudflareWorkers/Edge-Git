@@ -644,9 +644,10 @@ describe('TeamService members', () => {
     await svc.setMemberRole('acme', 'frontend', 'owner@x.co', 'a@x.co', 'member');
     await svc.removeMember('acme', 'frontend', 'owner@x.co', 'a@x.co');
     const members = await svc.listMembers('acme', 'frontend', 'member@x.co');
-    expect(members.map((m) => m.email).sort()).toEqual(['b@x.co', 'u@x.co']);
-    // Unknown users resolve to a null username instead of failing the list.
-    expect(members.find((m) => m.email === 'b@x.co')).toMatchObject({ username: null, role: 'admin' });
+    expect(members.map((m) => m.username).sort()).toEqual(['bob', 'ghost']);
+    // Unknown users resolve to ghost instead of leaking email or failing the list.
+    expect(members.find((m) => m.username === 'ghost')).toMatchObject({ role: 'admin' });
+    expect(members.every((m) => !('email' in m))).toBe(true);
     await expect(svc.listMembers('acme', 'frontend', 'stranger@x.co')).rejects.toThrow('members');
   });
 

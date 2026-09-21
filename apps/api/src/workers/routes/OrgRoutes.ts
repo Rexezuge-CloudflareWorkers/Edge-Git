@@ -1,5 +1,6 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { usernameFor, usernameMap } from './IdentityPresenter';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
@@ -193,7 +194,8 @@ function registerOrgRoutes(app: OrgApp): void {
       if (!repo) return jsonError(c, 'Not found', 404);
       const collabDao = await scope.get(Tokens.RepoCollaboratorDAO)();
       const rows = await collabDao.listByRepo(repo.id);
-      return c.json({ collaborators: rows.map((r) => ({ email: r.user_email, role: r.role })) });
+      const map = await usernameMap(scope, rows.map((r) => r.user_email));
+      return c.json({ collaborators: rows.map((r) => ({ username: usernameFor(map, r.user_email), role: r.role })) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }

@@ -178,7 +178,7 @@ export function SearchView({ showNotice }: { showNotice: (type: 'success' | 'err
                   <Link to="/snippets" className="font-semibold text-[var(--color-accent)]">
                     {s.title || s.id.slice(0, 8)}
                   </Link>
-                  <p className="mt-1 text-xs text-[var(--color-text-secondary)]">{s.ownerEmail}</p>
+                  <p className="mt-1 text-xs text-[var(--color-text-secondary)]">{s.owner}</p>
                 </Card>
               ))
             )}

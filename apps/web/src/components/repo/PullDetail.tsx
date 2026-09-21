@@ -166,7 +166,7 @@ export function PullDetail({
         </p>
         <p className="mt-1 text-xs text-[var(--color-text-muted)]">
           {t('pulls.openedBy', 'Opened By {{email}} · {{date}}', {
-            email: pull.creator_email,
+            username: pull.creator,
             date: formatTimestamp(pull.created_at),
           })}
         </p>

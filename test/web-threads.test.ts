@@ -11,34 +11,34 @@ import {
 
 describe('web thread gate parity', () => {
   it('mirrors the API latest-wins gate and skips dismissed reviews', () => {
-    expect(isBlockedByReviews([{ author_email: 'a@b.c', state: 'changes_requested' }])).toBe(true);
-    expect(isBlockedByReviews([{ author_email: 'a@b.c', state: 'approved' }])).toBe(false);
-    expect(isBlockedByReviews([{ author_email: 'a@b.c', state: 'changes_requested', dismissed: 1 }])).toBe(false);
+    expect(isBlockedByReviews([{ author: 'a@b.c', state: 'changes_requested' }])).toBe(true);
+    expect(isBlockedByReviews([{ author: 'a@b.c', state: 'approved' }])).toBe(false);
+    expect(isBlockedByReviews([{ author: 'a@b.c', state: 'changes_requested', dismissed: 1 }])).toBe(false);
     // Insertion order breaks same-second ties: last entry per author wins.
     expect(
       isBlockedByReviews([
-        { author_email: 'a@b.c', state: 'changes_requested' },
-        { author_email: 'a@b.c', state: 'approved' },
+        { author: 'a@b.c', state: 'changes_requested' },
+        { author: 'a@b.c', state: 'approved' },
       ]),
     ).toBe(false);
-    expect(latestReviewsByAuthor([{ author_email: 'A@b.c', state: 'approved' }]).has('a@b.c')).toBe(true);
+    expect(latestReviewsByAuthor([{ author: 'A@b.c', state: 'approved' }]).has('a@b.c')).toBe(true);
   });
 
   it('counts approvals excluding the creator', () => {
     const reviews = [
-      { author_email: 'bob@example.com', state: 'approved' },
-      { author_email: 'alice@example.com', state: 'approved' },
+      { author: 'bob@example.com', state: 'approved' },
+      { author: 'alice@example.com', state: 'approved' },
     ];
     expect(countApprovals(reviews, 'alice@example.com')).toBe(1);
   });
 
   it('enforces the codeowner quorum like the API gate', () => {
-    const reviews = [{ author_email: 'carol@example.com', state: 'approved' }];
+    const reviews = [{ author: 'carol@example.com', state: 'approved' }];
     expect(isBlockedByCodeowners(reviews, 'alice@example.com', [])).toBe(false);
     expect(isBlockedByCodeowners(reviews, 'alice@example.com', ['carol@example.com'])).toBe(false);
     expect(isBlockedByCodeowners(reviews, 'alice@example.com', ['dave@example.com'])).toBe(true);
     expect(
-      isBlockedByCodeowners([{ author_email: 'alice@example.com', state: 'approved' }], 'alice@example.com', ['alice@example.com']),
+      isBlockedByCodeowners([{ author: 'alice@example.com', state: 'approved' }], 'alice@example.com', ['alice@example.com']),
     ).toBe(true);
   });
 });

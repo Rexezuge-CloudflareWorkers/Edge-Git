@@ -1,5 +1,6 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { presentSingle } from './IdentityPresenter';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { runImportJob } from '@edge-git/background/transfer/ImportRunner';
@@ -39,7 +40,7 @@ function registerImportRoutes(app: TransferApp): void {
       const fullName = `${owner}/${repoName}`;
       const waitUntil = waitUntilOf(c);
       if (waitUntil) waitUntil(runImportJob(c.env, fullName, job.id).catch(() => undefined));
-      return c.json({ job }, 202);
+      return c.json({ job: await presentSingle(scope, job) }, 202);
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to start import'), toServiceStatus(error));
     }
@@ -54,7 +55,7 @@ function registerImportRoutes(app: TransferApp): void {
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'read');
       const job = await scope.get(Tokens.ImportService).latestForRepo(repo.id);
       if (!job) return jsonError(c, 'No import found', 404);
-      return c.json({ job });
+      return c.json({ job: await presentSingle(scope, job) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to load import'), toServiceStatus(error));
     }
@@ -68,7 +69,7 @@ function registerImportRoutes(app: TransferApp): void {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       const job = await scope.get(Tokens.ImportService).cancelJob(c.req.param('jobId'), repo.id);
-      return c.json({ job });
+      return c.json({ job: await presentSingle(scope, job) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to cancel import'), toServiceStatus(error));
     }

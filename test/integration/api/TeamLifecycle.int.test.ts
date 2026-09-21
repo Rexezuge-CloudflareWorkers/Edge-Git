@@ -67,9 +67,10 @@ describe('team lifecycle on real D1+DO', () => {
     expect(badRole.status).toBe(400);
 
     const listed = (await (await api(`/user/orgs/${ORG}/teams/${TEAM}/members`)).json()) as {
-      members: Array<{ email: string; role: string }>;
+      members: Array<{ username: string; role: string }>;
     };
-    expect(listed.members.map((m) => m.email)).toContain(SECOND);
+    expect(listed.members.map((m) => m.username)).toContain('second');
+    expect(listed.members.every((m) => !('email' in m))).toBe(true);
 
     const promoted = await api(
       `/user/orgs/${ORG}/teams/${TEAM}/members/${encodeURIComponent(SECOND)}`,
@@ -91,9 +92,9 @@ describe('team lifecycle on real D1+DO', () => {
     expect(removed.status).toBe(200);
 
     const relisted = (await (await api(`/user/orgs/${ORG}/teams/${TEAM}/members`)).json()) as {
-      members: Array<{ email: string }>;
+      members: Array<{ username: string }>;
     };
-    expect(relisted.members.map((m) => m.email)).not.toContain(SECOND);
+    expect(relisted.members.map((m) => m.username)).not.toContain('second');
 
     // Restore `second` for the grant/git test below.
     const restored = await api(

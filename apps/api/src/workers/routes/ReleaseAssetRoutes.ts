@@ -1,5 +1,6 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { presentMany, presentSingle } from './IdentityPresenter';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { assetNameSchema, decodeBase64Strict, normalizeAssetContentType } from '@edge-git/shared/validation';
@@ -49,7 +50,7 @@ function registerReleaseAssetPublicRoutes(app: ReleaseAssetApp): void {
           if (!(await viewerCanSeeDrafts(c.env, viewerEmail, row.owner, row.name))) return jsonError(c, 'Not found', 404);
         }
         const assets = await scope.get(Tokens.ReleaseService).listAssets(row.id, release.tagName);
-        return c.json({ assets });
+        return c.json({ assets: await presentMany(scope, assets) });
       } catch {
         return c.json({ assets: [] });
       }
@@ -144,7 +145,7 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
         // Never surface raw DO error strings (may contain paths/stacks).
         return jsonError(c, 'Failed to store asset bytes', 500);
       }
-      return c.json({ asset }, 201);
+      return c.json({ asset: await presentSingle(scope, asset) }, 201);
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to upload asset'), toServiceStatus(error));
     }

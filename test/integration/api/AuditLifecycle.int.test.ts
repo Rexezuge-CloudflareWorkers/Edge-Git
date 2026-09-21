@@ -29,11 +29,13 @@ describe('audit readers on real D1', () => {
   it('lists personal audit trail with cursor shape', async () => {
     const res = await api('/user/audit?limit=5');
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { logs: Array<{ userEmail: string; action: string }>; nextCursor: string | null };
+    const body = (await res.json()) as { logs: Array<{ username: string; action: string }>; nextCursor: string | null };
     expect(Array.isArray(body.logs)).toBe(true);
     expect(body.logs.length).toBeGreaterThan(0);
     // Seeded row is present (live `activityAudit` rows may sort first).
-    expect(body.logs).toContainEqual(expect.objectContaining({ userEmail: USER.toLowerCase(), action: 'repo.list' }));
+    // Email stays the store key; the API exposes only the current username.
+    expect(body.logs).toContainEqual(expect.objectContaining({ username: 'test', action: 'repo.list' }));
+    expect(body.logs.every((l) => !('userEmail' in l) && !('user_email' in l))).toBe(true);
     expect('nextCursor' in body).toBe(true);
   });
 

@@ -6,6 +6,7 @@ export * from './project/index';
 export * from './repo/index';
 export * from './snippet/index';
 export * from './user/index';
+export * from './identity/index';
 export * from './issue/index';
 export * from './pull/index';
 export * from './org/index';

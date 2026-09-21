@@ -30,7 +30,7 @@ export interface RepoWebhookMetadata {
   consecutiveFailures: number;
   lastDeliveryAt: number | null;
   lastDeliveryStatus: 'success' | 'failure' | null;
-  creatorEmail: string;
+  creator: string;
   createdAt: number;
   updatedAt: number;
 }

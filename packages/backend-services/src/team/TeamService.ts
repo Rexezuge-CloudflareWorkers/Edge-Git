@@ -13,6 +13,7 @@ import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError, ForbiddenError, NotFoundError } from '@edge-git/backend-errors';
 import { AppConfiguration } from '@edge-git/backend-runtime/config';
 import { EmailAddress, SLUG_RE, TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
+import { GHOST_USERNAME } from '../identity/IdentityResolver';
 
 interface TeamServiceEnv {
   DB: D1Queryable;
@@ -248,22 +249,22 @@ class TeamService {
     orgUsername: string,
     teamSlug: string,
     requesterEmail: string,
-  ): Promise<Array<{ email: string; username: string | null; role: TeamMemberRole }>> {
+  ): Promise<Array<{ username: string; role: TeamMemberRole }>> {
     const { org, team } = await this.requireTeam(orgUsername, teamSlug);
     await this.requireOrgMember(org, requesterEmail);
     const memberDAO = await this.deps.teamMemberDAO();
     const userDAO = await this.deps.userDAO();
     const rows = await memberDAO.listByTeam(team.id);
-    const out: Array<{ email: string; username: string | null; role: TeamMemberRole }> = [];
+    const out: Array<{ username: string; role: TeamMemberRole }> = [];
     for (const row of rows) {
-      let username: string | null = null;
+      let username: string = GHOST_USERNAME;
       try {
         const user = await userDAO.getByEmail(row.user_email);
-        username = user?.username ?? null;
+        username = user?.username ?? GHOST_USERNAME;
       } catch {
-        username = null;
+        username = GHOST_USERNAME;
       }
-      out.push({ email: row.user_email, username, role: row.role });
+      out.push({ username, role: row.role });
     }
     return out;
   }

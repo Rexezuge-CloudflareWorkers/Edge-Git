@@ -5,6 +5,7 @@ import { getCheckRunnerStub } from '../doStubs';
 import { emitWebhookEvent, publishCheckUpdate } from './SocialEmit';
 import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
+import { presentMany, presentSingle } from './IdentityPresenter';
 
 type CheckApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -58,8 +59,9 @@ function registerCheckPublicRoutes(app: CheckApp): void {
   app.get('/repos/:owner/:repo/commits/:sha/checks', async (c) => {
     return withPublicRepo(c, async (row) => {
       try {
-        const { runs, state } = await createRequestScope(c.env).get(Tokens.CheckService).listForSha(row.id, c.req.param('sha'));
-        return c.json({ state, checks: runs.map(toCheckJson) });
+        const scope = createRequestScope(c.env);
+        const { runs, state } = await scope.get(Tokens.CheckService).listForSha(row.id, c.req.param('sha'));
+        return c.json({ state, checks: await presentMany(scope, runs.map(toCheckJson)) });
       } catch (error) {
         return jsonError(c, toSafeErrorMessage(error, 'Failed to list checks'), toServiceStatus(error));
       }
@@ -75,8 +77,9 @@ function registerCheckUserRoutes(app: CheckApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
-      const { runs, state } = await createRequestScope(c.env).get(Tokens.CheckService).listForSha(row.id, c.req.param('sha'));
-      return c.json({ state, checks: runs.map(toCheckJson) });
+      const scope = createRequestScope(c.env);
+      const { runs, state } = await scope.get(Tokens.CheckService).listForSha(row.id, c.req.param('sha'));
+      return c.json({ state, checks: await presentMany(scope, runs.map(toCheckJson)) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to list checks'), toServiceStatus(error));
     }
@@ -104,7 +107,8 @@ function registerCheckUserRoutes(app: CheckApp): void {
     }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const run = await createRequestScope(c.env).get(Tokens.CheckService).reportStatus({
+      const scope = createRequestScope(c.env);
+      const run = await scope.get(Tokens.CheckService).reportStatus({
         repositoryId: row.id,
         headSha: body.headSha,
         context: body.context,
@@ -138,7 +142,7 @@ function registerCheckUserRoutes(app: CheckApp): void {
         actorEmail: email,
         checkId: run.id,
       });
-      return c.json({ check: toCheckJson(run) }, 201);
+      return c.json({ check: await presentSingle(scope, toCheckJson(run)) }, 201);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to report check';
       const status = message.includes('already completed') ? 409 : toServiceStatus(error);
@@ -168,7 +172,8 @@ function registerCheckUserRoutes(app: CheckApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.status !== 'string') return jsonError(c, 'status is required', 400);
     try {
-      const run = await createRequestScope(c.env)
+      const scope = createRequestScope(c.env);
+      const run = await scope
         .get(Tokens.CheckService)
         .updateRun({
           repositoryId: row.id,
@@ -201,7 +206,7 @@ function registerCheckUserRoutes(app: CheckApp): void {
         actorEmail: email,
         checkId: run.id,
       });
-      return c.json({ check: toCheckJson(run) });
+      return c.json({ check: await presentSingle(scope, toCheckJson(run)) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to update check'), toServiceStatus(error));
     }

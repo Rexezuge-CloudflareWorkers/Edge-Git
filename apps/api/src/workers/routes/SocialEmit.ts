@@ -110,11 +110,19 @@ interface WebhookEmitInput {
 // Best-effort: never throws.
 async function emitWebhookEvent(env: Env, input: WebhookEmitInput): Promise<void> {
   try {
+    // Internal fan-out keys on email, but the public webhook payload exposes
+    // only the username. Resolve best-effort; fall back to ghost (never email).
+    let actorUsername = 'ghost';
+    try {
+      actorUsername = await createRequestScope(env).get(Tokens.IdentityResolver).resolveUsername(input.actorEmail);
+    } catch {
+      actorUsername = 'ghost';
+    }
     await createRequestScope(env).get(Tokens.WebhookDeliveryService).enqueueForEvent({
       repositoryId: input.repositoryId,
       fullName: input.fullName,
       event: input.event,
-      actorEmail: input.actorEmail,
+      actorUsername,
       eventId: input.eventId,
       subjectType: input.subjectType,
       subjectNumber: input.subjectNumber,

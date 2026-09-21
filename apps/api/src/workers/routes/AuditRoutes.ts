@@ -4,6 +4,7 @@ import { RepoFullName } from '@edge-git/shared/utils';
 import { BadRequestError } from '@edge-git/backend-errors';
 import { clampAuditLimit, truncateAuditFilter } from '@edge-git/shared/validation';
 import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { resolveFilterEmail, usernameFor, usernameMap } from './IdentityPresenter';
 
 type AuditApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -17,6 +18,10 @@ function isValidAuditCursor(cursor: string): boolean {
 }
 
 function parseAuditQuery(url: string): {
+  user?: string;
+  /**
+  @deprecated Use `user`. Kept for backwards compat.
+  */
   userEmail?: string;
   action?: string;
   repo?: string;
@@ -26,13 +31,26 @@ function parseAuditQuery(url: string): {
   cursor?: string;
 } {
   const params = new URL(url).searchParams;
-  const out: { userEmail?: string; action?: string; repo?: string; startTime?: number; endTime?: number; limit?: number; cursor?: string } =
-    {};
-  const userEmail = params.get('userEmail') ?? params.get('user_email');
+  const out: {
+    user?: string;
+    userEmail?: string;
+    action?: string;
+    repo?: string;
+    startTime?: number;
+    endTime?: number;
+    limit?: number;
+    cursor?: string;
+  } = {};
+  // Privacy: filters accept `username` (canonical) + legacy `userEmail` alias.
+  const user = params.get('username') ?? params.get('user') ?? params.get('userEmail') ?? params.get('user_email');
   const action = params.get('action');
   const repo = params.get('repo');
   const cursor = params.get('cursor');
-  if (truncateAuditFilter(userEmail ?? undefined)) out.userEmail = truncateAuditFilter(userEmail ?? undefined);
+  const truncatedUser = truncateAuditFilter(user ?? undefined);
+  if (truncatedUser) {
+    out.user = truncatedUser;
+    out.userEmail = truncatedUser;
+  }
   if (truncateAuditFilter(action ?? undefined)) out.action = truncateAuditFilter(action ?? undefined);
   if (truncateAuditFilter(repo ?? undefined)) out.repo = truncateAuditFilter(repo ?? undefined);
   if (cursor) {
@@ -59,7 +77,9 @@ function parseAuditQuery(url: string): {
   return out;
 }
 
-function logJson(
+// Email is the stable store key; responses expose only the current username.
+async function logJson(
+  scope: ReturnType<typeof createRequestScope>,
   rows: Array<{
     log_id: string;
     timestamp: number;
@@ -73,11 +93,15 @@ function logJson(
     ip_address: string | null;
     user_agent: string | null;
   }>,
-): unknown {
+): Promise<unknown> {
+  const map = await usernameMap(
+    scope,
+    rows.map((r) => r.user_email),
+  );
   return rows.map((r) => ({
     id: r.log_id,
     timestamp: r.timestamp,
-    userEmail: r.user_email,
+    username: usernameFor(map, r.user_email),
     action: r.action,
     resource: r.resource,
     method: r.method,
@@ -105,16 +129,17 @@ function registerAuditRoutes(app: AuditApp): void {
         if (!repo) return jsonError(c, 'Repository not found', 404);
         repoId = repo.id;
       }
+      const userEmail = await resolveFilterEmail(scope, query.user ?? query.userEmail);
       const { logs, nextCursor } = await scope
         .get(Tokens.AuditService)
         .queryByOrg(
           c.req.param('org'),
           email,
-          { userEmail: query.userEmail, action: query.action, repoId, startTime: query.startTime, endTime: query.endTime },
+          { userEmail, action: query.action, repoId, startTime: query.startTime, endTime: query.endTime },
           query.limit,
           query.cursor,
         );
-      return c.json({ logs: logJson(logs), nextCursor });
+      return c.json({ logs: await logJson(scope, logs), nextCursor });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
@@ -124,10 +149,11 @@ function registerAuditRoutes(app: AuditApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const query = parseAuditQuery(c.req.url);
     try {
-      const { logs, nextCursor } = await createRequestScope(c.env)
+      const scope = createRequestScope(c.env);
+      const { logs, nextCursor } = await scope
         .get(Tokens.AuditService)
         .queryMine(email, { action: query.action, startTime: query.startTime, endTime: query.endTime }, query.limit, query.cursor);
-      return c.json({ logs: logJson(logs), nextCursor });
+      return c.json({ logs: await logJson(scope, logs), nextCursor });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
     }

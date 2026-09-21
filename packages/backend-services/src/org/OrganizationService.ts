@@ -16,6 +16,7 @@ import { BadRequestError, ForbiddenError, NotFoundError } from '@edge-git/backen
 import { isReservedNamespaceName } from '@edge-git/shared/constants';
 import { SLUG_RE, TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 import { cascadeOwnerRepos } from '../repo/repoRenameCascade';
+import { GHOST_USERNAME } from '../identity/IdentityResolver';
 
 interface OrganizationServiceEnv {
   DB: D1Queryable;
@@ -193,21 +194,21 @@ class OrganizationService {
   public async listMembers(
     orgUsername: string,
     requesterEmail: string,
-  ): Promise<Array<{ email: string; username: string | null; role: OrgMemberRole }>> {
+  ): Promise<Array<{ username: string; role: OrgMemberRole }>> {
     const org = await this.requireMember(orgUsername, requesterEmail);
     const memberDAO = await this.deps.organizationMemberDAO();
     const userDAO = await this.deps.userDAO();
     const rows = await memberDAO.listByOrg(org.id);
-    const out: Array<{ email: string; username: string | null; role: OrgMemberRole }> = [];
+    const out: Array<{ username: string; role: OrgMemberRole }> = [];
     for (const row of rows) {
-      let username: string | null = null;
+      let username: string = GHOST_USERNAME;
       try {
         const user = await userDAO.getByEmail(row.user_email);
-        username = user?.username ?? null;
+        username = user?.username ?? GHOST_USERNAME;
       } catch {
-        username = null;
+        username = GHOST_USERNAME;
       }
-      out.push({ email: row.user_email, username, role: row.role });
+      out.push({ username, role: row.role });
     }
     return out;
   }

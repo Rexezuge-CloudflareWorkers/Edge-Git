@@ -1,5 +1,6 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { presentMany, presentSingle } from './IdentityPresenter';
 import type { AccessIdentityContext } from '@edge-git/backend-services/auth';
 import { emitWebhookEvent } from './SocialEmit';
 import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
@@ -12,8 +13,9 @@ function registerSnippetPublicRoutes(app: SnippetApp): void {
     try {
       const url = new URL(c.req.url);
       const limit = Math.min(Math.max(Number(url.searchParams.get('limit') ?? 20) || 20, 1), 50);
-      const snippets = await createRequestScope(c.env).get(Tokens.SnippetService).listPublic(limit);
-      return c.json({ snippets });
+      const scope = createRequestScope(c.env);
+      const snippets = await scope.get(Tokens.SnippetService).listPublic(limit);
+      return c.json({ snippets: await presentMany(scope, snippets) });
     } catch {
       return c.json({ snippets: [] });
     }
@@ -31,8 +33,9 @@ function registerSnippetPublicRoutes(app: SnippetApp): void {
       } catch {
         viewerEmail = null;
       }
-      const result = await createRequestScope(c.env).get(Tokens.SnippetService).getSnippet(c.req.param('id'), viewerEmail);
-      return c.json(result);
+      const scope = createRequestScope(c.env);
+      const result = await scope.get(Tokens.SnippetService).getSnippet(c.req.param('id'), viewerEmail);
+      return c.json({ snippet: await presentSingle(scope, result.snippet), files: result.files });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
@@ -51,8 +54,9 @@ function registerSnippetPublicRoutes(app: SnippetApp): void {
       } catch {
         viewerEmail = null;
       }
-      const snippets = await createRequestScope(c.env).get(Tokens.SnippetService).listByOwner(user.email, viewerEmail);
-      return c.json({ snippets });
+      const scope = createRequestScope(c.env);
+      const snippets = await scope.get(Tokens.SnippetService).listByOwner(user.email, viewerEmail);
+      return c.json({ snippets: await presentMany(scope, snippets) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
@@ -63,8 +67,9 @@ function registerSnippetUserRoutes(app: SnippetApp): void {
   app.get('/user/snippets', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     try {
-      const snippets = await createRequestScope(c.env).get(Tokens.SnippetService).listByOwner(email, email);
-      return c.json({ snippets });
+      const scope = createRequestScope(c.env);
+      const snippets = await scope.get(Tokens.SnippetService).listByOwner(email, email);
+      return c.json({ snippets: await presentMany(scope, snippets) });
     } catch {
       return c.json({ snippets: [] });
     }
@@ -90,7 +95,7 @@ function registerSnippetUserRoutes(app: SnippetApp): void {
         subjectType: 'snippet',
         subjectOid: result.snippet.id,
       }).catch(() => undefined);
-      return c.json(result, 201);
+      return c.json({ snippet: await presentSingle(scope, result.snippet), files: result.files }, 201);
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to create snippet'), toServiceStatus(error));
     }
@@ -99,9 +104,10 @@ function registerSnippetUserRoutes(app: SnippetApp): void {
   app.get('/user/snippets/:id', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     try {
-      const result = await createRequestScope(c.env).get(Tokens.SnippetService).getSnippet(c.req.param('id'), email);
+      const scope = createRequestScope(c.env);
+      const result = await scope.get(Tokens.SnippetService).getSnippet(c.req.param('id'), email);
       if (result.snippet.ownerEmail.toLowerCase() !== email.toLowerCase()) return jsonError(c, 'Not found', 404);
-      return c.json(result);
+      return c.json({ snippet: await presentSingle(scope, result.snippet), files: result.files });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
@@ -112,8 +118,9 @@ function registerSnippetUserRoutes(app: SnippetApp): void {
     const { malformed, body } = await readJsonBody<{ title?: unknown; visibility?: unknown; files?: unknown }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const result = await createRequestScope(c.env).get(Tokens.SnippetService).updateSnippet(c.req.param('id'), email, body);
-      return c.json(result);
+      const scope = createRequestScope(c.env);
+      const result = await scope.get(Tokens.SnippetService).updateSnippet(c.req.param('id'), email, body);
+      return c.json({ snippet: await presentSingle(scope, result.snippet), files: result.files });
     } catch (error) {
       const status = toServiceStatus(error);
       if (error instanceof Error && error.message.includes('Only the snippet owner')) return jsonError(c, error.message, 403);

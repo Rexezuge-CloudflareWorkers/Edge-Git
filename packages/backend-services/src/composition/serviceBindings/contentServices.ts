@@ -49,7 +49,7 @@ function bindContentServices(scope: Container, { env, daos }: ServiceGroupContex
   scope.bind(Tokens.SecuritySettingsService, () =>
     createService(SecuritySettingsService, env, { settingsDAO: daos.securitySettingsDAO }),
   );
-  scope.bind(Tokens.WebhookService, () => createService(WebhookService, env, { webhookDAO: daos.webhookDAO }));
+  scope.bind(Tokens.WebhookService, () => createService(WebhookService, env, { webhookDAO: daos.webhookDAO, userDAO: daos.userDAO }));
   scope.bind(Tokens.WebhookDeliveryService, () =>
     createService(WebhookDeliveryService, env, { webhookDAO: daos.webhookDAO, deliveryDAO: daos.webhookDeliveryDAO }),
   );

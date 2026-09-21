@@ -130,7 +130,7 @@ export function PullThreads({
                       </Badge>
                       <span className="font-mono text-xs text-[var(--color-text-muted)]">{threadLabel(thread)}</span>
                       <span className="text-xs text-[var(--color-text-muted)]">
-                        {thread.author_email} · {formatTimestamp(thread.created_at)}
+                        {thread.author} · {formatTimestamp(thread.created_at)}
                       </span>
                       {canWrite && (
                         <button
@@ -146,7 +146,7 @@ export function PullThreads({
                       {thread.comments.map((comment) => (
                         <li key={comment.id}>
                           <p className="text-xs text-[var(--color-text-muted)]">
-                            {comment.author_email} · {formatTimestamp(comment.created_at)}
+                            {comment.author} · {formatTimestamp(comment.created_at)}
                           </p>
                           <div className="mt-0.5 text-sm text-[var(--color-text-primary)]">
                             <Markdown content={comment.body} />

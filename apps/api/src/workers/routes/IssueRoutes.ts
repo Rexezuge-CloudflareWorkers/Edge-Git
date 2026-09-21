@@ -5,6 +5,7 @@ import { Tokens, createRequestScope } from '@edge-git/backend-services/compositi
 import { RepoFullName } from '@edge-git/shared/utils';
 import { parsePositiveInt } from '@edge-git/shared/validation';
 import { readJsonBody } from './BodyParser';
+import { presentMany, presentSingle } from './IdentityPresenter';
 
 type IssueApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -20,7 +21,7 @@ function registerIssueRoutes(app: IssueApp): void {
       const label = c.req.query('label');
       const assignee = c.req.query('assignee')?.toLowerCase();
       const milestone = c.req.query('milestone');
-      if (!label && !assignee && !milestone) return c.json({ issues });
+      if (!label && !assignee && !milestone) return c.json({ issues: await presentMany(scope, issues) });
       try {
         const collab = scope.get(Tokens.CollaborationService);
         const filtered: typeof issues = [];
@@ -31,9 +32,9 @@ function registerIssueRoutes(app: IssueApp): void {
           if (assignee && (meta.assignees as string[]).every((a) => a.toLowerCase() !== assignee)) continue;
           filtered.push(issue);
         }
-        return c.json({ issues: filtered });
+        return c.json({ issues: await presentMany(scope, filtered) });
       } catch {
-        return c.json({ issues });
+        return c.json({ issues: await presentMany(scope, issues) });
       }
     });
   });
@@ -43,8 +44,9 @@ function registerIssueRoutes(app: IssueApp): void {
       const number = parseIssueNumber(c.req.param('number'));
       if (number === null) return jsonError(c, 'Not found', 404);
       try {
-        const issue = await createRequestScope(c.env).get(Tokens.IssueService).getByNumber(row.id, number);
-        return c.json({ issue });
+        const scope = createRequestScope(c.env);
+        const issue = await scope.get(Tokens.IssueService).getByNumber(row.id, number);
+        return c.json({ issue: await presentSingle(scope, issue) });
       } catch (error) {
         return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
       }
@@ -56,8 +58,9 @@ function registerIssueRoutes(app: IssueApp): void {
       const number = parseIssueNumber(c.req.param('number'));
       if (number === null) return jsonError(c, 'Not found', 404);
       try {
-        const comments = await createRequestScope(c.env).get(Tokens.IssueService).listComments(row.id, number);
-        return c.json({ comments });
+        const scope = createRequestScope(c.env);
+        const comments = await scope.get(Tokens.IssueService).listComments(row.id, number);
+        return c.json({ comments: await presentMany(scope, comments) });
       } catch (error) {
         return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
       }
@@ -76,7 +79,7 @@ function registerUserIssueRoutes(app: IssueApp): void {
     const label = c.req.query('label');
     const assignee = c.req.query('assignee')?.toLowerCase();
     const milestone = c.req.query('milestone');
-    if (!label && !assignee && !milestone) return c.json({ issues });
+    if (!label && !assignee && !milestone) return c.json({ issues: await presentMany(scope, issues) });
     try {
       const collab = scope.get(Tokens.CollaborationService);
       const filtered: typeof issues = [];
@@ -87,7 +90,7 @@ function registerUserIssueRoutes(app: IssueApp): void {
         if (assignee && (meta.assignees as string[]).every((a) => a.toLowerCase() !== assignee)) continue;
         filtered.push(issue);
       }
-      return c.json({ issues: filtered });
+      return c.json({ issues: await presentMany(scope, filtered) });
     } catch {
       return c.json({ issues });
     }
@@ -102,7 +105,8 @@ function registerUserIssueRoutes(app: IssueApp): void {
     const { malformed, body } = await readJsonBody<{ title?: string; body?: string }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (!body.title) return jsonError(c, 'title is required', 400);
-    const created = await createRequestScope(c.env)
+    const scope = createRequestScope(c.env);
+    const created = await scope
       .get(Tokens.IssueService)
       .createIssue({
         repositoryId: row.id,
@@ -121,7 +125,7 @@ function registerUserIssueRoutes(app: IssueApp): void {
       subjectNumber: created.number,
       mentionText: `${body.title}\n${body.body ?? ''}`,
     });
-    return c.json(created, 201);
+    return c.json(await presentSingle(scope, created), 201);
   });
 
   app.get('/user/repos/:owner/:repo/issues/:number', async (c) => {
@@ -133,8 +137,9 @@ function registerUserIssueRoutes(app: IssueApp): void {
     const number = parseIssueNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
     try {
-      const issue = await createRequestScope(c.env).get(Tokens.IssueService).getByNumber(row.id, number);
-      return c.json({ issue });
+      const scope = createRequestScope(c.env);
+      const issue = await scope.get(Tokens.IssueService).getByNumber(row.id, number);
+      return c.json({ issue: await presentSingle(scope, issue) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
@@ -157,7 +162,8 @@ function registerUserIssueRoutes(app: IssueApp): void {
     const { malformed, body } = await readJsonBody<{ status?: string }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const issue = await createRequestScope(c.env)
+      const scope = createRequestScope(c.env);
+      const issue = await scope
         .get(Tokens.IssueService)
         .updateStatus({ repositoryId: row.id, number, status: body.status ?? '' });
       await recordAndNotify(c.env, {
@@ -170,7 +176,7 @@ function registerUserIssueRoutes(app: IssueApp): void {
         subjectNumber: issue.number,
         participantEmails: [issue.creator_email],
       });
-      return c.json({ issue });
+      return c.json({ issue: await presentSingle(scope, issue) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to update issue'), toServiceStatus(error));
     }
@@ -185,8 +191,9 @@ function registerUserIssueRoutes(app: IssueApp): void {
     const number = parseIssueNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
     try {
-      const comments = await createRequestScope(c.env).get(Tokens.IssueService).listComments(row.id, number);
-      return c.json({ comments });
+      const scope = createRequestScope(c.env);
+      const comments = await scope.get(Tokens.IssueService).listComments(row.id, number);
+      return c.json({ comments: await presentMany(scope, comments) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
@@ -223,7 +230,7 @@ function registerUserIssueRoutes(app: IssueApp): void {
         participantEmails: [issue.creator_email],
         mentionText: body.body,
       });
-      return c.json({ comment }, 201);
+      return c.json({ comment: await presentSingle(scope, comment) }, 201);
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to add comment'), toServiceStatus(error));
     }

@@ -4,6 +4,7 @@ import { WEBHOOK_EVENTS } from '@edge-git/backend-services/webhook';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
+import { presentMany, presentSingle } from './IdentityPresenter';
 
 type WebhookApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -26,7 +27,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'read');
       const hooks = await scope.get(Tokens.WebhookService).listHooks(repo.id);
-      return c.json({ hooks, events: [...WEBHOOK_EVENTS] });
+      return c.json({ hooks: await presentMany(scope, hooks), events: [...WEBHOOK_EVENTS] });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to list webhooks'), toServiceStatus(error));
     }
@@ -49,7 +50,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
         secret: body.secret,
         creatorEmail: email,
       });
-      return c.json({ hook, secret }, 201);
+      return c.json({ hook: await presentSingle(scope, hook), secret }, 201);
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to create webhook'), toServiceStatus(error));
     }
@@ -63,7 +64,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'read');
       const hook = await scope.get(Tokens.WebhookService).getHook(id, repo.id);
-      return c.json({ hook });
+      return c.json({ hook: await presentSingle(scope, hook) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to load webhook'), toServiceStatus(error));
     }
@@ -83,7 +84,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
         events: body.events,
         isActive: typeof body.isActive === 'boolean' ? body.isActive : undefined,
       });
-      return c.json({ hook });
+      return c.json({ hook: await presentSingle(scope, hook) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to update webhook'), toServiceStatus(error));
     }
@@ -111,7 +112,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       const { hook, secret } = await scope.get(Tokens.WebhookService).rotateHookSecret(id, repo.id);
-      return c.json({ hook, secret });
+      return c.json({ hook: await presentSingle(scope, hook), secret });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to rotate webhook secret'), toServiceStatus(error));
     }
@@ -124,7 +125,13 @@ function registerWebhookRoutes(app: WebhookApp): void {
     try {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
-      const delivery = await scope.get(Tokens.WebhookDeliveryService).sendTestPing(id, repo.id, `${repo.owner}/${repo.name}`, email);
+      let actorUsername = 'ghost';
+      try {
+        actorUsername = await scope.get(Tokens.IdentityResolver).resolveUsername(email);
+      } catch {
+        actorUsername = 'ghost';
+      }
+      const delivery = await scope.get(Tokens.WebhookDeliveryService).sendTestPing(id, repo.id, `${repo.owner}/${repo.name}`, actorUsername);
       return c.json({ delivery }, 201);
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to send test ping'), toServiceStatus(error));

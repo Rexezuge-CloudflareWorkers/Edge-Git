@@ -75,7 +75,7 @@ export interface TeamRepoGrant {
 export interface AuditLogEntry {
   id: string;
   timestamp: number;
-  userEmail: string;
+  username: string;
   action: string;
   resource: string | null;
   method: string;
@@ -124,7 +124,7 @@ export interface Issue {
   title: string;
   body: string | null;
   status: string;
-  creator_email: string;
+  creator: string;
   created_at: number;
   updated_at: number;
 }
@@ -132,7 +132,7 @@ export interface Issue {
 export interface Comment {
   id: string;
   issue_id: string;
-  author_email: string;
+  author: string;
   body: string;
   created_at: number;
 }

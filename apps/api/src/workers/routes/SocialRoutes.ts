@@ -3,6 +3,7 @@ import { jsonError, requireVisibleRepo, resolvePublicViewer, toRepoJson, withPub
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { emitWebhookEvent, publishLiveUpdate } from './SocialEmit';
+import { usernameFor, usernameMap } from './IdentityPresenter';
 
 type SocialApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -70,8 +71,11 @@ function registerSocialRoutes(app: SocialApp): void {
       const url = new URL(c.req.url);
       const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 30, 1), 100);
       const cursor = url.searchParams.get('cursor') ?? undefined;
-      const { events, nextCursor } = await createRequestScope(c.env).get(Tokens.ActivityService).listByRepo(row.id, limit, cursor);
-      return c.json({ events, nextCursor });
+      const scope = createRequestScope(c.env);
+      const { events, nextCursor } = await scope.get(Tokens.ActivityService).listByRepo(row.id, limit, cursor);
+      const map = await usernameMap(scope, events.map((e) => e.actor_email));
+      const presented = events.map(({ actor_email, ...rest }) => ({ ...rest, actor: usernameFor(map, actor_email) }));
+      return c.json({ events: presented, nextCursor });
     });
   });
 }

@@ -23,9 +23,14 @@ describe('parseAuditQuery (Number(null) trap)', () => {
   it('supports user_email alias and cursor passthrough', () => {
     const valid = btoa(JSON.stringify({ timestamp: 1, log_id: 'a' }));
     expect(parseAuditQuery(`https://x/user/audit?user_email=a@x.com&cursor=${valid}`)).toEqual({
+      user: 'a@x.com',
       userEmail: 'a@x.com',
       cursor: valid,
     });
+  });
+
+  it('supports username alias for privacy-safe filtering', () => {
+    expect(parseAuditQuery('https://x/user/audit?username=alice')).toEqual({ user: 'alice', userEmail: 'alice' });
   });
 
   it('rejects tampered cursors instead of silently restarting', () => {

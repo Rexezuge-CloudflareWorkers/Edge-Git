@@ -56,7 +56,7 @@ export function PullComments({
           {comments.map((c) => (
             <li key={c.id} className="py-3 first:pt-0 last:pb-0">
               <p className="text-xs text-[var(--color-text-muted)]">
-                {c.author_email} · {formatTimestamp(c.created_at)}
+                {c.author} · {formatTimestamp(c.created_at)}
               </p>
               <div className="mt-1 text-sm text-[var(--color-text-primary)]">
                 <Markdown content={c.body} />

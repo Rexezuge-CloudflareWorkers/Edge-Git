@@ -716,7 +716,7 @@
   "audit": {
     "title": "审计日志",
     "search": "搜索",
-    "userPlaceholder": "用户邮箱",
+    "userPlaceholder": "用户名",
     "actionPlaceholder": "操作，例如 PUSH",
     "path": "路径",
     "resource": "资源",

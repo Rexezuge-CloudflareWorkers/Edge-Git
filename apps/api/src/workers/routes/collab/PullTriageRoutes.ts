@@ -7,6 +7,32 @@ import { suggestCodeownerHandles } from '../CodeownerHelpers';
 import { needWrite, parseNumber } from './CollabHelpers';
 import type { CollabApp } from './CollabHelpers';
 import { readJsonBody } from '../BodyParser';
+import { presentSingle, usernameFor, usernameMap } from '../IdentityPresenter';
+
+type RequestScope = ReturnType<typeof createRequestScope>;
+
+// `assignees` come back as raw email string lists; expose usernames instead.
+async function presentAssignees(scope: RequestScope, emails: unknown[]): Promise<string[]> {
+  const cleaned = emails.filter((e): e is string => typeof e === 'string' && e.length > 0);
+  const map = await usernameMap(scope, cleaned);
+  return cleaned.map((e) => usernameFor(map, e));
+}
+
+// Reviewer rows carry `user_email` (no `role` key, so `presentMany` would
+// just drop it); map to `username` explicitly.
+async function presentReviewers(
+  scope: RequestScope,
+  rows: Array<Record<string, unknown>>,
+): Promise<Array<Record<string, unknown>>> {
+  const map = await usernameMap(
+    scope,
+    rows.map((r) => r['user_email']).filter((e): e is string => typeof e === 'string' && e.length > 0),
+  );
+  return rows.map((r) => {
+    const { user_email, ...rest } = r;
+    return { ...rest, username: usernameFor(map, typeof user_email === 'string' ? user_email : undefined) };
+  });
+}
 
 function registerCollabPullTriageRoutes(app: CollabApp): void {
   // Pull triage: labels / assignees / milestone + meta
@@ -26,7 +52,12 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
       } catch {
         // legacy DB without collab tables
       }
-      return c.json({ pull, ...meta });
+      return c.json({
+        pull: await presentSingle(scope, pull),
+        labels: meta.labels,
+        assignees: await presentAssignees(scope, meta.assignees),
+        reviewers: await presentReviewers(scope, meta.reviewers as Array<Record<string, unknown>>),
+      });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
@@ -73,7 +104,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
         .get(Tokens.CollaborationService)
         .listReviewers(pull.id)
         .catch(() => []);
-      return c.json({ reviewers });
+      return c.json({ reviewers: await presentReviewers(scope, reviewers as Array<Record<string, unknown>>) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
@@ -143,8 +174,9 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.isDraft !== 'boolean') return jsonError(c, 'isDraft must be a boolean', 400);
     try {
-      const pull = await createRequestScope(c.env).get(Tokens.PullRequestService).setDraft(row.id, number, body.isDraft);
-      return c.json({ pull });
+      const scope = createRequestScope(c.env);
+      const pull = await scope.get(Tokens.PullRequestService).setDraft(row.id, number, body.isDraft);
+      return c.json({ pull: await presentSingle(scope, pull) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to update draft'), toServiceStatus(error));
     }

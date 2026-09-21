@@ -5,6 +5,7 @@ import { RepoFullName } from '@edge-git/shared/utils';
 import { getIssueMetaSafe, needWrite, parseNumber } from './CollabHelpers';
 import type { CollabApp } from './CollabHelpers';
 import { readJsonBody } from '../BodyParser';
+import { presentSingle, usernameFor, usernameMap } from '../IdentityPresenter';
 
 function registerCollabIssueTriageRoutes(app: CollabApp): void {
   // Issue triage: labels / assignees / milestone + meta
@@ -16,9 +17,16 @@ function registerCollabIssueTriageRoutes(app: CollabApp): void {
     const number = parseNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
     try {
-      const issue = await createRequestScope(c.env).get(Tokens.IssueService).getByNumber(row.id, number);
+      const scope = createRequestScope(c.env);
+      const issue = await scope.get(Tokens.IssueService).getByNumber(row.id, number);
       const meta = await getIssueMetaSafe(c.env, issue.id);
-      return c.json({ issue, ...meta, milestoneId: (issue as { milestone_id?: string | null }).milestone_id ?? null });
+      const assigneeMap = await usernameMap(scope, meta.assignees);
+      return c.json({
+        issue: await presentSingle(scope, issue),
+        labels: meta.labels,
+        assignees: meta.assignees.map((e) => usernameFor(assigneeMap, e)),
+        milestoneId: (issue as { milestone_id?: string | null }).milestone_id ?? null,
+      });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }

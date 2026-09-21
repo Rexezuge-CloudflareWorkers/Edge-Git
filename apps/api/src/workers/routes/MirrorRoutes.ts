@@ -1,5 +1,6 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { presentSingle } from './IdentityPresenter';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { runMirrorSync } from '@edge-git/background/transfer/MirrorRunner';
 import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
@@ -31,7 +32,7 @@ function registerMirrorRoutes(app: MirrorApp): void {
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'read');
       const mirror = await scope.get(Tokens.MirrorService).getForRepo(repo.id);
       if (!mirror) return jsonError(c, 'No mirror configured', 404);
-      return c.json({ mirror });
+      return c.json({ mirror: await presentSingle(scope, mirror) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to load mirror'), toServiceStatus(error));
     }
@@ -49,7 +50,7 @@ function registerMirrorRoutes(app: MirrorApp): void {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       const mirror = await scope.get(Tokens.MirrorService).configure(repo.id, body.sourceUrl, body.intervalMinutes, email);
-      return c.json({ mirror });
+      return c.json({ mirror: await presentSingle(scope, mirror) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to configure mirror'), toServiceStatus(error));
     }
@@ -68,11 +69,11 @@ function registerMirrorRoutes(app: MirrorApp): void {
       if (waitUntil) {
         waitUntil(runMirrorSync(c.env, repo.id).catch(() => undefined));
         const refreshed = await scope.get(Tokens.MirrorService).getForRepo(repo.id);
-        return c.json({ mirror: refreshed, sync: 'started' }, 202);
+        return c.json({ mirror: refreshed ? await presentSingle(scope, refreshed) : refreshed, sync: 'started' }, 202);
       }
       await runMirrorSync(c.env, repo.id);
       const refreshed = await scope.get(Tokens.MirrorService).getForRepo(repo.id);
-      return c.json({ mirror: refreshed, sync: 'done' });
+      return c.json({ mirror: refreshed ? await presentSingle(scope, refreshed) : refreshed, sync: 'done' });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to sync mirror'), toServiceStatus(error));
     }
@@ -89,7 +90,7 @@ function registerMirrorRoutes(app: MirrorApp): void {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       const mirror = await scope.get(Tokens.MirrorService).setEnabled(repo.id, body.enabled);
-      return c.json({ mirror });
+      return c.json({ mirror: await presentSingle(scope, mirror) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to update mirror'), toServiceStatus(error));
     }

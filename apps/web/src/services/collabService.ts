@@ -65,9 +65,9 @@ export async function getPullMeta(
   owner: string,
   repo: string,
   number: number,
-): Promise<{ labels: Label[]; assignees: string[]; reviewers: Array<{ user_email: string; status: string }> }> {
+): Promise<{ labels: Label[]; assignees: string[]; reviewers: Array<{ username: string; status: string }> }> {
   try {
-    const data = await apiGet<{ labels?: Label[]; assignees?: string[]; reviewers?: Array<{ user_email: string; status: string }> }>(
+    const data = await apiGet<{ labels?: Label[]; assignees?: string[]; reviewers?: Array<{ username: string; status: string }> }>(
       `${base(owner, repo)}/pulls/${number}/meta`,
     );
     return { labels: data.labels ?? [], assignees: data.assignees ?? [], reviewers: data.reviewers ?? [] };

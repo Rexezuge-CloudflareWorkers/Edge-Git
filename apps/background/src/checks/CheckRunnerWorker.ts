@@ -276,13 +276,19 @@ class CheckRunnerWorker extends DurableObject<Env> {
   private async emitCheckCompleted(item: PendingItem, runId: string, context: string, conclusion: string, title: string): Promise<void> {
     const fullName = await this.resolveFullName(item.repositoryId);
     if (!fullName) return;
+    let actorUsername = 'ghost';
+    try {
+      actorUsername = await createRequestScope(this.env).get(Tokens.IdentityResolver).resolveUsername(item.actorEmail);
+    } catch {
+      actorUsername = 'ghost';
+    }
     await createRequestScope(this.env)
       .get(Tokens.WebhookDeliveryService)
       .enqueueForEvent({
         repositoryId: item.repositoryId,
         fullName,
         event: 'check_run',
-        actorEmail: item.actorEmail,
+        actorUsername,
         subjectOid: item.headSha,
         title: `${context}: ${conclusion}`,
         action: 'completed',

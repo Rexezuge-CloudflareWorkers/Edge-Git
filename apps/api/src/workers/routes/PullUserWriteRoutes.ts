@@ -10,6 +10,7 @@ import { parsePullNumber } from './PullShared';
 import type { MergePreviewShape, PullApp } from './PullShared';
 import { resolveCodeownerEmails, suggestCodeownerHandles } from './CodeownerHelpers';
 import { readJsonBody } from './BodyParser';
+import { presentSingle } from './IdentityPresenter';
 
 function registerUserPullWriteRoutes(app: PullApp): void {
   // Open a PR: any visible user (read+) may propose. Branches are resolved
@@ -57,6 +58,10 @@ function registerUserPullWriteRoutes(app: PullApp): void {
         title: body.title,
         body: body.body ?? null,
       });
+      if (result.status === 201) {
+        const scope = createRequestScope(c.env);
+        return c.json(await presentSingle(scope, result.body as Record<string, unknown>), result.status);
+      }
       return c.json(result.body, result.status);
     }
     let preview: MergePreviewShape | null = null;
@@ -118,7 +123,7 @@ function registerUserPullWriteRoutes(app: PullApp): void {
         headSha: preview.headOid,
         actorEmail: email,
       }).catch(() => undefined);
-      return c.json(created, 201);
+      return c.json(await presentSingle(scope, created), 201);
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to create pull request'), toServiceStatus(error));
     }
@@ -142,7 +147,8 @@ function registerUserPullWriteRoutes(app: PullApp): void {
     const { malformed, body } = await readJsonBody<{ status?: string }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const pull = await createRequestScope(c.env)
+      const scope = createRequestScope(c.env);
+      const pull = await scope
         .get(Tokens.PullRequestService)
         .updateStatus({ repositoryId: row.id, number, status: body.status ?? '' });
       await recordAndNotify(c.env, {
@@ -155,7 +161,7 @@ function registerUserPullWriteRoutes(app: PullApp): void {
         subjectNumber: pull.number,
         participantEmails: [pull.creator_email],
       });
-      return c.json({ pull });
+      return c.json({ pull: await presentSingle(scope, pull) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to update pull request'), toServiceStatus(error));
     }
@@ -193,7 +199,7 @@ function registerUserPullWriteRoutes(app: PullApp): void {
         participantEmails: [pull.creator_email],
         mentionText: body.body,
       });
-      return c.json({ comment }, 201);
+      return c.json({ comment: await presentSingle(scope, comment) }, 201);
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to add comment'), toServiceStatus(error));
     }
@@ -242,7 +248,7 @@ function registerUserPullWriteRoutes(app: PullApp): void {
         participantEmails: [pull.creator_email],
         mentionText: typeof body.body === 'string' ? body.body : null,
       });
-      return c.json({ review }, 201);
+      return c.json({ review: await presentSingle(scope, review) }, 201);
     } catch (error) {
       const status = toServiceStatus(error);
       return jsonError(c, toSafeErrorMessage(error, 'Failed to add review'), status === 500 ? 400 : status);

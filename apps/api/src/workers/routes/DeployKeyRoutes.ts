@@ -1,5 +1,6 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { presentMany, presentSingle } from './IdentityPresenter';
 import { DeployKeyService } from '@edge-git/backend-services/deploykey';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
@@ -19,7 +20,7 @@ function registerDeployKeyRoutes(app: DeployKeyApp): void {
       const scope = createRequestScope(c.env);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       const keys = await scope.get(Tokens.DeployKeyService).listKeys(repo.id);
-      return c.json({ keys });
+      return c.json({ keys: await presentMany(scope, keys) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to list deploy keys'), toServiceStatus(error));
     }
@@ -38,7 +39,7 @@ function registerDeployKeyRoutes(app: DeployKeyApp): void {
       const created = await scope
         .get(Tokens.DeployKeyService)
         .createKey(repo.id, body.name, DeployKeyService.normalizePermission(body.permission), email, body.expiresInDays);
-      return c.json(created, 201);
+      return c.json(await presentSingle(scope, created), 201);
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to create deploy key'), toServiceStatus(error));
     }
