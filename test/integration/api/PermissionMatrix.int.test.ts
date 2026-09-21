@@ -88,15 +88,16 @@ describe('permission matrix on real D1 (git trust boundary)', () => {
     expect([200, 201].includes(put.status)).toBe(true);
 
     const listed = (await (await api(`/user/repos/${OWNER}/${PRIV}/collaborators`)).json()) as {
-      collaborators: Array<{ email: string; role: string }>;
+      collaborators: Array<{ username: string; role: string }>;
     };
-    expect(listed.collaborators.map((c) => c.email)).toContain(SECOND);
+    expect(listed.collaborators.map((c) => c.username)).toContain('second');
+    expect(listed.collaborators.every((c) => !('email' in c))).toBe(true);
 
     expect((await api(`/user/repos/${OWNER}/${PRIV}/collaborators/second`, { method: 'DELETE' })).status).toBe(200);
     const relisted = (await (await api(`/user/repos/${OWNER}/${PRIV}/collaborators`)).json()) as {
-      collaborators: Array<{ email: string }>;
+      collaborators: Array<{ username: string }>;
     };
-    expect(relisted.collaborators.map((c) => c.email)).not.toContain(SECOND);
+    expect(relisted.collaborators.map((c) => c.username)).not.toContain('second');
     expect((await api(`/${OWNER}/${PRIV}/info/refs?service=git-upload-pack`, { headers: bearerHeader(secondToken) })).status).toBe(401);
   });
 });
