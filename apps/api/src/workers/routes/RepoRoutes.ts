@@ -15,6 +15,7 @@ import { RepoService } from '@edge-git/backend-services/repo';
 import { EmailAddress, RepoFullName } from '@edge-git/shared/utils';
 import { readJsonBody } from './BodyParser';
 import { parseOverviewArgs, parseWithLastCommit, sanitizeDepthParam, sanitizePathParam, sanitizeRefParam } from './RepoParamParsers';
+import { ErrorSanitizationUtil } from '@edge-git/shared/utils';
 
 type RepoApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -239,12 +240,12 @@ function registerUserRepoRoutes(app: RepoApp): void {
       try {
         await getRepoStub(c.env, fullName).deleteRepo();
       } catch (error) {
-        console.error('Failed to purge repo DO', fullName, error);
+        console.error('Failed to purge repo DO', fullName, ErrorSanitizationUtil.sanitizeErrorForLogging(error));
       }
       try {
         await getScope(c).get(Tokens.SearchService).clearRepo(id);
       } catch (error) {
-        console.error('Failed to purge code index', fullName, error);
+        console.error('Failed to purge code index', fullName, ErrorSanitizationUtil.sanitizeErrorForLogging(error));
       }
       return c.json({ ok: true, id });
     } catch (error) {

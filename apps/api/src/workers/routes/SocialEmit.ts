@@ -2,6 +2,7 @@ import { Tokens, createRequestScope } from '@edge-git/backend-services/compositi
 import { NotificationService } from '@edge-git/backend-services/social/NotificationService';
 import type { IRealtimePublisher } from '@edge-git/backend-services/ports';
 import { mapRepoEventToWebhookEvent } from '@edge-git/backend-services/webhook';
+import { ErrorSanitizationUtil } from '@edge-git/shared/utils';
 import type { WebhookEventName } from '@edge-git/shared';
 import type { RepoEventType } from '@edge-git/backend-data/dao';
 import type { RealtimeWorker } from '@edge-git/background';
@@ -21,6 +22,13 @@ interface SocialEmitInput {
   mentionText?: string | null;
 }
 
+// Observer fan-out: social writes must never fail the user-visible mutation.
+// All failures are logged secret-safe and swallowed (fail-open by design,
+// documented per call site).
+function logSocialFailure(message: string, context: string, fullName: string, error: unknown): void {
+  console.error(message, context, fullName, ErrorSanitizationUtil.sanitizeErrorForLogging(error));
+}
+
 // Best-effort activity + notification fan-out for issue/PR/fork/push flows.
 // Never throws: social writes must not fail the user-visible mutation.
 async function recordAndNotify(env: Env, input: SocialEmitInput): Promise<void> {
@@ -37,7 +45,7 @@ async function recordAndNotify(env: Env, input: SocialEmitInput): Promise<void> 
       payload: input.payload ?? {},
     });
   } catch (error) {
-    console.error('Failed to record repo event', input.type, input.fullName, error);
+    logSocialFailure('Failed to record repo event', input.type, input.fullName, error);
   }
   try {
     const mentionUsernames = NotificationService.parseMentions(input.mentionText ?? input.title);
@@ -68,7 +76,7 @@ async function recordAndNotify(env: Env, input: SocialEmitInput): Promise<void> 
       recipientEmails: fanout.recipients,
     });
   } catch (error) {
-    console.error('Failed to fan out notifications', input.type, input.fullName, error);
+    logSocialFailure('Failed to fan out notifications', input.type, input.fullName, error);
   }
   try {
     await scope.get(Tokens.WatchService).ensureWatching(input.repositoryId, input.actorEmail);
@@ -124,7 +132,7 @@ async function emitWebhookEvent(env: Env, input: WebhookEmitInput): Promise<void
   try {
     await createRequestScope(env).get(Tokens.DomainEventBus).emit({ type: 'webhook.emit', input });
   } catch (error) {
-    console.error('Failed to enqueue webhook deliveries', input.event, input.fullName, error);
+    logSocialFailure('Failed to enqueue webhook deliveries', input.event, input.fullName, error);
   }
 }
 
@@ -135,7 +143,7 @@ async function flushDueWebhookDeliveries(env: Env, limit = 50): Promise<{ proces
   try {
     return await createRequestScope(env).get(Tokens.WebhookDeliveryService).processDue({ limit });
   } catch (error) {
-    console.error('Failed to flush webhook deliveries', error);
+    console.error('Failed to flush webhook deliveries', ErrorSanitizationUtil.sanitizeErrorForLogging(error));
     return { processed: 0, succeeded: 0, failed: 0 };
   }
 }

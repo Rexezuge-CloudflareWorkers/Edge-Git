@@ -6,6 +6,25 @@ import { readJsonBody } from './BodyParser';
 
 type TeamApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
+// Pure Strategy helper: Hono already decodes params, but a literal `%` in the
+// route still reaches `decodeURIComponent` here. Guard the URIError so a
+// malformed member becomes 400 instead of an uncaught 500.
+function decodeMemberParam(raw: string): string | null {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return null;
+  }
+}
+
+// Pure normalization: trim whitespace; lowercase emails so `Foo@Bar.com `
+// resolves to the same user. Usernames keep case (resolved case-insensitively
+// downstream via IdentityResolver/TeamService).
+function normalizeMemberTarget(input: string): string {
+  const trimmed = input.trim();
+  return trimmed.includes('@') ? trimmed.toLowerCase() : trimmed;
+}
+
 function teamJson(t: {
   id: string;
   slug: string;
@@ -96,10 +115,12 @@ function registerTeamRoutes(app: TeamApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const target = body.username ?? body.email;
     if (!target) return jsonError(c, 'username or email is required', 400);
+    const normalizedTarget = normalizeMemberTarget(target);
+    if (!normalizedTarget) return jsonError(c, 'username or email is required', 400);
     const role = body.role ?? 'member';
     if (role !== 'admin' && role !== 'member') return jsonError(c, 'Invalid role', 400);
     try {
-      await getScope(c).get(Tokens.TeamService).addMember(c.req.param('org'), c.req.param('team'), email, target, role);
+      await getScope(c).get(Tokens.TeamService).addMember(c.req.param('org'), c.req.param('team'), email, normalizedTarget, role);
       return c.json({ ok: true }, 201);
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
@@ -111,10 +132,10 @@ function registerTeamRoutes(app: TeamApp): void {
     const { malformed, body } = await readJsonBody<{ role?: string }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (body.role !== 'admin' && body.role !== 'member') return jsonError(c, 'Invalid role', 400);
+    const member = decodeMemberParam(c.req.param('member'));
+    if (member === null || !member) return jsonError(c, 'Invalid member', 400);
     try {
-      await getScope(c)
-        .get(Tokens.TeamService)
-        .setMemberRole(c.req.param('org'), c.req.param('team'), email, decodeURIComponent(c.req.param('member')), body.role);
+      await getScope(c).get(Tokens.TeamService).setMemberRole(c.req.param('org'), c.req.param('team'), email, member, body.role);
       return c.json({ ok: true });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
@@ -123,10 +144,10 @@ function registerTeamRoutes(app: TeamApp): void {
 
   app.delete('/user/orgs/:org/teams/:team/members/:member', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
+    const member = decodeMemberParam(c.req.param('member'));
+    if (member === null || !member) return jsonError(c, 'Invalid member', 400);
     try {
-      await getScope(c)
-        .get(Tokens.TeamService)
-        .removeMember(c.req.param('org'), c.req.param('team'), email, decodeURIComponent(c.req.param('member')));
+      await getScope(c).get(Tokens.TeamService).removeMember(c.req.param('org'), c.req.param('team'), email, member);
       return c.json({ ok: true });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
@@ -190,4 +211,4 @@ function registerTeamRoutes(app: TeamApp): void {
   });
 }
 
-export { registerTeamRoutes };
+export { registerTeamRoutes, decodeMemberParam, normalizeMemberTarget };
