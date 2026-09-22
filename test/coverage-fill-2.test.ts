@@ -1,25 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { cache } from '@edge-git/backend-runtime/cache';
+import { KvCache } from '@edge-git/backend-runtime/kv';
+import type { KvNamespaceLike } from '@edge-git/backend-runtime/kv';
 import { createLogger } from '@edge-git/backend-runtime/logger';
 import { BaseScheduledTask } from '@edge-git/background/scheduled/IScheduledTask';
 import { StarService } from '@edge-git/backend-services/social/StarService';
 import { WatchService } from '@edge-git/backend-services/social/WatchService';
 import { NotificationService } from '@edge-git/backend-services/social/NotificationService';
 
-function installMemoryCache() {
-  const store = new Map<string, Response>();
-  const fakeCache = {
-    async put(key: URL | Request | string, res: Response) {
-      store.set(String(key), res.clone());
+function makeMemoryKv(): KvNamespaceLike & { store: Map<string, string> } {
+  const store = new Map<string, string>();
+  return {
+    store,
+    get: (key: string) => Promise.resolve(store.get(key) ?? null),
+    put: (key: string, value: string) => {
+      store.set(key, value);
+      return Promise.resolve();
     },
-    async match(key: URL | Request | string) {
-      return store.get(String(key)) ?? undefined;
+    delete: (key: string) => Promise.resolve(store.delete(key)),
+    list: (options: { prefix: string }) => {
+      const keys = [...store.keys()].filter((name) => name.startsWith(options.prefix)).map((name) => ({ name }));
+      return Promise.resolve({ keys, list_complete: true });
     },
   };
-  (globalThis as unknown as { caches: { open: () => Promise<typeof fakeCache> } }).caches = {
-    open: async () => fakeCache,
-  };
-  return store;
 }
 
 class ProbeTask extends BaseScheduledTask {
@@ -38,29 +40,22 @@ class ProbeTask extends BaseScheduledTask {
 }
 
 describe('cache helpers', () => {
-  beforeEach(() => {
-    installMemoryCache();
+  it('builds namespaced keys and round-trips through the single binding', async () => {
+    const kv = makeMemoryKv();
+    const cache = new KvCache(kv);
+    expect(cache.keyFor('refs', ['alice/demo', 'abc'])).toBe('refs:v1:alice%2Fdemo:abc');
+    await expect(cache.putJson('refs', ['k1'], { n: 1 })).resolves.toBe(true);
+    await expect(cache.getJson<{ n: number }>('refs', ['k1'])).resolves.toEqual({ n: 1 });
+    await expect(cache.getJson('refs', ['missing'])).resolves.toBeNull();
   });
 
-  it('builds stable keys and round-trips json', async () => {
-    const url = cache.buildCacheKey({ key: 'repos', params: { owner: 'alice', empty: undefined } });
-    expect(url.pathname).toBe('/__cache/repos');
-    expect(url.searchParams.get('owner')).toBe('alice');
-    const custom = cache.buildCacheKey({ key: '/x', params: {}, baseUrl: 'https://example.com' });
-    expect(custom.origin).toBe('https://example.com');
-    await cache.putJson({ key: 'k1', data: { n: 1 }, params: {} });
-    await expect(cache.getJson<{ n: number }>({ key: 'k1', params: {} })).resolves.toEqual({ n: 1 });
-    await expect(cache.getJson({ key: 'missing', params: {} })).resolves.toBeNull();
-  });
-
-  it('getOrSetJson caches fetchers and skips nullish', async () => {
-    let n = 0;
-    const v1 = await cache.getOrSetJson({ key: 'g1', params: {}, fetcher: async () => ({ v: ++n }) });
-    const v2 = await cache.getOrSetJson({ key: 'g1', params: {}, fetcher: async () => ({ v: ++n }) });
-    expect(v1).toEqual({ v: 1 });
-    expect(v2).toEqual({ v: 1 });
-    expect(n).toBe(1);
-    await expect(cache.getOrSetJson({ key: 'g-null', params: {}, fetcher: () => null as unknown as { v: number } })).resolves.toBeNull();
+  it('isolates purge by domain prefix', async () => {
+    const kv = makeMemoryKv();
+    const cache = new KvCache(kv);
+    await cache.putText('refs', ['a'], 'x');
+    await cache.putText('jwks', ['a'], 'y');
+    await expect(cache.purgePrefix('refs')).resolves.toBe(1);
+    await expect(cache.getText('jwks', ['a'])).resolves.toBe('y');
   });
 });
 

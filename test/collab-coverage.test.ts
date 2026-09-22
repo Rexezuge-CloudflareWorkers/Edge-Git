@@ -58,6 +58,14 @@ function createFullFakeDb() {
     const P = (i: number): string => String(params[i] ?? '');
     return {
       first<T>(): Promise<T | null> {
+        if (q.includes('FROM repositories WHERE owner_ci = ? AND name_ci = ?')) {
+          const row = state.repos.find(
+            (r) =>
+              String(r.owner_ci ?? r.owner).toLowerCase() === P(0).toLowerCase() &&
+              String(r.name_ci ?? r.name).toLowerCase() === P(1).toLowerCase(),
+          );
+          return Promise.resolve((row ?? null) as T | null);
+        }
         if (q.includes('FROM repositories WHERE lower(owner)')) {
           const row = state.repos.find(
             (r) => String(r.owner).toLowerCase() === P(0).toLowerCase() && String(r.name).toLowerCase() === P(1).toLowerCase(),

@@ -60,6 +60,15 @@ function createTransferFakeDb() {
         if (q.includes('FROM namespaces WHERE username_ci = ?')) {
           return Promise.resolve((state.namespaces.find((n) => n.username_ci === params[0]) ?? null) as T | null);
         }
+        if (q.includes('FROM repositories WHERE owner_ci = ? AND name_ci = ?')) {
+          return Promise.resolve(
+            (state.repos.find(
+              (r) =>
+                String(r.owner_ci ?? r.owner).toLowerCase() === String(params[0]).toLowerCase() &&
+                String(r.name_ci ?? r.name).toLowerCase() === String(params[1]).toLowerCase(),
+            ) ?? null) as T | null,
+          );
+        }
         if (q.includes('FROM repositories WHERE lower(owner) = ? AND lower(name) = ?')) {
           return Promise.resolve(
             (state.repos.find(

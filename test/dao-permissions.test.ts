@@ -59,6 +59,15 @@ function createPermFakeDb() {
         if (q.includes('FROM repositories WHERE id = ?')) {
           return Promise.resolve((state.repos.find((r) => r.id === params[0]) ?? null) as T | null);
         }
+        if (q.includes('FROM repositories WHERE owner_ci = ? AND name_ci = ?')) {
+          return Promise.resolve(
+            (state.repos.find(
+              (r) =>
+                String(r.owner_ci ?? r.owner).toLowerCase() === String(params[0]).toLowerCase() &&
+                String(r.name_ci ?? r.name).toLowerCase() === String(params[1]).toLowerCase(),
+            ) ?? null) as T | null,
+          );
+        }
         if (q.includes('FROM repositories WHERE lower(owner) = ? AND lower(name) = ?')) {
           return Promise.resolve(
             (state.repos.find((r) => (r.owner as string).toLowerCase() === params[0] && (r.name as string).toLowerCase() === params[1]) ??
@@ -95,6 +104,11 @@ function createPermFakeDb() {
             state.collabs.filter((c) => String(c.user_email).toLowerCase() === String(params[0]).toLowerCase()).map((c) => c.repo_id),
           );
           return Promise.resolve({ results: state.repos.filter((r) => ids.has(r.id)) as T[] });
+        }
+        if (q.includes('FROM repositories WHERE owner_ci = ?')) {
+          return Promise.resolve({
+            results: state.repos.filter((r) => String(r.owner_ci ?? r.owner).toLowerCase() === String(params[0]).toLowerCase()) as T[],
+          });
         }
         if (q.includes('FROM repositories WHERE lower(owner) = ?')) {
           return Promise.resolve({ results: state.repos.filter((r) => (r.owner as string).toLowerCase() === params[0]) as T[] });
@@ -270,12 +284,14 @@ function createPermFakeDb() {
         }
         if (q.startsWith('UPDATE repositories SET owner')) {
           for (const r of state.repos) {
-            if (
-              (r.owner as string).toLowerCase() === (params[params.length - 1] as string).toLowerCase?.() ||
-              r.owner === params[params.length - 1]
-            ) {
+            const target = params[params.length - 1] as string;
+            if ((r.owner as string).toLowerCase() === target.toLowerCase?.() || r.owner === target || r.owner_ci === target) {
               r.owner = params[0];
-              if (params.length === 3) r.owner_ci = params[1];
+              // Single-path rename: (owner, owner_ci, updated_at, where owner_ci).
+              if (params.length === 4) {
+                r.owner_ci = params[1];
+                r.updated_at = params[2];
+              } else if (params.length === 3) r.owner_ci = params[1];
             }
           }
           return Promise.resolve({ success: true, meta: { changes: 1 } });

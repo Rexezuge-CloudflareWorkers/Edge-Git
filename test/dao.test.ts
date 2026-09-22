@@ -21,6 +21,15 @@ function createDaoFakeDb(): D1Queryable & {
     const q = query.replace(/\s+/g, ' ').trim();
     return {
       first<T>(): Promise<T | null> {
+        if (q.includes('FROM repositories WHERE owner_ci = ? AND name_ci = ?')) {
+          return Promise.resolve(
+            (state.repos.find(
+              (r) =>
+                String(r.owner_ci ?? r.owner).toLowerCase() === String(params[0]).toLowerCase() &&
+                String(r.name_ci ?? r.name).toLowerCase() === String(params[1]).toLowerCase(),
+            ) ?? null) as T | null,
+          );
+        }
         if (q.includes('FROM repositories WHERE owner = ? AND name = ?')) {
           return Promise.resolve((state.repos.find((r) => r.owner === params[0] && r.name === params[1]) ?? null) as T | null);
         }
@@ -47,6 +56,11 @@ function createDaoFakeDb(): D1Queryable & {
         return Promise.resolve(null);
       },
       all<T>(): Promise<{ results: T[] }> {
+        if (q.includes('FROM repositories WHERE owner_ci = ?')) {
+          return Promise.resolve({
+            results: state.repos.filter((r) => String(r.owner_ci ?? r.owner).toLowerCase() === String(params[0]).toLowerCase()) as T[],
+          });
+        }
         if (q.includes('FROM repositories WHERE owner_email = ?') || q.includes('FROM repositories WHERE lower(owner_email)')) {
           return Promise.resolve({
             results: state.repos.filter((r) => String(r.owner_email).toLowerCase() === String(params[0]).toLowerCase()) as T[],
@@ -75,8 +89,10 @@ function createDaoFakeDb(): D1Queryable & {
       },
       run(): Promise<{ success: boolean; meta?: { changes?: number } }> {
         if (q.startsWith('INSERT INTO repositories')) {
-          const [id, owner_email, owner, name, description, is_private, created_at, updated_at] = params as Array<string | number | null>;
-          state.repos.push({ id, owner_email, owner, name, description, is_private, created_at, updated_at });
+          const [id, owner_email, owner, name, description, is_private, created_at, updated_at, owner_type, owner_ci, name_ci] = params as Array<
+            string | number | null
+          >;
+          state.repos.push({ id, owner_email, owner, name, description, is_private, created_at, updated_at, owner_type, owner_ci, name_ci });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE repositories SET')) {

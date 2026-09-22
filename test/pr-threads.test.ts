@@ -309,7 +309,7 @@ describe('PullThreadDAO SQL', () => {
     expect(await dao.getThread('pr-1', 'nope')).toBeNull();
   });
 
-  it('degrades gracefully on legacy DBs without thread tables', async () => {
+  it('throws on missing thread tables instead of degrading', async () => {
     const db = {
       prepare: () => ({
         bind: () => ({
@@ -320,8 +320,12 @@ describe('PullThreadDAO SQL', () => {
       }),
     } as unknown as D1Queryable;
     const dao = new PullThreadDAO(db);
-    await expect(dao.listThreads('pr-1')).resolves.toEqual([]);
-    await expect(dao.listThreadComments('t-1')).resolves.toEqual([]);
+    // Post-0021 the thread tables are part of the baseline schema: a missing
+    // table is deploy skew, not a legacy DB — fail closed instead of [].
+    // (`getThread` resolves null only because the fake's `first()` does;
+    // a real missing table rejects there too.)
+    await expect(dao.listThreads('pr-1')).rejects.toThrow('no such table');
+    await expect(dao.listThreadComments('t-1')).rejects.toThrow('no such table');
     await expect(dao.getThread('pr-1', 't-1')).resolves.toBeNull();
   });
 

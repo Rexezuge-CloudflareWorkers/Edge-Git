@@ -51,27 +51,18 @@ class PullThreadDAO extends BaseDAO {
   }
 
   public async listThreads(pullRequestId: string): Promise<PullReviewThreadRow[]> {
-    try {
-      const result = await this.database
-        .prepare('SELECT * FROM pull_review_threads WHERE pull_request_id = ? ORDER BY created_at ASC')
-        .bind(pullRequestId)
-        .all<PullReviewThreadRow>();
-      return result.results ?? [];
-    } catch {
-      // Legacy DBs without migration 0010 — no threads yet.
-      return [];
-    }
+    const result = await this.database
+      .prepare('SELECT * FROM pull_review_threads WHERE pull_request_id = ? ORDER BY created_at ASC')
+      .bind(pullRequestId)
+      .all<PullReviewThreadRow>();
+    return result.results ?? [];
   }
 
   public async getThread(pullRequestId: string, threadId: string): Promise<PullReviewThreadRow | null> {
-    try {
-      return await this.database
-        .prepare('SELECT * FROM pull_review_threads WHERE pull_request_id = ? AND id = ? LIMIT 1')
-        .bind(pullRequestId, threadId)
-        .first<PullReviewThreadRow>();
-    } catch {
-      return null;
-    }
+    return this.database
+      .prepare('SELECT * FROM pull_review_threads WHERE pull_request_id = ? AND id = ? LIMIT 1')
+      .bind(pullRequestId, threadId)
+      .first<PullReviewThreadRow>();
   }
 
   public async resolveThread(threadId: string, resolvedBy: string, resolved: boolean, now: number): Promise<void> {
@@ -97,15 +88,11 @@ class PullThreadDAO extends BaseDAO {
   }
 
   public async listThreadComments(threadId: string): Promise<PullThreadCommentRow[]> {
-    try {
-      const result = await this.database
-        .prepare('SELECT * FROM pull_thread_comments WHERE thread_id = ? ORDER BY created_at ASC')
-        .bind(threadId)
-        .all<PullThreadCommentRow>();
-      return result.results ?? [];
-    } catch {
-      return [];
-    }
+    const result = await this.database
+      .prepare('SELECT * FROM pull_thread_comments WHERE thread_id = ? ORDER BY created_at ASC')
+      .bind(threadId)
+      .all<PullThreadCommentRow>();
+    return result.results ?? [];
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {
