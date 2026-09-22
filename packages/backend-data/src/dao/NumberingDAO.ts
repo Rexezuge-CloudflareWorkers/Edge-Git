@@ -23,10 +23,10 @@ function isNumberedEntity(value: string): value is NumberedEntity {
 // even under concurrent POSTs; the seed subquery starts new counters above
 // the current MAX(number) so pre-existing rows never collide.
 //
-// Throws on unexpected shapes (missing table on legacy DBs, fakes without
-// the table): callers fall back to the legacy MAX+1 loop, with the 0019
-// UNIQUE indexes + 3-attempt retry as the backstop. The allocator is an
-// optimization, never a new failure mode.
+// Throws on unexpected shapes (fakes without the table, deploy skew):
+// callers fall back to the MAX+1 loop, with the UNIQUE indexes + 3-attempt
+// retry as the backstop. The allocator is an optimization, never a new
+// failure mode.
 class NumberingDAO extends BaseDAO {
   constructor(database: D1Queryable) {
     super(database);

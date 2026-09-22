@@ -43,7 +43,6 @@ class ActivityService {
     await dao.append({
       id,
       repositoryId: input.repositoryId,
-      fullName: input.fullName,
       actorEmail: input.actorEmail.toLowerCase(),
       type: input.type,
       subjectType: input.subjectType ?? null,

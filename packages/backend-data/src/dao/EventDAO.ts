@@ -30,6 +30,8 @@ export type RepoEventType =
 export interface RepoEventRow {
   id: string;
   repository_id: string;
+  // Computed `full_name` alias (`repositories` join) — the stored copy was
+  // dropped in 0024; never written, only selected.
   full_name: string;
   actor_email: string;
   type: RepoEventType;
@@ -48,7 +50,6 @@ class EventDAO extends BaseDAO {
   public async append(input: {
     id: string;
     repositoryId: string;
-    fullName: string;
     actorEmail: string;
     type: RepoEventType;
     subjectType?: string | null;
@@ -61,12 +62,11 @@ class EventDAO extends BaseDAO {
       () =>
         this.database
           .prepare(
-            'INSERT INTO repo_events (id, repository_id, full_name, actor_email, type, subject_type, subject_number, subject_oid, payload, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO repo_events (id, repository_id, actor_email, type, subject_type, subject_number, subject_oid, payload, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
           )
           .bind(
             input.id,
             input.repositoryId,
-            input.fullName,
             input.actorEmail,
             input.type,
             input.subjectType ?? null,
@@ -80,6 +80,11 @@ class EventDAO extends BaseDAO {
     );
   }
 
+  // `full_name` is computed from `repositories` (0024 dropped the stored
+  // copy): renames need no cascade here.
+  private static readonly FULL_NAME_ALIAS =
+    "(SELECT owner || '/' || name FROM repositories WHERE id = repo_events.repository_id) AS full_name";
+
   public async listByRepo(
     repositoryId: string,
     limit = 50,
@@ -90,12 +95,12 @@ class EventDAO extends BaseDAO {
     const result =
       decoded === undefined
         ? await this.database
-            .prepare('SELECT * FROM repo_events WHERE repository_id = ? ORDER BY created_at DESC, id DESC LIMIT ?')
+            .prepare(`SELECT repo_events.*, ${EventDAO.FULL_NAME_ALIAS} FROM repo_events WHERE repository_id = ? ORDER BY created_at DESC, id DESC LIMIT ?`)
             .bind(repositoryId, pageSize)
             .all<RepoEventRow>()
         : await this.database
             .prepare(
-              'SELECT * FROM repo_events WHERE repository_id = ? AND (created_at < ? OR (created_at = ? AND id < ?)) ORDER BY created_at DESC, id DESC LIMIT ?',
+              `SELECT repo_events.*, ${EventDAO.FULL_NAME_ALIAS} FROM repo_events WHERE repository_id = ? AND (created_at < ? OR (created_at = ? AND id < ?)) ORDER BY created_at DESC, id DESC LIMIT ?`,
             )
             .bind(repositoryId, decoded.created_at, decoded.created_at, decoded.id, pageSize)
             .all<RepoEventRow>();
@@ -111,15 +116,6 @@ class EventDAO extends BaseDAO {
       () => this.database.prepare('DELETE FROM repo_events WHERE repository_id = ?').bind(repositoryId).run(),
       'delete events by repo',
     );
-  }
-
-  // Refresh denormalized `full_name` after an owner/org rename. Keyed by
-  // stable `repository_id` so history rows follow the new `owner/name`.
-  public async updateFullNameByRepo(repositoryId: string, fullName: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('UPDATE repo_events SET full_name = ? WHERE repository_id = ?').bind(fullName, repositoryId).run(),
-      'rename repo event full name',
-    ).catch(() => undefined);
   }
 
   public async pruneOlderThan(cutoff: number, limit: number): Promise<number> {

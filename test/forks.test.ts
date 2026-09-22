@@ -28,14 +28,6 @@ function createForkFakeDb() {
           );
           return Promise.resolve((row ?? null) as T | null);
         }
-        if (q.includes('FROM repositories WHERE lower(owner)')) {
-          const row = state.repos.find(
-            (r) =>
-              String(r.owner).toLowerCase() === String(params[0]).toLowerCase() &&
-              String(r.name).toLowerCase() === String(params[1]).toLowerCase(),
-          );
-          return Promise.resolve((row ?? null) as T | null);
-        }
         if (q.includes('FROM repositories WHERE id = ?')) {
           const row = state.repos.find((r) => r.id === params[0]);
           return Promise.resolve((row ?? null) as T | null);
@@ -103,11 +95,15 @@ function createForkFakeDb() {
           const [id, owner_email, owner, name, description, is_private, created_at, updated_at] = params as Array<string | number | null>;
           const row: Record<string, unknown> = { id, owner_email, owner, name, description, is_private, created_at, updated_at };
           if (params.length > 8) {
-            const [, , , , , , , , owner_type, owner_ci, name_ci, owner_user_email, org_id, forked_from_repo_id, forked_from_full_name] =
+            const [, , , , , , , , owner_type, owner_ci, name_ci, owner_user_email, org_id, forked_from_repo_id] =
               params as Array<string | number | null>;
-            Object.assign(row, { owner_type, owner_ci, name_ci, owner_user_email, org_id, forked_from_repo_id, forked_from_full_name });
+            Object.assign(row, { owner_type, owner_ci, name_ci, owner_user_email, org_id, forked_from_repo_id });
           }
           state.repos.push(row);
+          // Emulate the computed `forked_from_full_name` SELECT alias from
+          // the stored source row (dropped column in 0024).
+          const source = state.repos.find((r) => r.id === row.forked_from_repo_id);
+          row.forked_from_full_name = source ? `${source.owner}/${source.name}` : null;
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('DELETE FROM repositories WHERE id = ?')) {
@@ -123,7 +119,6 @@ function createForkFakeDb() {
           const [
             id,
             repository_id,
-            full_name,
             number,
             title,
             body,
@@ -136,11 +131,16 @@ function createForkFakeDb() {
             creator_email,
             created_at,
             updated_at,
+            head_repository_id,
           ] = params as Array<string | number | null>;
+          // Emulate the computed `full_name` / `head_full_name` SELECT
+          // aliases from the stored repo rows (dropped columns in 0024).
+          const base = state.repos.find((r) => r.id === repository_id);
+          const head = state.repos.find((r) => r.id === head_repository_id);
           const row: Record<string, unknown> = {
             id,
             repository_id,
-            full_name,
+            full_name: base ? `${base.owner}/${base.name}` : null,
             number,
             title,
             body,
@@ -155,8 +155,8 @@ function createForkFakeDb() {
             merged_at: null,
             created_at,
             updated_at,
-            head_repository_id: params.length > 15 ? params[15] : null,
-            head_full_name: params.length > 16 ? params[16] : null,
+            head_repository_id: head_repository_id ?? null,
+            head_full_name: head ? `${head.owner}/${head.name}` : null,
           };
           state.pulls.push(row);
           return Promise.resolve({ success: true, meta: { changes: 1 } });
@@ -350,7 +350,7 @@ describe('ForkService', () => {
     const fork = await svc.createForkRow('bob@example.com', 'alice', 'demo', { owner: 'bob', name: 'demo-fork' });
     expect(fork).toMatchObject({ owner: 'bob', name: 'demo-fork', fullName: 'bob/demo-fork' });
     const stored = db.repos.find((r) => r.id === fork.id);
-    expect(stored).toMatchObject({ forked_from_repo_id: 'r1', forked_from_full_name: 'alice/demo' });
+    expect(stored).toMatchObject({ forked_from_repo_id: 'r1' });
   });
 
   it('defaults dest owner to the forker and name to the source', async () => {

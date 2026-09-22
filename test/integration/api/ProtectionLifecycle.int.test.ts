@@ -57,9 +57,9 @@ describe('branch protection lifecycle on real D1', () => {
     const testEnv = env as unknown as TestEnv;
     const now = Math.floor(Date.now() / 1000);
     await testEnv.DB.prepare(
-      `INSERT INTO pull_requests (id, repository_id, full_name, number, title, body, status, base_branch, head_branch, base_oid, head_oid, merge_base_oid, creator_email, merged_by, merged_at, created_at, updated_at) VALUES (?, ?, ?, 1, 'Big change', NULL, 'open', 'main', 'feature', NULL, NULL, NULL, ?, NULL, NULL, ?, ?)`,
+      `INSERT INTO pull_requests (id, repository_id, number, title, body, status, base_branch, head_branch, base_oid, head_oid, merge_base_oid, creator_email, merged_by, merged_at, created_at, updated_at) VALUES (?, ?, 1, 'Big change', NULL, 'open', 'main', 'feature', NULL, NULL, NULL, ?, NULL, NULL, ?, ?)`,
     )
-      .bind('pr-protect-1', repoId, `${OWNER}/${REPO}`, USER.toLowerCase(), now, now)
+      .bind('pr-protect-1', repoId, USER.toLowerCase(), now, now)
       .run();
     await api(rulesPath, json({ method: 'POST', body: JSON.stringify({ pattern: 'main', requirePr: true, requiredApprovals: 1 }) }));
 

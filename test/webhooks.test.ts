@@ -33,6 +33,7 @@ function createWebhookFakeDb() {
     namespaces: [] as Array<Record<string, unknown>>,
     repos: [] as Array<Record<string, unknown>>,
     hooks: [] as Array<Record<string, unknown>>,
+    hookEvents: [] as Array<{ hook_id: string; event: string }>,
     deliveries: [] as Array<Record<string, unknown>>,
   };
 
@@ -62,10 +63,6 @@ function createWebhookFakeDb() {
           );
           return Promise.resolve((row ?? null) as T | null);
         }
-        if (q.includes('FROM repositories WHERE owner = ? AND name = ?')) {
-          const row = state.repos.find((r) => r.owner === params[0] && r.name === params[1]);
-          return Promise.resolve((row ?? null) as T | null);
-        }
         if (q.includes('FROM repo_webhooks WHERE id = ? AND repository_id = ?')) {
           const row = state.hooks.find((h) => h.id === params[0] && h.repository_id === params[1]);
           return Promise.resolve((row ?? null) as T | null);
@@ -91,6 +88,10 @@ function createWebhookFakeDb() {
           const rows = state.hooks
             .filter((h) => h.repository_id === params[0])
             .sort((a, b) => (a.created_at as number) - (b.created_at as number) || String(a.id).localeCompare(String(b.id)));
+          return Promise.resolve({ results: rows as T[] });
+        }
+        if (q.includes('SELECT event FROM webhook_events WHERE hook_id = ?')) {
+          const rows = state.hookEvents.filter((e) => e.hook_id === params[0]).map((e) => ({ event: e.event }));
           return Promise.resolve({ results: rows as T[] });
         }
         if (q.includes("FROM webhook_deliveries WHERE status = 'pending'")) {
@@ -140,17 +141,15 @@ function createWebhookFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO repo_webhooks')) {
-          const [id, repository_id, full_name, url, url_prefix, secret, secret_suffix, events, creator_email, created_at, updated_at] =
+          const [id, repository_id, url, url_prefix, secret, secret_suffix, creator_email, created_at, updated_at] =
             params as Array<string | number>;
           state.hooks.push({
             id,
             repository_id,
-            full_name,
             url,
             url_prefix,
             secret,
             secret_suffix,
-            events,
             is_active: 1,
             consecutive_failures: 0,
             last_delivery_at: null,
@@ -159,6 +158,15 @@ function createWebhookFakeDb() {
             created_at,
             updated_at,
           });
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('DELETE FROM webhook_events WHERE hook_id = ?')) {
+          state.hookEvents = state.hookEvents.filter((e) => e.hook_id !== params[0]);
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('INSERT OR IGNORE INTO webhook_events')) {
+          const [hook_id, event] = params as [string, string];
+          if (!state.hookEvents.some((e) => e.hook_id === hook_id && e.event === event)) state.hookEvents.push({ hook_id, event });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE repo_webhooks SET last_delivery_at')) {
@@ -459,12 +467,11 @@ describe('webhook DAOs', () => {
     await dao.create({
       id: 'h1',
       repositoryId: 'repo-1',
-      fullName: 'alice/demo',
       url: 'https://hooks.example.com/a',
       urlPrefix: 'https://hooks.example.com/a',
       secret: 's3cret-value',
       secretSuffix: 'alue',
-      eventsJson: JSON.stringify(['push']),
+      events: ['push'],
       creatorEmail: 'alice@example.com',
       now: 100,
     });
@@ -599,9 +606,10 @@ describe('WebhookService', () => {
     };
     const dao = stubDao({
       getByIdAndRepo: vi.fn(async (id: string) => (id === 'h1' ? { ...row } : null)),
-      update: vi.fn(async (_id: string, _repo: string, patch: { url?: string; eventsJson?: string; isActive?: boolean }) => {
+      listEvents: vi.fn(async () => ['push']),
+      update: vi.fn(async (_id: string, _repo: string, patch: { url?: string; events?: string[]; isActive?: boolean }) => {
         if (patch.url !== undefined) row.url = patch.url;
-        if (patch.eventsJson !== undefined) row.events = patch.eventsJson;
+        if (patch.events !== undefined) row.events = JSON.stringify(patch.events);
         if (patch.isActive !== undefined) row.is_active = patch.isActive ? 1 : 0;
       }),
     });
@@ -650,8 +658,19 @@ describe('WebhookDeliveryService', () => {
     ) => Promise<{ httpStatus: number | null; error: string | null }>;
   }) {
     const deliveries: Array<Record<string, unknown>> = [];
+    // Derive junction subscriptions from the seeded JSON `events` payload
+    // (invalid payloads yield none — fail closed, mirrors the DAO).
+    const eventsFor = (hook: { id: string; events?: unknown }): string[] => {
+      try {
+        const parsed: unknown = typeof hook.events === 'string' ? JSON.parse(hook.events) : hook.events;
+        return Array.isArray(parsed) ? parsed.filter((e): e is string => typeof e === 'string') : [];
+      } catch {
+        return [];
+      }
+    };
     const webhookDAO = {
       listByRepo: vi.fn().mockResolvedValue(deps.hooks ?? []),
+      listEvents: vi.fn(async (id: string) => eventsFor(((deps.hooks as Array<{ id: string }> | undefined) ?? []).find((h) => h.id === id) ?? { id })),
       getById: vi.fn(async (id: string) => (deps.hooks as Array<{ id: string }> | undefined)?.find((h) => h.id === id) ?? null),
       getByIdAndRepo: vi.fn(),
     };
@@ -828,12 +847,11 @@ describe('webhook composition and cron', () => {
     await hookDao.create({
       id: 'h1',
       repositoryId: 'repo-1',
-      fullName: 'alice/demo',
       url: 'https://hooks.example.com/x',
       urlPrefix: 'https://hooks.example.com/x',
       secret: 'cron-secret',
       secretSuffix: 'cret',
-      eventsJson: JSON.stringify(['push']),
+      events: ['push'],
       creatorEmail: 'alice@example.com',
       now: 100,
     });

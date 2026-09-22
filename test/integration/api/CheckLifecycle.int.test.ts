@@ -63,9 +63,9 @@ describe('checks lifecycle on real D1', () => {
     // Fresh SHA: no runs exist yet, so the gate must report pending.
     const headSha = 'd'.repeat(40);
     await testEnv.DB.prepare(
-      `INSERT INTO pull_requests (id, repository_id, full_name, number, title, body, status, base_branch, head_branch, base_oid, head_oid, merge_base_oid, creator_email, merged_by, merged_at, created_at, updated_at) VALUES (?, ?, ?, 7, 'Checked change', NULL, 'open', 'main', 'feature', NULL, ?, NULL, ?, NULL, NULL, ?, ?)`,
+      `INSERT INTO pull_requests (id, repository_id, number, title, body, status, base_branch, head_branch, base_oid, head_oid, merge_base_oid, creator_email, merged_by, merged_at, created_at, updated_at) VALUES (?, ?, 7, 'Checked change', NULL, 'open', 'main', 'feature', NULL, ?, NULL, ?, NULL, NULL, ?, ?)`,
     )
-      .bind('pr-checks-7', repoId, `${OWNER}/${REPO}`, headSha, USER.toLowerCase(), now, now)
+      .bind('pr-checks-7', repoId, headSha, USER.toLowerCase(), now, now)
       .run();
     await api(
       `/user/repos/${OWNER}/${REPO}/rules`,

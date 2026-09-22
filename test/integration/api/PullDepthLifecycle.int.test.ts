@@ -21,10 +21,10 @@ async function seedPull(db: D1Database, repoId: string, number: number, title: s
   const now = Math.floor(Date.now() / 1000);
   await db
     .prepare(
-      `INSERT INTO pull_requests (id, repository_id, full_name, number, title, body, status, base_branch, head_branch, base_oid, head_oid, merge_base_oid, creator_email, created_at, updated_at) ` +
-        `VALUES (?, ?, ?, ?, ?, ?, 'open', 'main', 'feature', NULL, NULL, NULL, ?, ?, ?)`,
+      `INSERT INTO pull_requests (id, repository_id, number, title, body, status, base_branch, head_branch, base_oid, head_oid, merge_base_oid, creator_email, created_at, updated_at) ` +
+        `VALUES (?, ?, ?, ?, ?, 'open', 'main', 'feature', NULL, NULL, NULL, ?, ?, ?)`,
     )
-    .bind(id, repoId, `${OWNER}/${REPO}`, number, title, body, USER, now, now)
+    .bind(id, repoId, number, title, body, USER, now, now)
     .run();
   return id;
 }

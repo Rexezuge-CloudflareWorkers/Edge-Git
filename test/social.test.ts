@@ -62,7 +62,7 @@ function createSocialFakeDb(): D1Queryable & { state: FakeState } {
             const rows = state.watches.filter((s) => s.user_email === params[0]).slice(0, params[1] as number);
             return { results: rows as unknown as T[] };
           }
-          if (q.startsWith('SELECT * FROM repo_events WHERE repository_id = ?')) {
+          if (q.includes('FROM repo_events WHERE repository_id = ?')) {
             let rows = state.events.filter((e) => e.repository_id === params[0]);
             rows = [...rows].sort(
               (a, b) => (b.created_at as number) - (a.created_at as number) || String(b.id).localeCompare(String(a.id)),
@@ -77,7 +77,7 @@ function createSocialFakeDb(): D1Queryable & { state: FakeState } {
             }
             return { results: rows.slice(0, params[1] as number) as unknown as T[] };
           }
-          if (q.startsWith('SELECT * FROM notifications WHERE user_email = ?')) {
+          if (q.includes('FROM notifications WHERE user_email = ?')) {
             const unreadOnly = q.includes('AND is_read = 0');
             let rows = state.notifications.filter((n) => n.user_email === params[0] && (!unreadOnly || n.is_read === 0));
             rows = [...rows].sort(
@@ -133,12 +133,11 @@ function createSocialFakeDb(): D1Queryable & { state: FakeState } {
             return { success: true, meta: { changes: before - state.watches.length } };
           }
           if (q.startsWith('INSERT INTO repo_events')) {
-            const [id, repository_id, full_name, actor_email, type, subject_type, subject_number, subject_oid, payload, created_at] =
+            const [id, repository_id, actor_email, type, subject_type, subject_number, subject_oid, payload, created_at] =
               params as Array<string | number | null>;
             state.events.push({
               id,
               repository_id,
-              full_name,
               actor_email,
               type,
               subject_type,
@@ -162,14 +161,13 @@ function createSocialFakeDb(): D1Queryable & { state: FakeState } {
             return { success: true, meta: { changes: victims.length } };
           }
           if (q.startsWith('INSERT OR IGNORE INTO notifications')) {
-            const [id, user_email, repository_id, full_name, actor_email, type, title, subject_type, subject_number, created_at] =
+            const [id, user_email, repository_id, actor_email, type, title, subject_type, subject_number, created_at] =
               params as Array<string | number | null>;
             if (!state.notifications.some((n) => n.id === id)) {
               state.notifications.push({
                 id,
                 user_email,
                 repository_id,
-                full_name,
                 actor_email,
                 type,
                 title,

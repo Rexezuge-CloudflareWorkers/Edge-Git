@@ -140,10 +140,10 @@ function runnerDb(state: RunnerState): D1Queryable {
                 return { success: true };
               }
               if (q.startsWith("UPDATE repo_imports SET status = 'done'")) {
-                const job = state.imports.find((j) => j.id === params[3]);
+                const job = state.imports.find((j) => j.id === params[2]);
                 if (job) {
                   job.status = 'done';
-                  state.done.push({ id: String(params[3]), refs: Number(params[1]) });
+                  state.done.push({ id: String(params[2]), refs: Number(params[0]) });
                 }
                 return { success: true };
               }

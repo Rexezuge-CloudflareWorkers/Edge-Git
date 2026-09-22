@@ -6,7 +6,5 @@ export {
   TOKEN_SCOPES,
   DEFAULT_TOKEN_SCOPES,
   coversScope,
-  parseTokenScopes,
   normalizeTokenScopes,
-  serializeTokenScopes,
 } from './TokenScopes';

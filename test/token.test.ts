@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { TokenService, coversScope, normalizeTokenScopes, parseTokenScopes } from '@edge-git/backend-services/auth';
+import { TokenService, coversScope, normalizeTokenScopes } from '@edge-git/backend-services/auth';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 
 function createTokenFakeDb(): D1Queryable & { tokens: Array<Record<string, unknown>> } {
-  const state = { tokens: [] as Array<Record<string, unknown>> };
+  const state = {
+    tokens: [] as Array<Record<string, unknown>>,
+    scopes: [] as Array<{ token_id: string; scope: string }>,
+  };
   function statement(query: string, params: unknown[]) {
     const q = query.replace(/\s+/g, ' ').trim();
     return {
@@ -19,11 +22,15 @@ function createTokenFakeDb(): D1Queryable & { tokens: Array<Record<string, unkno
           const rows = state.tokens.filter((t) => String(t.user_email).toLowerCase() === String(params[0]).toLowerCase());
           return Promise.resolve({ results: rows as T[] });
         }
+        if (q.startsWith('SELECT scope FROM token_scopes WHERE token_id = ?')) {
+          const rows = state.scopes.filter((s) => s.token_id === params[0]).map((s) => ({ scope: s.scope }));
+          return Promise.resolve({ results: rows as T[] });
+        }
         return Promise.resolve({ results: [] });
       },
       run(): Promise<{ success: boolean; meta?: { changes?: number } }> {
         if (q.startsWith('INSERT INTO user_access_tokens')) {
-          const [token_id, user_email, token_hash, tname, expires_at, created_at, scopes] = params as Array<string | number>;
+          const [token_id, user_email, token_hash, tname, expires_at, created_at, token_prefix] = params as Array<string | number>;
           state.tokens.push({
             token_id,
             user_email,
@@ -32,8 +39,17 @@ function createTokenFakeDb(): D1Queryable & { tokens: Array<Record<string, unkno
             expires_at,
             last_used_at: null,
             created_at,
-            scopes: typeof scopes === 'string' ? scopes : null,
+            token_prefix: typeof token_prefix === 'string' ? token_prefix : null,
           });
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('DELETE FROM token_scopes WHERE token_id = ?')) {
+          state.scopes = state.scopes.filter((s) => s.token_id !== params[0]);
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('INSERT OR IGNORE INTO token_scopes')) {
+          const [token_id, scope] = params as [string, string];
+          if (!state.scopes.some((s) => s.token_id === token_id && s.scope === scope)) state.scopes.push({ token_id, scope });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE user_access_tokens SET last_used_at')) {
@@ -77,15 +93,6 @@ describe('token scope helpers', () => {
     expect(coversScope([], 'repo:read')).toBe(false);
   });
 
-  it('parseTokenScopes fails closed for legacy/invalid rows', () => {
-    expect(parseTokenScopes(null)).toEqual([]);
-    expect(parseTokenScopes(undefined)).toEqual([]);
-    expect(parseTokenScopes('not-json')).toEqual([]);
-    expect(parseTokenScopes('[]')).toEqual([]);
-    expect(parseTokenScopes('["repo:read"]')).toEqual(['repo:read']);
-    expect(parseTokenScopes('["repo:write","repo:read"]')).toEqual(['repo:read', 'repo:write']);
-  });
-
   it('normalizeTokenScopes defaults omitted input and rejects bad input', () => {
     expect(normalizeTokenScopes(undefined)).toEqual(['repo:read', 'repo:write']);
     expect(normalizeTokenScopes(null)).toEqual(['repo:read', 'repo:write']);
@@ -115,7 +122,7 @@ describe('TokenService scoped lifecycle', () => {
     await expect(svc.createToken('alice@example.com', 'bad', undefined, ['nope'])).rejects.toThrow('scopes must be');
   });
 
-  it('denies legacy rows without scopes (fail-closed)', async () => {
+  it('denies rows without junction scopes (fail-closed)', async () => {
     const db = createTokenFakeDb();
     db.tokens.push({
       token_id: 'legacy',
@@ -125,7 +132,6 @@ describe('TokenService scoped lifecycle', () => {
       expires_at: 9_999_999_999,
       last_used_at: null,
       created_at: 1,
-      scopes: null,
     });
     const svc = new TokenService({ DB: db });
     const identity = await svc.authenticateWithPAT('legacy-token');

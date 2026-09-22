@@ -40,14 +40,6 @@ function createRouteFakeDb() {
           const row = state.namespaces.find((n) => n.username_ci === params[0]);
           return Promise.resolve((row ?? null) as T | null);
         }
-        if (q.includes('FROM repositories WHERE lower(owner)')) {
-          const row = state.repos.find(
-            (r) =>
-              String(r.owner).toLowerCase() === String(params[0]).toLowerCase() &&
-              String(r.name).toLowerCase() === String(params[1]).toLowerCase(),
-          );
-          return Promise.resolve((row ?? null) as T | null);
-        }
         if (q.includes('FROM repositories WHERE id = ?') || q.includes('FROM repositories WHERE owner = ? AND name = ?')) {
           return Promise.resolve((state.repos[0] ?? null) as T | null);
         }

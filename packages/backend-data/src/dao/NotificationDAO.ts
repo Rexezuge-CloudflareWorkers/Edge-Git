@@ -5,7 +5,9 @@ export interface NotificationRow {
   id: string;
   user_email: string;
   repository_id: string | null;
-  full_name: string;
+  // Computed `full_name` alias (`repositories` join) — the stored copy was
+  // dropped in 0024. Null for global (repo-less) notifications.
+  full_name: string | null;
   actor_email: string;
   type: string;
   title: string;
@@ -24,7 +26,6 @@ class NotificationDAO extends BaseDAO {
     id: string;
     userEmail: string;
     repositoryId: string | null;
-    fullName: string;
     actorEmail: string;
     type: string;
     title: string;
@@ -36,13 +37,12 @@ class NotificationDAO extends BaseDAO {
       () =>
         this.database
           .prepare(
-            'INSERT OR IGNORE INTO notifications (id, user_email, repository_id, full_name, actor_email, type, title, subject_type, subject_number, is_read, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)',
+            'INSERT OR IGNORE INTO notifications (id, user_email, repository_id, actor_email, type, title, subject_type, subject_number, is_read, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)',
           )
           .bind(
             input.id,
             input.userEmail,
             input.repositoryId,
-            input.fullName,
             input.actorEmail,
             input.type,
             input.title,
@@ -54,6 +54,11 @@ class NotificationDAO extends BaseDAO {
       'insert notification',
     );
   }
+
+  // `full_name` is computed from `repositories` (0024 dropped the stored
+  // copy): renames need no cascade here. Null when `repository_id` is null.
+  private static readonly FULL_NAME_ALIAS =
+    "(SELECT owner || '/' || name FROM repositories WHERE id = notifications.repository_id) AS full_name";
 
   public async listByUser(
     userEmail: string,
@@ -67,12 +72,14 @@ class NotificationDAO extends BaseDAO {
     const result =
       decoded === undefined
         ? await this.database
-            .prepare(`SELECT * FROM notifications WHERE user_email = ? ${readFilter} ORDER BY created_at DESC, id DESC LIMIT ?`)
+            .prepare(
+              `SELECT notifications.*, ${NotificationDAO.FULL_NAME_ALIAS} FROM notifications WHERE user_email = ? ${readFilter} ORDER BY created_at DESC, id DESC LIMIT ?`,
+            )
             .bind(userEmail, pageSize)
             .all<NotificationRow>()
         : await this.database
             .prepare(
-              `SELECT * FROM notifications WHERE user_email = ? ${readFilter} AND (created_at < ? OR (created_at = ? AND id < ?)) ORDER BY created_at DESC, id DESC LIMIT ?`,
+              `SELECT notifications.*, ${NotificationDAO.FULL_NAME_ALIAS} FROM notifications WHERE user_email = ? ${readFilter} AND (created_at < ? OR (created_at = ? AND id < ?)) ORDER BY created_at DESC, id DESC LIMIT ?`,
             )
             .bind(userEmail, decoded.created_at, decoded.created_at, decoded.id, pageSize)
             .all<NotificationRow>();
@@ -120,15 +127,6 @@ class NotificationDAO extends BaseDAO {
       () => this.database.prepare('DELETE FROM notifications WHERE repository_id = ?').bind(repositoryId).run(),
       'delete notifications by repo',
     );
-  }
-
-  // Refresh denormalized `full_name` after an owner/org rename. Keyed by
-  // stable `repository_id` so inbox rows follow the new `owner/name`.
-  public async updateFullNameByRepo(repositoryId: string, fullName: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('UPDATE notifications SET full_name = ? WHERE repository_id = ?').bind(fullName, repositoryId).run(),
-      'rename notification full name',
-    ).catch(() => undefined);
   }
 }
 

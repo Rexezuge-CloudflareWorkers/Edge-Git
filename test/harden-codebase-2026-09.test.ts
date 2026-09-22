@@ -8,7 +8,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { parseBlobFilter, shouldSkipBlob } from '../packages/git-service/src/PackFilter';
 import { RefService } from '../packages/git-service/src/RefService';
 import {
-  isHookSubscribed,
   resolveSenderUsername,
   toPublicDelivery,
 } from '../packages/backend-services/src/webhook/WebhookDeliveryMapping';
@@ -61,17 +60,8 @@ describe('harden: WebhookDeliveryMapping pure policy', () => {
     expect(toPublicDelivery({ ...base, status: 'weird' }).status).toBe('pending');
   });
 
-  it('matches hooks by active flag and subscribed event', () => {
-    const active = { is_active: 1, events: JSON.stringify(['push', 'ping']) } as never;
-    expect(isHookSubscribed(active, 'push' as never)).toBe(true);
-    expect(isHookSubscribed(active, 'issues' as never)).toBe(false);
-    expect(isHookSubscribed({ is_active: 0, events: JSON.stringify(['push']) } as never, 'push' as never)).toBe(false);
-    expect(isHookSubscribed({ is_active: 1, events: 'not-json' } as never, 'push' as never)).toBe(false);
-  });
-
-  it('resolves sender username with legacy email fallback', () => {
+  it('resolves sender username with ghost fallback', () => {
     expect(resolveSenderUsername('alice')).toBe('alice');
-    expect(resolveSenderUsername(undefined, 'ALICE@Example.COM')).toBe('alice@example.com');
     expect(resolveSenderUsername()).toBe('ghost');
   });
 });

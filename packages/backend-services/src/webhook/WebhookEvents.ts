@@ -231,10 +231,6 @@ interface WebhookPayloadInput {
   event: string;
   fullName: string;
   actorUsername?: string;
-  /**
-  @deprecated Transitional fallback: resolved to `sender.username` when `actorUsername` is absent.
-  */
-  actorEmail?: string;
   eventId?: string | null;
   subjectType?: string | null;
   subjectNumber?: number | null;
@@ -254,9 +250,7 @@ function buildWebhookPayload(input: WebhookPayloadInput): Record<string, unknown
   delete safeExtra.sender;
   delete safeExtra.processed_at;
   // Public payloads expose only the username — never the stored email.
-  // `actorEmail` remains as a deprecated input fallback so legacy callers
-  // keep compiling; its value is mapped into `sender.username`.
-  const senderUsername = input.actorUsername ?? input.actorEmail ?? 'ghost';
+  const senderUsername = input.actorUsername ?? 'ghost';
   return {
     event: input.event,
     repository: { full_name: input.fullName },

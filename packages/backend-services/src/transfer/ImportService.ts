@@ -19,22 +19,15 @@ interface ImportServiceDeps {
 }
 
 function toMetadata(row: RepoImportRow): RepoImportMetadata {
-  let refs: RepoImportMetadata['refs'] = null;
-  if (row.refs_json) {
-    try {
-      const parsed: unknown = JSON.parse(row.refs_json);
-      refs = Array.isArray(parsed) ? (parsed as RepoImportMetadata['refs']) : null;
-    } catch {
-      refs = null;
-    }
-  }
+  // Refs live only in `repo_import_refs` (0024 dropped the JSON column):
+  // static metadata carries null; `withJunctionRefs` fills from the junction.
   return {
     id: row.id,
     repositoryId: row.repository_id,
     sourceUrl: row.source_url,
     status: row.status,
     error: row.error,
-    refs,
+    refs: null,
     importedRefs: row.imported_refs,
     createdBy: row.created_by,
     createdAt: row.created_at,

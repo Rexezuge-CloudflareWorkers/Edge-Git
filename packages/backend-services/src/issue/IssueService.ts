@@ -40,7 +40,6 @@ class IssueService {
 
   public async createIssue(input: {
     repositoryId: string;
-    fullName: string;
     title: string;
     body?: string | null;
     creatorEmail: string;
@@ -70,7 +69,6 @@ class IssueService {
         await dao.create({
           id,
           repositoryId: input.repositoryId,
-          fullName: input.fullName,
           number,
           title,
           body,

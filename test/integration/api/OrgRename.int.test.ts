@@ -60,10 +60,12 @@ describe('org rename on real D1+DO', () => {
     expect((await api(`/repos/${NEXT}/${REPO}/blob?ref=main&path=README.md`)).status).toBe(200);
     expect((await api(`/repos/${ORG}/${REPO}/branches`)).status).toBe(404);
 
-    // Sidecar cascade: denormalized issue full_name follows the new owner.
+    // Rename follows through: the computed issue full_name reflects the new owner.
     const db = (env as unknown as TestEnv).DB;
     const issue = (await db
-      .prepare('SELECT full_name FROM issues WHERE title = ?')
+      .prepare(
+        "SELECT (SELECT owner || '/' || name FROM repositories WHERE id = issues.repository_id) AS full_name FROM issues WHERE title = ?",
+      )
       .bind('Org rename me')
       .first<{ full_name: string }>()) as { full_name: string };
     expect(issue.full_name).toBe(`${NEXT}/${REPO}`);

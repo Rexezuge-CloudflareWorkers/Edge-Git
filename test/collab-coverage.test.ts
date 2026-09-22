@@ -66,16 +66,6 @@ function createFullFakeDb() {
           );
           return Promise.resolve((row ?? null) as T | null);
         }
-        if (q.includes('FROM repositories WHERE lower(owner)')) {
-          const row = state.repos.find(
-            (r) => String(r.owner).toLowerCase() === P(0).toLowerCase() && String(r.name).toLowerCase() === P(1).toLowerCase(),
-          );
-          return Promise.resolve((row ?? null) as T | null);
-        }
-        if (q.includes('FROM repositories WHERE owner = ? AND name = ?')) {
-          const row = state.repos.find((r) => r.owner === params[0] && r.name === params[1]);
-          return Promise.resolve((row ?? null) as T | null);
-        }
         if (q.includes('FROM repositories WHERE id = ?')) {
           const row = state.repos.find((r) => r.id === params[0]);
           return Promise.resolve((row ?? null) as T | null);
@@ -187,13 +177,14 @@ function createFullFakeDb() {
           return Promise.resolve({ success: true });
         }
         if (q.startsWith('INSERT INTO issues')) {
-          const [id, repository_id, full_name, number, title, body, status, creator_email, created_at, updated_at] = params as Array<
+          const [id, repository_id, number, title, body, status, creator_email, created_at, updated_at] = params as Array<
             string | number | null
           >;
+          const repo = state.repos.find((r) => r.id === repository_id);
           state.issues.push({
             id,
             repository_id,
-            full_name,
+            full_name: repo ? `${repo.owner}/${repo.name}` : null,
             number,
             title,
             body,
@@ -226,7 +217,6 @@ function createFullFakeDb() {
           const [
             id,
             repository_id,
-            full_name,
             number,
             title,
             body,
@@ -238,10 +228,11 @@ function createFullFakeDb() {
             merge_base_oid,
             creator_email,
           ] = params as Array<string | number | null>;
+          const repo = state.repos.find((r) => r.id === repository_id);
           state.pulls.push({
             id,
             repository_id,
-            full_name,
+            full_name: repo ? `${repo.owner}/${repo.name}` : null,
             number,
             title,
             body,

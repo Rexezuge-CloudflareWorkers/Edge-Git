@@ -179,7 +179,6 @@ class ForkService {
 
     const { id } = await this.repoService().createRepo(forkerEmail, normalizedOwner, normalizedName, description, isPrivate, {
       forkedFromRepoId: source.id,
-      forkedFromFullName: sourceFullName,
     });
     const created = await dao.getById(id);
     const canonicalOwner = created?.owner ?? normalizedOwner;

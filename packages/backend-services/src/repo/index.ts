@@ -6,4 +6,4 @@ export type { RepoCreatePath } from './RepoCreatePolicy';
 export { RepoVisibilityService } from './RepoVisibilityService';
 export type { RepoVisibilityDeps } from './RepoVisibilityService';
 export { cascadeOwnerRepos } from './repoRenameCascade';
-export type { RepoRenameCascadeDeps, RepoRenameMove } from './repoRenameCascade';
+export type { RepoRenameCascadeDeps } from './repoRenameCascade';

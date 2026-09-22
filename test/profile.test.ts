@@ -54,18 +54,6 @@ function createProfileFakeDb() {
             ) ?? null) as T | null,
           );
         }
-        if (q.includes('FROM repositories WHERE lower(owner) = ? AND lower(name) = ?')) {
-          return Promise.resolve(
-            (state.repos.find(
-              (r) =>
-                String(r.owner).toLowerCase() === String(params[0]).toLowerCase() &&
-                String(r.name).toLowerCase() === String(params[1]).toLowerCase(),
-            ) ?? null) as T | null,
-          );
-        }
-        if (q.includes('FROM repositories WHERE owner = ? AND name = ?')) {
-          return Promise.resolve((state.repos.find((r) => r.owner === params[0] && r.name === params[1]) ?? null) as T | null);
-        }
         if (q.includes('FROM repositories WHERE id = ?')) {
           return Promise.resolve((state.repos.find((r) => r.id === params[0]) ?? null) as T | null);
         }
@@ -83,20 +71,6 @@ function createProfileFakeDb() {
         if (q.includes('FROM repositories WHERE owner_ci = ?')) {
           const rows = state.repos
             .filter((r) => String(r.owner_ci ?? r.owner).toLowerCase() === String(params[0]).toLowerCase())
-            .sort((a, b) => (b.updated_at as number) - (a.updated_at as number))
-            .slice(0, params[1] as number);
-          return Promise.resolve({ results: rows as T[] });
-        }
-        if (q.includes('FROM repositories WHERE lower(owner) = ? ORDER BY')) {
-          const rows = state.repos
-            .filter((r) => String(r.owner).toLowerCase() === String(params[0]).toLowerCase())
-            .sort((a, b) => (b.updated_at as number) - (a.updated_at as number))
-            .slice(0, params[1] as number);
-          return Promise.resolve({ results: rows as T[] });
-        }
-        if (q.includes('FROM repositories WHERE owner = ? ORDER BY')) {
-          const rows = state.repos
-            .filter((r) => r.owner === params[0])
             .sort((a, b) => (b.updated_at as number) - (a.updated_at as number))
             .slice(0, params[1] as number);
           return Promise.resolve({ results: rows as T[] });

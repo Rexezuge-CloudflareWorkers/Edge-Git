@@ -158,16 +158,6 @@ function createFillFakeDb() {
             ) ?? null) as T | null,
           );
         }
-        if (q.includes('FROM repositories WHERE lower(owner)')) {
-          return Promise.resolve(
-            (state.repos.find(
-              (r) => String(r.owner).toLowerCase() === P(0).toLowerCase() && String(r.name).toLowerCase() === P(1).toLowerCase(),
-            ) ?? null) as T | null,
-          );
-        }
-        if (q.includes('FROM repositories WHERE owner = ? AND name = ?')) {
-          return Promise.resolve((state.repos.find((r) => r.owner === params[0] && r.name === params[1]) ?? null) as T | null);
-        }
         if (q.includes('FROM repositories WHERE id = ?')) {
           return Promise.resolve((state.repos.find((r) => r.id === params[0]) ?? null) as T | null);
         }

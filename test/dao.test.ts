@@ -30,9 +30,6 @@ function createDaoFakeDb(): D1Queryable & {
             ) ?? null) as T | null,
           );
         }
-        if (q.includes('FROM repositories WHERE owner = ? AND name = ?')) {
-          return Promise.resolve((state.repos.find((r) => r.owner === params[0] && r.name === params[1]) ?? null) as T | null);
-        }
         if (q.includes('FROM repositories WHERE id = ?')) {
           return Promise.resolve((state.repos.find((r) => r.id === params[0]) ?? null) as T | null);
         }
@@ -65,9 +62,6 @@ function createDaoFakeDb(): D1Queryable & {
           return Promise.resolve({
             results: state.repos.filter((r) => String(r.owner_email).toLowerCase() === String(params[0]).toLowerCase()) as T[],
           });
-        }
-        if (q.includes('FROM repositories WHERE owner = ?')) {
-          return Promise.resolve({ results: state.repos.filter((r) => r.owner === params[0]) as T[] });
         }
         if (q.includes('FROM user_access_tokens WHERE') && q.includes('user_email')) {
           return Promise.resolve({
@@ -129,10 +123,10 @@ function createDaoFakeDb(): D1Queryable & {
           return Promise.resolve({ success: true, meta: { changes: before - state.tokens.length } });
         }
         if (q.startsWith('INSERT INTO issues')) {
-          const [id, repository_id, full_name, number, title, body, status, creator_email, created_at, updated_at] = params as Array<
+          const [id, repository_id, number, title, body, status, creator_email, created_at, updated_at] = params as Array<
             string | number | null
           >;
-          state.issues.push({ id, repository_id, full_name, number, title, body, status, creator_email, created_at, updated_at });
+          state.issues.push({ id, repository_id, number, title, body, status, creator_email, created_at, updated_at });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE issues SET status')) {
