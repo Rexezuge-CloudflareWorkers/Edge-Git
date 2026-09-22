@@ -35,24 +35,56 @@ function decodeBlobContent(blob: BlobLike | null): string | null {
   }
 }
 
+/**
+ * Structural stub view for CODEOWNERS reads (unit-test fakes included).
+ */
+interface CodeownerRepoStub {
+  getBlob(args: { ref: string; filepath: string }): Promise<unknown>;
+  getTree?(args: { ref: string; path?: string; withLastCommit: boolean }): Promise<unknown>;
+}
+
+async function readCodeownerBlob(stub: CodeownerRepoStub, baseBranch: string, filepath: string): Promise<string | null> {
+  try {
+    const blob = (await stub.getBlob({ ref: baseBranch, filepath })) as BlobLike | null;
+    return decodeBlobContent(blob);
+  } catch {
+    return null;
+  }
+}
+
+async function probeCodeownerCandidates(stub: CodeownerRepoStub, baseBranch: string): Promise<CodeownerRule[]> {
+  for (const candidate of CODEOWNER_CANDIDATES) {
+    const content = await readCodeownerBlob(stub, baseBranch, candidate);
+    if (content) return parseCodeowners(content);
+  }
+  return [];
+}
+
+async function treeHasCandidate(stub: CodeownerRepoStub, baseBranch: string, rootNames: Set<string>, candidate: string): Promise<boolean> {
+  const slash = candidate.indexOf('/');
+  if (slash === -1) return rootNames.has(candidate);
+  const dir = candidate.slice(0, slash);
+  if (!rootNames.has(dir) || typeof stub.getTree !== 'function') return false;
+  try {
+    const sub = (await stub.getTree({ ref: baseBranch, path: dir, withLastCommit: false })) as Array<{
+      path: string;
+    }> | null;
+    const leaf = candidate.slice(slash + 1);
+    return (sub ?? []).some((e) => e.path === leaf);
+  } catch {
+    return false;
+  }
+}
+
 async function readCodeownerRules(env: Env, fullName: string, baseBranch: string): Promise<CodeownerRule[]> {
-  const stub = getRepoStub(env, fullName);
+  const stub = getRepoStub(env, fullName) as unknown as CodeownerRepoStub;
   // List-then-read: a direct `getBlob` miss leaves a dangling isomorphic-git
   // rejection that workerd surfaces as unhandled (it fails
   // `vitest-pool-workers` runs and spams production logs). Membership checks
   // against tree listings only ever read objects known to exist. Stubs
   // without `getTree` (unit-test fakes) fall back to direct probing.
-  if (typeof (stub as { getTree?: unknown }).getTree !== 'function') {
-    for (const candidate of CODEOWNER_CANDIDATES) {
-      try {
-        const blob = (await stub.getBlob({ ref: baseBranch, filepath: candidate })) as BlobLike | null;
-        const content = decodeBlobContent(blob);
-        if (content) return parseCodeowners(content);
-      } catch {
-        continue;
-      }
-    }
-    return [];
+  if (typeof stub.getTree !== 'function') {
+    return probeCodeownerCandidates(stub, baseBranch);
   }
   let rootNames: Set<string>;
   try {
@@ -63,20 +95,8 @@ async function readCodeownerRules(env: Env, fullName: string, baseBranch: string
   }
   for (const candidate of CODEOWNER_CANDIDATES) {
     try {
-      const slash = candidate.indexOf('/');
-      if (slash === -1) {
-        if (!rootNames.has(candidate)) continue;
-      } else {
-        const dir = candidate.slice(0, slash);
-        if (!rootNames.has(dir)) continue;
-        const leaf = candidate.slice(slash + 1);
-        const sub = (await stub.getTree({ ref: baseBranch, path: dir, withLastCommit: false })) as Array<{
-          path: string;
-        }> | null;
-        if ((sub ?? []).every((e) => e.path !== leaf)) continue;
-      }
-      const blob = (await stub.getBlob({ ref: baseBranch, filepath: candidate })) as BlobLike | null;
-      const content = decodeBlobContent(blob);
+      if (!(await treeHasCandidate(stub, baseBranch, rootNames, candidate))) continue;
+      const content = await readCodeownerBlob(stub, baseBranch, candidate);
       if (content) return parseCodeowners(content);
     } catch {
       continue;
@@ -170,5 +190,13 @@ async function resolveCodeownerEmails(env: Env, handles: readonly string[], excl
   return out;
 }
 
-export { suggestCodeownerHandles, resolveCodeownerEmails, readCodeownerRules, decodeBlobContent, appendUniqueEmails };
-export type { BlobLike };
+export {
+  suggestCodeownerHandles,
+  resolveCodeownerEmails,
+  readCodeownerRules,
+  decodeBlobContent,
+  appendUniqueEmails,
+  probeCodeownerCandidates,
+  treeHasCandidate,
+};
+export type { BlobLike, CodeownerRepoStub };

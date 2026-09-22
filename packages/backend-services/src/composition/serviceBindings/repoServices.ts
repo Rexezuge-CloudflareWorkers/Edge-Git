@@ -7,6 +7,7 @@ import { ForkService } from '@edge-git/backend-services/fork';
 import { NotificationService } from '@edge-git/backend-services/social/NotificationService';
 import { RealtimeService } from '@edge-git/backend-services/realtime';
 import { RepoService } from '@edge-git/backend-services/repo';
+import { RepoServiceDepsBuilder } from '@edge-git/backend-services/repo';
 import { SearchService } from '@edge-git/backend-services/search';
 import { AppConfiguration } from '@edge-git/backend-runtime/config';
 import type { Container } from '@edge-git/backend-runtime/di';
@@ -31,39 +32,45 @@ function bindRepoServices(scope: Container, { env, daos }: ServiceGroupContext):
     }),
   );
   scope.bind(Tokens.RepoService, (container) =>
-    createService(RepoService, env, {
-      repositoryDAO: daos.repositoryDAO,
-      issueDAO: daos.issueDAO,
-      pullRequestDAO: daos.pullRequestDAO,
-      pullThreadDAO: daos.pullThreadDAO,
-      branchProtectionDAO: daos.branchProtectionDAO,
-      userDAO: daos.userDAO,
-      organizationDAO: daos.organizationDAO,
-      organizationMemberDAO: daos.organizationMemberDAO,
-      repoCollaboratorDAO: daos.repoCollaboratorDAO,
-      namespaceDAO: daos.namespaceDAO,
-      starDAO: daos.starDAO,
-      watchDAO: daos.watchDAO,
-      eventDAO: daos.eventDAO,
-      notificationDAO: daos.notificationDAO,
-      releaseDAO: daos.releaseDAO,
-      projectDAO: daos.projectDAO,
-      discussionDAO: daos.discussionDAO,
-      wikiDAO: daos.wikiDAO,
-      importDAO: daos.importDAO,
-      mirrorDAO: daos.mirrorDAO,
-      deployKeyDAO: daos.deployKeyDAO,
-      tokenGrantDAO: daos.tokenGrantDAO,
-      securitySettingsDAO: daos.securitySettingsDAO,
-      collaborationDAO: daos.collaborationDAO,
-      webhookDAO: daos.webhookDAO,
-      webhookDeliveryDAO: daos.webhookDeliveryDAO,
-      auditLogDAO: daos.auditLogDAO,
-      teamGrantDAO: daos.teamGrantDAO,
-      checkRunDAO: daos.checkRunDAO,
-      permissionService: () => Promise.resolve(container.get(Tokens.PermissionService)),
-      config: AppConfiguration.fromEnv(env),
-    }),
+    createService(
+      RepoService,
+      env,
+      RepoServiceDepsBuilder.fromEnv(env)
+        .withDaos({
+          repositoryDAO: daos.repositoryDAO,
+          issueDAO: daos.issueDAO,
+          pullRequestDAO: daos.pullRequestDAO,
+          pullThreadDAO: daos.pullThreadDAO,
+          branchProtectionDAO: daos.branchProtectionDAO,
+          userDAO: daos.userDAO,
+          organizationDAO: daos.organizationDAO,
+          organizationMemberDAO: daos.organizationMemberDAO,
+          repoCollaboratorDAO: daos.repoCollaboratorDAO,
+          namespaceDAO: daos.namespaceDAO,
+          starDAO: daos.starDAO,
+          watchDAO: daos.watchDAO,
+          eventDAO: daos.eventDAO,
+          notificationDAO: daos.notificationDAO,
+          releaseDAO: daos.releaseDAO,
+          projectDAO: daos.projectDAO,
+          discussionDAO: daos.discussionDAO,
+          wikiDAO: daos.wikiDAO,
+          importDAO: daos.importDAO,
+          mirrorDAO: daos.mirrorDAO,
+          deployKeyDAO: daos.deployKeyDAO,
+          tokenGrantDAO: daos.tokenGrantDAO,
+          securitySettingsDAO: daos.securitySettingsDAO,
+          collaborationDAO: daos.collaborationDAO,
+          webhookDAO: daos.webhookDAO,
+          webhookDeliveryDAO: daos.webhookDeliveryDAO,
+          auditLogDAO: daos.auditLogDAO,
+          teamGrantDAO: daos.teamGrantDAO,
+          checkRunDAO: daos.checkRunDAO,
+        })
+        .withPermissionService(() => Promise.resolve(container.get(Tokens.PermissionService)))
+        .withConfig(AppConfiguration.fromEnv(env))
+        .build(),
+    ),
   );
   scope.bind(Tokens.SearchService, (container) =>
     createService(SearchService, env, {

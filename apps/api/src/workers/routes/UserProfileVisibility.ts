@@ -62,4 +62,62 @@ function deduplicateRepoRows<T extends { id: string }>(...lists: T[][]): T[] {
   return Array.from(seen.values());
 }
 
-export { PROFILE_REPO_SCAN_CAP, filterVisibleRepos, hasVisibleRepo, parseLimit, deduplicateRepoRows };
+/**
+ * Viewer-role + org-membership lookups injected by `UserRoutes`.
+ */
+interface OrgVisibilityDeps {
+  getMemberRole(orgId: string, viewerEmail: string): Promise<string | null>;
+  listByOrgId(orgId: string, limit: number): Promise<RepositoryRow[]>;
+  getRole(viewerEmail: string | null, repo: RepositoryRow): Promise<string | null>;
+}
+
+/**
+ * Shared outsider-org filter (Specification): an org is visible when the
+ * viewer shares membership or when at least one of its repos is
+ * viewer-visible. Unifies the `/users/:username` count path and the
+ * `/users/:username/orgs` list path, which duplicated this loop.
+ */
+async function filterVisibleOrgUsernames(
+  orgs: Array<{ id: string; username: string }>,
+  viewerEmail: string | null,
+  deps: OrgVisibilityDeps,
+): Promise<string[]> {
+  const visible: string[] = [];
+  for (const org of orgs) {
+    let show = false;
+    if (viewerEmail) {
+      const role = await deps.getMemberRole(org.id, viewerEmail).catch(() => null);
+      if (role) show = true;
+    }
+    if (!show) {
+      const repos = await deps.listByOrgId(org.id, 5).catch(() => []);
+      show = await hasVisibleRepo(repos, (repo) => deps.getRole(viewerEmail, repo).catch(() => null));
+    }
+    if (show) visible.push(org.username);
+  }
+  return visible;
+}
+
+/**
+ * Count viewer-visible repos in a pre-fetched row list. Thin wrapper over
+ * `filterVisibleRepos` so profile handlers share one call shape.
+ */
+async function countVisibleRepos(
+  rows: RepositoryRow[],
+  viewerEmail: string | null,
+  getRole: (viewerEmail: string | null, repo: RepositoryRow) => Promise<string | null>,
+): Promise<number> {
+  const visible = await filterVisibleRepos(rows, (row) => getRole(viewerEmail, row), PROFILE_REPO_SCAN_CAP);
+  return visible.length;
+}
+
+export {
+  PROFILE_REPO_SCAN_CAP,
+  filterVisibleRepos,
+  hasVisibleRepo,
+  parseLimit,
+  deduplicateRepoRows,
+  filterVisibleOrgUsernames,
+  countVisibleRepos,
+};
+export type { OrgVisibilityDeps };

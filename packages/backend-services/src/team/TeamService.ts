@@ -14,6 +14,7 @@ import { BadRequestError, ForbiddenError, NotFoundError } from '@edge-git/backen
 import { AppConfiguration } from '@edge-git/backend-runtime/config';
 import { EmailAddress, SLUG_RE, TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 import { GHOST_USERNAME } from '../identity/IdentityResolver';
+import { assertNotLastTeamAdmin } from '../policy/MembershipPolicy';
 
 interface TeamServiceEnv {
   DB: D1Queryable;
@@ -225,7 +226,7 @@ class TeamService {
     if (!existing) throw new NotFoundError('Member not found');
     if (role !== 'admin' && existing.role === 'admin') {
       const admins = await memberDAO.countAdmins(team.id);
-      if (admins <= 1) throw new BadRequestError('Cannot demote the last team admin');
+      assertNotLastTeamAdmin(existing.role, admins, 'demote');
     }
     await memberDAO.upsert(team.id, targetEmail, role, TimestampUtil.getCurrentUnixTimestampInSeconds());
   }
@@ -238,7 +239,7 @@ class TeamService {
     if (!existing) throw new NotFoundError('Member not found');
     if (existing.role === 'admin') {
       const admins = await memberDAO.countAdmins(team.id);
-      if (admins <= 1) throw new BadRequestError('Cannot remove the last team admin');
+      assertNotLastTeamAdmin(existing.role, admins, 'remove');
     }
     await memberDAO.remove(team.id, targetEmail);
   }

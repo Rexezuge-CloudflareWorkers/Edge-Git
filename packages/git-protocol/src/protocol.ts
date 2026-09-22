@@ -8,13 +8,6 @@ export { buildFetchErrorResponse, shouldSendPackfileForFetch, buildLsRefsRespons
 export type { FetchResponseOptions } from './FetchResponseBuilder';
 export { getBasicCredentials, getBearerToken } from './AuthHeaders';
 export { ZERO_OID, isZeroOid, branchNameFromRef, checkStaticPushProtection } from './ProtectionPolicy';
-export {
-  fetchRemotePack,
-  parseUploadPackAdvertisement,
-  buildUploadPackRequest,
-  decodeUploadPackResponse,
-  normalizePublicGitUrl,
-  resolveRedirectUrl,
-  MAX_REDIRECTS,
-} from './RemoteImportClient';
+export { normalizePublicGitUrl, resolveRedirectUrl, MAX_REDIRECTS, MAX_URL_LENGTH } from './GitUrlPolicy';
+export { fetchRemotePack, parseUploadPackAdvertisement, buildUploadPackRequest, decodeUploadPackResponse } from './RemoteImportClient';
 export type { RemoteRef, RemotePack, RemoteGitFetcher } from './RemoteImportClient';

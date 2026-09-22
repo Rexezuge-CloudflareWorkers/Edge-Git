@@ -15,6 +15,7 @@ import {
   UPSERT_CODE_FILE_SQL,
   buildFtsQuery,
   buildLikeOrClause,
+  buildScopedLikeStatement,
   clampSearchLimit,
   likeParamsForTokens,
   tokenizeSearchQuery,
@@ -106,22 +107,22 @@ class SearchDAO extends BaseDAO {
       ).all<IssueRow>();
       return result.results ?? [];
     } catch {
-      const likes = buildLikeOrClause(TITLE_BODY_SEARCH_COLUMNS, tokens.length);
-      const params: unknown[] = likeParamsForTokens(tokens, TITLE_BODY_SEARCH_COLUMNS.length);
+      const like = buildScopedLikeStatement({
+        table: 'issues',
+        scopeColumn: 'repository_id',
+        scopeValue: opts.repoId,
+        columns: TITLE_BODY_SEARCH_COLUMNS,
+        tokenCount: tokens.length,
+        scopedOrderBy: 'number DESC',
+        unscopedOrderBy: 'updated_at DESC',
+      });
+      const patterns = likeParamsForTokens(tokens, TITLE_BODY_SEARCH_COLUMNS.length);
       try {
-        if (opts.repoId) {
-          params.push(opts.repoId, limit);
-          const result = await this.database
-            .prepare(`SELECT * FROM issues WHERE repository_id = ? AND ${likes} ORDER BY number DESC LIMIT ?`)
-            .bind(opts.repoId, ...params.slice(0, -2), limit)
-            .all<IssueRow>();
-          return result.results ?? [];
-        }
-        params.push(limit);
-        const result = await this.database
-          .prepare(`SELECT * FROM issues WHERE ${likes} ORDER BY updated_at DESC LIMIT ?`)
-          .bind(...params)
-          .all<IssueRow>();
+        const result = await (
+          like.scoped
+            ? this.database.prepare(like.text).bind(opts.repoId, ...patterns, limit)
+            : this.database.prepare(like.text).bind(...patterns, limit)
+        ).all<IssueRow>();
         return result.results ?? [];
       } catch (error) {
         if (!isMissingSchemaError(error))
@@ -145,21 +146,22 @@ class SearchDAO extends BaseDAO {
       ).all<PullRequestRow>();
       return result.results ?? [];
     } catch {
-      const likes = buildLikeOrClause(TITLE_BODY_SEARCH_COLUMNS, tokens.length);
-      const params: unknown[] = likeParamsForTokens(tokens, TITLE_BODY_SEARCH_COLUMNS.length);
+      const like = buildScopedLikeStatement({
+        table: 'pull_requests',
+        scopeColumn: 'repository_id',
+        scopeValue: opts.repoId,
+        columns: TITLE_BODY_SEARCH_COLUMNS,
+        tokenCount: tokens.length,
+        scopedOrderBy: 'number DESC',
+        unscopedOrderBy: 'updated_at DESC',
+      });
+      const patterns = likeParamsForTokens(tokens, TITLE_BODY_SEARCH_COLUMNS.length);
       try {
-        if (opts.repoId) {
-          const result = await this.database
-            .prepare(`SELECT * FROM pull_requests WHERE repository_id = ? AND ${likes} ORDER BY number DESC LIMIT ?`)
-            .bind(opts.repoId, ...params, limit)
-            .all<PullRequestRow>();
-          return result.results ?? [];
-        }
-        params.push(limit);
-        const result = await this.database
-          .prepare(`SELECT * FROM pull_requests WHERE ${likes} ORDER BY updated_at DESC LIMIT ?`)
-          .bind(...params)
-          .all<PullRequestRow>();
+        const result = await (
+          like.scoped
+            ? this.database.prepare(like.text).bind(opts.repoId, ...patterns, limit)
+            : this.database.prepare(like.text).bind(...patterns, limit)
+        ).all<PullRequestRow>();
         return result.results ?? [];
       } catch (error) {
         if (!isMissingSchemaError(error))
@@ -183,21 +185,22 @@ class SearchDAO extends BaseDAO {
       ).all<CodeHit>();
       return result.results ?? [];
     } catch {
-      const likes = buildLikeOrClause(CODE_SEARCH_COLUMNS, tokens.length);
-      const params: unknown[] = likeParamsForTokens(tokens, CODE_SEARCH_COLUMNS.length);
+      const like = buildScopedLikeStatement({
+        table: 'code_index',
+        scopeColumn: 'repo_id',
+        scopeValue: opts.repoId,
+        columns: CODE_SEARCH_COLUMNS,
+        tokenCount: tokens.length,
+        scopedOrderBy: 'path ASC',
+        unscopedOrderBy: 'updated_at DESC',
+      });
+      const patterns = likeParamsForTokens(tokens, CODE_SEARCH_COLUMNS.length);
       try {
-        if (opts.repoId) {
-          const result = await this.database
-            .prepare(`SELECT * FROM code_index WHERE repo_id = ? AND ${likes} ORDER BY path ASC LIMIT ?`)
-            .bind(opts.repoId, ...params, limit)
-            .all<CodeHit>();
-          return result.results ?? [];
-        }
-        params.push(limit);
-        const result = await this.database
-          .prepare(`SELECT * FROM code_index WHERE ${likes} ORDER BY updated_at DESC LIMIT ?`)
-          .bind(...params)
-          .all<CodeHit>();
+        const result = await (
+          like.scoped
+            ? this.database.prepare(like.text).bind(opts.repoId, ...patterns, limit)
+            : this.database.prepare(like.text).bind(...patterns, limit)
+        ).all<CodeHit>();
         return result.results ?? [];
       } catch (error) {
         if (!isMissingSchemaError(error))
@@ -335,21 +338,22 @@ class SearchDAO extends BaseDAO {
       ).all<DiscussionRow>();
       return result.results ?? [];
     } catch {
-      const likes = buildLikeOrClause(TITLE_BODY_SEARCH_COLUMNS, tokens.length);
-      const params: unknown[] = likeParamsForTokens(tokens, TITLE_BODY_SEARCH_COLUMNS.length);
+      const like = buildScopedLikeStatement({
+        table: 'discussions',
+        scopeColumn: 'repository_id',
+        scopeValue: opts.repoId,
+        columns: TITLE_BODY_SEARCH_COLUMNS,
+        tokenCount: tokens.length,
+        scopedOrderBy: 'number DESC',
+        unscopedOrderBy: 'updated_at DESC',
+      });
+      const patterns = likeParamsForTokens(tokens, TITLE_BODY_SEARCH_COLUMNS.length);
       try {
-        if (opts.repoId) {
-          const result = await this.database
-            .prepare(`SELECT * FROM discussions WHERE repository_id = ? AND ${likes} ORDER BY number DESC LIMIT ?`)
-            .bind(opts.repoId, ...params, limit)
-            .all<DiscussionRow>();
-          return result.results ?? [];
-        }
-        params.push(limit);
-        const result = await this.database
-          .prepare(`SELECT * FROM discussions WHERE ${likes} ORDER BY updated_at DESC LIMIT ?`)
-          .bind(...params)
-          .all<DiscussionRow>();
+        const result = await (
+          like.scoped
+            ? this.database.prepare(like.text).bind(opts.repoId, ...patterns, limit)
+            : this.database.prepare(like.text).bind(...patterns, limit)
+        ).all<DiscussionRow>();
         return result.results ?? [];
       } catch (error) {
         if (!isMissingSchemaError(error))

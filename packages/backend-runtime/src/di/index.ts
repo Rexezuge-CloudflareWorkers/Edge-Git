@@ -1,5 +1,7 @@
 export { Container } from './Container';
 export type { Factory, Token } from './Container';
+export { providerOf } from './Provider';
+export type { Provider } from './Provider';
 export { createServiceContext } from './ServiceContext';
 export type { ServiceContext, ServiceContextOverrides } from './ServiceContext';
 export { ConsoleLogger, SystemClock, NullLogger, FixedClock } from './ServiceContext';

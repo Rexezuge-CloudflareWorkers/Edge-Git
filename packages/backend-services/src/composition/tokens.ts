@@ -62,6 +62,7 @@ import type { DeployKeyService } from '../deploykey/DeployKeyService';
 import type { SecuritySettingsService } from '../security/SecuritySettingsService';
 import type { AuditService } from '../audit/AuditService';
 import type { AuditObserverRegistry } from '../audit/AuditObserver';
+import type { DomainEventBus } from '../events/DomainEventBus';
 import type { IdentityResolver } from '../identity/IdentityResolver';
 import type { PermissionService } from '../permission/PermissionService';
 import type { SearchService } from '../search/SearchService';
@@ -142,6 +143,7 @@ const Tokens = {
   TeamService: Symbol('TeamService') as Token<TeamService>,
   AuditService: Symbol('AuditService') as Token<AuditService>,
   AuditObserverRegistry: Symbol('AuditObserverRegistry') as Token<AuditObserverRegistry>,
+  DomainEventBus: Symbol('DomainEventBus') as Token<DomainEventBus>,
   IdentityResolver: Symbol('IdentityResolver') as Token<IdentityResolver>,
   PermissionService: Symbol('PermissionService') as Token<PermissionService>,
   SearchService: Symbol('SearchService') as Token<SearchService>,

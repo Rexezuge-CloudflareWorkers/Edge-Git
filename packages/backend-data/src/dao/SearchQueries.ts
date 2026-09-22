@@ -66,6 +66,37 @@ const TITLE_BODY_SEARCH_COLUMNS = ['lower(title)', `lower(COALESCE(body, ''))`];
 const CODE_SEARCH_COLUMNS = ['lower(path)', 'lower(content)'];
 const SNIPPET_SEARCH_COLUMNS = ['lower(title)'];
 
+interface ScopedLikeSearch {
+  table: string;
+  scopeColumn: string;
+  scopeValue?: string;
+  columns: string[];
+  tokenCount: number;
+  scopedOrderBy: string;
+  unscopedOrderBy: string;
+}
+
+/**
+ * LIKE-fallback statement for the four repo-scoped searches (issues, pulls,
+ * code, discussions). Centralizes the `WHERE <scope> = ? AND <likes> ...`
+ * vs unscoped template plus the bind-order contract (scope first, LIKE
+ * patterns, limit last) so the DAOs no longer juggle `params.push/slice`.
+ * Returns `scoped` so the caller binds `scopeValue` only when present.
+ */
+function buildScopedLikeStatement(search: ScopedLikeSearch): { text: string; scoped: boolean } {
+  const likes = buildLikeOrClause(search.columns, search.tokenCount);
+  if (search.scopeValue) {
+    return {
+      scoped: true,
+      text: `SELECT * FROM ${search.table} WHERE ${search.scopeColumn} = ? AND ${likes} ORDER BY ${search.scopedOrderBy} LIMIT ?`,
+    };
+  }
+  return {
+    scoped: false,
+    text: `SELECT * FROM ${search.table} WHERE ${likes} ORDER BY ${search.unscopedOrderBy} LIMIT ?`,
+  };
+}
+
 export {
   SEARCH_DEFAULT_LIMIT,
   SEARCH_MAX_LIMIT,
@@ -77,6 +108,7 @@ export {
   buildFtsQuery,
   buildLikePattern,
   buildLikeOrClause,
+  buildScopedLikeStatement,
   likeParamsForTokens,
   REPO_SEARCH_COLUMNS,
   TITLE_BODY_SEARCH_COLUMNS,

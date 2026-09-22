@@ -3,6 +3,7 @@
 // dependent groups resolve it lazily via the container.
 import { AccessAuthService, TokenService } from '@edge-git/backend-services/auth';
 import { AuditObserverRegistry, AuditService } from '@edge-git/backend-services/audit';
+import { DomainEventBus, registerDomainEventDefaults } from '@edge-git/backend-services/events';
 import { IdentityResolver } from '@edge-git/backend-services/identity';
 import { OrganizationService } from '@edge-git/backend-services/org';
 import { PermissionService } from '@edge-git/backend-services/permission';
@@ -71,6 +72,10 @@ function bindCoreServices(scope: Container, { env, daos }: ServiceGroupContext):
       observers: container.get(Tokens.AuditObserverRegistry),
     }),
   );
+  // Mediator for audit/webhook/realtime/check fan-out. Default transport
+  // subscribers resolve lazily via the container so routes and middleware
+  // publish intent (`bus.emit(...)`) instead of calling services directly.
+  scope.bind(Tokens.DomainEventBus, (container) => registerDomainEventDefaults(new DomainEventBus(), container));
   scope.bind(Tokens.PermissionService, () =>
     createService(PermissionService, env, {
       organizationDAO: daos.organizationDAO,

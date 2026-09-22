@@ -88,9 +88,7 @@ class CollaborationDAO extends BaseDAO {
     await this.withRetry(
       () =>
         this.database
-          .prepare(
-            "INSERT INTO milestones (id, repository_id, title, description, due_on, status, created_at) VALUES (?, ?, ?, ?, ?, 'open', ?)",
-          )
+          .prepare(CollaborationQueries.insertMilestoneOpen())
           .bind(input.id, input.repositoryId, input.title, input.description, input.dueOn, input.now)
           .run(),
       'create milestone',
@@ -258,21 +256,14 @@ class CollaborationDAO extends BaseDAO {
   public async requestReviewers(pullRequestId: string, emails: string[], now: number): Promise<void> {
     for (const email of emails) {
       await this.withRetry(
-        () =>
-          this.database
-            .prepare("INSERT OR IGNORE INTO pull_reviewers (pull_request_id, user_email, status, created_at) VALUES (?, ?, 'pending', ?)")
-            .bind(pullRequestId, email.toLowerCase(), now)
-            .run(),
+        () => this.database.prepare(CollaborationQueries.insertReviewerIgnore()).bind(pullRequestId, email.toLowerCase(), now).run(),
         'request reviewer',
       );
     }
   }
 
   public async listReviewers(pullRequestId: string): Promise<PullReviewerRow[]> {
-    const result = await this.database
-      .prepare('SELECT * FROM pull_reviewers WHERE pull_request_id = ? ORDER BY user_email ASC')
-      .bind(pullRequestId)
-      .all<PullReviewerRow>();
+    const result = await this.database.prepare(CollaborationQueries.listReviewersByEmail()).bind(pullRequestId).all<PullReviewerRow>();
     return result.results ?? [];
   }
 

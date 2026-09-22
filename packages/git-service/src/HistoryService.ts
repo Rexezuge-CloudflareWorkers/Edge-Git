@@ -4,6 +4,9 @@ import { diffText } from './DiffHunks';
 import type { DiffHunk } from './DiffHunks';
 import { GitCache } from './GitCache';
 import { TreeReader } from './TreeReader';
+import { TreeDiffer } from './TreeDiffer';
+import type { FileStateChange } from './TreeDiffer';
+import { BlameReader } from './BlameReader';
 
 const logger = {
   warn: (...args: unknown[]): void => console.warn('[WARN] [GitService]', ...args),
@@ -12,15 +15,6 @@ const logger = {
 };
 
 type PromiseFsClient = ReturnType<IsoGitFs['getPromiseFsClient']>;
-
-type TextFile = { isBinary: boolean; content: string | null };
-
-type FileStateChange = {
-  type: 'add' | 'modify' | 'remove';
-  path: string;
-  old: TextFile | null;
-  new: TextFile | null;
-};
 
 export interface FileDiffWithHunks {
   path: string;
@@ -35,6 +29,8 @@ export class HistoryService {
   private readonly gitdir: string;
   private readonly cacheHolder = new GitCache();
   private readonly trees: TreeReader;
+  private readonly differ: TreeDiffer;
+  private readonly blamer: BlameReader;
 
   private get cache(): object {
     return this.cacheHolder.getCache();
@@ -44,6 +40,8 @@ export class HistoryService {
     this.fs = fs;
     this.gitdir = gitdir;
     this.trees = new TreeReader(fs, gitdir, () => this.cacheHolder.getCache());
+    this.differ = new TreeDiffer(fs, gitdir, (content) => this.trees.detectBinary(content));
+    this.blamer = new BlameReader(fs, gitdir, this.trees, () => this.cacheHolder.getCache());
   }
 
   public clearCache(): void {
@@ -106,90 +104,7 @@ export class HistoryService {
   }
 
   async getFileStateChanges(oldCommit: string | undefined, newCommit: string | undefined) {
-    type File =
-      | {
-          isBinary: false;
-          content: string;
-        }
-      | {
-          isBinary: true;
-          content: null;
-        };
-
-    type Change = {
-      type: 'add' | 'modify' | 'remove';
-      path: string;
-      old: File | null;
-      new: File | null;
-    };
-
-    const data = await git.walk({
-      fs: this.fs,
-      gitdir: this.gitdir,
-      trees: [git.TREE({ ref: oldCommit }), git.TREE({ ref: newCommit })],
-      map: async (filepath, [A, B]): Promise<Change | undefined> => {
-        if (filepath === '.') {
-          return;
-        }
-
-        const Atype = A ? await A.type() : null;
-        const Btype = B ? await B.type() : null;
-
-        if (Atype === 'tree' || Btype === 'tree') {
-          return;
-        }
-
-        const Aoid = A ? await A.oid() : null;
-        const Boid = B ? await B.oid() : null;
-
-        if (Aoid === null && Boid === null) {
-          logger.warn(`(get-file-state-changes): Both A and B are null for path ${filepath}`);
-          return;
-        }
-        const type: 'equal' | 'modify' | 'add' | 'remove' =
-          Aoid === null ? 'add' : Boid === null ? 'remove' : Aoid === Boid ? 'equal' : 'modify';
-
-        if (type === 'equal') {
-          return;
-        }
-
-        const oldContent = await A?.content();
-        const newContent = await B?.content();
-
-        const isOldBinary = oldContent && this.detectBinary(oldContent);
-        const isNewBinary = newContent && this.detectBinary(newContent);
-
-        let oldFile: File | null = null;
-
-        if (isOldBinary) {
-          oldFile = { isBinary: true, content: null };
-        } else if (oldContent) {
-          oldFile = {
-            isBinary: false,
-            content: new TextDecoder().decode(oldContent),
-          };
-        }
-
-        let newFile: File | null = null;
-
-        if (isNewBinary) {
-          newFile = { isBinary: true, content: null };
-        } else if (newContent) {
-          newFile = {
-            isBinary: false,
-            content: new TextDecoder().decode(newContent),
-          };
-        }
-
-        return {
-          type,
-          path: filepath,
-          old: oldFile,
-          new: newFile,
-        };
-      },
-    });
-    return data as Change[];
+    return this.differ.diffTrees(oldCommit, newCommit);
   }
 
   async getCommit(commitOid: string) {
@@ -264,7 +179,7 @@ export class HistoryService {
       mergeBase = null;
     }
     const diffBase = mergeBase ?? baseOid;
-    const changes = (await this.getFileStateChanges(diffBase, headOid)) as FileStateChange[];
+    const changes = await this.getFileStateChanges(diffBase, headOid);
     return {
       baseOid,
       headOid,
@@ -276,9 +191,8 @@ export class HistoryService {
 
   /**
    * Blame v1: attribute each line of `filepath` at `ref` to the most recent
-   * commit that last touched it. Walks file history oldest-first and replays
-   * hunks: lines surviving from an older version keep their commit, new lines
-   * take the current commit. Capped to 5000 lines / 200 commits.
+   * commit that last touched it. Delegates to `BlameReader` (SRP); see that
+   * class for the walk-forward attribution algorithm and caps.
    */
   async getBlame(
     ref: string,
@@ -288,69 +202,6 @@ export class HistoryService {
     lines: Array<{ line: number; commitOid: string; author: string; content: string }>;
     truncated: boolean;
   } | null> {
-    let resolved: string | null = null;
-    try {
-      resolved = await git.resolveRef({ fs: this.fs, gitdir: this.gitdir, ref });
-    } catch {
-      return null;
-    }
-    if (!resolved) return null;
-    const current = await this.getBlob(resolved, filepath);
-    if (!current || (current as { isBinary?: boolean }).isBinary) return null;
-    const text = new TextDecoder().decode((current as { content: Uint8Array }).content);
-    if (text.length > 200_000) return { oid: resolved, lines: [], truncated: true };
-    const currentLines = text.split('\n');
-    if (currentLines.length > 5000) return { oid: resolved, lines: [], truncated: true };
-    let history: Array<{ oid: string; commit: { author: { name: string; email: string } } }>;
-    try {
-      history = await git.log({ fs: this.fs, gitdir: this.gitdir, ref, filepath, cache: this.cache });
-    } catch {
-      return null;
-    }
-    if (history.length === 0) return null;
-    // eslint-disable-next-line unicorn/no-array-reverse
-    const oldestFirst = [...history].reverse().slice(-200);
-    // Start: all lines belong to the oldest commit touching the file, then
-    // walk forward attributing changed lines to newer commits via simple
-    // longest-common-subsequence-free heuristic (position-anchored diff).
-    const attribution: Array<{ commitOid: string; author: string }> = currentLines.map(() => ({
-      commitOid: oldestFirst[0].oid,
-      author: oldestFirst[0].commit.author.email || oldestFirst[0].commit.author.name,
-    }));
-    const fileAt = async (oid: string): Promise<string[] | null> => {
-      try {
-        const { blob } = await git.readBlob({ fs: this.fs, gitdir: this.gitdir, oid, filepath, cache: this.cache });
-        if (this.detectBinary(blob)) return null;
-        return new TextDecoder().decode(blob).split('\n');
-      } catch {
-        return null;
-      }
-    };
-    let previous = await fileAt(oldestFirst[0].oid);
-    for (const entry of oldestFirst.slice(1)) {
-      const next = await fileAt(entry.oid);
-      if (!next || !previous) {
-        previous = next;
-        continue;
-      }
-      // Lines present in `next` but not at the same position in `previous`
-      // are attributed to `entry`; surviving lines keep older attribution.
-      // Rebuild attribution anchored to the newest content at the end.
-      if (next.length === currentLines.length) {
-        for (const [i, line] of next.entries()) {
-          if (previous[i] !== line)
-            attribution[i] = { commitOid: entry.oid, author: entry.commit.author.email || entry.commit.author.name };
-        }
-      }
-      previous = next;
-    }
-    // Anchor to current content length (history tip should equal ref).
-    const lines = currentLines.map((content, i) => ({
-      line: i + 1,
-      commitOid: attribution[i]?.commitOid ?? resolved ?? '',
-      author: attribution[i]?.author ?? '',
-      content,
-    }));
-    return { oid: resolved, lines, truncated: false };
+    return this.blamer.blame(ref, filepath);
   }
 }
