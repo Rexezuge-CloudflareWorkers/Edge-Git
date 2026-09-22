@@ -14,8 +14,9 @@ import {
 // node unit-test env — it pulls `i18next`/`react-i18next` (web-only deps, not
 // resolvable from the repo root) and a Vite `import.meta.glob` locale chunk
 // map. Web `normalizeLanguage`/`detectInitialLanguage` are therefore covered
-// indirectly here by invoking `pnpm run validate:locales` (parity of the web
-// `en` + `zh-CN` bundles) below.
+// indirectly here by invoking `pnpm run validate:locales` (key/placeholder
+// parity of all 12 bundles + bundle-dir parity with `SUPPORTED_LANGUAGES`)
+// below.
 
 describe('backend strings (en)', () => {
   it('serves Title Case English strings', () => {
@@ -27,8 +28,33 @@ describe('backend strings (en)', () => {
   });
 
   it('keeps locale bundles structurally identical', () => {
-    expect(Object.keys(BACKEND_STRINGS.en).sort()).toEqual(Object.keys(BACKEND_STRINGS['zh-CN']).sort());
-    expect(SUPPORTED_BACKEND_LOCALES).toEqual(['en', 'zh-CN']);
+    const enKeys = Object.keys(BACKEND_STRINGS.en).sort();
+    expect(SUPPORTED_BACKEND_LOCALES).toEqual(['en', 'de', 'fr', 'es', 'it', 'nl', 'pt', 'pl', 'ja', 'zh-CN', 'zh-TW', 'ko']);
+    expect(Object.keys(BACKEND_STRINGS)).toEqual([...SUPPORTED_BACKEND_LOCALES]);
+    for (const locale of SUPPORTED_BACKEND_LOCALES) {
+      expect(Object.keys(BACKEND_STRINGS[locale]).sort()).toEqual(enKeys);
+    }
+  });
+
+  it('keeps {placeholder} parity across all locales', () => {
+    const varsOf = (value: string): string[] =>
+      [...new Set(value.match(/\{(\w+)\}/g) ?? [])].sort();
+    const collect = (node: object, out: Map<string, string[]>): void => {
+      for (const [key, value] of Object.entries(node)) {
+        if (value !== null && typeof value === 'object') collect(value as object, out);
+        else if (typeof value === 'string') out.set(key, varsOf(value));
+      }
+    };
+    const enVars = new Map<string, string[]>();
+    collect(BACKEND_STRINGS.en, enVars);
+    for (const locale of SUPPORTED_BACKEND_LOCALES) {
+      if (locale === 'en') continue;
+      const vars = new Map<string, string[]>();
+      collect(BACKEND_STRINGS[locale], vars);
+      for (const [key, expected] of enVars) {
+        expect(vars.get(key), `${locale}:${key}`).toEqual(expected);
+      }
+    }
   });
 });
 
@@ -43,8 +69,14 @@ describe('backend strings (zh-CN)', () => {
 
 describe('locale fallback', () => {
   it('falls back to en for unknown, empty, or missing locales', () => {
-    for (const locale of ['de', 'en-US', 'fr-CA', '', null, undefined]) {
+    for (const locale of ['en-US', 'xx', '', null, undefined]) {
       expect(getBackendStrings(locale)).toBe(BACKEND_STRINGS.en);
+    }
+  });
+
+  it('serves every supported locale directly', () => {
+    for (const locale of SUPPORTED_BACKEND_LOCALES) {
+      expect(getBackendStrings(locale)).toBe(BACKEND_STRINGS[locale]);
     }
   });
 
@@ -54,16 +86,24 @@ describe('locale fallback', () => {
     }
   });
 
+  it('base-matches regional variants to their language bundle', () => {
+    expect(getBackendStrings('de-AT')).toBe(BACKEND_STRINGS.de);
+    expect(getBackendStrings('fr-CA')).toBe(BACKEND_STRINGS.fr);
+    expect(getBackendStrings('pt-BR')).toBe(BACKEND_STRINGS.pt);
+  });
+
   it('canonicalizes tags case- and separator-insensitively', () => {
     expect(canonicalizeBackendLocaleTag('zh_cn')).toBe('zh-CN');
     expect(canonicalizeBackendLocaleTag('ZH-CN')).toBe('zh-CN');
     expect(canonicalizeBackendLocaleTag(' en ')).toBe('en');
-    expect(normalizeBackendLocale('pt')).toBe('en');
+    expect(normalizeBackendLocale('pt')).toBe('pt');
+    expect(normalizeBackendLocale('xx')).toBe('en');
   });
 
   it('resolveLocalizedStrings prefers the primary locale, then the fallback', () => {
     expect(resolveLocalizedStrings('zh-CN')).toBe(BACKEND_STRINGS['zh-CN']);
-    expect(resolveLocalizedStrings('de', 'zh-CN')).toBe(BACKEND_STRINGS['zh-CN']);
+    expect(resolveLocalizedStrings('xx', 'zh-CN')).toBe(BACKEND_STRINGS['zh-CN']);
+    expect(resolveLocalizedStrings('de', 'zh-CN')).toBe(BACKEND_STRINGS.de);
     expect(resolveLocalizedStrings(null, null)).toBe(BACKEND_STRINGS.en);
     expect(resolveLocalizedStrings('en')).toBe(BACKEND_STRINGS.en);
   });
@@ -82,8 +122,8 @@ describe('formatBackendString', () => {
 });
 
 describe('web locale bundles', () => {
-  it('passes scripts/validate_locales.mjs (en + zh-CN parity)', () => {
+  it('passes scripts/validate_locales.mjs (all 12 bundles + SUPPORTED_LANGUAGES parity)', () => {
     const output = execFileSync('node', ['scripts/validate_locales.mjs'], { encoding: 'utf-8' });
-    expect(output).toContain('OK');
+    expect(output).toContain('ALL OK');
   });
 });

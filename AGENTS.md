@@ -9,7 +9,7 @@ Edge-Git: Cloudflare Workers git server (`@edge-git/monorepo`, `pnpm@11.2.2`).
 - **API**: `apps/api` Hono+Chanfana `EdgeGitWorker` (`/:owner/:repo/info/refs|git-upload-pack|git-receive-pack` + `/user/me|repos|orgs|tokens|issues` + `/users/:username` + `/health`, `/docs`); permissions `admin|write|read` (org `owner|member`, owner+member may create org repos); `apps/api/src/index.ts` re-exports DOs for bindings.
 - **Web**: `apps/web` Vite SPA, build embeds `dist/index.html` → `apps/api/src/generated/spa-shell.ts`.
 - **Composition**: single scope per request via `scopeMiddleware` (`getScope(c).get(Tokens.X)`; `createRequestScope(env)` is the composition root, table-driven DAO wiring + single `PermissionService` binding); `Container` + `createServiceContext` + `AppConfiguration` + `memoizeAsync`/`NullLogger`/`FixedClock` in `@edge-git/backend-runtime/di+config` are the DI foundation. See `docs/agents/runtime/AGENTS.md`.
-- **i18n**: backend strings in `packages/shared/src/i18n` (`en`, `zh-CN`, wired via `BaseRoute.toErrorResponse`) + web i18next (`SUPPORTED_LANGUAGES` 12 tags, `en`+`zh-CN` bundles shipped, single `canonicalizeLanguageTag` in `i18n.ts` + `repoTypes/pullTypes` split from `types.ts`); English UI text uses Title Case. See `apps/web/AGENTS.md`.
+- **i18n**: backend strings in `packages/shared/src/i18n` (12 locales, wired via `BaseRoute.toErrorResponse`) + web i18next (`SUPPORTED_LANGUAGES` 12 tags, all 12 bundles shipped, single `canonicalizeLanguageTag` in `i18n.ts` + `repoTypes/pullTypes` split from `types.ts`); English UI text uses Title Case. See `apps/web/AGENTS.md`.
 
 ## Commands
 
