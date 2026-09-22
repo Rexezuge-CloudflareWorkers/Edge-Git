@@ -1,41 +1,38 @@
 # Edge-Git
 
-Self-hosted Git forge on Cloudflare Workers + Durable Objects + D1, structured like Otter/AWS-AccessBridge, with Git protocol logic ported from Gitflare.
+Your own place to keep code and work together.
 
-- **Git Smart HTTP**: `GET /:owner/:repo/info/refs`, `POST /:owner/:repo/git-upload-pack`, `POST /:owner/:repo/git-receive-pack` (v2 upload, v0 receive, sideband-64k).
-- **Storage**: one Durable Object (`RepoWorker`) per repo, virtual FS (`dofs` 512KB chunks, 5GB) + `isomorphic-git`; metadata in D1 (`users`, `repositories`, `user_access_tokens`, `issues`, `comments`).
-- **Auth**: `/user/*` via Cloudflare Access (`cf-access-jwt-assertion` → `POLICY_AUD`/`TEAM_DOMAIN`, `ctx.access` fallback, `DEV_AUTH_EMAIL` local bypass); git via anonymous (public fetch only) or scoped PAT Basic/Bearer (owner-only v1). PATs minted at `/user/tokens` with scopes `repo:read` (fetch), `repo:write` (push), `admin` (both; hierarchy `admin` > `write` > `read`). Legacy tokens without scopes keep full access.
-- **Teams**: org-scoped teams (`admin|member`, `MAX_TEAMS_PER_ORG=20`) with per-team repo grants (`admin|write|read`); effective repo role is `max(direct collaborator grant, same-org team grants)`, org owners stay implicit `admin`. `org/team` CODEOWNERS tokens expand to team members. Manage tab: Teams card (create/select, member invite with role, `owner/name` grant picker).
-- **Audit log**: every `/user/*` call (including reads and denied requests) plus `git-receive-pack` pushes is recorded via `waitUntil` (`action`, `resource`, `method`, `path`, `status`, IP, user agent; never fails the request). Org owners read `GET /user/orgs/:org/audit`, everyone reads their own trail at `GET /user/audit` (cursor-paginated, `userEmail|action|repo` filters); retention `AUDIT_LOG_RETENTION_DAYS` (default 90) pruned by cron. Manage tab: Audit Log card with filter + expandable rows.
-- **Branch protection**: per-repo rules (`POST /user/repos/:owner/:repo/rules`, `admin`-only) with `*` glob patterns, `require_pr`, `required_approvals` (0-6, PR creator self-approval never counts), `block_force_push` (ancestry-checked in the DO), `block_deletion`, and `require_status_checks` (commit status checks must pass on the head SHA before merge, `409` otherwise; direct pushes unaffected). Rules apply to everyone including admins (delete the rule to push directly); any push touching a protected branch is rejected as a whole, pre-receive-hook style (`ng` per ref with the reason on the blocked ref).
-- **CI checks**: commit status checks (`GET /repos/:owner/:repo/commits/:sha/checks`, `POST|PATCH /user/repos/:owner/:repo/checks`) with four built-in contexts executed by a per-repo `CheckRunnerWorker` Durable Object (30s CPU vs 10ms in the Worker): `secret-scan`, `diff-limit`, `codeowners-exists`, `required-files` (e.g. `required-files:README.md,LICENSE`). Pushes and PR opens auto-queue the base branch's required contexts; external runners report any other context via the API. Stale runs time out (`CHECK_TIMEOUT_SECONDS`, default 3600) and old runs prune via cron (`CHECK_RETENTION_DAYS`, default 90); completions emit `check_run` webhook events; PR view shows the Checks badge.
-- **Custom check scripts**: repo-defined checks travel with the code in `.edgegit/checks.json` (`{ "checks": [{ "context": "lint", "script": ".edgegit/checks/lint.js", "env": { "LEVEL": "strict" }, "allowHosts": ["example.com"] }] }`) and run sandboxed in QuickJS inside the `CheckRunnerWorker` (separate heap; `eval` is impossible in Workers by platform design). Scripts define a synchronous `function main(ctx)` returning `{ conclusion: 'success'|'failure'|'neutral'|'skipped', title?, summary? }`; the host API is `{ env, listFiles(), readFile(path), fetch(url, opts?), log(...), console }` (host calls already block — never `await` them). Zero ambient authority: no credentials, no timers, no network unless `allowHosts` lists the exact host (https-only, SSRF literals rejected like webhooks); CPU (`CHECK_CUSTOMJS_MAX_CPU_MS`, default 5000), memory (16MB), fetch-count, and output caps bound abuse. Timeouts report `timed_out`, violations and bad shapes report `failure`/`action_required` — never a hanging `pending`.
-- **Pull requests**: per-repo numbered PRs with reviews, inline file threads (`path`/`line`/`old|new`, resolve/reopen), review dismissal (`write+`; dismissed reviews stay visible but leave the merge gate), CODEOWNERS suggestions with auto-request on open plus a merge-time owner quorum (one non-creator owner approval when owners resolve), merge strategies (`merge|squash|rebase`), PR search (`?q=` on list routes, `/search?type=pulls`).
-- **Releases**: tag-backed releases (`GET|POST /repos/:owner/:repo/releases`, drafts hidden from non-`write+`, publishing requires the git tag to exist) with binary assets (upload `write+` base64 → DO `/release-assets` bytes up to `MAX_ASSET_BYTES=25MB`, binary download `read+`); `release_created`/`release_published` activity + notifications + `release` webhook events; Releases tab with create-from-tag picker.
-- **Social + notifications**: star/watch repos (`PUT|DELETE /user/repos/:owner/:repo/star|watch`, public counts at `/repos/:owner/:repo/stars|watches`); per-repo activity feed (`GET /repos/:owner/:repo/activity`, cursor-paginated: pushes, issues, PRs, forks, repo creates); personal inbox (`GET /user/notifications`, `PATCH /user/notifications/:id/read`, `POST /user/notifications/read-all`, header bell with unread count). Events fan out to watchers + participants + `@mentions` (actor excluded, private repos never leak — only `read+` holders are notified). Creators auto-watch their repos; events and read notifications prune via cron (`AUDIT_LOG_RETENTION_DAYS`, default 90).
-- **Webhooks**: per-repo HTTPS hooks (`GET|POST /user/repos/:owner/:repo/hooks`, `PATCH|DELETE .../hooks/:id`, `POST .../hooks/:id/rotate-secret|test`, `GET .../hooks/:id/deliveries`, `POST .../deliveries/:deliveryId/redeliver`; list `read+`, mutate `admin`) subscribed to `push|repository|issues|issue_comment|pull_request|pull_request_review|fork|star|watch` (+ `ping` test). Each hook carries its own unique signing secret (`X-EdgeGit-Signature-256: sha256=<hmac>`, one-time display, masked in lists); deliveries retry with backoff via request-triggered `waitUntil` flush + cron sweeper (`WEBHOOK_DELIVERY_RETENTION_DAYS`, default 30), auto-disabling hooks after `WEBHOOK_MAX_CONSECUTIVE_FAILURES` (default 20).
-- **Import / mirror / export**: bring repos in from any public `https` git remote (`POST /user/repos/:owner/:repo/import`, empty repos only; no credentials ever stored), keep a scheduled fast-forward pull-mirror (`PUT|GET|DELETE .../mirror`, `POST .../mirror/sync|/enable`, intervals 60m–7d, auto-disable after `MAX_MIRROR_FAILURES=5`), take repos out (`GET .../export` returns refs + base64 packfile, bounded by `MAX_EXPORT_BYTES=25MB`). Jobs run inline via `waitUntil` with a cron sweeper fallback (`ImportSweeperTask`, `MirrorSyncTask`); mirrors never force-update, never delete, and skip diverged branches. Settings tab: Transfer card.
-- **Access hardening**: fine-grained PATs (`repoGrants: [{owner, name, scope}]` restrict a token to listed repos — empty means all visible; missing repo hides existence with 401), token rotation (`POST /user/tokens/:id/rotate`, old secret dies immediately) and identifiable prefixes; per-repo deploy keys (`GET|POST /user/repos/:owner/:repo/keys`, `DELETE .../keys/:id`, `read` default or `write`, git-only, `401` outside their repo); push-time secret scanning (`GET|PATCH .../security`, `off|warn|block`, **warn by default** — flags pushes/saves via `X-EdgeGit-Secret-Warning`, `block` rejects the whole push pre-receive style for everyone including admins).
-- **Realtime**: live issue/PR comments, presence, typing indicators, check badges, activity feed, and notification bell over hibernatable Durable Object WebSockets (`RealtimeWorker`, one shard per repo + a global inbox shard). Clients mint short-lived single-use tickets (`POST /user/realtime/ticket`, `GET /user/realtime/inbox-ticket`; private repos hide existence) and upgrade at `GET /realtime/ws?shard=…&ticket=…`. Mutations publish one RPC per shard via `waitUntil` (never throws; no-ops when `REALTIME_ENABLED=false`, the default); idle sockets cost ~0 duration and zero D1 writes, inside the Workers Free 100k req/day budget. Caps: `REALTIME_MAX_CONN_PER_REPO_SHARD=100` (anon yields to signed-in), `REALTIME_MAX_CONN_PER_INBOX_SHARD=1000`. The SPA degrades to polling/manual refresh when sockets are unavailable.
-- **UI**: Vite SPA served from the Worker (`/user/`), repo create/list, PAT manager, clone instructions.
+Edge-Git is a simple website for saving your projects, tracking ideas, and collaborating with others. Think of it like a notebook for code that the whole team can share.
 
-## Quick start
+## What You Can Do
 
-```bash
-pnpm install
-pnpm -r typecheck && pnpm run lint && pnpm run test:coverage && pnpm run test:integration
-pnpm --filter @edge-git/web build
-cp apps/api/wrangler.template.jsonc wrangler.jsonc  # fill D1 id
-pnpm exec wrangler d1 migrations apply --remote edge-git-db
-pnpm exec wrangler deploy
-```
+- **Keep Your Projects Safe:** Save all your work in one place so you never lose it.
+- **Work Together:** Open issues when something needs fixing, discuss ideas, and review changes before they go live.
+- **Propose Changes With Confidence:** Suggest edits, ask teammates for approval, and merge when everyone is happy.
+- **Follow What Matters:** Star projects you like, watch projects for updates, and get notified when someone mentions you.
+- **Share Releases:** Package your work and share files with others when you are ready.
 
-Clone: `git clone https://<host>/<owner>/<repo>`; authenticated: `git clone https://<owner>:<PAT>@<host>/<owner>/<repo>`.
+## Getting Started in 3 Steps
 
-## Git limits
+1. **Sign In:** Open the Edge-Git website and sign in.
+2. **Create a Project:** Make a new project and give it a name.
+3. **Bring It to Your Computer:** Copy your project with:
 
-DoS guards (all tunable via vars, shown with defaults): fetch `MAX_FETCH_WANTS=64` wants / `MAX_FETCH_HAVES=512` haves per request, `MAX_FETCH_BODY_BYTES=1048576` request body; pack `MAX_PACK_OBJECTS=10000` objects / `MAX_PACK_BYTES=52428800` bytes each way; push `MAX_PUSH_COMMANDS=100` ref updates. Over-limit fetches fail with `ERR …` (`400`/`413`); over-limit pushes fail closed (`413` at the edge, `unpack …` report-status from the DO). The isomorphic-git object cache is cleared after every push and expires after `GIT_CACHE_TTL_SECONDS=3600`.
+   ```bash
+   git clone https://<host>/<owner>/<repo>
+   ```
 
-## CD vars
+   That is it. You can now start working.
 
-`WRANGLER_JSONC` (full file) or `WRANGLER_VARS_PATCH_JSON` e.g. `{"POLICY_AUD":"…","TEAM_DOMAIN":"https://….cloudflareaccess.com","SITE_URL":"https://git.example.com"}`.
+## Everyday Workflow
+
+- **Make Changes:** Edit files on your computer, save them, and share them back to Edge-Git.
+- **Report a Problem:** Found a bug or have an idea? Open an issue to start the conversation.
+- **Suggest an Improvement:** Made a fix? Open a request, ask for a review, and merge it in.
+- **Stay in the Loop:** Check your inbox for replies, mentions, and updates on projects you watch.
+
+If you need to make private changes, create a personal access token in your settings and use it as your password when your computer asks.
+
+## Need Help?
+
+Have a question or found a problem? Open an issue on this project and let us know. We are happy to help.
