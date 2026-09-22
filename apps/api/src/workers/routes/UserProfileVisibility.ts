@@ -50,4 +50,16 @@ async function hasVisibleRepo(repos: RepositoryRow[], getRole: (repo: Repository
   return roles.some((role) => role !== null);
 }
 
-export { PROFILE_REPO_SCAN_CAP, filterVisibleRepos, hasVisibleRepo, parseLimit };
+/**
+ * Pure org/user repo dedup (Specification): merges `listByOrgId` +
+ * `listByOwner` rows by id so profile counts never double-count repos
+ * present in both listings. Extracted from `UserRoutes` where the
+ * Map-based merge was duplicated in two handlers.
+ */
+function deduplicateRepoRows<T extends { id: string }>(...lists: T[][]): T[] {
+  const seen = new Map<string, T>();
+  for (const list of lists) for (const row of list) seen.set(row.id, row);
+  return Array.from(seen.values());
+}
+
+export { PROFILE_REPO_SCAN_CAP, filterVisibleRepos, hasVisibleRepo, parseLimit, deduplicateRepoRows };

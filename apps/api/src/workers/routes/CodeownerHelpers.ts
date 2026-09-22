@@ -8,13 +8,21 @@ interface CodeownerRule {
   owners: string[];
 }
 
+/**
+ * Minimal blob view returned by DO `getBlob` (avoids inline casts).
+ */
+interface BlobLike {
+  contentBase64?: string;
+  isBinary?: boolean;
+}
+
 const CODEOWNER_CANDIDATES = ['CODEOWNERS', '.github/CODEOWNERS', 'docs/CODEOWNERS'];
 const MAX_RULE_CONTENT_BYTES = 20_000;
 const MAX_DIFF_PATHS = 50;
 const MAX_SUGGESTED_OWNERS = 20;
 const MAX_RESOLVED_OWNERS = 10;
 
-function decodeBlobContent(blob: { contentBase64?: string; isBinary?: boolean } | null): string | null {
+function decodeBlobContent(blob: BlobLike | null): string | null {
   if (!blob?.contentBase64 || blob.isBinary) return null;
   try {
     const binary = atob(blob.contentBase64);
@@ -37,10 +45,7 @@ async function readCodeownerRules(env: Env, fullName: string, baseBranch: string
   if (typeof (stub as { getTree?: unknown }).getTree !== 'function') {
     for (const candidate of CODEOWNER_CANDIDATES) {
       try {
-        const blob = (await stub.getBlob({ ref: baseBranch, filepath: candidate })) as {
-          contentBase64?: string;
-          isBinary?: boolean;
-        } | null;
+        const blob = (await stub.getBlob({ ref: baseBranch, filepath: candidate })) as BlobLike | null;
         const content = decodeBlobContent(blob);
         if (content) return parseCodeowners(content);
       } catch {
@@ -70,10 +75,7 @@ async function readCodeownerRules(env: Env, fullName: string, baseBranch: string
         }> | null;
         if ((sub ?? []).every((e) => e.path !== leaf)) continue;
       }
-      const blob = (await stub.getBlob({ ref: baseBranch, filepath: candidate })) as {
-        contentBase64?: string;
-        isBinary?: boolean;
-      } | null;
+      const blob = (await stub.getBlob({ ref: baseBranch, filepath: candidate })) as BlobLike | null;
       const content = decodeBlobContent(blob);
       if (content) return parseCodeowners(content);
     } catch {
@@ -106,6 +108,21 @@ async function suggestCodeownerHandles(
   return { owners: fallback, rules: rules.length };
 }
 
+/**
+ * Pure email accumulator (Specification): lowercase, exclude-self, dedupe,
+ * and cap-aware. Shared by team expansion and raw-email passthrough so both
+ * paths enforce the same invite rules.
+ */
+function appendUniqueEmails(into: string[], candidates: readonly string[], excludeLower: string, cap: number): string[] {
+  for (const candidate of candidates) {
+    if (into.length >= cap) break;
+    const lower = candidate.toLowerCase();
+    if (!lower || lower === excludeLower || into.includes(lower)) continue;
+    into.push(lower);
+  }
+  return into;
+}
+
 async function collectTeamMemberEmails(
   env: Env,
   team: { org: string; team: string },
@@ -115,12 +132,7 @@ async function collectTeamMemberEmails(
   if (remaining <= 0) return [];
   try {
     const emails = await createRequestScope(env).get(Tokens.TeamService).listMemberEmails(team.org, team.team);
-    const collected: string[] = [];
-    for (const email of emails) {
-      const lower = email.toLowerCase();
-      if (lower && lower !== excludeEmail && !collected.includes(lower)) collected.push(lower);
-    }
-    return collected.slice(0, remaining);
+    return appendUniqueEmails([], emails, excludeEmail, remaining);
   } catch {
     // Unresolvable team — skip like before.
     return [];
@@ -158,4 +170,5 @@ async function resolveCodeownerEmails(env: Env, handles: readonly string[], excl
   return out;
 }
 
-export { suggestCodeownerHandles, resolveCodeownerEmails, readCodeownerRules };
+export { suggestCodeownerHandles, resolveCodeownerEmails, readCodeownerRules, decodeBlobContent, appendUniqueEmails };
+export type { BlobLike };
