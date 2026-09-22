@@ -73,8 +73,10 @@ function registerSearchRoutes(app: SearchApp): void {
           return c.json({ type, query: q, discussions: await presentMany(scope, discussions) });
         }
         if (type === 'snippets') {
-          const snippets = await svc.searchSnippets(q, { limit });
-          return c.json({ type, query: q, snippets: await presentMany(scope, snippets) });
+          // Snippets are global user entities (no repository_id): a
+          // repo-scoped query cannot match any, so return empty instead of
+          // leaking the global public list into a repo context.
+          return c.json({ type, query: q, snippets: [] });
         }
         const repos = await svc.searchRepos(q, viewerEmail, limit);
         return c.json({ type, query: q, repos: repos.filter((r) => r.id === row.id).map((r) => toRepoJson(r)) });

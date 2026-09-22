@@ -20,6 +20,8 @@ export { parseSymbolicHead } from './RefParsers';
 export { ObjectReader } from './ObjectReader';
 export { PackCollector } from './PackCollector';
 export { PackLimitError, checkObjectBudget, maxVisitedFor } from './PackLimits';
+export { parseBlobFilter, shouldSkipBlob } from './PackFilter';
+export type { ParsedBlobFilter } from './PackFilter';
 export { HistoryService } from './HistoryService';
 export { TreeReader } from './TreeReader';
 export { MergeService } from './MergeService';

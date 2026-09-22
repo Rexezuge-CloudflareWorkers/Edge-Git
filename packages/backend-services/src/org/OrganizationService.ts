@@ -35,9 +35,7 @@ interface OrganizationServiceDeps {
   webhookDAO?: () => Promise<WebhookDAO>;
 }
 
-// Canonical slug lives in `@edge-git/shared/utils` (Layer 0).
-// Re-exported here for backward compatibility.
-export { SLUG_RE as ORG_NAME_RE } from '@edge-git/shared/utils';
+// Canonical slug rule: import `SLUG_RE` from `@edge-git/shared/utils` (Layer 0).
 
 class OrganizationService {
   private readonly deps: Required<OrganizationServiceDeps>;

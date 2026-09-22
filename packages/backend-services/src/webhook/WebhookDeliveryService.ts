@@ -7,6 +7,7 @@ import type { WebhookDeliveryMetadata, WebhookEventName } from '@edge-git/shared
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 import { buildWebhookPayload, signDelivery, validateWebhookUrl } from './WebhookEvents';
 import { backoffSecondsForAttempt, isRetryableHttpStatus } from './WebhookRetryPolicy';
+import { isHookSubscribed, resolveSenderUsername, toPublicDelivery } from './WebhookDeliveryMapping';
 
 interface WebhookDeliveryServiceEnv {
   DB: D1Queryable;
@@ -82,20 +83,7 @@ async function defaultPostJson(
 }
 
 function toPublic(row: WebhookDeliveryRow): WebhookDeliveryMetadata {
-  return {
-    id: row.id,
-    hookId: row.hook_id,
-    repositoryId: row.repository_id,
-    event: row.event,
-    eventId: row.event_id,
-    status: row.status === 'success' ? 'success' : row.status === 'failed' ? 'failed' : 'pending',
-    attempts: row.attempts,
-    nextRetryAt: row.next_retry_at,
-    lastHttpStatus: row.last_http_status,
-    lastError: row.last_error,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
+  return toPublicDelivery(row);
 }
 
 class WebhookDeliveryService {
@@ -128,19 +116,11 @@ class WebhookDeliveryService {
     try {
       const webhookDAO = await this.deps.webhookDAO();
       const hooks = await webhookDAO.listByRepo(input.repositoryId).catch(() => [] as RepoWebhookRow[]);
-      const matching = hooks.filter((hook) => {
-        if (hook.is_active !== 1) return false;
-        try {
-          const events: unknown = JSON.parse(hook.events);
-          return Array.isArray(events) && events.includes(input.event);
-        } catch {
-          return false;
-        }
-      });
+      const matching = hooks.filter((hook) => isHookSubscribed(hook, input.event));
       if (matching.length === 0) return { enqueued: 0 };
       const maxBytes = ConfigurationManager.webhooks.getMaxPayloadBytes(this.env);
       const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
-      const senderUsername = input.actorUsername ?? input.actorEmail?.toLowerCase() ?? 'ghost';
+      const senderUsername = resolveSenderUsername(input.actorUsername, input.actorEmail);
       const payload = JSON.stringify(
         buildWebhookPayload({
           event: input.event,

@@ -78,10 +78,11 @@ describe('GitService hardening: initRepo and empty refs', () => {
     await svc.initRepo();
     const head = await fs.promises.readFile(path.join(bareAt, 'HEAD'), 'utf8');
     expect(head).toContain('refs/heads/main');
-    // Direct gitdir without redirect: hardcoded /repo/HEAD read misses.
+    // listRefs honors the injected gitdir (no hardcoded /repo/HEAD read).
     const empty = await svc.listRefs();
     expect(empty.refs).toEqual([]);
-    // With redirect the symbolic head resolves.
+    expect(empty.symbolicHead).toBe('refs/heads/main');
+    // With redirect the symbolic head resolves (legacy compat path).
     const redirected = new GitService(redirectClient(bareAt) as never, '/repo');
     const listed = await redirected.listRefs();
     expect(listed.symbolicHead).toBe('refs/heads/main');

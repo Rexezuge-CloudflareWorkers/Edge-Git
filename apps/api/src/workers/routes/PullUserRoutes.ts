@@ -11,5 +11,3 @@ function registerUserPullRoutes(app: PullApp): void {
 }
 
 export { registerUserPullRoutes };
-export { registerUserPullReadRoutes } from './PullUserReadRoutes';
-export { registerUserPullWriteRoutes } from './PullUserWriteRoutes';
