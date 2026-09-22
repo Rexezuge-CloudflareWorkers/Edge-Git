@@ -8,7 +8,7 @@ import {
 } from '@edge-git/backend-data/dao';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
+import { BadRequestError, ForbiddenError, NotFoundError } from '@edge-git/backend-errors';
 import { EmailAddress, RepoFullName } from '@edge-git/shared/utils';
 import { PermissionService } from '../permission/PermissionService';
 import { RepoService } from '../repo/RepoService';
@@ -29,10 +29,10 @@ interface ForkServiceDeps {
 }
 
 /**
- * Forks: user-specified destination `{owner, name}` copies of a visible
- * source repo. D1 lineage (`forked_from_*`) is recorded at creation; git
- * object copying is orchestrated by the API layer via DO RPC
- * (`exportPack`/`importPack`) and rolled back on failure.
+ * Forks: destination-allowlisted (`self + member orgs`, mirroring new-repo
+ * creation) copies of a visible source repo. D1 lineage (`forked_from_*`) is
+ * recorded at creation; git object copying is orchestrated by the API layer
+ * via DO RPC (`exportPack`/`importPack`) and rolled back on failure.
  */
 class ForkService {
   private readonly deps: Required<ForkServiceDeps>;
@@ -92,6 +92,55 @@ class ForkService {
     return normalized.split('@', 1)[0] ?? normalized;
   }
 
+  private async resolveCallerUsernameCi(userEmail: string): Promise<string | null> {
+    const normalized = EmailAddress.normalize(userEmail);
+    try {
+      const userDao = await this.deps.userDAO();
+      const user = await userDao.getByEmail(normalized);
+      if (user?.username) return user.username.toLowerCase();
+    } catch {
+      // ignore — fall back to email prefix below
+    }
+    const prefix = normalized.split('@', 1)[0]?.toLowerCase() ?? '';
+    return prefix || null;
+  }
+
+  /**
+   * Destination allowlist (mirrors new-repo creation): a fork may only land
+   * in the forker's own namespace or an org where the forker is a member.
+   * Anything else — another user, a non-member org, an unclaimed name — is
+   * a permission escalation and is rejected before any row is created.
+   */
+  private async assertForkDestinationAllowed(forkerEmail: string, normalizedOwner: string): Promise<void> {
+    const ownerCi = normalizedOwner.toLowerCase();
+    const callerCi = await this.resolveCallerUsernameCi(forkerEmail);
+    if (callerCi && ownerCi === callerCi) return;
+
+    const callerEmail = EmailAddress.normalize(forkerEmail);
+    let org: { id: string; username: string } | null = null;
+    try {
+      const orgDao = await this.deps.organizationDAO();
+      org = await orgDao.getByUsernameCi(ownerCi);
+    } catch {
+      org = null;
+    }
+    if (org) {
+      let membership: { role: string } | null = null;
+      try {
+        const memberDao = await this.deps.organizationMemberDAO();
+        membership = await memberDao.get(org.id, callerEmail);
+      } catch {
+        membership = null;
+      }
+      if (!membership) {
+        throw new ForbiddenError('Only organization members can create repositories for this organization');
+      }
+      return;
+    }
+
+    throw new ForbiddenError('Only the repository owner can perform this action');
+  }
+
   /**
    * Validate the fork request and create the destination D1 row (with
    * lineage). The caller must copy git objects afterwards and roll back via
@@ -112,11 +161,13 @@ class ForkService {
 
     const destOwner = (dest.owner ?? '').trim() || (await this.resolveDefaultOwner(forkerEmail));
     const destName = (dest.name ?? '').trim() || source.name;
+    const normalizedOwner = RepoFullName.normalizeOwner(destOwner);
     const normalizedName = RepoFullName.normalizeRepo(destName);
-    RepoService.validateNames(RepoFullName.normalizeOwner(destOwner), normalizedName);
+    RepoService.validateNames(normalizedOwner, normalizedName);
+    await this.assertForkDestinationAllowed(forkerEmail, normalizedOwner);
 
     const sourceFullName = `${source.owner}/${source.name}`;
-    const destFullName = `${destOwner}/${normalizedName}`;
+    const destFullName = `${normalizedOwner}/${normalizedName}`;
     if (destFullName.toLowerCase() === sourceFullName.toLowerCase()) {
       throw new BadRequestError('Cannot fork a repository into itself');
     }
@@ -126,12 +177,12 @@ class ForkService {
     const isPrivate = sourcePrivate ? true : (dest.isPrivate ?? false);
     const description = dest.description === undefined ? (source.description ?? null) : dest.description;
 
-    const { id } = await this.repoService().createRepo(forkerEmail, destOwner, normalizedName, description, isPrivate, {
+    const { id } = await this.repoService().createRepo(forkerEmail, normalizedOwner, normalizedName, description, isPrivate, {
       forkedFromRepoId: source.id,
       forkedFromFullName: sourceFullName,
     });
     const created = await dao.getById(id);
-    const canonicalOwner = created?.owner ?? destOwner;
+    const canonicalOwner = created?.owner ?? normalizedOwner;
     return { id, owner: canonicalOwner, name: normalizedName, fullName: `${canonicalOwner}/${normalizedName}`, source, isPrivate };
   }
 
