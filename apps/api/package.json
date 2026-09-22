@@ -15,7 +15,7 @@
     "@edge-git/git-protocol": "workspace:*",
     "@edge-git/shared": "workspace:*",
     "chanfana": "3.4.0",
-    "hono": "4.13.7",
+    "hono": "4.13.8",
     "zod": "4.6.2"
   },
   "devDependencies": {
