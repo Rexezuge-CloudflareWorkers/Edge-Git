@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { GitFork } from 'lucide-react';
 import { forkRepo } from '../../services/forkService';
+import { listMyOrgs } from '../../services/profileService';
 import { Button } from '../ui/Button';
-import { Input, Label } from '../ui/Input';
+import { Input, Label, Select } from '../ui/Input';
 import { ModalBody, ModalHeader, ModalShell } from '../modals/ModalShell';
 
 export function ForkButton({
@@ -22,11 +23,31 @@ export function ForkButton({
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [forkOwner, setForkOwner] = useState(defaultOwner);
+  const [owners, setOwners] = useState<string[]>([defaultOwner]);
   const [forkName, setForkName] = useState(repo);
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const orgs = await listMyOrgs();
+        if (cancelled) return;
+        const next = [defaultOwner, ...orgs.map((o) => o.username).filter((u) => u.toLowerCase() !== defaultOwner.toLowerCase())];
+        setOwners(next);
+        setForkOwner((prev) => prev || defaultOwner);
+      } catch {
+        if (!cancelled) setOwners([defaultOwner]);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [defaultOwner]);
+
   const openModal = () => {
-    setForkOwner(defaultOwner);
+    setForkOwner((prev) => (owners.includes(prev) ? prev : defaultOwner));
     setForkName(repo);
     setOpen(true);
   };
@@ -62,11 +83,13 @@ export function ForkButton({
             <form onSubmit={submit} className="space-y-3">
               <div>
                 <Label className="mb-1.5">{t('repos.owner', 'Owner')}</Label>
-                <Input
-                  value={forkOwner}
-                  onChange={(e) => setForkOwner(e.target.value)}
-                  placeholder={t('repos.ownerPlaceholder', 'owner (default: you)')}
-                />
+                <Select value={forkOwner} onChange={(e) => setForkOwner(e.target.value)} className="w-full">
+                  {owners.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </Select>
                 <p className="mt-1 text-xs text-[var(--color-text-muted)]">
                   {t('forks.ownerHint', 'Your Username Or An Organization You Belong To.')}
                 </p>

@@ -380,6 +380,49 @@ describe('ForkService', () => {
     expect(await svc.listForks('r1')).toHaveLength(1);
     expect(await svc.countForks('missing')).toBe(0);
   });
+
+  it('rejects forks into another user namespace (permission escalation)', async () => {
+    const db = createForkFakeDb();
+    seedBase(db);
+    const svc = new ForkService({ DB: db });
+    await expect(svc.createForkRow('bob@example.com', 'alice', 'demo', { owner: 'alice', name: 'stolen' })).rejects.toThrow(
+      /repository owner|organization members/i,
+    );
+    await expect(svc.createForkRow('bob@example.com', 'alice', 'demo', { owner: 'carol', name: 'stolen' })).rejects.toThrow(
+      /repository owner|organization members/i,
+    );
+    expect(db.repos.some((r) => r.name === 'stolen')).toBe(false);
+  });
+
+  it('rejects forks into unclaimed namespaces and non-member orgs, allows member orgs', async () => {
+    const db = createForkFakeDb();
+    seedBase(db);
+    const svc = new ForkService({ DB: db });
+    await expect(svc.createForkRow('bob@example.com', 'alice', 'demo', { owner: 'acme', name: 'x' })).rejects.toThrow(
+      /repository owner|organization members/i,
+    );
+
+    const orgSvc = new ForkService(
+      { DB: db },
+      {
+        organizationDAO: (async () => ({ getByUsernameCi: async (ci: string) => (ci === 'acme' ? { id: 'org-1', username: 'acme' } : null) })) as never,
+        organizationMemberDAO: (async () => ({ get: async () => null })) as never,
+      },
+    );
+    await expect(orgSvc.createForkRow('bob@example.com', 'alice', 'demo', { owner: 'acme', name: 'x' })).rejects.toThrow(
+      /organization members/i,
+    );
+
+    const memberSvc = new ForkService(
+      { DB: db },
+      {
+        organizationDAO: (async () => ({ getByUsernameCi: async (ci: string) => (ci === 'acme' ? { id: 'org-1', username: 'acme' } : null) })) as never,
+        organizationMemberDAO: (async () => ({ get: async () => ({ role: 'member' }) })) as never,
+      },
+    );
+    const fork = await memberSvc.createForkRow('bob@example.com', 'alice', 'demo', { owner: 'acme', name: 'demo-fork' });
+    expect(fork).toMatchObject({ owner: 'acme', name: 'demo-fork', fullName: 'acme/demo-fork' });
+  });
 });
 
 describe('Fork API routes', () => {
@@ -466,6 +509,22 @@ describe('Fork API routes', () => {
     // Bob cannot see the private fork in the owner's other listings.
     const listed = (await (await call(alice, '/repos/alice/secret/forks')).json()) as { count: number };
     expect(listed.count).toBe(1);
+  });
+
+  it('rejects cross-owner forks at the API boundary without creating rows', async () => {
+    const db = createForkFakeDb();
+    seedBase(db);
+    const harness = createGitHarness();
+    harness.seed('alice/demo', { refs: [{ ref: 'refs/heads/main', oid: OID_A }], objects: [OID_A] });
+    const bob = createEnv(db, harness, 'bob@example.com');
+
+    const res = await call(bob, '/user/repos/alice/demo/forks', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ owner: 'alice', name: 'stolen' }),
+    });
+    expect(res.status).toBe(403);
+    expect(db.repos.some((r) => r.name === 'stolen')).toBe(false);
   });
 });
 
