@@ -1,5 +1,6 @@
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { GHOST_USERNAME } from '@edge-git/backend-services/identity';
+import { isValidEmailFormat } from '@edge-git/shared/utils';
 
 type Scope = ReturnType<typeof createRequestScope>;
 
@@ -24,7 +25,7 @@ async function resolveFilterEmail(scope: Scope, input: string | undefined): Prom
   if (!raw || raw.length > 254) return undefined;
   if (raw.includes('@')) {
     const normalized = raw.toLowerCase();
-    if (!/^[^@\s]+@[^\s@]+\.[^\s@]+$/.test(normalized)) return '__unknown_user__';
+    if (!isValidEmailFormat(normalized)) return '__unknown_user__';
     return normalized;
   }
   try {

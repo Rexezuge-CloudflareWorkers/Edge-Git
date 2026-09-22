@@ -2,6 +2,7 @@ import { jwtVerify, createRemoteJWKSet } from 'jose';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { UnauthorizedError } from '@edge-git/backend-errors';
 import { DEMO_USER_EMAIL } from '@edge-git/shared/constants';
+import { isValidEmailFormat } from '@edge-git/shared/utils';
 
 interface AccessAuthEnv {
   TEAM_DOMAIN?: string;
@@ -29,8 +30,8 @@ function demoModeStrategy(env: AccessAuthEnv): Promise<string | null> {
 }
 
 function isValidAuthEmail(raw: string): boolean {
-  if (!raw || raw.length > 254 || /\s/.test(raw)) return false;
-  return /^[^@\s]+@[^\s@][^\s.@]*\.[^\s@]+$/.test(raw);
+  if (!raw || /\s/.test(raw)) return false;
+  return isValidEmailFormat(raw);
 }
 
 function devEmailStrategy(env: AccessAuthEnv): Promise<string | null> {

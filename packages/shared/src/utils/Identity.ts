@@ -4,6 +4,13 @@
  * normalization point. Layer 0 stays dependency-free: validation failures
  * throw plain `Error`; callers in layers 2-3 map to `BadRequestError`.
  */
+const EMAIL_FORMAT_RE = /^[^@\s]+@[^\s@][^\s.@]*\.[^\s@]+$/;
+
+function isValidEmailFormat(raw: string): boolean {
+  if (!raw || raw.length > 254) return false;
+  return EMAIL_FORMAT_RE.test(raw);
+}
+
 class EmailAddress {
   private constructor(private readonly canonical: string) {}
 
@@ -123,7 +130,7 @@ class RepoFullName {
   }
 }
 
-export { EmailAddress, RepoFullName, OWNER_PATTERN, REPO_PATTERN };
+export { EmailAddress, RepoFullName, OWNER_PATTERN, REPO_PATTERN, isValidEmailFormat };
 
 /**
  * Canonical `REPO.getByName()` key for an `owner/name` pair without throwing.

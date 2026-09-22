@@ -64,7 +64,8 @@ async function runScheduledTasks(env: Env, cron: string, scheduledTime: number):
   await Promise.all(phase2.map((t) => t.run(env).catch((error: unknown) => logger.error(`Task ${t.name} failed`, error))));
 }
 
-export { CRON_TASK_DEFINITIONS, CRON_TASK_FACTORIES, tasksForPhase, runScheduledTasks, isSearchTick, SEARCH_TICK_CRON, BackgroundTaskRunPruningTask, SocialPruningTask };
+export { CRON_TASK_DEFINITIONS, CRON_TASK_FACTORIES, tasksForPhase, runScheduledTasks, isSearchTick, SEARCH_TICK_CRON };
+export { BackgroundTaskRunPruningTask, SocialPruningTask } from './SocialPruningTasks';
 export { AuditLogCleanupTask } from './AuditLogCleanupTask';
 export { CheckPruneTask } from './CheckPruneTask';
 export { CheckStaleTask } from './CheckStaleTask';

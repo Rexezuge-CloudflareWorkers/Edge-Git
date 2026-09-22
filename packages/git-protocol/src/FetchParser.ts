@@ -176,10 +176,10 @@ export function parseFetchRequest(_data: Uint8Array, args: string[]): FetchReque
       shallow.push(arg.slice('shallow '.length));
     } else if (arg.startsWith('deepen ')) {
       const raw = arg.slice('deepen '.length).trim();
-      deepen = /^\d+$/.test(raw) ? Math.trunc(Number(raw)) : Number.NaN;
+      deepen = /^\d+$/.test(raw) ? Math.trunc(Number(raw)) : NaN;
     } else if (arg.startsWith('deepen-since ')) {
       const raw = arg.slice('deepen-since '.length).trim();
-      deepenSince = /^\d+$/.test(raw) ? Math.trunc(Number(raw)) : Number.NaN;
+      deepenSince = /^\d+$/.test(raw) ? Math.trunc(Number(raw)) : NaN;
     } else if (arg.startsWith('deepen-not ')) {
       deepenNot.push(arg.slice('deepen-not '.length));
     } else if (arg.startsWith('filter ')) {

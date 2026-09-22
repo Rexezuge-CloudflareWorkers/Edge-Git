@@ -1,5 +1,6 @@
 import { UserDAO } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
+import { isValidEmailFormat } from '@edge-git/shared/utils';
 
 interface IdentityResolverEnv {
   DB: D1Queryable;
@@ -42,7 +43,7 @@ class IdentityResolver {
     for (const raw of emails) {
       if (typeof raw !== 'string' || !raw) continue;
       const key = normalizeEmail(raw);
-      if (!key || key.length > 254 || !/^[^@\s]+@[^\s@]+\.[^\s@]+$/.test(key)) continue;
+      if (!isValidEmailFormat(key)) continue;
       if (seen.has(key)) continue;
       seen.add(key);
       deduped.push(key);
@@ -82,7 +83,7 @@ class IdentityResolver {
     if (!raw || raw.length > 254) return null;
     if (raw.includes('@')) {
       const normalized = normalizeEmail(raw);
-      if (!/^[^@\s]+@[^\s@]+\.[^\s@]+$/.test(normalized)) return null;
+      if (!isValidEmailFormat(normalized)) return null;
       return normalized;
     }
     try {
