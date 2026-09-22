@@ -2,11 +2,11 @@ import type { Hono } from 'hono';
 import { Tokens } from '@edge-git/backend-services/composition';
 import { jsonError, resolvePublicViewer, toRepoJson, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
-import { PROFILE_REPO_SCAN_CAP, filterVisibleRepos, hasVisibleRepo, parseLimit } from './UserProfileVisibility';
+import { PROFILE_REPO_SCAN_CAP, deduplicateRepoRows, filterVisibleRepos, hasVisibleRepo, parseLimit } from './UserProfileVisibility';
 
 type UserApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
-export { PROFILE_REPO_SCAN_CAP, filterVisibleRepos, hasVisibleRepo, parseLimit } from './UserProfileVisibility';
+export { PROFILE_REPO_SCAN_CAP, deduplicateRepoRows, filterVisibleRepos, hasVisibleRepo, parseLimit } from './UserProfileVisibility';
 
 function registerUserProfileRoutes(app: UserApp): void {
   app.get('/users/:username', async (c) => {
@@ -89,10 +89,11 @@ function registerUserProfileRoutes(app: UserApp): void {
       const repoDao = await scope.get(Tokens.RepositoryDAO)();
       const byOrg = await repoDao.listByOrgId(org.id, 200).catch(() => []);
       const byOwner = await repoDao.listByOwner(org.username, 200).catch(() => []);
-      const seen = new Map<string, (typeof byOrg)[number]>();
-      for (const row of [...byOrg, ...byOwner]) seen.set(row.id, row);
+      // Public read-model: degrade to [] on transient D1 failures (fail-open
+      // to an empty list, never a 500 existence oracle). Auth-guarded
+      // mutating routes fail closed instead — see `requireRoleForRepo`.
       const visible = await filterVisibleRepos(
-        Array.from(seen.values()),
+        deduplicateRepoRows(byOrg, byOwner),
         (row) => permission.getRole(viewerEmail, row),
         PROFILE_REPO_SCAN_CAP,
       );
@@ -158,9 +159,7 @@ function registerUserProfileRoutes(app: UserApp): void {
     const repoDao = await scope.get(Tokens.RepositoryDAO)();
     const byOrg = await repoDao.listByOrgId(org.id, 200).catch(() => []);
     const byOwner = await repoDao.listByOwner(org.username, 200).catch(() => []);
-    const seen = new Map<string, (typeof byOrg)[number]>();
-    for (const row of [...byOrg, ...byOwner]) seen.set(row.id, row);
-    const ordered = Array.from(seen.values()).sort((a, b) => (b.updated_at ?? 0) - (a.updated_at ?? 0));
+    const ordered = deduplicateRepoRows(byOrg, byOwner).sort((a, b) => (b.updated_at ?? 0) - (a.updated_at ?? 0));
     const visible = await filterVisibleRepos(ordered, (row) => permission.getRole(viewerEmail, row), limit);
     const repos: unknown[] = visible.map(({ row, role }) =>
       viewerEmail

@@ -1,7 +1,14 @@
 export { IsoGitFs } from './IsoGitFs';
 export { GitCache } from './GitCache';
-export { createDofsFs, setDofsDeviceSize, DEFAULT_CHUNK_SIZE } from './DofsFsAdapter';
-export type { DofsFs, DofsFsOptions } from './DofsFsAdapter';
+export {
+  createDofsFs,
+  setDofsDeviceSize,
+  trySetDofsDeviceSize,
+  validateChunkSize,
+  DEFAULT_CHUNK_SIZE,
+  MAX_CHUNK_SIZE,
+} from './DofsFsAdapter';
+export type { DofsFs, DofsFsContext, DofsFsEnvironment, DofsFsFactory, DofsFsOptions } from './DofsFsAdapter';
 export { ErrorNormalizer, ErrorWithCode, normalizePath } from './ErrorNormalizer';
 export { GitService } from './GitService';
 export { RefService } from './RefService';
