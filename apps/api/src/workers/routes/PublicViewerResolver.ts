@@ -162,7 +162,7 @@ function parseLimit(url: string, def = 100, max = 100): number {
   return BaseRoute.parseLimit(url, def, max);
 }
 
-async function readJson<T>(c: RequestContext): Promise<{ malformed: boolean; body: T }> {
+async function readJson<T>(c: RequestContext): Promise<{ malformed: boolean; oversized: boolean; body: T }> {
   return BaseRoute.readJson<T>(c);
 }
 
