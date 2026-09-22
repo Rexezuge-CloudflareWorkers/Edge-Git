@@ -2,6 +2,7 @@ import * as git from 'isomorphic-git';
 import type { IsoGitFs } from './IsoGitFs';
 import { GitCache } from './GitCache';
 import { PackLimitError, checkObjectBudget, maxVisitedFor } from './PackLimits';
+import { parseBlobFilter, shouldSkipBlob as shouldSkipBlobByFilter } from './PackFilter';
 
 const logger = {
   warn: (...args: unknown[]): void => console.warn('[WARN] [GitService]', ...args),
@@ -77,15 +78,9 @@ export class PackCollector {
       checkObjectBudget({ objectsToSend: objectsToSend.size, visited: visited.size, maxObjects, maxVisited });
     };
     const filter = opts.filter?.trim() ?? '';
-    const filterBlobs = filter === 'blob:none';
-    const blobLimitMatch = /^blob:limit=(\d+)$/.exec(filter);
-    const blobLimit = blobLimitMatch ? Math.trunc(Number(blobLimitMatch[1])) : undefined;
+    const parsedFilter = parseBlobFilter(filter);
 
-    const shouldSkipBlob = (size: number): boolean => {
-      if (filterBlobs) return true;
-      if (blobLimit !== undefined && Number.isFinite(blobLimit)) return size > blobLimit;
-      return false;
-    };
+    const shouldSkipBlob = (size: number): boolean => shouldSkipBlobByFilter(size, parsedFilter);
 
     const queue: Array<{ oid: string; depth: number }> = wants.map((oid) => ({ oid, depth: 0 }));
 

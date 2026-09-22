@@ -88,8 +88,8 @@ describe('slice1: UserRoutes pure helpers', () => {
     expect(getRole).toHaveBeenCalledTimes(2);
   });
 
-  it('hasVisibleRepo propagates DAO failures', async () => {
-    await expect(hasVisibleRepo([{ id: 'r1' } as never], async () => Promise.reject(new Error('D1 down')))).rejects.toThrow('D1 down');
+  it('hasVisibleRepo fails closed on DAO errors (hides the repo)', async () => {
+    await expect(hasVisibleRepo([{ id: 'r1' } as never], async () => Promise.reject(new Error('D1 down')))).resolves.toBe(false);
   });
 
   it('parseProjectNumber validates', () => {

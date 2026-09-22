@@ -153,7 +153,4 @@ export { MiddlewareHandlers };
 
 export type { GitAuthResult, RequestContext } from './GitAuth';
 
-export { type TokenService } from '@edge-git/backend-services/auth';
-export { NotFoundError } from '@edge-git/backend-errors';
-
 export { gitAuthForRepo, unauthorizedGit } from './GitAuth';

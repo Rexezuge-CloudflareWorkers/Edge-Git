@@ -35,7 +35,7 @@ export class RefService {
     const refs: Array<{ ref: string; oid: string }> = [];
 
     try {
-      const headContent = await this.fs.promises.readFile('/repo/HEAD', {
+      const headContent = await this.fs.promises.readFile(`${this.gitdir}/HEAD`, {
         encoding: 'utf8',
       });
       symbolicHead = parseSymbolicHead(headContent);

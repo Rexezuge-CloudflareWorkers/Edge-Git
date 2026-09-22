@@ -2,10 +2,6 @@ import type { PullReviewThread } from '../types';
 
 export interface ReviewGateView {
   author: string;
-  /**
-   * @deprecated Transitional: API now returns `author`.
-   */
-  author_email?: string;
   state: string;
   dismissed?: number | null;
 }
@@ -23,8 +19,7 @@ export function latestReviewsByAuthor(reviews: readonly ReviewGateView[]): Map<s
   const latest = new Map<string, ReviewGateView>();
   for (const review of reviews) {
     if (isDismissed(review)) continue;
-    const fallback = (review as { author_email?: unknown }).author_email;
-    const key = review.author ?? (typeof fallback === 'string' ? fallback : '');
+    const key = review.author ?? '';
     latest.set(key.toLowerCase(), review);
   }
   return latest;
