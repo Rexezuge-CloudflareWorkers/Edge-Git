@@ -188,7 +188,7 @@ export function IssueDetail({
           <PresenceDots status={liveStatus} viewers={viewers} />
         </div>
         <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-          {t('issues.openedBy', 'Opened By {{email}} · {{date}}', {
+          {t('issues.openedBy', 'Opened By {{username}} · {{date}}', {
             username: issue.creator,
             date: formatTimestamp(issue.created_at),
           })}
@@ -218,7 +218,7 @@ export function IssueDetail({
             {comments.map((c) => (
               <li key={c.id} className="py-3 first:pt-0 last:pb-0">
                 <p className="text-xs text-[var(--color-text-muted)]">
-                  {t('issues.openedBy', 'Opened By {{email}} · {{date}}', {
+                  {t('issues.openedBy', 'Opened By {{username}} · {{date}}', {
                     username: c.author,
                     date: formatTimestamp(c.created_at),
                   })}

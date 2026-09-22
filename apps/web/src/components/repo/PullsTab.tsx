@@ -276,7 +276,7 @@ export function PullsTab({
                   </div>
                 )}
                 <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                  {t('pulls.openedBy', 'Opened By {{email}} · {{date}}', {
+                  {t('pulls.openedBy', 'Opened By {{username}} · {{date}}', {
                     username: p.creator,
                     date: formatTimestamp(p.created_at),
                   })}

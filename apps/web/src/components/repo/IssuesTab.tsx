@@ -145,7 +145,7 @@ export function IssuesTab({
                   </div>
                 )}
                 <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                  {t('issues.openedBy', 'Opened By {{email}} · {{date}}', {
+                  {t('issues.openedBy', 'Opened By {{username}} · {{date}}', {
                     username: i.creator,
                     date: formatTimestamp(i.created_at),
                   })}

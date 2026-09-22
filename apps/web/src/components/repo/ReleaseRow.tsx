@@ -123,7 +123,7 @@ export function ReleaseRow({ owner, repo, release, canWrite, authorized, showNot
         </div>
       )}
       <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-        {t('releases.publishedBy', 'By {{email}} · {{date}}', { email: release.createdBy, date: formatTimestamp(release.createdAt) })}
+        {t('releases.publishedBy', 'By {{username}} · {{date}}', { username: release.createdBy, date: formatTimestamp(release.createdAt) })}
       </p>
       {assets.length > 0 && (
         <ul className="mt-2 space-y-1">
