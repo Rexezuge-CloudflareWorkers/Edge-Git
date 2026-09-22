@@ -166,7 +166,7 @@ export function PullDetail({
           {pull.base_branch} ← {headLabel(pull)}
         </p>
         <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-          {t('pulls.openedBy', 'Opened By {{email}} · {{date}}', {
+          {t('pulls.openedBy', 'Opened By {{username}} · {{date}}', {
             username: pull.creator,
             date: formatTimestamp(pull.created_at),
           })}
