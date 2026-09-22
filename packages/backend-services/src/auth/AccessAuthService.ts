@@ -75,11 +75,17 @@ const DEFAULT_ACCESS_AUTH_STRATEGIES: readonly AccessAuthStrategy[] = [
   accessCtxStrategy,
 ];
 
+function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.codePointAt(end - 1) === 47) end -= 1;
+  return value.slice(0, end);
+}
+
 class AccessAuthService {
   private static readonly jwksCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 
   private static jwksFor(teamDomain: string): ReturnType<typeof createRemoteJWKSet> {
-    const normalized = teamDomain.trim().toLowerCase().replace(/\/+$/, '');
+    const normalized = trimTrailingSlashes(teamDomain.trim().toLowerCase());
     const cached = this.jwksCache.get(normalized);
     if (cached) {
       this.jwksCache.delete(normalized);
@@ -130,7 +136,7 @@ class AccessAuthService {
 
     let normalizedTeamDomainEnd: number = teamDomain.trim().length;
     const trimmedDomain = teamDomain.trim();
-    while (normalizedTeamDomainEnd > 0 && trimmedDomain.charAt(normalizedTeamDomainEnd - 1) === '/') {
+    while (normalizedTeamDomainEnd > 0 && trimmedDomain.codePointAt(normalizedTeamDomainEnd - 1) === 47) {
       normalizedTeamDomainEnd -= 1;
     }
     const normalizedTeamDomain: string = trimmedDomain.slice(0, normalizedTeamDomainEnd).toLowerCase();

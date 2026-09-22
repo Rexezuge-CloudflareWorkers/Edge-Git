@@ -15,7 +15,6 @@ class RemoteImportClient {
   private readonly timeoutMs: number;
 
   constructor(fetcher: RemoteGitFetcher = workerFetchAdapter(), options: RemoteImportClientOptions = {}) {
-    void options.maxRedirects;
     this.fetcher = fetcher;
     this.timeoutMs = options.timeoutMs ?? 30_000;
   }

@@ -15,9 +15,7 @@ function parseLimit(url: string): number {
     // `?limit=abc` must not silently become a 100-row over-fetch.
     // Numeric out-of-range values clamp (0→1, 500→100); non-numeric →20.
     if (raw === null || raw.trim() === '') return 20;
-    const trimmed = raw.trim();
-    if (!/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(trimmed)) return 20;
-    const n = Number(trimmed);
+    const n = Number(raw.trim());
     if (!Number.isFinite(n)) return 20;
     return Math.min(100, Math.max(1, Math.floor(n)));
   } catch {
@@ -33,9 +31,9 @@ async function filterVisibleRepos(
   const scanned = repos.slice(0, PROFILE_REPO_SCAN_CAP);
   const roles = await Promise.all(scanned.map((repo) => getRole(repo).catch(() => null)));
   const visible: Array<{ row: RepositoryRow; role: string }> = [];
-  for (let i = 0; i < scanned.length; i += 1) {
-    const role = roles[i];
-    if (role) visible.push({ row: scanned[i], role });
+  for (const [index, row] of scanned.entries()) {
+    const role = roles[index];
+    if (role) visible.push({ row, role });
     if (visible.length >= limit) break;
   }
   return visible;

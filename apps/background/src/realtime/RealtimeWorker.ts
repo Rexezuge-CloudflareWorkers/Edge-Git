@@ -15,7 +15,7 @@ import type { RealtimeEnvelope } from '@edge-git/shared/realtime';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 import { pickEvictionCandidate, pruneFrameTimes, shouldRateLimit } from './RealtimePolicy';
 import { RealtimeTicketStore } from './RealtimeTicketStore';
-import type { TicketRecord, TicketStorage } from './RealtimeTicketStore';
+import type { TicketRecord } from './RealtimeTicketStore';
 import { buildChannelEnvelope, inboxTagsFor } from './RealtimePublisher';
 import type { PublishInput } from './RealtimePublisher';
 
@@ -51,6 +51,10 @@ class RealtimeWorker extends DurableObject<Env> {
     return new Response('Not Found', { status: 404 });
   }
 
+  private ticketStore(): RealtimeTicketStore {
+    return new RealtimeTicketStore(this.ctx.storage);
+  }
+
   // Server-only ticket minting (called via DO RPC from the API Worker after
   // `RealtimeService` authorized the channels — never exposed over fetch).
   public async issueTicket(input: IssueTicketInput): Promise<{ ticket: string; expiresAt: number } | { error: string }> {
@@ -62,8 +66,7 @@ class RealtimeWorker extends DurableObject<Env> {
       if (channels.length === 0) return { error: 'no channels' };
       const viewer = typeof input.viewer === 'string' && input.viewer.length > 0 ? input.viewer.slice(0, 320) : 'anonymous';
       const ttl = this.ticketTtlSeconds();
-      const store = new RealtimeTicketStore(this.ctx.storage as unknown as TicketStorage);
-      return await store.mint(input.shard, channels, viewer, ttl);
+      return await this.ticketStore().mint(input.shard, channels, viewer, ttl);
     } catch (error) {
       logger.error('RealtimeWorker: issueTicket failed', error);
       return { error: 'unavailable' };
@@ -111,8 +114,7 @@ class RealtimeWorker extends DurableObject<Env> {
 
   public override async alarm(): Promise<void> {
     try {
-      const store = new RealtimeTicketStore(this.ctx.storage as unknown as TicketStorage);
-      await store.collectGarbage();
+      await this.ticketStore().collectGarbage();
     } catch (error) {
       logger.error('RealtimeWorker: alarm GC failed', error);
     }
@@ -332,4 +334,5 @@ class RealtimeWorker extends DurableObject<Env> {
 }
 
 export { RealtimeWorker };
-export type { IssueTicketInput, PublishInput };
+export type { IssueTicketInput };
+export type { PublishInput } from './RealtimePublisher';
