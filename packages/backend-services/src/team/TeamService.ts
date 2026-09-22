@@ -15,6 +15,7 @@ import { AppConfiguration } from '@edge-git/backend-runtime/config';
 import { EmailAddress, SLUG_RE, TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 import { GHOST_USERNAME } from '../identity/IdentityResolver';
 import { assertNotLastTeamAdmin } from '../policy/MembershipPolicy';
+import { assertQuotaWithinLimit } from '../policy/QuotaPolicy';
 
 interface TeamServiceEnv {
   DB: D1Queryable;
@@ -136,7 +137,7 @@ class TeamService {
     if (existing) throw new BadRequestError('Team already exists');
     const count = await dao.countByOrg(org.id).catch(() => 0);
     const max = this.deps.config.getMaxTeamsPerOrg();
-    if (count >= max) throw new BadRequestError(`Maximum of ${max} teams reached`);
+    assertQuotaWithinLimit(count, max, 'teams');
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const id = UUIDUtil.getRandomUUID();
     const name = (input.name ?? slug).trim() || slug;
@@ -206,7 +207,7 @@ class TeamService {
         .then((rows) => rows.length)
         .catch(() => 0);
       const max = this.deps.config.getMaxTeamMembers();
-      if (count >= max) throw new BadRequestError(`Maximum of ${max} team members reached`);
+      assertQuotaWithinLimit(count, max, 'team members');
     }
     await memberDAO.upsert(team.id, targetEmail, role, TimestampUtil.getCurrentUnixTimestampInSeconds());
   }
@@ -287,7 +288,7 @@ class TeamService {
     if (!existing) {
       const count = await grantDAO.countByTeam(team.id).catch(() => 0);
       const max = this.deps.config.getMaxTeamGrants();
-      if (count >= max) throw new BadRequestError(`Maximum of ${max} repository grants reached`);
+      assertQuotaWithinLimit(count, max, 'repository grants');
     }
     await grantDAO.upsert(team.id, repoId, role, actorEmail.toLowerCase(), TimestampUtil.getCurrentUnixTimestampInSeconds());
   }

@@ -16,7 +16,6 @@ export {
   ZERO_OID,
   isCommitOid,
   isZeroOid,
-  isValidBranchName as isValidRefBranchName,
   branchRefFor,
   isDeleteCommand,
   isCreateCommand,

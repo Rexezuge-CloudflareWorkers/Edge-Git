@@ -1,4 +1,5 @@
 import { PackLimitError } from '@edge-git/git-service';
+import { ZERO_OID } from '@edge-git/shared/constants';
 import type { RepoRpcDeps } from './RepoRpcDeps';
 
 // Mutation slice of the `RepoWorker` RPC surface: branch/file/ref writes plus
@@ -55,7 +56,6 @@ class RepoMutationRpc {
 
   public async updateRefs(updates: Array<{ ref: string; oldOid: string; newOid: string }>): Promise<unknown> {
     await this.deps.prepare();
-    const ZERO_OID = '0'.repeat(40);
     const pending = (updates ?? []).filter(
       (u) =>
         typeof u.ref === 'string' &&

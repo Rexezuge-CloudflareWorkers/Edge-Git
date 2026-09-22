@@ -1,10 +1,11 @@
 import type { Command } from './ReceiveParser';
 import type { ProtectedRefRule } from './types';
+import { ZERO_OID as SHARED_ZERO_OID } from '@edge-git/shared/constants';
 
-const ZERO_OID = '0'.repeat(40);
+export { ZERO_OID } from '@edge-git/shared/constants';
 
 function isZeroOid(oid: string): boolean {
-  return oid === ZERO_OID;
+  return oid === SHARED_ZERO_OID;
 }
 
 // `refs/heads/<branch>` → `<branch>`; anything else (tags, notes) → null.
@@ -35,6 +36,6 @@ function checkStaticPushProtection(cmd: Command, rule: ProtectedRefRule | undefi
   return null;
 }
 
-export { ZERO_OID, isZeroOid, branchNameFromRef, checkStaticPushProtection };
+export { isZeroOid, branchNameFromRef, checkStaticPushProtection };
 export type { Command } from './ReceiveParser';
 export type { ProtectedRefRule } from './types';

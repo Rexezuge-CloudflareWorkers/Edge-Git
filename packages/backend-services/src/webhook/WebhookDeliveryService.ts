@@ -42,6 +42,11 @@ interface EnqueueEventInput {
 
 // Retry policy lives in `./WebhookRetryPolicy.ts` (pure, unit testable).
 
+// Truncation budget for stored delivery error previews (SSRF rejections,
+// HTTP statuses, network failures). One named constant instead of the
+// previous `slice(0, 500)` literals scattered across this module.
+const ERROR_PREVIEW_LIMIT = 500;
+
 async function defaultPostJson(
   url: string,
   init: { headers: Record<string, string>; body: string; timeoutMs: number },
@@ -53,7 +58,7 @@ async function defaultPostJson(
     // (no resolver in Workers — use allowlist/egress proxy for strict).
     validateWebhookUrl(url);
   } catch (error) {
-    return { httpStatus: null, error: error instanceof Error ? error.message.slice(0, 500) : 'Invalid webhook URL.' };
+    return { httpStatus: null, error: error instanceof Error ? error.message.slice(0, ERROR_PREVIEW_LIMIT) : 'Invalid webhook URL.' };
   }
   try {
     const response = await fetch(url, {
@@ -74,7 +79,7 @@ async function defaultPostJson(
     if (response.ok) return { httpStatus: response.status, error: null };
     return { httpStatus: response.status, error: `Webhook returned HTTP ${response.status}` };
   } catch (error) {
-    return { httpStatus: null, error: error instanceof Error ? error.message.slice(0, 500) : 'Delivery failed.' };
+    return { httpStatus: null, error: error instanceof Error ? error.message.slice(0, ERROR_PREVIEW_LIMIT) : 'Delivery failed.' };
   }
 }
 
@@ -305,7 +310,7 @@ class WebhookDeliveryService {
         status: terminal ? 'failed' : 'pending',
         nextRetryAt: terminal ? now : now + backoffSecondsForAttempt(attempts),
         httpStatus: outcome.httpStatus,
-        error: outcome.error?.slice(0, 500) ?? null,
+        error: outcome.error?.slice(0, ERROR_PREVIEW_LIMIT) ?? null,
         now,
       })
       .catch(() => undefined);
