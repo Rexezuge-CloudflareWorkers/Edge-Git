@@ -174,5 +174,3 @@ async function presentSingle(scope: Scope, row: unknown): Promise<Record<string,
 }
 
 export { usernameMap, usernameFor, resolveFilterEmail, collectEmails, presentOne, presentMany, presentSingle };
-
-export { GHOST_USERNAME } from '@edge-git/backend-services/identity';
