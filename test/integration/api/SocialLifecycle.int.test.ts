@@ -101,9 +101,9 @@ describe('social lifecycle on real D1', () => {
     const id = crypto.randomUUID();
     await db
       .prepare(
-        "INSERT OR IGNORE INTO notifications (id, user_email, repository_id, full_name, actor_email, type, title, is_read, created_at) VALUES (?, ?, NULL, ?, ?, 'issue_opened', 'Seeded', 0, ?)",
+        "INSERT OR IGNORE INTO notifications (id, user_email, repository_id, actor_email, type, title, is_read, created_at) VALUES (?, ?, NULL, ?, 'issue_opened', 'Seeded', 0, ?)",
       )
-      .bind(id, USER, `${OWNER}/${REPO}`, FRIEND, now)
+      .bind(id, USER, FRIEND, now)
       .run();
     const list = await body<{ notifications: Array<{ id: string }>; unreadCount: number }>(await api('/user/notifications?unreadOnly=1'));
     expect(list.unreadCount).toBe(1);

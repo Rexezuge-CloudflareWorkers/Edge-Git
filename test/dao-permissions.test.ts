@@ -68,15 +68,6 @@ function createPermFakeDb() {
             ) ?? null) as T | null,
           );
         }
-        if (q.includes('FROM repositories WHERE lower(owner) = ? AND lower(name) = ?')) {
-          return Promise.resolve(
-            (state.repos.find((r) => (r.owner as string).toLowerCase() === params[0] && (r.name as string).toLowerCase() === params[1]) ??
-              null) as T | null,
-          );
-        }
-        if (q.includes('FROM repositories WHERE owner = ? AND name = ?')) {
-          return Promise.resolve((state.repos.find((r) => r.owner === params[0] && r.name === params[1]) ?? null) as T | null);
-        }
         return Promise.resolve(null);
       },
       all<T>(): Promise<{ results: T[] }> {
@@ -112,9 +103,6 @@ function createPermFakeDb() {
         }
         if (q.includes('FROM repositories WHERE lower(owner) = ?')) {
           return Promise.resolve({ results: state.repos.filter((r) => (r.owner as string).toLowerCase() === params[0]) as T[] });
-        }
-        if (q.includes('FROM repositories WHERE owner = ?')) {
-          return Promise.resolve({ results: state.repos.filter((r) => r.owner === params[0]) as T[] });
         }
         if (q.includes('FROM repositories WHERE owner_email = ?') || q.includes('FROM repositories WHERE lower(owner_email)')) {
           return Promise.resolve({

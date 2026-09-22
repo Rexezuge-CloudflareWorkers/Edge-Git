@@ -8,6 +8,7 @@ function createApiFakeDb() {
   const state = {
     repos: [] as Array<Record<string, unknown>>,
     tokens: [] as Array<Record<string, unknown>>,
+    tokenScopes: [] as Array<{ token_id: string; scope: string }>,
     issues: [] as Array<Record<string, unknown>>,
     comments: [] as Array<Record<string, unknown>>,
     users: [] as Array<Record<string, unknown>>,
@@ -25,9 +26,6 @@ function createApiFakeDb() {
                 String(r.name_ci ?? r.name).toLowerCase() === String(params[1]).toLowerCase(),
             ) ?? null) as T | null,
           );
-        }
-        if (q.includes('FROM repositories WHERE owner = ? AND name = ?')) {
-          return Promise.resolve((state.repos.find((r) => r.owner === params[0] && r.name === params[1]) ?? null) as T | null);
         }
         if (q.includes('FROM repositories WHERE id = ?')) {
           return Promise.resolve((state.repos.find((r) => r.id === params[0]) ?? null) as T | null);
@@ -76,6 +74,10 @@ function createApiFakeDb() {
             results: state.tokens.filter((t) => String(t.user_email).toLowerCase() === String(params[0]).toLowerCase()) as T[],
           });
         }
+        if (q.includes('SELECT scope FROM token_scopes WHERE token_id = ?')) {
+          const rows = state.tokenScopes.filter((s) => s.token_id === params[0]).map((s) => ({ scope: s.scope }));
+          return Promise.resolve({ results: rows as T[] });
+        }
         return Promise.resolve({ results: [] });
       },
       run(): Promise<{ success: boolean; meta?: { changes?: number } }> {
@@ -85,7 +87,7 @@ function createApiFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO user_access_tokens')) {
-          const [token_id, user_email, token_hash, tname, expires_at, created_at, scopes] = params as Array<string | number>;
+          const [token_id, user_email, token_hash, tname, expires_at, created_at, token_prefix] = params as Array<string | number>;
           state.tokens.push({
             token_id,
             user_email,
@@ -94,8 +96,17 @@ function createApiFakeDb() {
             expires_at,
             last_used_at: null,
             created_at,
-            scopes: typeof scopes === 'string' ? scopes : null,
+            token_prefix: typeof token_prefix === 'string' ? token_prefix : null,
           });
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('DELETE FROM token_scopes WHERE token_id = ?')) {
+          state.tokenScopes = state.tokenScopes.filter((s) => s.token_id !== params[0]);
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('INSERT OR IGNORE INTO token_scopes')) {
+          const [token_id, scope] = params as [string, string];
+          if (!state.tokenScopes.some((s) => s.token_id === token_id && s.scope === scope)) state.tokenScopes.push({ token_id, scope });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE user_access_tokens SET last_used_at')) {
@@ -116,10 +127,10 @@ function createApiFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: pruned } });
         }
         if (q.startsWith('INSERT INTO issues')) {
-          const [id, repository_id, full_name, number, title, body, status, creator_email, created_at, updated_at] = params as Array<
+          const [id, repository_id, number, title, body, status, creator_email, created_at, updated_at] = params as Array<
             string | number | null
           >;
-          state.issues.push({ id, repository_id, full_name, number, title, body, status, creator_email, created_at, updated_at });
+          state.issues.push({ id, repository_id, number, title, body, status, creator_email, created_at, updated_at });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE issues SET status = ?')) {

@@ -5,9 +5,9 @@ import { NotFoundError } from '@edge-git/backend-errors';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import type { WebhookDeliveryMetadata, WebhookEventName } from '@edge-git/shared';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
-import { buildWebhookPayload, signDelivery, validateWebhookUrl } from './WebhookEvents';
+import { buildWebhookPayload, normalizeEvents, signDelivery, validateWebhookUrl } from './WebhookEvents';
 import { backoffSecondsForAttempt, isRetryableHttpStatus } from './WebhookRetryPolicy';
-import { resolveSenderUsername, subscribedEvents, toPublicDelivery } from './WebhookDeliveryMapping';
+import { resolveSenderUsername, toPublicDelivery } from './WebhookDeliveryMapping';
 
 interface WebhookDeliveryServiceEnv {
   DB: D1Queryable;
@@ -31,10 +31,6 @@ interface EnqueueEventInput {
   fullName: string;
   event: WebhookEventName;
   actorUsername?: string;
-  /**
-  @deprecated Transitional fallback mapped into `sender.username`. Prefer `actorUsername`.
-  */
-  actorEmail?: string;
   eventId?: string | null;
   subjectType?: string | null;
   subjectNumber?: number | null;
@@ -119,23 +115,22 @@ class WebhookDeliveryService {
       const matching: RepoWebhookRow[] = [];
       for (const hook of hooks) {
         if (hook.is_active !== 1) continue;
-        // Junction-first subscription check with JSON fallback. Minimal test
-        // fakes without `listEvents` stay on the JSON path via the guard.
-        let subscribed = subscribedEvents(hook);
+        // Events live only in the junction table. Minimal test fakes
+        // without `listEvents` match nothing (fail closed, never throws).
+        let subscribed: WebhookEventName[] = [];
         try {
           if (typeof webhookDAO.listEvents === 'function') {
-            const junction = await webhookDAO.listEvents(hook.id);
-            if (junction.length > 0) subscribed = junction.filter((e): e is WebhookEventName => typeof e === 'string');
+            subscribed = normalizeEvents(await webhookDAO.listEvents(hook.id));
           }
         } catch {
-          // JSON fallback above.
+          subscribed = [];
         }
         if (subscribed.includes(input.event)) matching.push(hook);
       }
       if (matching.length === 0) return { enqueued: 0 };
       const maxBytes = ConfigurationManager.webhooks.getMaxPayloadBytes(this.env);
       const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
-      const senderUsername = resolveSenderUsername(input.actorUsername, input.actorEmail);
+      const senderUsername = resolveSenderUsername(input.actorUsername);
       const payload = JSON.stringify(
         buildWebhookPayload({
           event: input.event,

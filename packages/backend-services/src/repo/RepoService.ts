@@ -179,7 +179,7 @@ class RepoService {
     name: string,
     description: string | null,
     isPrivate: boolean,
-    opts: { forkedFromRepoId?: string | null; forkedFromFullName?: string | null } = {},
+    opts: { forkedFromRepoId?: string | null } = {},
   ): Promise<{ id: string }> {
     const normalizedOwner = RepoFullName.normalizeOwner(owner);
     const dao = await this.deps.repositoryDAO();
@@ -242,7 +242,6 @@ class RepoService {
         ownerType: 'user',
         ownerUserEmail: callerEmail,
         forkedFromRepoId: opts.forkedFromRepoId ?? null,
-        forkedFromFullName: opts.forkedFromFullName ?? null,
       });
       return { id };
     }
@@ -259,7 +258,6 @@ class RepoService {
       ownerType: 'org',
       orgId: path.orgId,
       forkedFromRepoId: opts.forkedFromRepoId ?? null,
-      forkedFromFullName: opts.forkedFromFullName ?? null,
     });
     return { id };
   }

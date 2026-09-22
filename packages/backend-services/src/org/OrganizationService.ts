@@ -257,26 +257,14 @@ class OrganizationService {
     } catch {
       // ignore
     }
-    // Simple rename: cascade owner on org repos (plus denormalized
-    // `full_name` sidecars), free the old name immediately. Legacy
-    // owner-named rows without `org_id` are covered by the owner snapshot
-    // inside the cascade; `org_id`-keyed rows are passed explicitly.
+    // Simple rename: cascade owner on org repos. Display names are computed
+    // from `repositories`, so no sidecar updates are needed. Legacy
+    // owner-named rows without `org_id` are covered by the owner rename;
+    // `org_id`-keyed rows are refreshed by the same UPDATE.
     try {
-      const repoDAO = await this.deps.repositoryDAO();
-      const orgRepos = await repoDAO.listByOrgId(org.id, 1000).catch(() => []);
-      await cascadeOwnerRepos(
-        {
-          repositoryDAO: this.deps.repositoryDAO,
-          issueDAO: this.deps.issueDAO,
-          pullRequestDAO: this.deps.pullRequestDAO,
-          eventDAO: this.deps.eventDAO,
-          notificationDAO: this.deps.notificationDAO,
-          webhookDAO: this.deps.webhookDAO,
-        },
-        { oldOwnerCi: org.username_ci, newOwner: handle, now, extraRepos: orgRepos },
-      );
+      await cascadeOwnerRepos({ repositoryDAO: this.deps.repositoryDAO }, { oldOwnerCi: org.username_ci, newOwner: handle, now });
     } catch {
-      // ignore — repos remain addressable by id; lookup falls back to legacy columns
+      // ignore — repos remain addressable by id
     }
     const updated = await orgDAO.getById(org.id);
     if (!updated) throw new NotFoundError('Organization not found');

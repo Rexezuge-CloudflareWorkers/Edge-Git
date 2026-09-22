@@ -108,7 +108,6 @@ function registerUserIssueRoutes(app: IssueApp): void {
     const scope = getScope(c);
     const created = await scope.get(Tokens.IssueService).createIssue({
       repositoryId: row.id,
-      fullName: `${owner}/${repoName}`,
       title: body.title,
       body: body.body ?? null,
       creatorEmail: email,

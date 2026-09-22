@@ -141,15 +141,20 @@ describe('harden-90 webhook payload allowlist', () => {
     const payload = buildWebhookPayload({
       event: 'push',
       fullName: 'a/b',
-      actorEmail: 'x@y.z',
+      actorUsername: 'x',
       processedAt: 1,
       extra: { event: 'evil', repository: 'evil', sender: 'evil', processed_at: 999, custom: 'ok' } as never,
     });
     expect(payload.event).toBe('push');
     expect(payload.repository).toEqual({ full_name: 'a/b' });
-    expect(payload.sender).toEqual({ username: 'x@y.z' });
+    expect(payload.sender).toEqual({ username: 'x' });
     expect(payload.processed_at).toBe(1);
     expect(payload.custom).toBe('ok');
+  });
+
+  it('falls back to ghost without an actor username', () => {
+    const payload = buildWebhookPayload({ event: 'push', fullName: 'a/b', processedAt: 1 });
+    expect(payload.sender).toEqual({ username: 'ghost' });
   });
 });
 

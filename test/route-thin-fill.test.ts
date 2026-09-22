@@ -73,6 +73,7 @@ function createThinFakeDb() {
     teamGrants: [] as Array<Record<string, unknown>>,
     collaborators: [] as Array<Record<string, unknown>>,
     branchRules: [] as Array<Record<string, unknown>>,
+    branchContexts: [] as Array<{ rule_id: string; context: string }>,
     checks: [] as Array<Record<string, unknown>>,
     releases: [] as Array<Record<string, unknown>>,
     releaseAssets: [] as Array<Record<string, unknown>>,
@@ -80,6 +81,7 @@ function createThinFakeDb() {
     snippetFiles: [] as Array<Record<string, unknown>>,
     security: [] as Array<Record<string, unknown>>,
     tokens: [] as Array<Record<string, unknown>>,
+    tokenScopes: [] as Array<{ token_id: string; scope: string }>,
     tokenGrants: [] as Array<Record<string, unknown>>,
   };
 
@@ -152,16 +154,6 @@ function createThinFakeDb() {
                 String(r.name_ci ?? r.name).toLowerCase() === P(1).toLowerCase(),
             ) ?? null) as T | null,
           );
-        }
-        if (q.includes('FROM repositories WHERE lower(owner)')) {
-          return Promise.resolve(
-            (state.repos.find(
-              (r) => String(r.owner).toLowerCase() === P(0).toLowerCase() && String(r.name).toLowerCase() === P(1).toLowerCase(),
-            ) ?? null) as T | null,
-          );
-        }
-        if (q.includes('FROM repositories WHERE owner = ? AND name = ?')) {
-          return Promise.resolve((state.repos.find((r) => r.owner === params[0] && r.name === params[1]) ?? null) as T | null);
         }
         if (q.includes('FROM repositories WHERE id = ?')) {
           return Promise.resolve((state.repos.find((r) => r.id === params[0]) ?? null) as T | null);
@@ -251,6 +243,10 @@ function createThinFakeDb() {
         if (q.includes('FROM branch_protection_rules WHERE repository_id = ?')) {
           return Promise.resolve({ results: state.branchRules.filter((r) => r.repository_id === params[0]) as T[] });
         }
+        if (q.includes('SELECT context FROM branch_protection_required_checks WHERE rule_id = ?')) {
+          const rows = state.branchContexts.filter((c) => c.rule_id === params[0]).map((c) => ({ context: c.context }));
+          return Promise.resolve({ results: rows as T[] });
+        }
         if (q.includes('FROM check_runs WHERE repository_id = ? AND head_sha = ?')) {
           return Promise.resolve({
             results: state.checks.filter((c) => c.repository_id === params[0] && c.head_sha === P(1).toLowerCase()) as T[],
@@ -321,6 +317,10 @@ function createThinFakeDb() {
         if (q.includes('FROM user_access_tokens WHERE')) {
           return Promise.resolve({ results: state.tokens.filter((t) => String(t.user_email).toLowerCase() === P(0).toLowerCase()) as T[] });
         }
+        if (q.includes('SELECT scope FROM token_scopes WHERE token_id = ?')) {
+          const rows = state.tokenScopes.filter((s) => s.token_id === params[0]).map((s) => ({ scope: s.scope }));
+          return Promise.resolve({ results: rows as T[] });
+        }
         return Promise.resolve({ results: [] as T[] });
       },
       run(): Promise<{ success: boolean; meta?: { changes?: number } }> {
@@ -333,10 +333,20 @@ function createThinFakeDb() {
             required_approvals: params[4],
             block_force_push: params[5],
             block_deletion: params[6],
-            require_status_checks: params[7],
-            created_by: params[8],
-            created_at: params[9],
+            created_by: params[7],
+            created_at: params[8],
           });
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('DELETE FROM branch_protection_required_checks WHERE rule_id = ?')) {
+          state.branchContexts = state.branchContexts.filter((c) => c.rule_id !== params[0]);
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('INSERT OR IGNORE INTO branch_protection_required_checks')) {
+          const [rule_id, context] = params as [string, string];
+          if (!state.branchContexts.some((c) => c.rule_id === rule_id && c.context === context)) {
+            state.branchContexts.push({ rule_id, context });
+          }
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO check_runs')) {
@@ -504,9 +514,17 @@ function createThinFakeDb() {
             expires_at: params[4],
             last_used_at: null,
             created_at: params[5],
-            scopes: params[6] ?? null,
-            token_prefix: params[7] ?? null,
+            token_prefix: (params[6] as string | null) ?? null,
           });
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('DELETE FROM token_scopes WHERE token_id = ?')) {
+          state.tokenScopes = state.tokenScopes.filter((s) => s.token_id !== params[0]);
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('INSERT OR IGNORE INTO token_scopes')) {
+          const [token_id, scope] = params as [string, string];
+          if (!state.tokenScopes.some((s) => s.token_id === token_id && s.scope === scope)) state.tokenScopes.push({ token_id, scope });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE user_access_tokens SET last_used_at')) {

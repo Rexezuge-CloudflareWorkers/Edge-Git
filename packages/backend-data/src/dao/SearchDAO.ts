@@ -50,14 +50,14 @@ interface CodeFileInput {
 /**
  * Metadata search over repositories + issues.
  *
- * Strategy: try FTS5 (`repo_fts` / `issue_fts` from migration 0005) first;
- * fall back to case-insensitive LIKE when the database (unit fakes, old D1)
- * lacks FTS5. Callers (SearchService) filter private rows via
+ * Strategy: try FTS5 (`repo_fts` / `issue_fts`) first; fall back to
+ * case-insensitive LIKE when the database (unit fakes, D1 without FTS5)
+ * lacks it. Callers (SearchService) filter private rows via
  * PermissionService — this DAO intentionally returns candidates including
  * private repos so visibility stays in one place.
  *
  * Token/FTS/LIKE construction lives in `SearchQueries` (pure builders);
- * methods here only run statements and degrade to `[]` on legacy DBs.
+ * methods here only run statements and degrade to `[]` when FTS is absent.
  */
 class SearchDAO extends BaseDAO {
   constructor(database: D1Queryable) {
@@ -219,7 +219,7 @@ class SearchDAO extends BaseDAO {
       return result.meta?.changes ?? 0;
     } catch (error) {
       if (!isMissingSchemaError(error)) throw error;
-      // Legacy DBs without migration 0006 — search degrades to no code results.
+      // Fakes/DBs without code search tables — search degrades to no code results.
       return 0;
     }
   }
@@ -251,7 +251,7 @@ class SearchDAO extends BaseDAO {
       return changed;
     } catch (error) {
       if (!isMissingSchemaError(error)) throw error;
-      // Legacy DBs without migration 0006 — search degrades to no code results.
+      // Fakes/DBs without code search tables — search degrades to no code results.
       return 0;
     }
   }
@@ -266,7 +266,7 @@ class SearchDAO extends BaseDAO {
     } catch (error) {
       if (!isMissingSchemaError(error))
         throw new DatabaseError(`Failed to list indexed oids: ${error instanceof Error ? error.message : String(error)}`);
-      // Legacy DBs without migration 0006.
+      // Fakes/DBs without code search tables.
       return [];
     }
   }

@@ -4,12 +4,13 @@ import type { D1Queryable } from '../utils/D1Types';
 interface RepoWebhookRow {
   id: string;
   repository_id: string;
+  // Computed `full_name` alias (`repositories` join) — the stored copy was
+  // dropped in 0024; never written, only selected.
   full_name: string;
   url: string;
   url_prefix: string;
   secret: string;
   secret_suffix: string;
-  events: string;
   is_active: number;
   consecutive_failures: number;
   last_delivery_at: number | null;
@@ -17,16 +18,6 @@ interface RepoWebhookRow {
   creator_email: string;
   created_at: number;
   updated_at: number;
-}
-
-function parseEventsJson(raw: string): string[] {
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((e): e is string => typeof e === 'string' && e.length > 0);
-  } catch {
-    return [];
-  }
 }
 
 class WebhookDAO extends BaseDAO {
@@ -37,12 +28,11 @@ class WebhookDAO extends BaseDAO {
   public async create(input: {
     id: string;
     repositoryId: string;
-    fullName: string;
     url: string;
     urlPrefix: string;
     secret: string;
     secretSuffix: string;
-    eventsJson: string;
+    events: readonly string[];
     creatorEmail: string;
     now: number;
   }): Promise<void> {
@@ -50,17 +40,15 @@ class WebhookDAO extends BaseDAO {
       () =>
         this.database
           .prepare(
-            'INSERT INTO repo_webhooks (id, repository_id, full_name, url, url_prefix, secret, secret_suffix, events, is_active, consecutive_failures, last_delivery_at, last_delivery_status, creator_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 0, NULL, NULL, ?, ?, ?)',
+            'INSERT INTO repo_webhooks (id, repository_id, url, url_prefix, secret, secret_suffix, is_active, consecutive_failures, last_delivery_at, last_delivery_status, creator_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, 0, NULL, NULL, ?, ?, ?)',
           )
           .bind(
             input.id,
             input.repositoryId,
-            input.fullName,
             input.url,
             input.urlPrefix,
             input.secret,
             input.secretSuffix,
-            input.eventsJson,
             input.creatorEmail,
             input.now,
             input.now,
@@ -68,9 +56,8 @@ class WebhookDAO extends BaseDAO {
           .run(),
       'create repo webhook',
     );
-    // Dual-write the 3NF junction (0022): best-effort, JSON stays
-    // authoritative until the drop migration; reads prefer junction rows.
-    await this.replaceEvents(input.id, parseEventsJson(input.eventsJson), input.now).catch(() => undefined);
+    // Events live only in the junction table (0024 dropped the JSON column).
+    await this.replaceEvents(input.id, input.events, input.now);
   }
 
   public async listEvents(hookId: string): Promise<string[]> {
@@ -102,21 +89,30 @@ class WebhookDAO extends BaseDAO {
     );
   }
 
+  // `full_name` is computed from `repositories` (0024 dropped the stored
+  // copy): renames need no cascade here.
+  private static readonly FULL_NAME_ALIAS =
+    "(SELECT owner || '/' || name FROM repositories WHERE id = repo_webhooks.repository_id) AS full_name";
+
   public async listByRepo(repositoryId: string): Promise<RepoWebhookRow[]> {
     const result = await this.database
-      .prepare('SELECT * FROM repo_webhooks WHERE repository_id = ? ORDER BY created_at ASC, id ASC')
+      .prepare(`SELECT repo_webhooks.*, ${WebhookDAO.FULL_NAME_ALIAS} FROM repo_webhooks WHERE repository_id = ? ORDER BY created_at ASC, id ASC`)
       .bind(repositoryId)
       .all<RepoWebhookRow>();
     return result.results ?? [];
   }
 
   public async getById(id: string): Promise<RepoWebhookRow | null> {
-    return this.findRowById<RepoWebhookRow>('repo_webhooks', 'id', id);
+    const row = await this.database
+      .prepare(`SELECT repo_webhooks.*, ${WebhookDAO.FULL_NAME_ALIAS} FROM repo_webhooks WHERE id = ? LIMIT 1`)
+      .bind(id)
+      .first<RepoWebhookRow>();
+    return row ?? null;
   }
 
   public async getByIdAndRepo(id: string, repositoryId: string): Promise<RepoWebhookRow | null> {
     const row = await this.database
-      .prepare('SELECT * FROM repo_webhooks WHERE id = ? AND repository_id = ? LIMIT 1')
+      .prepare(`SELECT repo_webhooks.*, ${WebhookDAO.FULL_NAME_ALIAS} FROM repo_webhooks WHERE id = ? AND repository_id = ? LIMIT 1`)
       .bind(id, repositoryId)
       .first<RepoWebhookRow>();
     return row ?? null;
@@ -133,17 +129,13 @@ class WebhookDAO extends BaseDAO {
   public async update(
     id: string,
     repositoryId: string,
-    patch: { url?: string; urlPrefix?: string; eventsJson?: string; isActive?: boolean; now: number },
+    patch: { url?: string; urlPrefix?: string; events?: readonly string[]; isActive?: boolean; now: number },
   ): Promise<void> {
     const sets: string[] = ['updated_at = ?'];
     const params: unknown[] = [patch.now];
     if (patch.url !== undefined && patch.urlPrefix !== undefined) {
       sets.push('url = ?', 'url_prefix = ?');
       params.push(patch.url, patch.urlPrefix);
-    }
-    if (patch.eventsJson !== undefined) {
-      sets.push('events = ?');
-      params.push(patch.eventsJson);
     }
     if (patch.isActive !== undefined) {
       sets.push('is_active = ?');
@@ -158,8 +150,8 @@ class WebhookDAO extends BaseDAO {
           .run(),
       'update repo webhook',
     );
-    if (patch.eventsJson !== undefined) {
-      await this.replaceEvents(id, parseEventsJson(patch.eventsJson), patch.now).catch(() => undefined);
+    if (patch.events !== undefined) {
+      await this.replaceEvents(id, patch.events, patch.now);
     }
   }
 
@@ -224,15 +216,6 @@ class WebhookDAO extends BaseDAO {
       () => this.database.prepare('DELETE FROM repo_webhooks WHERE repository_id = ?').bind(repositoryId).run(),
       'delete webhooks by repo',
     );
-  }
-
-  // Refresh denormalized `full_name` after an owner/org rename. Keyed by
-  // stable `repository_id` so hook rows follow the new `owner/name`.
-  public async updateFullNameByRepo(repositoryId: string, fullName: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('UPDATE repo_webhooks SET full_name = ? WHERE repository_id = ?').bind(fullName, repositoryId).run(),
-      'rename webhook full name',
-    ).catch(() => undefined);
   }
 }
 

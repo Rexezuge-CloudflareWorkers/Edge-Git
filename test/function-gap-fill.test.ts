@@ -90,6 +90,7 @@ function createGapFakeDb() {
     >,
     orgMembers: [{ org_id: 'org-acme', user_email: ALICE, role: 'owner', created_at: 1 }] as Array<Record<string, unknown>>,
     branchRules: [] as Array<Record<string, unknown>>,
+    branchContexts: [] as Array<{ rule_id: string; context: string }>,
     checks: [] as Array<Record<string, unknown>>,
     pulls: [
       {
@@ -164,15 +165,6 @@ function createGapFakeDb() {
             ) ?? null) as T | null,
           );
         }
-        if (q.includes('FROM repositories WHERE lower(owner)') && q.includes('AND lower(name)')) {
-          return Promise.resolve(
-            (state.repos.find((r) => String(r.owner).toLowerCase() === Pl(0) && String(r.name).toLowerCase() === Pl(1)) ??
-              null) as T | null,
-          );
-        }
-        if (q.includes('FROM repositories WHERE owner = ? AND name = ?')) {
-          return Promise.resolve((state.repos.find((r) => r.owner === params[0] && r.name === params[1]) ?? null) as T | null);
-        }
         if (q.includes('FROM repositories WHERE id = ?')) {
           return Promise.resolve((state.repos.find((r) => r.id === params[0]) ?? null) as T | null);
         }
@@ -211,6 +203,10 @@ function createGapFakeDb() {
         if (q.includes('FROM branch_protection_rules WHERE repository_id = ?')) {
           return Promise.resolve({ results: state.branchRules.filter((r) => r.repository_id === params[0]) as T[] });
         }
+        if (q.includes('SELECT context FROM branch_protection_required_checks WHERE rule_id = ?')) {
+          const rows = state.branchContexts.filter((c) => c.rule_id === params[0]).map((c) => ({ context: c.context }));
+          return Promise.resolve({ results: rows as T[] });
+        }
         if (q.includes('FROM check_runs WHERE repository_id = ? AND head_sha = ?')) {
           return Promise.resolve({
             results: state.checks.filter((c) => c.repository_id === params[0] && String(c.head_sha).toLowerCase() === Pl(1)) as T[],
@@ -221,9 +217,6 @@ function createGapFakeDb() {
         }
         if (q.includes('FROM repositories WHERE owner_ci = ?') && !q.includes('AND name_ci')) {
           return Promise.resolve({ results: state.repos.filter((r) => String(r.owner_ci ?? r.owner).toLowerCase() === Pl(0)) as T[] });
-        }
-        if (q.includes('FROM repositories WHERE lower(owner) = ?') && !q.includes('AND lower(name)')) {
-          return Promise.resolve({ results: state.repos.filter((r) => String(r.owner).toLowerCase() === Pl(0)) as T[] });
         }
         if (q.includes('FROM repositories WHERE org_id = ?')) {
           return Promise.resolve({ results: state.repos.filter((r) => r.org_id === params[0]) as T[] });
@@ -249,10 +242,20 @@ function createGapFakeDb() {
             required_approvals: params[4],
             block_force_push: params[5],
             block_deletion: params[6],
-            require_status_checks: params[7],
-            created_by: params[8],
-            created_at: params[9],
+            created_by: params[7],
+            created_at: params[8],
           });
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('DELETE FROM branch_protection_required_checks WHERE rule_id = ?')) {
+          state.branchContexts = state.branchContexts.filter((c) => c.rule_id !== params[0]);
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('INSERT OR IGNORE INTO branch_protection_required_checks')) {
+          const [rule_id, context] = params as [string, string];
+          if (!state.branchContexts.some((c) => c.rule_id === rule_id && c.context === context)) {
+            state.branchContexts.push({ rule_id, context });
+          }
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO check_runs')) {
@@ -937,9 +940,12 @@ describe('function-gap TriggerChecks', () => {
     };
     // seed a rule directly to avoid depending on POST
     db.prepare(
-      'INSERT INTO branch_protection_rules (id, repository_id, pattern, require_pr, required_approvals, block_force_push, block_deletion, require_status_checks, created_by, created_at)',
+      'INSERT INTO branch_protection_rules (id, repository_id, pattern, require_pr, required_approvals, block_force_push, block_deletion, created_by, created_at)',
     )
-      .bind('rule-1', 'r-demo', 'main', 0, 0, 1, 1, JSON.stringify(['ci']), ALICE, 1)
+      .bind('rule-1', 'r-demo', 'main', 0, 0, 1, 1, ALICE, 1)
+      .run();
+    db.prepare('INSERT OR IGNORE INTO branch_protection_required_checks (rule_id, context, created_at)')
+      .bind('rule-1', 'ci', 1)
       .run();
     // wait a tick for the in-memory push (run is sync-ish but async)
     await Promise.resolve();

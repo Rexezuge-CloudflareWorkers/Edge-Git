@@ -18,6 +18,8 @@ export interface RepositoryRow {
   owner_user_email?: string | null;
   org_id?: string | null;
   forked_from_repo_id?: string | null;
+  // Computed alias (`repositories` self-join) — the stored copy was dropped
+  // in 0024; never written, only selected.
   forked_from_full_name?: string | null;
 }
 
@@ -25,6 +27,12 @@ class RepositoryDAO extends BaseDAO {
   constructor(database: D1Queryable) {
     super(database);
   }
+
+  // Fork lineage is computed live (`repositories` self-join) — the stored
+  // `forked_from_full_name` copy was dropped in 0024, so renames need no
+  // refresh of fork rows.
+  private static readonly FORK_ALIAS =
+    "(SELECT owner || '/' || name FROM repositories AS f WHERE f.id = repositories.forked_from_repo_id) AS forked_from_full_name";
 
   public async create(input: {
     id: string;
@@ -38,7 +46,6 @@ class RepositoryDAO extends BaseDAO {
     orgId?: string | null;
     ownerUserEmail?: string | null;
     forkedFromRepoId?: string | null;
-    forkedFromFullName?: string | null;
   }): Promise<void> {
     const ownerType = input.ownerType ?? 'user';
     const ownerCi = input.owner.toLowerCase();
@@ -48,7 +55,7 @@ class RepositoryDAO extends BaseDAO {
       () =>
         this.database
           .prepare(
-            'INSERT INTO repositories (id, owner_email, owner, name, description, is_private, created_at, updated_at, owner_type, owner_ci, name_ci, owner_user_email, org_id, forked_from_repo_id, forked_from_full_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO repositories (id, owner_email, owner, name, description, is_private, created_at, updated_at, owner_type, owner_ci, name_ci, owner_user_email, org_id, forked_from_repo_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           )
           .bind(
             input.id,
@@ -65,7 +72,6 @@ class RepositoryDAO extends BaseDAO {
             ownerUserEmail,
             input.orgId ?? null,
             input.forkedFromRepoId ?? null,
-            input.forkedFromFullName ?? null,
           )
           .run(),
       'create repository',
@@ -81,7 +87,7 @@ class RepositoryDAO extends BaseDAO {
     const nameCi = name.toLowerCase();
     try {
       return await this.database
-        .prepare('SELECT * FROM repositories WHERE owner_ci = ? AND name_ci = ? LIMIT 1')
+        .prepare(`SELECT repositories.*, ${RepositoryDAO.FORK_ALIAS} FROM repositories WHERE owner_ci = ? AND name_ci = ? LIMIT 1`)
         .bind(ownerCi, nameCi)
         .first<RepositoryRow>();
     } catch (error) {
@@ -90,13 +96,16 @@ class RepositoryDAO extends BaseDAO {
   }
 
   public async getById(id: string): Promise<RepositoryRow | null> {
-    return this.findRowById<RepositoryRow>('repositories', 'id', id);
+    return this.database
+      .prepare(`SELECT repositories.*, ${RepositoryDAO.FORK_ALIAS} FROM repositories WHERE id = ? LIMIT 1`)
+      .bind(id)
+      .first<RepositoryRow>();
   }
 
   public async listByOwner(owner: string, limit = 100): Promise<RepositoryRow[]> {
     const ownerCi = owner.toLowerCase();
     const result = await this.database
-      .prepare('SELECT * FROM repositories WHERE owner_ci = ? ORDER BY updated_at DESC LIMIT ?')
+      .prepare(`SELECT repositories.*, ${RepositoryDAO.FORK_ALIAS} FROM repositories WHERE owner_ci = ? ORDER BY updated_at DESC LIMIT ?`)
       .bind(ownerCi, limit)
       .all<RepositoryRow>();
     return result.results ?? [];
@@ -104,7 +113,9 @@ class RepositoryDAO extends BaseDAO {
 
   public async listByOwnerEmail(ownerEmail: string, limit = 100): Promise<RepositoryRow[]> {
     const result = await this.database
-      .prepare('SELECT * FROM repositories WHERE lower(owner_email) = lower(?) ORDER BY updated_at DESC LIMIT ?')
+      .prepare(
+        `SELECT repositories.*, ${RepositoryDAO.FORK_ALIAS} FROM repositories WHERE lower(owner_email) = lower(?) ORDER BY updated_at DESC LIMIT ?`,
+      )
       .bind(ownerEmail, limit)
       .all<RepositoryRow>();
     return result.results ?? [];
@@ -112,7 +123,7 @@ class RepositoryDAO extends BaseDAO {
 
   public async listByOrgId(orgId: string, limit = 200): Promise<RepositoryRow[]> {
     const result = await this.database
-      .prepare('SELECT * FROM repositories WHERE org_id = ? ORDER BY updated_at DESC LIMIT ?')
+      .prepare(`SELECT repositories.*, ${RepositoryDAO.FORK_ALIAS} FROM repositories WHERE org_id = ? ORDER BY updated_at DESC LIMIT ?`)
       .bind(orgId, limit)
       .all<RepositoryRow>();
     return result.results ?? [];
@@ -121,7 +132,7 @@ class RepositoryDAO extends BaseDAO {
   public async listByCollaboratorEmail(userEmail: string, limit = 500): Promise<RepositoryRow[]> {
     const result = await this.database
       .prepare(
-        'SELECT r.* FROM repositories r JOIN repo_collaborators c ON c.repo_id = r.id WHERE lower(c.user_email) = lower(?) ORDER BY r.updated_at DESC LIMIT ?',
+        `SELECT r.*, (SELECT owner || '/' || name FROM repositories AS f WHERE f.id = r.forked_from_repo_id) AS forked_from_full_name FROM repositories r JOIN repo_collaborators c ON c.repo_id = r.id WHERE lower(c.user_email) = lower(?) ORDER BY r.updated_at DESC LIMIT ?`,
       )
       .bind(userEmail, limit)
       .all<RepositoryRow>();
@@ -141,23 +152,12 @@ class RepositoryDAO extends BaseDAO {
     );
   }
 
-  // Refresh denormalized fork-source names after the source owner renames.
-  // Best-effort cascade helper (never throws).
-  public async updateForkSourceFullName(sourceRepoId: string, sourceFullName: string): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('UPDATE repositories SET forked_from_full_name = ? WHERE forked_from_repo_id = ?')
-          .bind(sourceFullName, sourceRepoId)
-          .run(),
-      'rename fork source full name',
-    ).catch(() => undefined);
-  }
-
   public async listForks(sourceRepoId: string, limit = 100): Promise<RepositoryRow[]> {
     try {
       const result = await this.database
-        .prepare('SELECT * FROM repositories WHERE forked_from_repo_id = ? ORDER BY updated_at DESC LIMIT ?')
+        .prepare(
+          `SELECT repositories.*, ${RepositoryDAO.FORK_ALIAS} FROM repositories WHERE forked_from_repo_id = ? ORDER BY updated_at DESC LIMIT ?`,
+        )
         .bind(sourceRepoId, limit)
         .all<RepositoryRow>();
       return result.results ?? [];
@@ -202,7 +202,7 @@ class RepositoryDAO extends BaseDAO {
   public async listRecent(limit = 50, offset = 0): Promise<RepositoryRow[]> {
     try {
       const result = await this.database
-        .prepare('SELECT * FROM repositories ORDER BY updated_at DESC LIMIT ? OFFSET ?')
+        .prepare(`SELECT repositories.*, ${RepositoryDAO.FORK_ALIAS} FROM repositories ORDER BY updated_at DESC LIMIT ? OFFSET ?`)
         .bind(limit, offset)
         .all<RepositoryRow>();
       return result.results ?? [];

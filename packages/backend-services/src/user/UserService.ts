@@ -262,19 +262,12 @@ class UserService {
     // for other accounts, but the owning email may reclaim them (rename
     // back / rollback after a failed DO move). A future tombstone/GC
     // migration can free them after a grace period.
-    // Simple rename: cascade owner on user-owned repos (plus denormalized
-    // `full_name` sidecars).
+    // Simple rename: cascade owner on user-owned repos. Display names are
+    // computed from `repositories`, so no sidecar updates are needed.
     if (oldCi) {
       try {
         await cascadeOwnerRepos(
-          {
-            repositoryDAO: this.deps.repositoryDAO,
-            issueDAO: this.deps.issueDAO,
-            pullRequestDAO: this.deps.pullRequestDAO,
-            eventDAO: this.deps.eventDAO,
-            notificationDAO: this.deps.notificationDAO,
-            webhookDAO: this.deps.webhookDAO,
-          },
+          { repositoryDAO: this.deps.repositoryDAO },
           { oldOwnerCi: oldCi, newOwner: handle, now },
         );
       } catch {

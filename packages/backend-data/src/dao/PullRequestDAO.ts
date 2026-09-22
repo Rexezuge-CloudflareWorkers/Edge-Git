@@ -4,6 +4,8 @@ import type { D1Queryable } from '../utils/D1Types';
 export interface PullRequestRow {
   id: string;
   repository_id: string;
+  // Computed aliases (`repositories` joins) — the stored `full_name` /
+  // `head_full_name` copies were dropped in 0024; never written, selected.
   full_name: string;
   number: number;
   title: string;
@@ -63,7 +65,6 @@ class PullRequestDAO extends BaseDAO {
   public async create(input: {
     id: string;
     repositoryId: string;
-    fullName: string;
     number: number;
     title: string;
     body: string | null;
@@ -75,18 +76,16 @@ class PullRequestDAO extends BaseDAO {
     creatorEmail: string;
     now: number;
     headRepositoryId?: string | null;
-    headFullName?: string | null;
   }): Promise<void> {
     await this.withRetry(
       () =>
         this.database
           .prepare(
-            'INSERT INTO pull_requests (id, repository_id, full_name, number, title, body, status, base_branch, head_branch, base_oid, head_oid, merge_base_oid, creator_email, merged_by, merged_at, created_at, updated_at, head_repository_id, head_full_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?)',
+            'INSERT INTO pull_requests (id, repository_id, number, title, body, status, base_branch, head_branch, base_oid, head_oid, merge_base_oid, creator_email, merged_by, merged_at, created_at, updated_at, head_repository_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)',
           )
           .bind(
             input.id,
             input.repositoryId,
-            input.fullName,
             input.number,
             input.title,
             input.body,
@@ -100,16 +99,21 @@ class PullRequestDAO extends BaseDAO {
             input.now,
             input.now,
             input.headRepositoryId ?? null,
-            input.headFullName ?? null,
           )
           .run(),
       'create pull request',
     );
   }
 
+  // `full_name` / `head_full_name` are computed from `repositories` (0024
+  // dropped the stored copies): renames need no cascade — FTS via triggers.
+  private static readonly NAME_ALIASES =
+    "(SELECT owner || '/' || name FROM repositories WHERE id = pull_requests.repository_id) AS full_name, " +
+    "(SELECT owner || '/' || name FROM repositories WHERE id = pull_requests.head_repository_id) AS head_full_name";
+
   public async listByRepo(repositoryId: string, limit = 50): Promise<PullRequestRow[]> {
     const result = await this.database
-      .prepare('SELECT * FROM pull_requests WHERE repository_id = ? ORDER BY number DESC LIMIT ?')
+      .prepare(`SELECT pull_requests.*, ${PullRequestDAO.NAME_ALIASES} FROM pull_requests WHERE repository_id = ? ORDER BY number DESC LIMIT ?`)
       .bind(repositoryId, limit)
       .all<PullRequestRow>();
     return result.results ?? [];
@@ -117,13 +121,16 @@ class PullRequestDAO extends BaseDAO {
 
   public async getByNumber(repositoryId: string, number: number): Promise<PullRequestRow | null> {
     return this.database
-      .prepare('SELECT * FROM pull_requests WHERE repository_id = ? AND number = ? LIMIT 1')
+      .prepare(`SELECT pull_requests.*, ${PullRequestDAO.NAME_ALIASES} FROM pull_requests WHERE repository_id = ? AND number = ? LIMIT 1`)
       .bind(repositoryId, number)
       .first<PullRequestRow>();
   }
 
   public async getById(id: string): Promise<PullRequestRow | null> {
-    return this.findRowById<PullRequestRow>('pull_requests', 'id', id);
+    return this.database
+      .prepare(`SELECT pull_requests.*, ${PullRequestDAO.NAME_ALIASES} FROM pull_requests WHERE id = ? LIMIT 1`)
+      .bind(id)
+      .first<PullRequestRow>();
   }
 
   public async setStatus(id: string, status: 'open' | 'closed' | 'merged', now: number): Promise<void> {
@@ -131,28 +138,6 @@ class PullRequestDAO extends BaseDAO {
       () => this.database.prepare('UPDATE pull_requests SET status = ?, updated_at = ? WHERE id = ?').bind(status, now, id).run(),
       'update pull request status',
     );
-  }
-
-  // Refresh denormalized names after an owner/org rename. Base `full_name` is
-  // keyed by stable `repository_id`; fork `head_full_name` by stable
-  // `head_repository_id`. Best-effort cascade helpers (never throw).
-  // FTS follows via `trg_pull_fts_au`.
-  public async updateFullNameByRepo(repositoryId: string, fullName: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('UPDATE pull_requests SET full_name = ? WHERE repository_id = ?').bind(fullName, repositoryId).run(),
-      'rename pull request full name',
-    ).catch(() => undefined);
-  }
-
-  public async updateHeadFullNameByHeadRepo(headRepositoryId: string, headFullName: string): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('UPDATE pull_requests SET head_full_name = ? WHERE head_repository_id = ?')
-          .bind(headFullName, headRepositoryId)
-          .run(),
-      'rename pull request head full name',
-    ).catch(() => undefined);
   }
 
   public async markMerged(id: string, mergedBy: string, commitOid: string | null, now: number): Promise<void> {

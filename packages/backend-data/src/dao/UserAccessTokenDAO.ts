@@ -10,29 +10,10 @@ export interface TokenRow {
   expires_at: number;
   last_used_at: number | null;
   created_at: number;
-  scopes?: string | null;
   token_prefix?: string | null;
 }
 
-function parseScopes(raw: string | null | undefined): TokenScope[] {
-  // Fail closed: legacy NULL/invalid/empty scope rows grant nothing.
-  // Previously these fell back to full access; that fail-open could
-  // escalate a corrupt row to admin. New mints always serialize explicit
-  // scopes, so empty here means deny.
-  if (raw === null || raw === undefined) return [];
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    const valid = parsed.filter(
-      (s): s is TokenScope => typeof s === 'string' && (['repo:read', 'repo:write', 'admin'] as const).includes(s as TokenScope),
-    );
-    return valid.length > 0 ? valid : [];
-  } catch {
-    return [];
-  }
-}
-
-function toMetadata(row: TokenRow): UserAccessTokenMetadata {
+function toMetadata(row: TokenRow, scopes: TokenScope[]): UserAccessTokenMetadata {
   return {
     tokenId: row.token_id,
     userEmail: row.user_email,
@@ -41,7 +22,9 @@ function toMetadata(row: TokenRow): UserAccessTokenMetadata {
     expiresAt: row.expires_at,
     lastUsedAt: row.last_used_at,
     createdAt: row.created_at,
-    scopes: parseScopes(row.scopes),
+    // Scopes live only in `token_scopes` (0024 dropped the JSON column):
+    // fail closed to `[]` when the junction has no rows.
+    scopes,
     tokenPrefix: row.token_prefix ?? null,
   };
 }
@@ -61,21 +44,25 @@ class UserAccessTokenDAO extends BaseDAO {
     scopes?: readonly TokenScope[] | null,
     tokenPrefix?: string | null,
   ): Promise<void> {
-    const serialized = scopes && scopes.length > 0 ? JSON.stringify([...scopes]) : null;
     await this.withRetry(
       () =>
         this.database
           .prepare(
-            'INSERT INTO user_access_tokens (token_id, user_email, token_hash, name, expires_at, last_used_at, created_at, scopes, token_prefix) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)',
+            'INSERT INTO user_access_tokens (token_id, user_email, token_hash, name, expires_at, last_used_at, created_at, token_prefix) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)',
           )
-          .bind(tokenId, userEmail.toLowerCase(), tokenHash, name, expiresAt, now, serialized, tokenPrefix ?? null)
+          .bind(tokenId, userEmail.toLowerCase(), tokenHash, name, expiresAt, now, tokenPrefix ?? null)
           .run(),
       'create access token',
     );
-    // Dual-write the 3NF junction (0022): best-effort so minimal fakes and
-    // DBs without the table keep working — reads prefer junction rows with a
-    // JSON fallback, so a skipped write self-heals on read.
-    await this.replaceScopes(tokenId, scopes ?? [], now).catch(() => undefined);
+    // Scopes live only in the junction table: fail closed by rolling back
+    // the row when the junction write fails (a token without scopes must
+    // never silently exist as unrestricted).
+    try {
+      await this.replaceScopes(tokenId, scopes ?? [], now);
+    } catch (error) {
+      await this.database.prepare('DELETE FROM user_access_tokens WHERE token_id = ?').bind(tokenId).run().catch(() => undefined);
+      throw error;
+    }
   }
 
   public async listScopes(tokenId: string): Promise<TokenScope[]> {
@@ -110,13 +97,10 @@ class UserAccessTokenDAO extends BaseDAO {
     );
   }
 
-  private async withJunctionScopes(meta: UserAccessTokenMetadata): Promise<UserAccessTokenMetadata> {
-    // Junction-first read with JSON fallback: pre-backfill rows and skipped
-    // dual-writes resolve to the JSON scopes; fail-closed `[]` is preserved
-    // when both are empty.
-    const junction = await this.listScopes(meta.tokenId).catch(() => null);
-    if (junction && junction.length > 0) return { ...meta, scopes: junction };
-    return meta;
+  private async withJunctionScopes(row: TokenRow): Promise<UserAccessTokenMetadata> {
+    // Fail closed: an empty junction means deny (never full access).
+    const scopes = await this.listScopes(row.token_id).catch(() => [] as TokenScope[]);
+    return toMetadata(row, scopes);
   }
 
   public async getByTokenHash(tokenHash: string, nowSeconds: number): Promise<UserAccessTokenMetadata | undefined> {
@@ -125,7 +109,7 @@ class UserAccessTokenDAO extends BaseDAO {
       .bind(tokenHash, nowSeconds)
       .first<TokenRow>();
     if (!row) return undefined;
-    return this.withJunctionScopes(toMetadata(row));
+    return this.withJunctionScopes(row);
   }
 
   public async getByUserEmail(userEmail: string): Promise<UserAccessTokenMetadata[]> {
@@ -135,7 +119,7 @@ class UserAccessTokenDAO extends BaseDAO {
       .all<TokenRow>();
     const rows = result.results ?? [];
     const out: UserAccessTokenMetadata[] = [];
-    for (const row of rows) out.push(await this.withJunctionScopes(toMetadata(row)));
+    for (const row of rows) out.push(await this.withJunctionScopes(row));
     return out;
   }
 

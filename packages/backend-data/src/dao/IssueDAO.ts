@@ -4,6 +4,8 @@ import type { D1Queryable } from '../utils/D1Types';
 export interface IssueRow {
   id: string;
   repository_id: string;
+  // Computed `full_name` alias (`repositories` join) — the stored copy was
+  // dropped in 0024; never written, only selected.
   full_name: string;
   number: number;
   title: string;
@@ -39,7 +41,6 @@ class IssueDAO extends BaseDAO {
   public async create(input: {
     id: string;
     repositoryId: string;
-    fullName: string;
     number: number;
     title: string;
     body: string | null;
@@ -50,28 +51,22 @@ class IssueDAO extends BaseDAO {
       () =>
         this.database
           .prepare(
-            'INSERT INTO issues (id, repository_id, full_name, number, title, body, status, creator_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO issues (id, repository_id, number, title, body, status, creator_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
           )
-          .bind(
-            input.id,
-            input.repositoryId,
-            input.fullName,
-            input.number,
-            input.title,
-            input.body,
-            'open',
-            input.creatorEmail,
-            input.now,
-            input.now,
-          )
+          .bind(input.id, input.repositoryId, input.number, input.title, input.body, 'open', input.creatorEmail, input.now, input.now)
           .run(),
       'create issue',
     );
   }
 
+  // `full_name` is computed from `repositories` (0024 dropped the stored
+  // copy): renames need no cascade here — FTS follows via triggers.
+  private static readonly FULL_NAME_ALIAS =
+    "(SELECT owner || '/' || name FROM repositories WHERE id = issues.repository_id) AS full_name";
+
   public async listByRepo(repositoryId: string, limit = 50): Promise<IssueRow[]> {
     const result = await this.database
-      .prepare('SELECT * FROM issues WHERE repository_id = ? ORDER BY number DESC LIMIT ?')
+      .prepare(`SELECT issues.*, ${IssueDAO.FULL_NAME_ALIAS} FROM issues WHERE repository_id = ? ORDER BY number DESC LIMIT ?`)
       .bind(repositoryId, limit)
       .all<IssueRow>();
     return result.results ?? [];
@@ -79,7 +74,7 @@ class IssueDAO extends BaseDAO {
 
   public async getByNumber(repositoryId: string, number: number): Promise<IssueRow | null> {
     return this.database
-      .prepare('SELECT * FROM issues WHERE repository_id = ? AND number = ? LIMIT 1')
+      .prepare(`SELECT issues.*, ${IssueDAO.FULL_NAME_ALIAS} FROM issues WHERE repository_id = ? AND number = ? LIMIT 1`)
       .bind(repositoryId, number)
       .first<IssueRow>();
   }
@@ -89,15 +84,6 @@ class IssueDAO extends BaseDAO {
       () => this.database.prepare('UPDATE issues SET status = ?, updated_at = ? WHERE id = ?').bind(status, now, id).run(),
       'update issue status',
     );
-  }
-
-  // Refresh denormalized `full_name` after an owner/org rename. Keyed by
-  // stable `repository_id` — FTS follows via the `trg_issue_fts_au` trigger.
-  public async updateFullNameByRepo(repositoryId: string, fullName: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('UPDATE issues SET full_name = ? WHERE repository_id = ?').bind(fullName, repositoryId).run(),
-      'rename issue full name',
-    ).catch(() => undefined);
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {

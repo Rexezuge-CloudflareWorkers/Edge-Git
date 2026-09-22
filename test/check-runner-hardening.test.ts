@@ -350,7 +350,7 @@ function createDoDb() {
     const q = query.replace(/\s+/g, ' ').trim();
     return {
       first<T>(): Promise<T | null> {
-        if (q.startsWith('SELECT * FROM repositories WHERE id = ?')) {
+        if (q.includes('FROM repositories WHERE id = ?')) {
           return Promise.resolve((repos.find((r) => r.id === params[0]) ?? null) as T | null);
         }
         if (q.startsWith('SELECT * FROM check_runs WHERE repository_id = ? AND head_sha = ? AND context = ?')) {

@@ -7,7 +7,7 @@ import type { ProtectedRefRule } from '@edge-git/git-protocol';
 import { PushHandler } from '@edge-git/background/PushHandler';
 
 function createProtectionFakeDb(seedRules: Array<Record<string, unknown>> = []): D1Queryable & { rules: Array<Record<string, unknown>> } {
-  const state = { rules: seedRules.map((r) => ({ ...r })) };
+  const state = { rules: seedRules.map((r) => ({ ...r })), contexts: [] as Array<{ rule_id: string; context: string }> };
   function statement(query: string, params: unknown[]) {
     const q = query.replace(/\s+/g, ' ').trim();
     return {
@@ -32,22 +32,16 @@ function createProtectionFakeDb(seedRules: Array<Record<string, unknown>> = []):
             .sort((a, b) => String(a.pattern).localeCompare(String(b.pattern)));
           return Promise.resolve({ results: rows as T[] });
         }
+        if (q.startsWith('SELECT context FROM branch_protection_required_checks WHERE rule_id = ?')) {
+          const rows = state.contexts.filter((c) => c.rule_id === params[0]).map((c) => ({ context: c.context }));
+          return Promise.resolve({ results: rows as T[] });
+        }
         return Promise.resolve({ results: [] });
       },
       run(): Promise<{ success: boolean; meta?: { changes?: number } }> {
         if (q.startsWith('INSERT INTO branch_protection_rules')) {
-          const [
-            id,
-            repository_id,
-            pattern,
-            require_pr,
-            required_approvals,
-            block_force_push,
-            block_deletion,
-            require_status_checks,
-            created_by,
-            created_at,
-          ] = params as Array<string | number | null>;
+          const [id, repository_id, pattern, require_pr, required_approvals, block_force_push, block_deletion, created_by, created_at] =
+            params as Array<string | number | null>;
           if (state.rules.some((r) => r.repository_id === repository_id && r.pattern === pattern)) {
             return Promise.resolve({ success: false, error: 'UNIQUE constraint failed' });
           }
@@ -59,15 +53,24 @@ function createProtectionFakeDb(seedRules: Array<Record<string, unknown>> = []):
             required_approvals,
             block_force_push,
             block_deletion,
-            require_status_checks,
             created_by,
             created_at,
           });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
+        if (q.startsWith('DELETE FROM branch_protection_required_checks WHERE rule_id = ?')) {
+          state.contexts = state.contexts.filter((c) => c.rule_id !== params[0]);
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('INSERT OR IGNORE INTO branch_protection_required_checks')) {
+          const [rule_id, context] = params as [string, string];
+          if (!state.contexts.some((c) => c.rule_id === rule_id && c.context === context)) state.contexts.push({ rule_id, context });
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
         if (q.startsWith('DELETE FROM branch_protection_rules WHERE id = ?')) {
           const before = state.rules.length;
           state.rules = state.rules.filter((r) => !(r.id === params[0] && r.repository_id === params[1]));
+          state.contexts = state.contexts.filter((c) => c.rule_id !== params[0]);
           return Promise.resolve({ success: true, meta: { changes: before - state.rules.length } });
         }
         if (q.startsWith('DELETE FROM branch_protection_rules WHERE repository_id = ?')) {

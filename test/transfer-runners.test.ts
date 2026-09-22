@@ -68,12 +68,11 @@ function createRunnerDb(seed: Partial<RunnerDb> = {}): D1Queryable & { data: Run
       },
       run(): Promise<{ success: boolean; meta?: { changes?: number } }> {
         if (q.includes("UPDATE repo_imports SET status = 'done'")) {
-          const row = data.imports.find((i) => i.id === params[3] && ['pending', 'running'].includes(i.status as string));
+          const row = data.imports.find((i) => i.id === params[2] && ['pending', 'running'].includes(i.status as string));
           if (row) {
             row.status = 'done';
-            row.refs_json = params[0];
-            row.imported_refs = params[1];
-            row.updated_at = params[2];
+            row.imported_refs = params[0];
+            row.updated_at = params[1];
           }
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }

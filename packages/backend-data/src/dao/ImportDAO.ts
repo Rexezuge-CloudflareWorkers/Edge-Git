@@ -26,7 +26,6 @@ interface RepoImportRow {
   source_url: string;
   status: ImportStatus;
   error: string | null;
-  refs_json: string | null;
   imported_refs: number;
   created_by: string;
   created_at: number;
@@ -43,7 +42,7 @@ class ImportDAO extends BaseDAO {
       () =>
         this.database
           .prepare(
-            'INSERT INTO repo_imports (id, repository_id, source_url, status, error, refs_json, imported_refs, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, NULL, NULL, 0, ?, ?, ?)',
+            'INSERT INTO repo_imports (id, repository_id, source_url, status, error, imported_refs, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, NULL, 0, ?, ?, ?)',
           )
           .bind(input.id, input.repositoryId, input.sourceUrl, 'pending', input.createdBy, input.now, input.now)
           .run(),
@@ -106,15 +105,15 @@ class ImportDAO extends BaseDAO {
       () =>
         this.database
           .prepare(
-            "UPDATE repo_imports SET status = 'done', error = NULL, refs_json = ?, imported_refs = ?, updated_at = ? WHERE id = ? AND status IN ('pending', 'running')",
+            "UPDATE repo_imports SET status = 'done', error = NULL, imported_refs = ?, updated_at = ? WHERE id = ? AND status IN ('pending', 'running')",
           )
-          .bind(refsJson, importedRefs, now, id)
+          .bind(importedRefs, now, id)
           .run(),
       'mark repo import done',
     );
-    // Dual-write the 3NF junction (0022): best-effort, JSON stays
-    // authoritative until the drop migration; reads prefer junction rows.
-    await this.replaceRefs(id, parseRefsJson(refsJson), now).catch(() => undefined);
+    // Refs live only in the junction table (0024 dropped the JSON column);
+    // the JSON argument is parsed transiently, never stored.
+    await this.replaceRefs(id, parseRefsJson(refsJson), now);
   }
 
   public async listRefs(importId: string): Promise<Array<{ ref: string; oid: string | null }>> {

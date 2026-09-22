@@ -33,18 +33,6 @@ function createPullFakeDb() {
           );
           return Promise.resolve((row ?? null) as T | null);
         }
-        if (q.includes('FROM repositories WHERE lower(owner)')) {
-          const row = state.repos.find(
-            (r) =>
-              String(r.owner).toLowerCase() === String(params[0]).toLowerCase() &&
-              String(r.name).toLowerCase() === String(params[1]).toLowerCase(),
-          );
-          return Promise.resolve((row ?? null) as T | null);
-        }
-        if (q.includes('FROM repositories WHERE owner = ? AND name = ?')) {
-          const row = state.repos.find((r) => r.owner === params[0] && r.name === params[1]);
-          return Promise.resolve((row ?? null) as T | null);
-        }
         if (q.includes('COALESCE(MAX(number)') && q.includes('FROM pull_requests')) {
           const max = state.pulls.filter((p) => p.repository_id === params[0]).reduce((m, p) => Math.max(m, p.number as number), 0);
           return Promise.resolve({ max_n: max } as unknown as T);
@@ -86,7 +74,6 @@ function createPullFakeDb() {
           const [
             id,
             repository_id,
-            full_name,
             number,
             title,
             body,
@@ -99,11 +86,11 @@ function createPullFakeDb() {
             creator_email,
             created_at,
             updated_at,
+            head_repository_id,
           ] = params as Array<string | number | null>;
           state.pulls.push({
             id,
             repository_id,
-            full_name,
             number,
             title,
             body,
@@ -118,6 +105,7 @@ function createPullFakeDb() {
             merged_at: null,
             created_at,
             updated_at,
+            head_repository_id,
           });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }

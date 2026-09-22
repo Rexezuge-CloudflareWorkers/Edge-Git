@@ -141,7 +141,6 @@ class NotificationService {
           id: UUIDUtil.getRandomUUID(),
           userEmail: recipient,
           repositoryId: input.repositoryId,
-          fullName: input.fullName,
           actorEmail: actor,
           type: input.type,
           title: input.title.slice(0, 200),

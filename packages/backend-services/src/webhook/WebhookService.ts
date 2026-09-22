@@ -44,16 +44,7 @@ function toDeliveryStatus(raw: string | null): 'success' | 'failure' | null {
   }
 }
 
-function parseStoredEvents(raw: string): WebhookEventName[] {
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return normalizeEvents(parsed);
-  } catch {
-    return [];
-  }
-}
-
-function toPublic(row: RepoWebhookRow): RepoWebhookMetadata {
+function toPublic(row: RepoWebhookRow, events: WebhookEventName[]): RepoWebhookMetadata {
   return {
     id: row.id,
     repositoryId: row.repository_id,
@@ -61,7 +52,7 @@ function toPublic(row: RepoWebhookRow): RepoWebhookMetadata {
     urlMasked: maskUrl(row.url),
     hasSecret: row.secret.length > 0,
     secretSuffix: row.secret_suffix,
-    events: parseStoredEvents(row.events),
+    events,
     isActive: row.is_active === 1,
     consecutiveFailures: row.consecutive_failures,
     lastDeliveryAt: row.last_delivery_at,
@@ -85,15 +76,14 @@ async function resolveCreator(getUserDAO: () => Promise<UserDAO>, creatorEmail: 
   }
 }
 
-async function resolveEvents(dao: WebhookDAO, hookId: string, fallback: WebhookEventName[]): Promise<WebhookEventName[]> {
-  // Junction-first read with JSON fallback. The `typeof` guard keeps minimal
-  // test fakes (objects without the new method) on the JSON path.
+async function resolveEvents(dao: WebhookDAO, hookId: string): Promise<WebhookEventName[]> {
+  // Events live only in the junction table. The `typeof` guard keeps minimal
+  // test fakes (objects without the new method) on an empty set.
   try {
-    if (typeof dao.listEvents !== 'function') return fallback;
-    const junction = normalizeEvents(await dao.listEvents(hookId));
-    return junction.length > 0 ? junction : fallback;
+    if (typeof dao.listEvents !== 'function') return [];
+    return normalizeEvents(await dao.listEvents(hookId));
   } catch {
-    return fallback;
+    return [];
   }
 }
 
@@ -120,14 +110,14 @@ class WebhookService {
     };
   }
 
-  public static toPublic(row: RepoWebhookRow): RepoWebhookMetadata {
-    return toPublic(row);
+  public static toPublic(row: RepoWebhookRow, events: WebhookEventName[]): RepoWebhookMetadata {
+    return toPublic(row, events);
   }
 
   private async toPublicResolved(row: RepoWebhookRow): Promise<RepoWebhookMetadata> {
-    const base = toPublic(row);
+    const events = await resolveEvents(await this.deps.webhookDAO(), row.id);
+    const base = toPublic(row, events);
     base.creator = await resolveCreator(this.deps.userDAO, row.creator_email);
-    base.events = await resolveEvents(await this.deps.webhookDAO(), row.id, base.events);
     return base;
   }
 
@@ -177,12 +167,11 @@ class WebhookService {
     await dao.create({
       id,
       repositoryId: input.repositoryId,
-      fullName: input.fullName,
       url,
       urlPrefix: url.slice(0, 30),
       secret,
       secretSuffix: secretSuffix(secret),
-      eventsJson: JSON.stringify(events),
+      events,
       creatorEmail: input.creatorEmail.toLowerCase(),
       now,
     });
@@ -225,10 +214,10 @@ class WebhookService {
       }
       urlPrefix = url.slice(0, 30);
     }
-    let eventsJson: string | undefined;
+    let events: WebhookEventName[] | undefined;
     if (patch.events !== undefined) {
       try {
-        eventsJson = JSON.stringify(normalizeEvents(patch.events));
+        events = normalizeEvents(patch.events);
       } catch (error) {
         throw new BadRequestError(error instanceof Error ? error.message : 'Invalid webhook events.');
       }
@@ -237,7 +226,7 @@ class WebhookService {
       throw new BadRequestError('isActive must be a boolean');
     }
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
-    await dao.update(hookId, repositoryId, { url, urlPrefix, eventsJson, isActive: patch.isActive, now });
+    await dao.update(hookId, repositoryId, { url, urlPrefix, events, isActive: patch.isActive, now });
     const updated = await dao.getByIdAndRepo(hookId, repositoryId);
     if (!updated) throw new NotFoundError('Webhook not found.');
     return this.toPublicResolved(updated);

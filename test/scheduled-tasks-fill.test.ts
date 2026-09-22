@@ -86,13 +86,13 @@ function createFakeDb(tables: FakeTables): D1Queryable {
     const q = query.replace(/\s+/g, ' ').trim();
     return {
       first<T>(): Promise<T | null> {
-        if (q.startsWith('SELECT * FROM repositories WHERE id = ?')) {
+        if (q.includes('FROM repositories WHERE id = ?')) {
           return Promise.resolve((tables.repos.find((r) => r.id === params[0]) ?? null) as T | null);
         }
-        if (q.startsWith('SELECT * FROM repo_imports WHERE id = ?')) {
+        if (q.includes('FROM repo_imports WHERE id = ?')) {
           return Promise.resolve((tables.imports.find((i) => i.id === params[0]) ?? null) as T | null);
         }
-        if (q.startsWith('SELECT * FROM repo_mirrors WHERE repository_id = ?')) {
+        if (q.includes('FROM repo_mirrors WHERE repository_id = ?')) {
           return Promise.resolve((tables.mirrors.find((m) => m.repository_id === params[0]) ?? null) as T | null);
         }
         if (q.startsWith('SELECT * FROM check_runs WHERE id = ? AND repository_id = ?')) {
@@ -110,7 +110,7 @@ function createFakeDb(tables: FakeTables): D1Queryable {
         return Promise.resolve(null);
       },
       all<T>(): Promise<{ results: T[] }> {
-        if (q.startsWith('SELECT * FROM repositories ORDER BY updated_at DESC')) {
+        if (q.includes('FROM repositories ORDER BY updated_at DESC')) {
           const limit = params[0] as number;
           const offset = (params[1] as number) ?? 0;
           const rows = [...tables.repos].sort((a, b) => (b.updated_at as number) - (a.updated_at as number)).slice(offset, offset + limit);
@@ -220,11 +220,10 @@ function createFakeDb(tables: FakeTables): D1Queryable {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith("UPDATE repo_imports SET status = 'done'")) {
-          const [refsJson, importedRefs, now, id] = params as [string, number, number, string];
+          const [importedRefs, now, id] = params as [number, number, string];
           const row = tables.imports.find((i) => i.id === id && ['pending', 'running'].includes(i.status as string));
           if (row) {
             row.status = 'done';
-            row.refs_json = refsJson;
             row.imported_refs = importedRefs;
             row.updated_at = now;
           }

@@ -19,7 +19,9 @@ interface FakeState {
   namespaces: Row[];
   repositories: Row[];
   repo_imports: Row[];
+  repo_import_refs: Row[];
   repo_webhooks: Row[];
+  webhook_events: Row[];
   webhook_deliveries: Row[];
 }
 
@@ -36,7 +38,9 @@ function emptyState(): FakeState {
     namespaces: [],
     repositories: [],
     repo_imports: [],
+    repo_import_refs: [],
     repo_webhooks: [],
+    webhook_events: [],
     webhook_deliveries: [],
   };
 }
@@ -177,14 +181,6 @@ function createFakeDb(seed?: Partial<FakeState>): FakeDb {
           const rows = state.team_repo_grants.filter((g) => g.team_id === params[0]).slice(0, params[1] as number);
           return Promise.resolve({ results: rows as T[] });
         }
-        if (q.includes('FROM repositories WHERE lower(owner) = ? ORDER BY')) {
-          const rows = state.repositories.filter((r) => lower(r.owner) === lower(params[0])).slice(0, params[1] as number);
-          return Promise.resolve({ results: rows as T[] });
-        }
-        if (q.includes('FROM repositories WHERE owner = ? ORDER BY')) {
-          const rows = state.repositories.filter((r) => r.owner === params[0]).slice(0, params[1] as number);
-          return Promise.resolve({ results: rows as T[] });
-        }
         if (q.includes('FROM repo_webhooks WHERE repository_id = ? ORDER BY')) {
           const rows = state.repo_webhooks.filter((h) => h.repository_id === params[0]);
           return Promise.resolve({ results: rows as T[] });
@@ -210,8 +206,18 @@ function createFakeDb(seed?: Partial<FakeState>): FakeDb {
         }
         if (q.includes('FROM repo_imports WHERE')) {
           const rows = state.repo_imports
-            .filter((r) => r.repository_id === params[1] || r.status === 'pending')
+            .filter((r) => r.repository_id === params[0] || r.repository_id === params[1] || r.status === 'pending')
             .slice(0, params.at(-1) as number);
+          return Promise.resolve({ results: rows as T[] });
+        }
+        if (q.includes('SELECT event FROM webhook_events WHERE hook_id = ?')) {
+          const rows = state.webhook_events.filter((e) => e.hook_id === params[0]).map((e) => ({ event: e.event }));
+          return Promise.resolve({ results: rows as T[] });
+        }
+        if (q.includes('SELECT ref_name, oid FROM repo_import_refs WHERE import_id = ?')) {
+          const rows = state.repo_import_refs
+            .filter((r) => r.import_id === params[0])
+            .map((r) => ({ ref_name: r.ref_name, oid: r.oid }));
           return Promise.resolve({ results: rows as T[] });
         }
         return Promise.resolve({ results: [] });
@@ -383,12 +389,22 @@ function createFakeDb(seed?: Partial<FakeState>): FakeDb {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.includes("UPDATE repo_imports SET status = 'done'")) {
-          const row = state.repo_imports.find((r) => r.id === params[3]);
+          const row = state.repo_imports.find((r) => r.id === params[2]);
           if (row) {
             row.status = 'done';
-            row.refs_json = params[0];
-            row.imported_refs = params[1];
-            row.updated_at = params[2];
+            row.imported_refs = params[0];
+            row.updated_at = params[1];
+          }
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('DELETE FROM repo_import_refs WHERE import_id = ?')) {
+          removeInPlace(state.repo_import_refs, (r) => r.import_id === params[0]);
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('INSERT OR IGNORE INTO repo_import_refs')) {
+          const [import_id, ref_name, oid] = params as [string, string, string | null];
+          if (!state.repo_import_refs.some((r) => r.import_id === import_id && r.ref_name === ref_name)) {
+            state.repo_import_refs.push({ import_id, ref_name, oid });
           }
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
@@ -571,6 +587,18 @@ function seedHook(db: FakeDb, patch: Partial<Row> = {}): Row {
     ...patch,
   };
   db.repo_webhooks.push(hook);
+  // Mirror the junction table: the service reads only `webhook_events`, so
+  // derive rows from the seeded JSON (invalid payloads yield none).
+  try {
+    const parsed: unknown = JSON.parse(hook.events as string);
+    if (Array.isArray(parsed)) {
+      for (const event of parsed) {
+        if (typeof event === 'string' && event.length > 0) db.webhook_events.push({ hook_id: hook.id, event });
+      }
+    }
+  } catch {
+    // Invalid seed payload → no subscriptions (fail closed, mirrors the DAO).
+  }
   return hook;
 }
 
@@ -758,7 +786,7 @@ describe('ImportService', () => {
     ).toEqual({ maxRefs: 5, maxPackBytes: 7, timeoutMs: 20_000, staleSeconds: 9 });
   });
 
-  it('validates import statuses and maps metadata refs', () => {
+  it('validates import statuses and resolves refs from the junction table', async () => {
     const db = createFakeDb();
     const svc = new ImportService({ DB: db });
     expect(svc.importStatus('pending')).toBe('pending');
@@ -769,15 +797,16 @@ describe('ImportService', () => {
       source_url: source,
       status: 'done',
       error: null,
-      refs_json: null,
       imported_refs: 0,
       created_by: 'a@x.co',
       created_at: 1,
       updated_at: 1,
     };
-    expect(ImportService.toMetadata({ ...base, refs_json: 'not-json' }).refs).toBeNull();
-    expect(ImportService.toMetadata({ ...base, refs_json: '[{"x":1}]' }).refs).toEqual([{ x: 1 }]);
-    expect(ImportService.toMetadata({ ...base, refs_json: '{"a":1}' }).refs).toBeNull();
+    // Static metadata carries no refs (junction-only since 0024).
+    expect(ImportService.toMetadata({ ...base }).refs).toBeNull();
+    db.repo_imports.push({ ...base });
+    db.repo_import_refs.push({ import_id: 'j1', ref_name: 'refs/heads/main', oid: 'abc' });
+    await expect(svc.latestForRepo('r1')).resolves.toMatchObject({ refs: [{ ref: 'refs/heads/main', oid: 'abc' }] });
   });
 });
 

@@ -13,6 +13,7 @@ import { rateLimit, resetRateLimitForTests, SECURITY_HEADERS } from '@/middlewar
 
 function createTokenFakeDb() {
   const tokens: Array<Record<string, unknown>> = [];
+  const tokenScopes: Array<{ token_id: string; scope: string }> = [];
   const repos: Array<Record<string, unknown>> = [
     { id: 'r1', owner: 'alice', name: 'repo', owner_email: 'alice@example.com', is_private: 0 },
   ];
@@ -24,16 +25,12 @@ function createTokenFakeDb() {
           const row = tokens.find((t) => t.token_hash === params[0] && (t.expires_at as number) > (params[1] as number));
           return Promise.resolve((row ?? null) as T | null);
         }
-        if (q.includes('FROM repositories WHERE lower(owner)')) {
+        if (q.includes('FROM repositories WHERE owner_ci = ? AND name_ci = ?')) {
           const row = repos.find(
             (r) =>
-              String(r.owner).toLowerCase() === String(params[0]).toLowerCase() &&
-              String(r.name).toLowerCase() === String(params[1]).toLowerCase(),
+              String(r.owner_ci ?? r.owner).toLowerCase() === String(params[0]).toLowerCase() &&
+              String(r.name_ci ?? r.name).toLowerCase() === String(params[1]).toLowerCase(),
           );
-          return Promise.resolve((row ?? null) as T | null);
-        }
-        if (q.includes('FROM repositories WHERE owner = ? AND name = ?')) {
-          const row = repos.find((r) => r.owner === params[0] && r.name === params[1]);
           return Promise.resolve((row ?? null) as T | null);
         }
         return Promise.resolve(null);
@@ -44,11 +41,15 @@ function createTokenFakeDb() {
             results: tokens.filter((t) => String(t.user_email).toLowerCase() === String(params[0]).toLowerCase()) as T[],
           });
         }
+        if (q.startsWith('SELECT scope FROM token_scopes WHERE token_id = ?')) {
+          const rows = tokenScopes.filter((s) => s.token_id === params[0]).map((s) => ({ scope: s.scope }));
+          return Promise.resolve({ results: rows as T[] });
+        }
         return Promise.resolve({ results: [] });
       },
       run(): Promise<{ success: boolean; meta?: { changes?: number } }> {
         if (q.startsWith('INSERT INTO user_access_tokens')) {
-          const [token_id, user_email, token_hash, tname, expires_at, created_at, scopes] = params as Array<string | number>;
+          const [token_id, user_email, token_hash, tname, expires_at, created_at, token_prefix] = params as Array<string | number>;
           tokens.push({
             token_id,
             user_email,
@@ -57,8 +58,19 @@ function createTokenFakeDb() {
             expires_at,
             last_used_at: null,
             created_at,
-            scopes: typeof scopes === 'string' ? scopes : null,
+            token_prefix: typeof token_prefix === 'string' ? token_prefix : null,
           });
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('DELETE FROM token_scopes WHERE token_id = ?')) {
+          for (let i = tokenScopes.length - 1; i >= 0; i -= 1) {
+            if (tokenScopes[i].token_id === params[0]) tokenScopes.splice(i, 1);
+          }
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('INSERT OR IGNORE INTO token_scopes')) {
+          const [token_id, scope] = params as [string, string];
+          if (!tokenScopes.some((s) => s.token_id === token_id && s.scope === scope)) tokenScopes.push({ token_id, scope });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE user_access_tokens SET last_used_at')) {
@@ -91,8 +103,8 @@ function createIssueFakeDb() {
       },
       run(): Promise<{ success: boolean }> {
         if (q.startsWith('INSERT INTO issues')) {
-          const [id, repository_id, full_name, number, title, body] = params as Array<string | number | null>;
-          issues.push({ id, repository_id, full_name, number, title, body });
+          const [id, repository_id, number, title, body] = params as Array<string | number | null>;
+          issues.push({ id, repository_id, number, title, body });
           return Promise.resolve({ success: true });
         }
         return Promise.resolve({ success: true });

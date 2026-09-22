@@ -103,7 +103,6 @@ class PullRequestService {
         await dao.create({
           id,
           repositoryId: input.repositoryId,
-          fullName: input.fullName,
           number,
           title,
           body: input.body ?? null,
@@ -115,7 +114,6 @@ class PullRequestService {
           creatorEmail: input.creatorEmail,
           now,
           headRepositoryId,
-          headFullName,
         });
         if (input.isDraft === true) {
           await dao.setDraft(id, true, now).catch(() => undefined);

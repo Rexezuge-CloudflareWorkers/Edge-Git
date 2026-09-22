@@ -96,8 +96,7 @@ async function sha256Hex(text: string): Promise<string> {
  * users that cannot use `POST /user/tokens`, which always acts as DEV).
  * Returns the raw token for `Authorization: Bearer` / Basic use.
  * Scopes default to full access; pass explicit subsets to test scope gates.
- * Fail-closed note: rows with NULL/invalid scopes now deny (see
- * `parseTokenScopes`), so this helper always serializes explicit scopes.
+ * Scopes live only in `token_scopes` (0024 dropped the JSON column).
  */
 export async function mintPatForEmail(
   db: D1Database,
@@ -114,10 +113,13 @@ export async function mintPatForEmail(
   const scopes = input.scopes ?? ['repo:read', 'repo:write', 'admin'];
   await db
     .prepare(
-      `INSERT INTO user_access_tokens (token_id, user_email, token_hash, name, expires_at, last_used_at, created_at, scopes, token_prefix) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
+      `INSERT INTO user_access_tokens (token_id, user_email, token_hash, name, expires_at, last_used_at, created_at, token_prefix) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)`,
     )
-    .bind(tokenId, normalized, tokenHash, input.name ?? 'test-token', expiresAt, now, JSON.stringify(scopes), raw.slice(0, 12))
+    .bind(tokenId, normalized, tokenHash, input.name ?? 'test-token', expiresAt, now, raw.slice(0, 12))
     .run();
+  for (const scope of scopes) {
+    await db.prepare(`INSERT OR IGNORE INTO token_scopes (token_id, scope, created_at) VALUES (?, ?, ?)`).bind(tokenId, scope, now).run();
+  }
   return { tokenId, token: raw };
 }
 

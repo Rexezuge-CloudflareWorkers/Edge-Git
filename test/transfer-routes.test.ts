@@ -41,6 +41,7 @@ function createTransferFakeDb() {
       },
     ] as Array<Record<string, unknown>>,
     tokens: [] as Array<Record<string, unknown>>,
+    tokenScopes: [] as Array<{ token_id: string; scope: string }>,
     grants: [] as Array<Record<string, unknown>>,
     imports: [] as Array<Record<string, unknown>>,
     mirrors: [] as Array<Record<string, unknown>>,
@@ -66,15 +67,6 @@ function createTransferFakeDb() {
               (r) =>
                 String(r.owner_ci ?? r.owner).toLowerCase() === String(params[0]).toLowerCase() &&
                 String(r.name_ci ?? r.name).toLowerCase() === String(params[1]).toLowerCase(),
-            ) ?? null) as T | null,
-          );
-        }
-        if (q.includes('FROM repositories WHERE lower(owner) = ? AND lower(name) = ?')) {
-          return Promise.resolve(
-            (state.repos.find(
-              (r) =>
-                String(r.owner).toLowerCase() === String(params[0]).toLowerCase() &&
-                String(r.name).toLowerCase() === String(params[1]).toLowerCase(),
             ) ?? null) as T | null,
           );
         }
@@ -126,6 +118,10 @@ function createTransferFakeDb() {
             results: state.tokens.filter((t) => String(t.user_email).toLowerCase() === String(params[0]).toLowerCase()) as T[],
           });
         }
+        if (q.includes('SELECT scope FROM token_scopes WHERE token_id = ?')) {
+          const rows = state.tokenScopes.filter((s) => s.token_id === params[0]).map((s) => ({ scope: s.scope }));
+          return Promise.resolve({ results: rows as T[] });
+        }
         if (q.includes('FROM token_repo_grants WHERE token_id = ?')) {
           return Promise.resolve({ results: state.grants.filter((g) => g.token_id === params[0]) as T[] });
         }
@@ -135,6 +131,11 @@ function createTransferFakeDb() {
         if (q.includes('FROM repositories WHERE') && q.includes('owner_email')) {
           return Promise.resolve({
             results: state.repos.filter((r) => String(r.owner_email).toLowerCase() === String(params[0]).toLowerCase()) as T[],
+          });
+        }
+        if (q.includes('FROM repositories WHERE owner_ci = ?')) {
+          return Promise.resolve({
+            results: state.repos.filter((r) => String(r.owner_ci ?? r.owner).toLowerCase() === String(params[0]).toLowerCase()) as T[],
           });
         }
         if (q.includes('FROM repositories WHERE lower(owner) = ?')) {
@@ -155,7 +156,7 @@ function createTransferFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO user_access_tokens')) {
-          const [token_id, user_email, token_hash, name, expires_at, created_at, scopes, token_prefix] = params as Array<
+          const [token_id, user_email, token_hash, name, expires_at, created_at, token_prefix] = params as Array<
             string | number | null
           >;
           state.tokens.push({
@@ -166,9 +167,17 @@ function createTransferFakeDb() {
             expires_at,
             last_used_at: null,
             created_at,
-            scopes: typeof scopes === 'string' ? scopes : null,
             token_prefix: (token_prefix as string | null) ?? null,
           });
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('DELETE FROM token_scopes WHERE token_id = ?')) {
+          state.tokenScopes = state.tokenScopes.filter((s) => s.token_id !== params[0]);
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('INSERT OR IGNORE INTO token_scopes')) {
+          const [token_id, scope] = params as [string, string];
+          if (!state.tokenScopes.some((s) => s.token_id === token_id && s.scope === scope)) state.tokenScopes.push({ token_id, scope });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE user_access_tokens SET token_hash')) {

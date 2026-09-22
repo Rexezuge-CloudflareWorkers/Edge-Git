@@ -3,97 +3,27 @@ import { OrganizationService } from '@edge-git/backend-services/org';
 import { cascadeOwnerRepos } from '@edge-git/backend-services/repo';
 import { UserService } from '@edge-git/backend-services/user';
 
-function sidecarSpy() {
-  const calls: Array<{ repoId: string; fullName: string }> = [];
-  return {
-    calls,
-    dao: async () =>
-      ({
-        updateFullNameByRepo: async (repoId: string, fullName: string) => {
-          calls.push({ repoId, fullName });
-        },
-      }) as never,
-  };
-}
-
-function pullSpy() {
-  const base: Array<{ repoId: string; fullName: string }> = [];
-  const head: Array<{ repoId: string; fullName: string }> = [];
-  return {
-    base,
-    head,
-    dao: async () =>
-      ({
-        updateFullNameByRepo: async (repoId: string, fullName: string) => {
-          base.push({ repoId, fullName });
-        },
-        updateHeadFullNameByHeadRepo: async (repoId: string, fullName: string) => {
-          head.push({ repoId, fullName });
-        },
-      }) as never,
-  };
-}
-
 describe('cascadeOwnerRepos', () => {
-  it('renames the owner and refreshes denormalized full names', async () => {
-    const renamed: Array<{ oldCi: string; next: string }> = [];
-    const forkSources: Array<{ id: string; fullName: string }> = [];
-    const issues = sidecarSpy();
-    const pulls = pullSpy();
-    const events = sidecarSpy();
-    const notifications = sidecarSpy();
-    const webhooks = sidecarSpy();
-    const moves = await cascadeOwnerRepos(
+  it('renames the owner with a single repositories UPDATE and no sidecars', async () => {
+    const renamed: Array<{ oldCi: string; next: string; now: number }> = [];
+    await cascadeOwnerRepos(
       {
         repositoryDAO: async () =>
           ({
-            listByOwner: async () => [{ id: 'r1', name: 'demo' }],
-            renameOwner: async (oldCi: string, next: string) => {
-              renamed.push({ oldCi, next });
-            },
-            updateForkSourceFullName: async (id: string, fullName: string) => {
-              forkSources.push({ id, fullName });
-            },
-          }) as never,
-        issueDAO: issues.dao,
-        pullRequestDAO: pulls.dao,
-        eventDAO: events.dao,
-        notificationDAO: notifications.dao,
-        webhookDAO: webhooks.dao,
-      },
-      { oldOwnerCi: 'alice', newOwner: 'alice-new', now: 42 },
-    );
-    expect(renamed).toEqual([{ oldCi: 'alice', next: 'alice-new' }]);
-    expect(moves).toEqual([{ id: 'r1', name: 'demo', oldFull: 'alice/demo', newFull: 'alice-new/demo' }]);
-    for (const spy of [issues, events, notifications, webhooks]) {
-      expect(spy.calls).toEqual([{ repoId: 'r1', fullName: 'alice-new/demo' }]);
-    }
-    expect(pulls.base).toEqual([{ repoId: 'r1', fullName: 'alice-new/demo' }]);
-    expect(pulls.head).toEqual([{ repoId: 'r1', fullName: 'alice-new/demo' }]);
-    expect(forkSources).toEqual([{ id: 'r1', fullName: 'alice-new/demo' }]);
-  });
-
-  it('tolerates fakes without snapshot or sidecar support', async () => {
-    const renamed: Array<{ oldCi: string; next: string }> = [];
-    const moves = await cascadeOwnerRepos(
-      {
-        repositoryDAO: async () =>
-          ({
-            renameOwner: async (oldCi: string, next: string) => {
-              renamed.push({ oldCi, next });
+            renameOwner: async (oldCi: string, next: string, now?: number) => {
+              renamed.push({ oldCi, next, now: now ?? 0 });
             },
           }) as never,
       },
       { oldOwnerCi: 'alice', newOwner: 'alice-new', now: 42 },
     );
-    expect(renamed).toEqual([{ oldCi: 'alice', next: 'alice-new' }]);
-    expect(moves).toEqual([]);
+    expect(renamed).toEqual([{ oldCi: 'alice', next: 'alice-new', now: 42 }]);
   });
 });
 
-describe('rename services refresh sidecars', () => {
-  it('UserService.renameUsername cascades issue full names', async () => {
-    const issues = sidecarSpy();
+describe('rename services cascade the owner only', () => {
+  it('UserService.renameUsername renames the owner without issue sidecars', async () => {
+    const renamed: Array<{ oldCi: string; next: string }> = [];
     const svc = new UserService({ DB: {} } as never, {
       userDAO: async () =>
         ({
@@ -111,17 +41,16 @@ describe('rename services refresh sidecars', () => {
       repositoryDAO: async () =>
         ({
           listByOwner: async () => [{ id: 'r1', name: 'demo' }],
-          renameOwner: async () => undefined,
-          updateForkSourceFullName: async () => undefined,
+          renameOwner: async (oldCi: string, next: string) => {
+            renamed.push({ oldCi, next });
+          },
         }) as never,
-      issueDAO: issues.dao,
     });
     await svc.renameUsername('a@x.co', 'newhandle');
-    expect(issues.calls).toEqual([{ repoId: 'r1', fullName: 'newhandle/demo' }]);
+    expect(renamed).toEqual([{ oldCi: 'old', next: 'newhandle' }]);
   });
 
-  it('OrganizationService.rename covers org_id rows missing an owner match', async () => {
-    const issues = sidecarSpy();
+  it('OrganizationService.rename renames the owner without issue sidecars', async () => {
     const renamed: Array<{ oldCi: string; next: string }> = [];
     const svc = new OrganizationService({ DB: {} } as never, {
       organizationDAO: async () =>
@@ -140,17 +69,12 @@ describe('rename services refresh sidecars', () => {
       userDAO: async () => ({ getByUsernameCi: async () => null }) as never,
       repositoryDAO: async () =>
         ({
-          listByOrgId: async () => [{ id: 'r9', name: 'api' }],
-          listByOwner: async () => [],
           renameOwner: async (oldCi: string, next: string) => {
             renamed.push({ oldCi, next });
           },
-          updateForkSourceFullName: async () => undefined,
         }) as never,
-      issueDAO: issues.dao,
     });
     await svc.rename('acme', 'owner@x.co', 'acme-new');
     expect(renamed).toEqual([{ oldCi: 'acme', next: 'acme-new' }]);
-    expect(issues.calls).toEqual([{ repoId: 'r9', fullName: 'acme-new/api' }]);
   });
 });

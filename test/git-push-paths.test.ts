@@ -55,9 +55,9 @@ function pushFakeDb(tokenHash: string, opts: PushFakeOptions = {}) {
     expires_at: now + 9999,
     last_used_at: null,
     created_at: 1,
-    scopes: '["repo:read","repo:write"]',
     token_prefix: 'slice5',
   };
+  const tokenScopes = [{ scope: 'repo:read' }, { scope: 'repo:write' }];
   return {
     prepare(query: string) {
       const q = query.replace(/\s+/g, ' ').trim();
@@ -75,6 +75,10 @@ function pushFakeDb(tokenHash: string, opts: PushFakeOptions = {}) {
             },
             async all<T>() {
               if (q.includes('FROM token_repo_grants WHERE')) return { results: [] };
+              if (q.includes('SELECT scope FROM token_scopes WHERE')) return { results: tokenScopes as T[] };
+              if (q.includes('SELECT context FROM branch_protection_required_checks WHERE')) {
+                return { results: contextsForRules(opts.rules ?? []) as T[] };
+              }
               if (q.includes('FROM branch_protection_rules WHERE')) {
                 if (opts.protectionsThrow) throw new Error('D1 outage');
                 return { results: opts.rules ?? [] };
@@ -89,6 +93,25 @@ function pushFakeDb(tokenHash: string, opts: PushFakeOptions = {}) {
       };
     },
   } as unknown as D1Queryable;
+}
+
+// Serve junction rows from legacy JSON-seeded rule fixtures: the DAO reads
+// only the junction table, so fakes derive contexts from the seed payload.
+function contextsForRules(rules: Array<Record<string, unknown>>): Array<{ context: string }> {
+  const out: Array<{ context: string }> = [];
+  for (const rule of rules) {
+    try {
+      const parsed: unknown = JSON.parse(rule.require_status_checks as string);
+      if (Array.isArray(parsed)) {
+        for (const context of parsed) {
+          if (typeof context === 'string' && context.length > 0) out.push({ context });
+        }
+      }
+    } catch {
+      // Invalid seed payload → no contexts (fail closed, mirrors the DAO).
+    }
+  }
+  return out;
 }
 
 function pushEnv(db: D1Queryable, received: Array<{ protections: unknown }>) {
@@ -209,6 +232,9 @@ describe('slice5: triggerRequiredChecks', () => {
                 return null;
               },
               async all<T>() {
+                if (q.includes('SELECT context FROM branch_protection_required_checks WHERE')) {
+                  return { results: contextsForRules(rules) };
+                }
                 if (q.includes('FROM branch_protection_rules WHERE')) return { results: rules };
                 return { results: [] as T[] };
               },

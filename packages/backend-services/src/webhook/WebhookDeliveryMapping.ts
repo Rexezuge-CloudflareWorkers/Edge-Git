@@ -1,13 +1,13 @@
-import type { RepoWebhookRow, WebhookDeliveryRow } from '@edge-git/backend-data/dao';
-import type { WebhookDeliveryMetadata, WebhookEventName } from '@edge-git/shared';
+import type { WebhookDeliveryRow } from '@edge-git/backend-data/dao';
+import type { WebhookDeliveryMetadata } from '@edge-git/shared';
 
 /**
  * Pure delivery mapping policy for webhooks (Layer 3).
  *
- * Extracted from `WebhookDeliveryService` so row mapping and hook matching
- * are unit-testable without D1. The service remains the orchestration
- * facade (enqueue/claim/settle); this module owns the pure row/JSON rules,
- * mirroring the `WebhookRetryPolicy` split.
+ * Extracted from `WebhookDeliveryService` so row mapping stays unit-testable
+ * without D1. The service remains the orchestration facade
+ * (enqueue/claim/settle); subscription matching reads the `webhook_events`
+ * junction via the DAO, mirroring the `WebhookRetryPolicy` split.
  */
 
 function toPublicDelivery(row: WebhookDeliveryRow): WebhookDeliveryMetadata {
@@ -27,23 +27,8 @@ function toPublicDelivery(row: WebhookDeliveryRow): WebhookDeliveryMetadata {
   };
 }
 
-function isHookSubscribed(hook: RepoWebhookRow, event: WebhookEventName): boolean {
-  if (hook.is_active !== 1) return false;
-  return subscribedEvents(hook).includes(event);
+function resolveSenderUsername(actorUsername?: string): string {
+  return actorUsername ?? 'ghost';
 }
 
-function subscribedEvents(hook: RepoWebhookRow): WebhookEventName[] {
-  try {
-    const events: unknown = JSON.parse(hook.events);
-    if (!Array.isArray(events)) return [];
-    return events.filter((e): e is WebhookEventName => typeof e === 'string');
-  } catch {
-    return [];
-  }
-}
-
-function resolveSenderUsername(actorUsername?: string, actorEmail?: string): string {
-  return actorUsername ?? actorEmail?.toLowerCase() ?? 'ghost';
-}
-
-export { isHookSubscribed, resolveSenderUsername, subscribedEvents, toPublicDelivery };
+export { resolveSenderUsername, toPublicDelivery };

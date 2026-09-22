@@ -16,6 +16,7 @@ import { DatabaseError } from '@edge-git/backend-errors';
 function createFakeDb(seed: { now?: number } = {}): D1Queryable & {
   repos: Array<Record<string, unknown>>;
   tokens: Array<Record<string, unknown>>;
+  tokenScopes: Array<{ token_id: string; scope: string }>;
   issues: Array<Record<string, unknown>>;
   users: Array<Record<string, unknown>>;
   comments: Array<Record<string, unknown>>;
@@ -24,6 +25,7 @@ function createFakeDb(seed: { now?: number } = {}): D1Queryable & {
   const state = {
     repos: [] as Array<Record<string, unknown>>,
     tokens: [] as Array<Record<string, unknown>>,
+    tokenScopes: [] as Array<{ token_id: string; scope: string }>,
     issues: [] as Array<Record<string, unknown>>,
     users: [] as Array<Record<string, unknown>>,
     comments: [] as Array<Record<string, unknown>>,
@@ -34,7 +36,7 @@ function createFakeDb(seed: { now?: number } = {}): D1Queryable & {
     const q = query.replace(/\s+/g, ' ').trim();
     return {
       first<T>(): Promise<T | null> {
-        if (q.startsWith('SELECT * FROM repositories WHERE owner_ci = ? AND name_ci = ?')) {
+        if (q.includes('FROM repositories WHERE owner_ci = ? AND name_ci = ?')) {
           const row = state.repos.find(
             (r) =>
               String(r.owner_ci ?? r.owner).toLowerCase() === String(params[0]).toLowerCase() &&
@@ -42,11 +44,7 @@ function createFakeDb(seed: { now?: number } = {}): D1Queryable & {
           );
           return Promise.resolve((row ?? null) as T | null);
         }
-        if (q.startsWith('SELECT * FROM repositories WHERE owner = ? AND name = ?')) {
-          const row = state.repos.find((r) => r.owner === params[0] && r.name === params[1]);
-          return Promise.resolve((row ?? null) as T | null);
-        }
-        if (q.startsWith('SELECT * FROM repositories WHERE id = ?')) {
+        if (q.includes('FROM repositories WHERE id = ?')) {
           const row = state.repos.find((r) => r.id === params[0]);
           return Promise.resolve((row ?? null) as T | null);
         }
@@ -62,32 +60,32 @@ function createFakeDb(seed: { now?: number } = {}): D1Queryable & {
           const row = state.users.find((u) => String(u.email).toLowerCase() === String(params[0]).toLowerCase());
           return Promise.resolve((row ?? null) as T | null);
         }
-        if (q.startsWith('SELECT * FROM issues WHERE repository_id = ? AND number = ?')) {
+        if (q.includes('FROM issues WHERE repository_id = ? AND number = ?')) {
           const row = state.issues.find((i) => i.repository_id === params[0] && i.number === params[1]);
           return Promise.resolve((row ?? null) as T | null);
         }
         return Promise.resolve(null);
       },
       all<T>(): Promise<{ results: T[] }> {
-        if (q.startsWith('SELECT * FROM repositories WHERE owner_email = ?') || q.includes('FROM repositories WHERE lower(owner_email)')) {
+        if (q.includes('FROM repositories WHERE owner_email = ?') || q.includes('FROM repositories WHERE lower(owner_email)')) {
           const rows = state.repos
             .filter((r) => String(r.owner_email).toLowerCase() === String(params[0]).toLowerCase())
             .slice(0, params[1] as number);
           return Promise.resolve({ results: rows as T[] });
         }
-        if (q.startsWith('SELECT * FROM repositories WHERE owner_ci = ?')) {
+        if (q.includes('FROM repositories WHERE owner_ci = ?')) {
           const rows = state.repos.filter((r) => String(r.owner_ci ?? r.owner).toLowerCase() === String(params[0]).toLowerCase());
-          return Promise.resolve({ results: rows as T[] });
-        }
-        if (q.startsWith('SELECT * FROM repositories WHERE owner = ?')) {
-          const rows = state.repos.filter((r) => r.owner === params[0]);
           return Promise.resolve({ results: rows as T[] });
         }
         if (q.startsWith('SELECT * FROM user_access_tokens WHERE') && q.includes('user_email')) {
           const rows = state.tokens.filter((t) => String(t.user_email).toLowerCase() === String(params[0]).toLowerCase());
           return Promise.resolve({ results: rows as T[] });
         }
-        if (q.startsWith('SELECT * FROM issues WHERE repository_id = ?')) {
+        if (q.startsWith('SELECT scope FROM token_scopes WHERE token_id = ?')) {
+          const rows = state.tokenScopes.filter((s) => s.token_id === params[0]).map((s) => ({ scope: s.scope }));
+          return Promise.resolve({ results: rows as T[] });
+        }
+        if (q.includes('FROM issues WHERE repository_id = ?')) {
           const rows = state.issues
             .filter((i) => i.repository_id === params[0])
             .sort((a, b) => (b.number as number) - (a.number as number))
@@ -109,7 +107,7 @@ function createFakeDb(seed: { now?: number } = {}): D1Queryable & {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO user_access_tokens')) {
-          const [token_id, user_email, token_hash, tname, expires_at, created_at, scopes] = params as Array<string | number>;
+          const [token_id, user_email, token_hash, tname, expires_at, created_at, token_prefix] = params as Array<string | number>;
           state.tokens.push({
             token_id,
             user_email,
@@ -118,8 +116,17 @@ function createFakeDb(seed: { now?: number } = {}): D1Queryable & {
             expires_at,
             last_used_at: null,
             created_at,
-            scopes: typeof scopes === 'string' ? scopes : null,
+            token_prefix: typeof token_prefix === 'string' ? token_prefix : null,
           });
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('DELETE FROM token_scopes WHERE token_id = ?')) {
+          state.tokenScopes = state.tokenScopes.filter((s) => s.token_id !== params[0]);
+          return Promise.resolve({ success: true, meta: { changes: 1 } });
+        }
+        if (q.startsWith('INSERT OR IGNORE INTO token_scopes')) {
+          const [token_id, scope] = params as [string, string];
+          if (!state.tokenScopes.some((s) => s.token_id === token_id && s.scope === scope)) state.tokenScopes.push({ token_id, scope });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE user_access_tokens SET last_used_at')) {
@@ -135,10 +142,10 @@ function createFakeDb(seed: { now?: number } = {}): D1Queryable & {
           return Promise.resolve({ success: true, meta: { changes: before - state.tokens.length } });
         }
         if (q.startsWith('INSERT INTO issues')) {
-          const [id, repository_id, full_name, number, title, body, status, creator_email, created_at, updated_at] = params as Array<
+          const [id, repository_id, number, title, body, status, creator_email, created_at, updated_at] = params as Array<
             string | number | null
           >;
-          state.issues.push({ id, repository_id, full_name, number, title, body, status, creator_email, created_at, updated_at });
+          state.issues.push({ id, repository_id, number, title, body, status, creator_email, created_at, updated_at });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE issues SET status = ?')) {
