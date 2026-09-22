@@ -3,7 +3,8 @@
     "dashboard": "ダッシュボード",
     "new": "新規",
     "settings": "設定",
-    "snippets": "スニペット"
+    "snippets": "スニペット",
+    "home": "Edge-Git ホーム"
   },
   "common": {
     "cancel": "キャンセル",
@@ -12,6 +13,7 @@
     "copyToClipboard": "クリップボードにコピー",
     "create": "作成",
     "delete": "削除",
+    "deleteConfirm": "{{name}}を削除しますか？この操作は取り消せません。",
     "error": "エラー",
     "loadMore": "さらに読み込む",
     "loading": "読み込み中…",
@@ -84,6 +86,7 @@
     "branch": "ブランチ",
     "defaultBranch": "既定のブランチ",
     "clone": "クローン",
+    "cloneRepository": "リポジトリをクローン",
     "closeCloneMenu": "クローンメニューを閉じる",
     "cloneMethod": "クローン方法",
     "cloneWithHttps": "HTTPS でクローン",
@@ -99,7 +102,10 @@
     "tags": "タグ",
     "noTags": "タグがまだありません。",
     "annotated": "注釈付き",
-    "lightweight": "軽量"
+    "lightweight": "軽量",
+    "sections": "リポジトリセクション",
+    "readme": "README",
+    "loadingRepository": "リポジトリを読み込み中…"
   },
   "rules": {
     "branchProtection": "ブランチ保護",
@@ -175,7 +181,9 @@
     "created": "ブランチを作成しました。",
     "deleted": "ブランチを削除しました。",
     "defaultBranch": "既定のブランチ",
-    "defaultUpdated": "既定のブランチを更新しました。"
+    "defaultUpdated": "既定のブランチを更新しました。",
+    "loading": "読み込み中…",
+    "noBranches": "ブランチがありません"
   },
   "checks": {
     "title": "ステータスチェック",
@@ -187,6 +195,8 @@
   "files": {
     "edit": "編集",
     "newFile": "新しいファイル",
+    "blame": "Blame",
+    "hideBlame": "Blame を非表示",
     "fileName": "ファイル名",
     "fileNamePlaceholder": "notes/todo.txt",
     "contentPlaceholder": "ファイルの内容…",
@@ -201,6 +211,7 @@
   },
   "issues": {
     "newIssue": "新しい課題",
+    "filterByLabel": "ラベルで絞り込む…",
     "titlePlaceholder": "タイトル",
     "descriptionPlaceholder": "説明 (任意)",
     "createIssue": "課題を作成",
@@ -290,7 +301,10 @@
     "resolveThread": "解決",
     "reopenThread": "再開",
     "resolved": "解決済み",
-    "open": "オープン"
+    "open": "オープン",
+    "merged": "マージ済み",
+    "reviewState": "レビューの状態",
+    "side": "サイド"
   },
   "releases": {
     "newRelease": "新しいリリース",
@@ -324,12 +338,18 @@
     "compareNotFound": "比較が見つかりません。",
     "diff": "差分",
     "diffTooLarge": "差分が大きすぎて表示できません。",
-    "viewAll": "すべてのコミットを表示"
+    "viewAll": "すべてのコミットを表示",
+    "loadingCommits": "コミットを読み込み中…"
   },
   "forks": {
     "fork": "フォーク",
     "forks": "フォーク",
     "forkRepository": "{{fullName}} をフォーク",
+    "checkSync": "上流を確認",
+    "syncFastForward": "同期 (Fast-Forward)",
+    "syncMerge": "同期 (マージ)",
+    "synced": "フォークを上流と同期しました。",
+    "upToDate": "フォークは既に最新です。",
     "ownerHint": "自分のユーザー名または所属する組織です。",
     "createFork": "フォークを作成",
     "forkCreated": "フォーク {{fullName}} を作成しました。",
@@ -362,6 +382,7 @@
     "revokeToken": "トークンを無効化",
     "tokenCreated": "トークンを作成しました。今すぐコピーしてください — 再表示されません。",
     "tokenRevoked": "トークンを無効化しました。",
+    "failedToRotate": "トークンのローテーションに失敗しました。",
     "scopes": "スコープ (Git のみ)",
     "scopesHint": "フェッチには repo:read、プッシュには repo:write が必要です。Admin は両方を含みます。",
     "selectAtLeastOneScope": "1 件以上のスコープを選択してください。",
@@ -439,6 +460,8 @@
     "organizations": "組織",
     "people": "メンバー",
     "manage": "管理",
+    "sections": "プロフィールセクション",
+    "loadingProfile": "プロフィールを読み込み中…",
     "notFound": "プロフィールが見つかりません",
     "notFoundDescription": "このユーザーまたは組織は存在しません。",
     "noRepos": "表示可能なリポジトリがありません。",
@@ -451,6 +474,8 @@
   },
   "orgs": {
     "newOrg": "新しい組織",
+    "role": "ロール",
+    "grantRole": "ロールを付与",
     "created": "組織 {{username}} を作成しました。",
     "failedToCreate": "組織の作成に失敗しました。",
     "general": "一般",
@@ -482,6 +507,7 @@
   },
   "collaborators": {
     "title": "コラボレーター",
+    "role": "ロール",
     "hint": "管理者は読み取り、書き込み、管理アクセスを付与できます。組織オーナーは既に管理アクセスを持っています。",
     "invitePlaceholder": "ユーザー名またはメール",
     "read": "読み取り",
@@ -552,13 +578,30 @@
     "fileNotFound": "ファイルが見つかりません。",
     "languageLoadFailed": "言語を読み込めません。",
     "languageSaveFailed": "言語を保存できません。",
-    "failedToSearch": "検索結果の読み込みに失敗しました。"
+    "failedToSearch": "検索結果の読み込みに失敗しました。",
+    "failedToSync": "フォークの同期に失敗しました。",
+    "failedToPreviewSync": "同期プレビューの読み込みに失敗しました。",
+    "failedToUpdateDraft": "ドラフトの更新に失敗しました。",
+    "backend": {
+      "badRequest": "不正なリクエストです。",
+      "unauthorized": "認証が必要です。",
+      "forbidden": "アクセスが拒否されました。",
+      "notFound": "見つかりませんでした。",
+      "conflict": "競合が発生しました。",
+      "payloadTooLarge": "ペイロードが大きすぎます。",
+      "rateLimited": "リクエストが多すぎます。しばらくしてから再試行してください。",
+      "methodNotAllowed": "許可されていないメソッドです。",
+      "databaseError": "サービスは一時的に利用できません。",
+      "internalError": "内部サーバーエラーが発生しました。"
+    }
   },
   "search": {
+    "title": "検索",
     "placeholder": "リポジトリや課題を検索…",
     "repos": "リポジトリ",
     "issues": "課題",
     "pulls": "プルリクエスト",
+    "categories": "検索カテゴリ",
     "hint": "2 文字以上入力して検索してください。",
     "noRepos": "リポジトリが見つかりません。",
     "noIssues": "課題が見つかりません。",
@@ -626,6 +669,7 @@
     "newProject": "新しいプロジェクト",
     "titlePlaceholder": "プロジェクトのタイトル",
     "projectCreated": "プロジェクトを作成しました。",
+    "untitled": "無題",
     "noProjects": "プロジェクトがまだありません。",
     "closed": "クローズ",
     "closeProject": "プロジェクトを閉じる",
@@ -671,7 +715,9 @@
     "conflict": "他のユーザーがこのページを更新しました。再読み込みして再試行してください。"
   },
   "snippets": {
+    "title": "スニペット",
     "snippets": "スニペット",
+    "scope": "スニペットのスコープ",
     "public": "パブリック",
     "mine": "自分",
     "secret": "シークレット",

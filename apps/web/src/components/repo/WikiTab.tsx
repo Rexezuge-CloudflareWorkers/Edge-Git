@@ -6,11 +6,13 @@ import type { WikiPage, WikiRevision } from '../../types';
 import { createWikiPage, deleteWikiPage, listWikiPages, loadWikiPage, loadWikiRevisions, updateWikiPage } from '../../services/wikiService';
 import { isValidWikiSlug, normalizeWikiSlug, titleToSlug } from '../../lib/wikiSlug';
 import { readParam, writeParams } from '../../lib/urlParams';
+import { getBackendErrorStatus } from '../../lib/api';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Input, Textarea } from '../ui/Input';
 import { RefreshButton } from '../shared/RefreshButton';
 import { Markdown } from '../shared/Markdown';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export function WikiTab({
   owner,
@@ -56,7 +58,7 @@ export function WikiTab({
       try {
         setPages(await listWikiPages(owner, repo, query.trim() || undefined, authOpt));
       } catch (error) {
-        showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadWiki', 'Failed To Load Wiki.'));
+        showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToLoadWiki', 'Failed To Load Wiki.'));
       } finally {
         setLoading(false);
       }
@@ -97,7 +99,7 @@ export function WikiTab({
         setSlugInput(loaded.slug);
       } catch (error) {
         if (cancelled) return;
-        showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadWiki', 'Failed To Load Wiki.'));
+        showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToLoadWiki', 'Failed To Load Wiki.'));
       }
     };
     void run();
@@ -137,12 +139,13 @@ export function WikiTab({
       setEditing(false);
       reload();
     } catch (error) {
+      const status = getBackendErrorStatus(error);
       const message = error instanceof Error ? error.message : '';
       showNotice(
         'error',
-        message.includes('409') || message.includes('revision conflict')
+        status === 409 || message.includes('revision conflict')
           ? t('wiki.conflict', 'Someone Else Updated This Page. Reload And Retry.')
-          : message || t('errors.failedToSaveWiki', 'Failed To Save Wiki Page.'),
+          : toLocalizedErrorMessage(t, error, 'errors.failedToSaveWiki', 'Failed To Save Wiki Page.'),
       );
     } finally {
       setSaving(false);

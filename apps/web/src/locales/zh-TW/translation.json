@@ -3,7 +3,8 @@
     "dashboard": "儀表板",
     "new": "新增",
     "settings": "設定",
-    "snippets": "程式碼片段"
+    "snippets": "程式碼片段",
+    "home": "Edge-Git 首頁"
   },
   "common": {
     "cancel": "取消",
@@ -12,6 +13,7 @@
     "copyToClipboard": "複製到剪貼簿",
     "create": "建立",
     "delete": "刪除",
+    "deleteConfirm": "刪除{{name}}？此操作無法復原。",
     "error": "錯誤",
     "loadMore": "載入更多",
     "loading": "載入中…",
@@ -84,6 +86,7 @@
     "branch": "分支",
     "defaultBranch": "預設分支",
     "clone": "複製",
+    "cloneRepository": "複製倉庫",
     "closeCloneMenu": "關閉複製選單",
     "cloneMethod": "複製方式",
     "cloneWithHttps": "使用 HTTPS 複製",
@@ -99,7 +102,10 @@
     "tags": "標簽",
     "noTags": "目前沒有標簽。",
     "annotated": "附註",
-    "lightweight": "輕量"
+    "lightweight": "輕量",
+    "sections": "倉庫分區",
+    "readme": "README",
+    "loadingRepository": "正在載入倉庫…"
   },
   "rules": {
     "branchProtection": "分支保護",
@@ -175,7 +181,9 @@
     "created": "分支已建立。",
     "deleted": "分支已刪除。",
     "defaultBranch": "預設分支",
-    "defaultUpdated": "預設分支已更新。"
+    "defaultUpdated": "預設分支已更新。",
+    "loading": "載入中…",
+    "noBranches": "尚無分支"
   },
   "checks": {
     "title": "狀態檢查",
@@ -187,6 +195,8 @@
   "files": {
     "edit": "編輯",
     "newFile": "新增檔案",
+    "blame": "追溯",
+    "hideBlame": "隱藏追溯",
     "fileName": "檔案名",
     "fileNamePlaceholder": "notes/todo.txt",
     "contentPlaceholder": "檔案內容…",
@@ -201,6 +211,7 @@
   },
   "issues": {
     "newIssue": "新增議題",
+    "filterByLabel": "依標籤篩選…",
     "titlePlaceholder": "標題",
     "descriptionPlaceholder": "描述（選填）",
     "createIssue": "建立議題",
@@ -290,7 +301,10 @@
     "resolveThread": "解決",
     "reopenThread": "重新開啟",
     "resolved": "已解決",
-    "open": "開啟"
+    "open": "開啟",
+    "merged": "已合併",
+    "reviewState": "審查狀態",
+    "side": "側"
   },
   "releases": {
     "newRelease": "新增發布",
@@ -324,12 +338,18 @@
     "compareNotFound": "比較不存在。",
     "diff": "差異",
     "diffTooLarge": "差異過大，無法顯示。",
-    "viewAll": "查看全部提交"
+    "viewAll": "查看全部提交",
+    "loadingCommits": "正在載入提交…"
   },
   "forks": {
     "fork": "複刻",
     "forks": "複刻",
     "forkRepository": "複刻 {{fullName}}",
+    "checkSync": "檢查上游",
+    "syncFastForward": "同步（快轉）",
+    "syncMerge": "同步（合併）",
+    "synced": "複刻已與上游同步。",
+    "upToDate": "複刻已是最新。",
     "ownerHint": "你的使用者名稱或你所屬的組織。",
     "createFork": "建立複刻",
     "forkCreated": "複刻 {{fullName}} 已建立。",
@@ -362,6 +382,7 @@
     "revokeToken": "撤銷令牌",
     "tokenCreated": "令牌已建立。請立即複製——之後將不再顯示。",
     "tokenRevoked": "令牌已撤銷。",
+    "failedToRotate": "輪換權杖失敗。",
     "scopes": "權限範圍（僅 Git）",
     "scopesHint": "拉取需要 repo:read。推送需要 repo:write。Admin 包含兩者。",
     "selectAtLeastOneScope": "請至少選擇一個權限範圍。",
@@ -439,6 +460,8 @@
     "organizations": "組織",
     "people": "成員",
     "manage": "管理",
+    "sections": "個人資料分區",
+    "loadingProfile": "正在載入個人資料…",
     "notFound": "找不到個人檔案",
     "notFoundDescription": "該使用者或組織不存在。",
     "noRepos": "目前沒有可見倉庫。",
@@ -451,6 +474,8 @@
   },
   "orgs": {
     "newOrg": "新增組織",
+    "role": "角色",
+    "grantRole": "授予角色",
     "created": "組織 {{username}} 已建立。",
     "failedToCreate": "建立組織失敗。",
     "general": "一般",
@@ -482,6 +507,7 @@
   },
   "collaborators": {
     "title": "協作者",
+    "role": "角色",
     "hint": "管理員可授予讀取、寫入或管理權限。組織擁有者預設擁有管理權限。",
     "invitePlaceholder": "使用者名稱或電子郵件",
     "read": "讀取",
@@ -552,13 +578,30 @@
     "fileNotFound": "檔案不存在。",
     "languageLoadFailed": "無法載入語言。",
     "languageSaveFailed": "無法儲存語言。",
-    "failedToSearch": "載入搜尋結果失敗。"
+    "failedToSearch": "載入搜尋結果失敗。",
+    "failedToSync": "同步複刻失敗。",
+    "failedToPreviewSync": "載入同步預覽失敗。",
+    "failedToUpdateDraft": "更新草稿失敗。",
+    "backend": {
+      "badRequest": "錯誤的請求。",
+      "unauthorized": "需要驗證。",
+      "forbidden": "存取被拒。",
+      "notFound": "找不到。",
+      "conflict": "衝突。",
+      "payloadTooLarge": "負載過大。",
+      "rateLimited": "請求過多，請稍後再試。",
+      "methodNotAllowed": "不允許的方法。",
+      "databaseError": "服務暫時無法使用。",
+      "internalError": "內部伺服器錯誤。"
+    }
   },
   "search": {
+    "title": "搜尋",
     "placeholder": "搜尋倉庫和議題…",
     "repos": "倉庫",
     "issues": "議題",
     "pulls": "合併請求",
+    "categories": "搜尋分類",
     "hint": "至少輸入 2 個字元以搜尋。",
     "noRepos": "找不到倉庫。",
     "noIssues": "找不到議題。",
@@ -626,6 +669,7 @@
     "newProject": "新增專案",
     "titlePlaceholder": "專案標題",
     "projectCreated": "專案已建立。",
+    "untitled": "未命名",
     "noProjects": "目前沒有專案。",
     "closed": "已關閉",
     "closeProject": "關閉專案",
@@ -671,7 +715,9 @@
     "conflict": "其他人剛更新了此頁面，請重新整理後再試。"
   },
   "snippets": {
+    "title": "程式碼片段",
     "snippets": "程式碼片段",
+    "scope": "程式碼片段範圍",
     "public": "公開",
     "mine": "我的",
     "secret": "私密",

@@ -13,6 +13,7 @@ import { AppPage } from '../components/layout/AppPage';
 import { LoadingSpinner } from '../components/layout/PageState';
 import Unauthorized from '../components/layout/Unauthorized';
 import { useRepoData } from '../hooks/useRepoData';
+import { toLocalizedErrorMessage } from '../lib/backendErrors';
 
 const PAGE_DEPTH = 30;
 
@@ -55,7 +56,7 @@ export function CommitsView({
         result = await fetchUpgraded(upgradeStateRef.current, key, () => loadCommits(owner, repo, undefined, depth, authOpt));
       } catch (error) {
         if (!cancelled) {
-          showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadCommits', 'Failed To Load Commits.'));
+          showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToLoadCommits', 'Failed To Load Commits.'));
           setLoading(false);
         }
         return;
@@ -74,7 +75,7 @@ export function CommitsView({
   }, [owner, repo, depth, status, showNotice, t, useAuthed]);
 
   if (status === 'loading' && !repoData) {
-    return <LoadingSpinner label="Loading commits" />;
+    return <LoadingSpinner label={t('commits.loadingCommits', 'Loading Commits…')} />;
   }
 
   if (status === 'missing') {

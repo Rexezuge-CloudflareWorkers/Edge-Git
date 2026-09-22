@@ -12,6 +12,8 @@ import { AppPage } from '../components/layout/AppPage';
 import { LoadingSpinner } from '../components/layout/PageState';
 import Unauthorized from '../components/layout/Unauthorized';
 import { useRepoData } from '../hooks/useRepoData';
+import { getBackendErrorStatus } from '../lib/api';
+import { toLocalizedErrorMessage } from '../lib/backendErrors';
 
 export function CommitView({
   authorized,
@@ -43,12 +45,11 @@ export function CommitView({
         result = await fetchUpgraded(upgradeStateRef.current, key, () => loadCommit(owner, repo, oid, authOpt));
       } catch (error) {
         if (cancelled) return;
-        const message = error instanceof Error ? error.message : '';
-        if (message.includes('404') || message.includes('Not found')) {
+        if (getBackendErrorStatus(error) === 404) {
           setMissing(true);
           return;
         }
-        showNotice('error', message || t('errors.failedToLoadCommit', 'Failed To Load Commit.'));
+        showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToLoadCommit', 'Failed To Load Commit.'));
         return;
       }
       if (cancelled || result.status === 'skipped') return;
@@ -65,7 +66,7 @@ export function CommitView({
   }, [owner, repo, oid, status, showNotice, t, useAuthed]);
 
   if (status === 'loading' && !repoData) {
-    return <LoadingSpinner label="Loading repository" />;
+    return <LoadingSpinner label={t('repos.loadingRepository', 'Loading Repository…')} />;
   }
 
   if (status === 'missing') {

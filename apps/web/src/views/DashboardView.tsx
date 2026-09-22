@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { BookMarked, ChevronDown, Plus } from 'lucide-react';
 import type { Repo } from '../types';
+import { toLocalizedErrorMessage } from '../lib/backendErrors';
 import { listMyRepos } from '../services/repoService';
 import { listWatchedRepos } from '../services/socialService';
 import { Button } from '../components/ui/Button';
@@ -40,7 +41,7 @@ export function DashboardView({ showNotice }: { showNotice: (type: 'success' | '
         setRepos(mine);
         setWatched(watching.filter((w) => !mineNames.has(w.fullName)));
       } catch (error) {
-        showNotice('error', error instanceof Error ? error.message : 'Failed To Load Repositories.');
+        showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToLoadRepositories', 'Failed To Load Repositories.'));
       } finally {
         setLoading(false);
       }
@@ -112,31 +113,27 @@ export function DashboardView({ showNotice }: { showNotice: (type: 'success' | '
 
       <Card>
         <CardHeader>
-          <CardTitle>Clone</CardTitle>
+          <CardTitle>{t('dashboard.clone', 'Clone')}</CardTitle>
         </CardHeader>
         <div className="space-y-3">
-          <ReadOnlyField label="Clone Any Repository" value={`git clone ${globalThis.location?.origin ?? ''}/<owner>/<repo>`} showCopy />
+          <ReadOnlyField label={t('dashboard.cloneAnyRepository', 'Clone Any Repository')} value={`git clone ${globalThis.location?.origin ?? ''}/<owner>/<repo>`} showCopy />
           <p className="text-sm text-[var(--color-text-secondary)]">
-            Authenticated push and private fetch use a personal access token as the password:{' '}
-            <code className="font-mono text-xs">https://&lt;owner&gt;:&lt;PAT&gt;@host/owner/repo</code>. Public repos allow anonymous
-            fetch. Manage tokens in{' '}
-            <Link to="/settings" className="text-[var(--color-accent)] hover:underline">
-              Settings
-            </Link>
-            .
+            {t('dashboard.cloneHelp', 'Authenticated Push And Private Fetch Use A Personal Access Token As The Password: {{example}}. Public Repos Allow Anonymous Fetch. Manage Tokens In Settings.', {
+              example: 'https://<owner>:<PAT>@host/owner/repo',
+            })}
           </p>
         </div>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Repositories</CardTitle>
+          <CardTitle>{t('dashboard.repositories', 'Repositories')}</CardTitle>
           <span className="text-sm text-[var(--color-text-muted)]">{repos.length}</span>
         </CardHeader>
         {!loading && repos.length === 0 ? (
           <EmptyState
             icon={<BookMarked className="h-6 w-6 text-[var(--color-text-muted)]" />}
-            message="No Repositories Yet. Create One To Get Started."
+            message={t('dashboard.empty', 'No Repositories Yet. Create One To Get Started.')}
           />
         ) : (
           <ul className="divide-y divide-[var(--color-border)]">

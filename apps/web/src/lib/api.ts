@@ -1,5 +1,25 @@
-function extractErrorMessage(payloadText: string, status: number): string {
-  if (!payloadText) return `HTTP ${status}`;
+class BackendError extends Error {
+  readonly errorType: string | null;
+  readonly status: number;
+
+  constructor(message: string, errorType: string | null, status: number) {
+    super(message);
+    this.name = 'BackendError';
+    this.errorType = errorType;
+    this.status = status;
+  }
+}
+
+function getBackendErrorType(error: unknown): string | null {
+  return error instanceof BackendError ? error.errorType : null;
+}
+
+function getBackendErrorStatus(error: unknown): number | null {
+  return error instanceof BackendError ? error.status : null;
+}
+
+function extractErrorMessage(payloadText: string, status: number): { message: string; type: string | null } {
+  if (!payloadText) return { message: `HTTP ${status}`, type: null };
   const MAX_MESSAGE_CHARS = 500;
   const truncate = (s: string): string => (s.length > MAX_MESSAGE_CHARS ? `${s.slice(0, MAX_MESSAGE_CHARS)}…` : s);
   try {
@@ -8,24 +28,26 @@ function extractErrorMessage(payloadText: string, status: number): string {
       error?: string;
       message?: string;
     };
+    const type = typeof data?.Exception?.Type === 'string' && data.Exception.Type.length > 0 ? data.Exception.Type : null;
     // AWS envelope first, then legacy `{error,message}`, then raw text.
     const exceptionMessage = data?.Exception?.Message;
-    if (typeof exceptionMessage === 'string' && exceptionMessage.length > 0) return truncate(exceptionMessage);
+    if (typeof exceptionMessage === 'string' && exceptionMessage.length > 0)
+      return { message: truncate(exceptionMessage), type };
     const legacy = data?.message ?? data?.error;
-    if (typeof legacy === 'string' && legacy.length > 0) return truncate(legacy);
-    const type = data?.Exception?.Type;
-    if (typeof type === 'string' && type.length > 0) return `${type} (HTTP ${status})`;
+    if (typeof legacy === 'string' && legacy.length > 0) return { message: truncate(legacy), type };
+    if (type) return { message: `${type} (HTTP ${status})`, type };
   } catch {
     // Plain-text body (git paths, proxies): surface truncated as-is so an
     // Access-login HTML page cannot become an unbounded error string.
   }
-  return truncate(payloadText) || `HTTP ${status}`;
+  return { message: truncate(payloadText) || `HTTP ${status}`, type: null };
 }
 
 export async function readJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(extractErrorMessage(text, response.status));
+    const { message, type } = extractErrorMessage(text, response.status);
+    throw new BackendError(message, type, response.status);
   }
   return response.json();
 }
@@ -72,6 +94,8 @@ export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
 
 export { buildQuery };
 
+export { BackendError, getBackendErrorStatus, getBackendErrorType };
+
 export function unwrapList<T>(data: Record<string, T[] | undefined>, key: string): T[] {
   return data[key] ?? [];
 }
@@ -86,10 +110,18 @@ export async function apiAuthedFirst<T>(authedPath: string, publicPath: string, 
     return await apiGet<T>(authedPath);
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
+    const status = getBackendErrorStatus(error);
     // Fail closed on permission signals: 401/403/404 on the authed path must
     // surface instead of silently falling back to public (which masks denials
     // and doubles latency on every denied request).
-    if (/HTTP 40[134]/.test(message) || /forbidden|unauthorized|not found/i.test(message)) throw error;
+    if (
+      status === 401 ||
+      status === 403 ||
+      status === 404 ||
+      /HTTP 40[134]/.test(message) ||
+      /forbidden|unauthorized|not found/i.test(message)
+    )
+      throw error;
     return apiGet<T>(publicPath);
   }
 }

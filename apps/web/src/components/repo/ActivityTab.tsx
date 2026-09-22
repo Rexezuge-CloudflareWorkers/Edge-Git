@@ -9,6 +9,7 @@ import { useRealtimeSubscription } from '../../realtime/useRealtime';
 import { Card } from '../ui/Card';
 import { LoadMoreButton } from '../shared/LoadMoreButton';
 import { RefreshButton } from '../shared/RefreshButton';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 const EVENT_LABELS: Record<string, string> = {
   repo_created: 'Created This Repository',
@@ -92,7 +93,7 @@ export function ActivityTab({
         setCursor(data.nextCursor);
       } catch (error) {
         if (!cancelled)
-          showNotice('error', error instanceof Error ? error.message : t('social.failedToLoadActivity', 'Failed To Load Activity.'));
+          showNotice('error', toLocalizedErrorMessage(t, error, 'social.failedToLoadActivity', 'Failed To Load Activity.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -111,7 +112,7 @@ export function ActivityTab({
       setEvents((prev) => [...prev, ...data.events]);
       setCursor(data.nextCursor);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('social.failedToLoadActivity', 'Failed To Load Activity.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'social.failedToLoadActivity', 'Failed To Load Activity.'));
     } finally {
       setLoadingMore(false);
     }

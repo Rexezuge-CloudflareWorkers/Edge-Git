@@ -4,6 +4,7 @@ import type { TagInfo } from '../../types';
 import type { Release } from '../../services/releaseService';
 import { listReleases } from '../../services/releaseService';
 import { loadTags } from '../../services/repoService';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export interface UseReleasesOptions {
   owner: string;
@@ -42,7 +43,7 @@ export function useReleases({ owner, repo, authorized, showNotice, onCountChange
         setReleases(list);
         onCountChange?.(list.length);
       } catch (error) {
-        showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadReleases', 'Failed To Load Releases.'));
+        showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToLoadReleases', 'Failed To Load Releases.'));
       } finally {
         setLoading(false);
       }

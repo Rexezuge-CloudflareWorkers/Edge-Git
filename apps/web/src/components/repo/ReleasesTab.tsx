@@ -8,6 +8,7 @@ import { Input, Textarea } from '../ui/Input';
 import { RefreshButton } from '../shared/RefreshButton';
 import { ReleaseRow } from './ReleaseRow';
 import { useReleases } from './useReleases';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export function ReleasesTab({
   owner,
@@ -51,7 +52,7 @@ export function ReleasesTab({
       showNotice('success', t('releases.created', 'Release Created.'));
       refresh();
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('releases.failedToCreate', 'Failed To Create Release.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'releases.failedToCreate', 'Failed To Create Release.'));
     } finally {
       setSaving(false);
     }

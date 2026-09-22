@@ -16,6 +16,7 @@ import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Badge, PullStatusBadge } from '../ui/Badge';
 import { usePullDetailData } from './usePullDetailData';
 import { PullMergePanel } from './PullMergePanel';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export function PullDetail({
   owner,
@@ -91,7 +92,7 @@ export function PullDetail({
         next === 'closed' ? t('pulls.pullClosed', 'Pull Request Closed.') : t('pulls.pullReopened', 'Pull Request Reopened.'),
       );
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToUpdatePull', 'Failed To Update Pull Request.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToUpdatePull', 'Failed To Update Pull Request.'));
     } finally {
       setToggling(false);
     }
@@ -129,10 +130,10 @@ export function PullDetail({
           showNotice('error', t('pulls.mergeConflicts', 'Merge Conflicts. Resolve Them On Your Branch.'));
           return;
         }
-        showNotice('error', parsed.error || t('errors.failedToMergePull', 'Failed To Merge Pull Request.'));
       } catch {
-        showNotice('error', raw || t('errors.failedToMergePull', 'Failed To Merge Pull Request.'));
+        // Not a structured conflict payload — fall through to the localized notice.
       }
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToMergePull', 'Failed To Merge Pull Request.'));
     } finally {
       setMerging(false);
     }
@@ -193,7 +194,9 @@ export function PullDetail({
                         .then(setPull)
                         .catch(() => undefined),
                     )
-                    .catch((error) => showNotice('error', error instanceof Error ? error.message : 'Failed To Update Draft.'));
+                    .catch((error) =>
+                      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToUpdateDraft', 'Failed To Update Draft.')),
+                    );
                 }}
               >
                 {(pull as { is_draft?: number }).is_draft === 1

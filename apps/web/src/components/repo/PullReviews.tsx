@@ -9,6 +9,7 @@ import { Button } from '../ui/Button';
 import { CardHeader, CardTitle } from '../ui/Card';
 import { Select, Textarea } from '../ui/Input';
 import { Badge } from '../ui/Badge';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export function PullReviews({
   owner,
@@ -72,7 +73,7 @@ export function PullReviews({
       await refresh();
       showNotice('success', t('pulls.reviewSubmitted', 'Review Submitted.'));
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToAddReview', 'Failed To Submit Review.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToAddReview', 'Failed To Submit Review.'));
     } finally {
       setReviewing(false);
     }
@@ -97,7 +98,7 @@ export function PullReviews({
                   .catch((error) =>
                     showNotice(
                       'error',
-                      error instanceof Error ? error.message : t('errors.failedToRequestReview', 'Failed To Request Review.'),
+                      toLocalizedErrorMessage(t, error, 'errors.failedToRequestReview', 'Failed To Request Review.'),
                     ),
                   );
               }}
@@ -121,7 +122,7 @@ export function PullReviews({
               .catch((error) =>
                 showNotice(
                   'error',
-                  error instanceof Error ? error.message : t('errors.failedToRequestReview', 'Failed To Request Review.'),
+                  toLocalizedErrorMessage(t, error, 'errors.failedToRequestReview', 'Failed To Request Review.'),
                 ),
               );
           }}
@@ -161,7 +162,7 @@ export function PullReviews({
                         .catch((error) =>
                           showNotice(
                             'error',
-                            error instanceof Error ? error.message : t('errors.failedToDismissReview', 'Failed To Dismiss Review.'),
+                            toLocalizedErrorMessage(t, error, 'errors.failedToDismissReview', 'Failed To Dismiss Review.'),
                           ),
                         );
                     }}
@@ -182,7 +183,7 @@ export function PullReviews({
       )}
       {canWrite && isOpen && (
         <form onSubmit={submitReview} className="mt-4 space-y-2">
-          <Select value={reviewState} onChange={(e) => setReviewState(e.target.value)} aria-label="Review state">
+          <Select value={reviewState} onChange={(e) => setReviewState(e.target.value)} aria-label={t('pulls.reviewState', 'Review State')}>
             <option value="approved">approved</option>
             <option value="changes_requested">changes_requested</option>
             <option value="commented">commented</option>

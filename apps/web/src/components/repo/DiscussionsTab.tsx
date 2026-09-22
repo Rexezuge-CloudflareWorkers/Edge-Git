@@ -12,6 +12,7 @@ import { RefreshButton } from '../shared/RefreshButton';
 import { Markdown } from '../shared/Markdown';
 import { useDiscussions } from './useDiscussions';
 import { useDiscussionDetail } from './useDiscussionDetail';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export function DiscussionsTab({
   owner,
@@ -70,7 +71,7 @@ export function DiscussionsTab({
       reload();
       selectDiscussion(discussion.number);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToCreateDiscussion', 'Failed To Create Discussion.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToCreateDiscussion', 'Failed To Create Discussion.'));
     } finally {
       setSaving(false);
     }

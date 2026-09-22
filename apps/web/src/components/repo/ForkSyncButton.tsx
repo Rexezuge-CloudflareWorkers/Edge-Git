@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../ui/Button';
 import { previewSync, syncFork } from '../../services/collabService';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export function ForkSyncButton({
   owner,
@@ -35,7 +36,7 @@ export function ForkSyncButton({
       setPreview(res.preview);
       if (res.preview?.alreadyMerged) showNotice('success', t('forks.upToDate', 'Fork Is Already Up To Date.'));
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToPreviewSync', 'Failed To Preview Sync.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToPreviewSync', 'Failed To Preview Sync.'));
     }
   };
 
@@ -53,7 +54,7 @@ export function ForkSyncButton({
       showNotice('success', t('forks.synced', 'Fork Synced With Upstream.'));
       onSynced?.();
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToSync', 'Failed To Sync Fork.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToSync', 'Failed To Sync Fork.'));
     } finally {
       setSyncing(false);
     }

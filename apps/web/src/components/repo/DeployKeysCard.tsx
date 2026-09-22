@@ -10,6 +10,7 @@ import { Input, Select } from '../ui/Input';
 import { RefreshButton } from '../shared/RefreshButton';
 import { ReadOnlyField } from '../shared/ReadOnlyField';
 import { ConfirmDeleteModal } from '../modals/ConfirmDeleteModal';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export function DeployKeysCard({
   owner,
@@ -62,7 +63,7 @@ export function DeployKeysCard({
       setLoading(true);
       setReloadKey((k) => k + 1);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('deployKeys.createFailed', 'Failed To Create Deploy Key.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'deployKeys.createFailed', 'Failed To Create Deploy Key.'));
     } finally {
       setSaving(false);
     }
@@ -76,7 +77,7 @@ export function DeployKeysCard({
       setLoading(true);
       setReloadKey((k) => k + 1);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('deployKeys.revokeFailed', 'Failed To Revoke Deploy Key.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'deployKeys.revokeFailed', 'Failed To Revoke Deploy Key.'));
     } finally {
       setRevoking(null);
     }

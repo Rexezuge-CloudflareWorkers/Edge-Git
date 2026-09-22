@@ -4,6 +4,7 @@ import { createOrg } from '../../services/profileService';
 import { Button } from '../ui/Button';
 import { Input, Label } from '../ui/Input';
 import { ModalShell } from '../modals/ModalShell';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export function OrgCreateModal({
   showNotice,
@@ -32,9 +33,7 @@ export function OrgCreateModal({
         'error',
         message.toLowerCase().includes('reserved')
           ? t('orgs.usernameReserved', 'This Name Is Reserved For System Use.')
-          : error instanceof Error
-            ? error.message
-            : t('orgs.failedToCreate', 'Failed To Create Organization.'),
+          : toLocalizedErrorMessage(t, error, 'orgs.failedToCreate', 'Failed To Create Organization.'),
       );
     } finally {
       setSaving(false);

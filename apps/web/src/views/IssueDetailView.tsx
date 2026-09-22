@@ -9,6 +9,7 @@ import { Card } from '../components/ui/Card';
 import { AppPage } from '../components/layout/AppPage';
 import { LoadingSpinner } from '../components/layout/PageState';
 import Unauthorized from '../components/layout/Unauthorized';
+import { getBackendErrorStatus } from '../lib/api';
 
 export function IssueDetailView({
   authorized,
@@ -54,8 +55,7 @@ export function IssueDetailView({
         }
       } catch (error) {
         if (cancelled) return;
-        const message = error instanceof Error ? error.message : '';
-        const kind = message.includes('404') || message.includes('Not found') ? 'missing' : 'forbidden';
+        const kind = getBackendErrorStatus(error) === 404 ? 'missing' : 'forbidden';
         if (authorized === null) {
           pendingErrorRef.current = { key: `${owner}/${repo}`, kind };
           return;
@@ -80,7 +80,7 @@ export function IssueDetailView({
   }, [authorized, status, repoData, owner, repo]);
 
   if (status === 'loading' && !repoData) {
-    return <LoadingSpinner label="Loading repository" />;
+    return <LoadingSpinner label={t('repos.loadingRepository', 'Loading Repository…')} />;
   }
 
   if (status === 'missing') {

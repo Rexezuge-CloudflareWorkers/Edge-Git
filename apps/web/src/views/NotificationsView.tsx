@@ -16,6 +16,7 @@ import { EmptyState } from '../components/layout/PageState';
 import { LoadMoreButton } from '../components/shared/LoadMoreButton';
 import { RefreshButton } from '../components/shared/RefreshButton';
 import { cn } from '../lib/utils';
+import { toLocalizedErrorMessage } from '../lib/backendErrors';
 
 export function NotificationsView({ showNotice }: { showNotice: (type: 'success' | 'error', text: string) => void }) {
   const { t } = useTranslation();
@@ -46,7 +47,7 @@ export function NotificationsView({ showNotice }: { showNotice: (type: 'success'
         setUnreadCount(data.unreadCount);
       } catch (error) {
         if (!cancelled)
-          showNotice('error', error instanceof Error ? error.message : t('notifications.failedToLoad', 'Failed To Load Notifications.'));
+          showNotice('error', toLocalizedErrorMessage(t, error, 'notifications.failedToLoad', 'Failed To Load Notifications.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -66,7 +67,7 @@ export function NotificationsView({ showNotice }: { showNotice: (type: 'success'
       setCursor(data.nextCursor);
       setUnreadCount(data.unreadCount);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('notifications.failedToLoad', 'Failed To Load Notifications.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'notifications.failedToLoad', 'Failed To Load Notifications.'));
     } finally {
       setLoadingMore(false);
     }
@@ -78,7 +79,7 @@ export function NotificationsView({ showNotice }: { showNotice: (type: 'success'
       setItems((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: 1 } : n)));
       setUnreadCount((c) => Math.max(0, c - 1));
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('notifications.failedToMark', 'Failed To Mark Notification Read.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'notifications.failedToMark', 'Failed To Mark Notification Read.'));
     }
   };
 
@@ -88,7 +89,7 @@ export function NotificationsView({ showNotice }: { showNotice: (type: 'success'
       setItems((prev) => prev.map((n) => ({ ...n, is_read: 1 })));
       setUnreadCount(0);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('notifications.failedToMark', 'Failed To Mark Notification Read.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'notifications.failedToMark', 'Failed To Mark Notification Read.'));
     }
   };
 

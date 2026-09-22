@@ -9,6 +9,7 @@ import { Button } from '../ui/Button';
 import { CardHeader, CardTitle } from '../ui/Card';
 import { Input, Select, Textarea } from '../ui/Input';
 import { Badge } from '../ui/Badge';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export function PullThreads({
   owner,
@@ -77,7 +78,7 @@ export function PullThreads({
       await load();
       showNotice('success', t('pulls.threadOpened', 'Inline Comment Added.'));
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToAddComment', 'Failed To Add Comment.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToAddComment', 'Failed To Add Comment.'));
     } finally {
       setSaving(false);
     }
@@ -91,7 +92,7 @@ export function PullThreads({
       setReplyBody('');
       await load();
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToAddComment', 'Failed To Add Comment.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToAddComment', 'Failed To Add Comment.'));
     }
   };
 
@@ -100,7 +101,7 @@ export function PullThreads({
       await resolvePullThread(owner, repo, number, thread.id, thread.status !== 'resolved');
       await load();
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToUpdatePull', 'Failed To Update Pull Request.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToUpdatePull', 'Failed To Update Pull Request.'));
     }
   };
 
@@ -211,7 +212,7 @@ export function PullThreads({
               onChange={(e) => setLine(e.target.value)}
               inputMode="numeric"
             />
-            <Select value={side} onChange={(e) => setSide(e.target.value as 'old' | 'new')} aria-label="Side">
+            <Select value={side} onChange={(e) => setSide(e.target.value as 'old' | 'new')} aria-label={t('pulls.side', 'Side')}>
               <option value="new">new</option>
               <option value="old">old</option>
             </Select>

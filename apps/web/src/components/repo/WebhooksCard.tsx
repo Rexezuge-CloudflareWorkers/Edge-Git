@@ -10,6 +10,7 @@ import { RefreshButton } from '../shared/RefreshButton';
 import { ConfirmDeleteModal } from '../modals/ConfirmDeleteModal';
 import { WebhookRow } from './WebhookRow';
 import type { Notice } from './WebhookRow';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 const FALLBACK_EVENTS: WebhookEventName[] = [
   'push',
@@ -53,7 +54,7 @@ export function WebhooksCard({ owner, repo, showNotice }: { owner: string; repo:
         }
       } catch (error) {
         if (!cancelled)
-          showNotice('error', error instanceof Error ? error.message : t('webhooks.failedToLoad', 'Failed To Load Webhooks.'));
+          showNotice('error', toLocalizedErrorMessage(t, error, 'webhooks.failedToLoad', 'Failed To Load Webhooks.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -93,7 +94,7 @@ export function WebhooksCard({ owner, repo, showNotice }: { owner: string; repo:
       setRevealedSecret({ hookId: hook.id, secret });
       showNotice('success', t('webhooks.hookCreated', 'Webhook Created.'));
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('webhooks.failedToCreate', 'Failed To Create Webhook.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'webhooks.failedToCreate', 'Failed To Create Webhook.'));
     } finally {
       setSaving(false);
     }
@@ -107,7 +108,7 @@ export function WebhooksCard({ owner, repo, showNotice }: { owner: string; repo:
       setHooks((prev) => prev.filter((h) => h.id !== removing.id));
       showNotice('success', t('webhooks.hookDeleted', 'Webhook Deleted.'));
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('webhooks.failedToDelete', 'Failed To Delete Webhook.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'webhooks.failedToDelete', 'Failed To Delete Webhook.'));
     } finally {
       setBusyHookId(null);
       setRemoving(null);

@@ -5,6 +5,7 @@ import { getStarState, getWatchState, starRepo, unstarRepo, unwatchRepo, watchRe
 import { useRealtimeSubscription } from '../../realtime/useRealtime';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/Button';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export type SocialNotice = (type: 'success' | 'error', text: string) => void;
 
@@ -91,7 +92,7 @@ export function useSocialState({
       setStarred(result.starred);
       setStarsCount(result.starsCount ?? result.count ?? 0);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('social.failedToStar', 'Failed To Update Star.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'social.failedToStar', 'Failed To Update Star.'));
     } finally {
       setBusy(null);
     }
@@ -105,7 +106,7 @@ export function useSocialState({
       setWatching(result.watching);
       setWatchersCount(result.watchersCount ?? result.count ?? 0);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('social.failedToWatch', 'Failed To Update Watch.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'social.failedToWatch', 'Failed To Update Watch.'));
     } finally {
       setBusy(null);
     }

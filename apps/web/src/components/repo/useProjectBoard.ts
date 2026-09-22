@@ -13,6 +13,7 @@ import {
   updateProject,
 } from '../../services/projectService';
 import { nextPosition } from '../../lib/projectOrder';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export interface UseProjectBoardOptions {
   owner: string;
@@ -42,7 +43,7 @@ export function useProjectBoard({ owner, repo, selected, authorized, showNotice,
       try {
         setBoard(await loadProjectBoard(owner, repo, selected, authOpt));
       } catch (error) {
-        showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadProjects', 'Failed To Load Projects.'));
+        showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToLoadProjects', 'Failed To Load Projects.'));
       }
     };
     void run();
@@ -54,7 +55,7 @@ export function useProjectBoard({ owner, repo, selected, authorized, showNotice,
     try {
       setBoard(await loadProjectBoard(owner, repo, selected, authOpt));
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadProjects', 'Failed To Load Projects.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToLoadProjects', 'Failed To Load Projects.'));
     }
   };
 
@@ -69,7 +70,7 @@ export function useProjectBoard({ owner, repo, selected, authorized, showNotice,
       showNotice('success', t('projects.columnCreated', 'Column Created.'));
       await refreshBoard();
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToCreateColumn', 'Failed To Create Column.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToCreateColumn', 'Failed To Create Column.'));
     }
   };
 
@@ -82,7 +83,7 @@ export function useProjectBoard({ owner, repo, selected, authorized, showNotice,
       showNotice('success', t('projects.cardCreated', 'Card Created.'));
       await refreshBoard();
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToCreateCard', 'Failed To Create Card.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToCreateCard', 'Failed To Create Card.'));
     }
   };
 
@@ -93,7 +94,7 @@ export function useProjectBoard({ owner, repo, selected, authorized, showNotice,
       await moveCard(owner, repo, selected, cardId, { toColumnId, position: nextPosition(siblings.map((c) => c.position)) });
       await refreshBoard();
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToMoveCard', 'Failed To Move Card.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToMoveCard', 'Failed To Move Card.'));
     }
   };
 

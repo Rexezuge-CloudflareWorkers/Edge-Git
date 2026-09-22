@@ -7,6 +7,7 @@ import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Input } from '../ui/Input';
 import { RefreshButton } from '../shared/RefreshButton';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 const PAGE_SIZE = 25;
 
@@ -42,7 +43,7 @@ export function OrgAuditLogCard({ org, showNotice }: { org: string; showNotice: 
           setNextCursor(data.nextCursor);
         }
       } catch (error) {
-        if (!cancelled) showNotice('error', error instanceof Error ? error.message : t('audit.failedToLoad', 'Failed To Load Audit Log.'));
+        if (!cancelled) showNotice('error', toLocalizedErrorMessage(t, error, 'audit.failedToLoad', 'Failed To Load Audit Log.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -66,7 +67,7 @@ export function OrgAuditLogCard({ org, showNotice }: { org: string; showNotice: 
       setLogs((prev) => [...prev, ...data.logs]);
       setNextCursor(data.nextCursor);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('audit.failedToLoad', 'Failed To Load Audit Log.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'audit.failedToLoad', 'Failed To Load Audit Log.'));
     } finally {
       setLoadingMore(false);
     }

@@ -18,6 +18,7 @@ import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Input, Label, Select } from '../ui/Input';
 import { RefreshButton } from '../shared/RefreshButton';
 import { ReadOnlyField } from '../shared/ReadOnlyField';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 const MIRROR_INTERVALS = [60, 360, 720, 1440, 10_080];
 
@@ -119,7 +120,7 @@ export function TransferCard({
       showNotice('success', t('transfer.importStarted', 'Import Started. Status Updates Automatically.'));
       void refresh();
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('transfer.importFailed', 'Failed To Start Import.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'transfer.importFailed', 'Failed To Start Import.'));
     } finally {
       setStarting(false);
     }
@@ -131,7 +132,7 @@ export function TransferCard({
       setJob(await cancelImport(owner, repo, job.id));
       showNotice('success', t('transfer.importCancelled', 'Import Cancelled.'));
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('transfer.cancelFailed', 'Failed To Cancel Import.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'transfer.cancelFailed', 'Failed To Cancel Import.'));
     }
   };
 
@@ -143,7 +144,7 @@ export function TransferCard({
       setMirror(await putMirror(owner, repo, mirrorUrl.trim(), intervalMinutes));
       showNotice('success', t('transfer.mirrorSaved', 'Mirror Configured.'));
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('transfer.mirrorFailed', 'Failed To Configure Mirror.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'transfer.mirrorFailed', 'Failed To Configure Mirror.'));
     } finally {
       setSavingMirror(false);
     }
@@ -155,7 +156,7 @@ export function TransferCard({
       showNotice('success', t('transfer.mirrorSyncStarted', 'Mirror Sync Started.'));
       void refresh();
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('transfer.syncFailed', 'Failed To Sync Mirror.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'transfer.syncFailed', 'Failed To Sync Mirror.'));
     }
   };
 
@@ -164,7 +165,7 @@ export function TransferCard({
     try {
       setMirror(await setMirrorEnabled(owner, repo, !mirror.enabled));
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('transfer.mirrorFailed', 'Failed To Configure Mirror.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'transfer.mirrorFailed', 'Failed To Configure Mirror.'));
     }
   };
 
@@ -175,7 +176,7 @@ export function TransferCard({
       setMirrorUrl('');
       showNotice('success', t('transfer.mirrorRemoved', 'Mirror Removed.'));
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('transfer.mirrorFailed', 'Failed To Configure Mirror.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'transfer.mirrorFailed', 'Failed To Configure Mirror.'));
     }
   };
 
@@ -187,7 +188,7 @@ export function TransferCard({
       downloadBytes(`${repo}-refs.json`, new TextEncoder().encode(JSON.stringify(result.refs, null, 2)), 'application/json');
       showNotice('success', t('transfer.exportDone', 'Export Downloaded (Pack + Refs).'));
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('transfer.exportFailed', 'Failed To Export Repository.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'transfer.exportFailed', 'Failed To Export Repository.'));
     } finally {
       setExporting(false);
     }

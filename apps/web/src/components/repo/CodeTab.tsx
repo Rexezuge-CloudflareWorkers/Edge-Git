@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import type { GitCommit, OverviewResponse, Repo, TagInfo, TreeEntry } from '../../types';
 import { decodeBlobContent, loadBlob, loadOverview, loadTree } from '../../services/repoService';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 import { readParam, writeParams } from '../../lib/urlParams';
 import { resolveSelectedRef, mergeEnrichedEntries } from './useCodeTabOverview';
 import { findReadmeEntry, isEditableSize } from './codeTabUtils';
-import { Card } from '../ui/Card';
-import { Markdown } from '../shared/Markdown';
 import { useSocialState } from './SocialButtons';
 import { BlobView } from './BlobView';
 import { FileBrowser } from './FileBrowser';
+import { ReadmeCard } from './ReadmeCard';
 import { CodeTabToolbar } from './CodeTabToolbar';
 import { CodeTabSidebar } from './CodeTabSidebar';
 
@@ -33,6 +34,7 @@ export function CodeTab({
   authorized?: boolean | null;
 }) {
   const social = useSocialState({ owner, repo, authorized, showNotice });
+  const { t } = useTranslation();
   const [params, setParams] = useSearchParams();
   const [branches, setBranches] = useState<string[]>([]);
   const [defaultBranch, setDefaultBranch] = useState<string | null>(null);
@@ -73,7 +75,7 @@ export function CodeTab({
   // `selectedRef` is what is displayed and used for fetching, so the dropdown
   // shows the actual branch name (e.g. `main`) instead of a generic placeholder.
   const selectedRef = ref || defaultBranch || branches[0] || '';
-  const emptyBranchesLabel = loading ? 'Loading...' : 'No Branches';
+  const emptyBranchesLabel = loading ? t('branches.loading', 'Loading…') : t('branches.noBranches', 'No Branches');
   const placeholderLabel = branches.length === 0 ? emptyBranchesLabel : selectedRef;
   // Web writes target branches only — tag refs are immutable snapshots.
   const isTagRef = ref.startsWith('refs/tags/');
@@ -212,7 +214,7 @@ export function CodeTab({
           }
         }
       } catch (error) {
-        if (!cancelled) showNotice('error', error instanceof Error ? error.message : 'Failed To Load Repository Files.');
+        if (!cancelled) showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToLoadFiles', 'Failed To Load Repository Files.'));
         if (!cancelled) setLoading(false);
       }
     };
@@ -269,7 +271,7 @@ export function CodeTab({
         const blob = await loadBlob(owner, repo, target, ref || selectedRef || undefined, authOpt);
         if (cancelled) return;
         if (!blob) {
-          showNotice('error', 'File Not Found.');
+          showNotice('error', t('errors.fileNotFound', 'File Not Found.'));
           return;
         }
         setLoadedBlob(target);
@@ -277,7 +279,7 @@ export function CodeTab({
         setBlobText(blob.isBinary ? null : decodeBlobContent(blob));
       } catch (error) {
         if (cancelled) return;
-        showNotice('error', error instanceof Error ? error.message : 'Failed To Load File.');
+        showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToLoadFile', 'Failed To Load File.'));
       }
     };
     void run();
@@ -366,12 +368,7 @@ export function CodeTab({
             />
           )}
 
-          {visibleReadme && !blobPath && (
-            <Card>
-              <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-3">README</h2>
-              <Markdown content={visibleReadme} />
-            </Card>
-          )}
+          {visibleReadme && !blobPath && <ReadmeCard text={visibleReadme} />}
         </div>
 
         <CodeTabSidebar

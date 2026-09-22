@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Discussion, DiscussionComment } from '../../types';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 import {
   addDiscussionComment,
   deleteDiscussion,
@@ -39,7 +40,7 @@ export function useDiscussionDetail({ owner, repo, selected, authorized, showNot
       try {
         setDetail(await loadDiscussion(owner, repo, selected, authOpt));
       } catch (error) {
-        showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadDiscussions', 'Failed To Load Discussions.'));
+        showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToLoadDiscussions', 'Failed To Load Discussions.'));
       }
     };
     void run();
@@ -50,7 +51,7 @@ export function useDiscussionDetail({ owner, repo, selected, authorized, showNot
     try {
       setDetail(await loadDiscussion(owner, repo, number, authOpt));
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadDiscussions', 'Failed To Load Discussions.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToLoadDiscussions', 'Failed To Load Discussions.'));
     }
   };
 
@@ -64,7 +65,7 @@ export function useDiscussionDetail({ owner, repo, selected, authorized, showNot
       setComment('');
       await reloadDetail(selected);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToAddComment', 'Failed To Add Comment.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToAddComment', 'Failed To Add Comment.'));
     }
   };
 

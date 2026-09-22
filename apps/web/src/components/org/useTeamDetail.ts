@@ -11,6 +11,7 @@ import {
   setTeamMemberRole,
 } from '../../services/teamService';
 import { splitRepo } from './teamRepoInput';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export interface UseTeamDetailOptions {
   org: string;
@@ -55,7 +56,7 @@ export function useTeamDetail({ org, selected, showNotice }: UseTeamDetailOption
         if (!cancelled) setDetail({ selected, members: m, grants: g });
       } catch (error) {
         if (!cancelled)
-          showNotice('error', error instanceof Error ? error.message : t('teams.failedToLoadDetail', 'Failed To Load Team Details.'));
+          showNotice('error', toLocalizedErrorMessage(t, error, 'teams.failedToLoadDetail', 'Failed To Load Team Details.'));
       }
     };
     void run();
@@ -70,7 +71,7 @@ export function useTeamDetail({ org, selected, showNotice }: UseTeamDetailOption
       const [m, g] = await Promise.all([listTeamMembers(org, teamSlug), listTeamRepos(org, teamSlug)]);
       setDetail({ selected: teamSlug, members: m, grants: g });
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('teams.failedToLoadDetail', 'Failed To Load Team Details.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'teams.failedToLoadDetail', 'Failed To Load Team Details.'));
     }
   };
 
@@ -84,7 +85,7 @@ export function useTeamDetail({ org, selected, showNotice }: UseTeamDetailOption
       showNotice('success', t('teams.memberAdded', 'Team Member Added.'));
       void refreshDetail(selected);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('teams.failedToAddMember', 'Failed To Add Team Member.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'teams.failedToAddMember', 'Failed To Add Team Member.'));
     }
   };
 
@@ -95,7 +96,7 @@ export function useTeamDetail({ org, selected, showNotice }: UseTeamDetailOption
       showNotice('success', t('teams.roleUpdated', 'Team Member Role Updated.'));
       void refreshDetail(selected);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('teams.failedToUpdateRole', 'Failed To Update Team Member Role.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'teams.failedToUpdateRole', 'Failed To Update Team Member Role.'));
     }
   };
 
@@ -106,7 +107,7 @@ export function useTeamDetail({ org, selected, showNotice }: UseTeamDetailOption
       showNotice('success', t('teams.memberRemoved', 'Team Member Removed.'));
       void refreshDetail(selected);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('teams.failedToRemoveMember', 'Failed To Remove Team Member.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'teams.failedToRemoveMember', 'Failed To Remove Team Member.'));
     }
   };
 
@@ -124,7 +125,7 @@ export function useTeamDetail({ org, selected, showNotice }: UseTeamDetailOption
       showNotice('success', t('teams.grantSaved', 'Repository Grant Saved.'));
       void refreshDetail(selected);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('teams.failedToSaveGrant', 'Failed To Save Repository Grant.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'teams.failedToSaveGrant', 'Failed To Save Repository Grant.'));
     }
   };
 
@@ -137,7 +138,7 @@ export function useTeamDetail({ org, selected, showNotice }: UseTeamDetailOption
       showNotice('success', t('teams.grantRevoked', 'Repository Grant Revoked.'));
       void refreshDetail(selected);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('teams.failedToRevokeGrant', 'Failed To Revoke Repository Grant.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'teams.failedToRevokeGrant', 'Failed To Revoke Repository Grant.'));
     }
   };
 

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Team } from '../../types';
 import { createTeam, deleteTeam, listTeams } from '../../services/teamService';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export interface UseTeamsOptions {
   org: string;
@@ -40,7 +41,7 @@ export function useTeams({ org, showNotice }: UseTeamsOptions) {
           setSelected(rows[0]?.slug ?? null);
         }
       } catch (error) {
-        if (!cancelled) showNotice('error', error instanceof Error ? error.message : t('teams.failedToLoad', 'Failed To Load Teams.'));
+        if (!cancelled) showNotice('error', toLocalizedErrorMessage(t, error, 'teams.failedToLoad', 'Failed To Load Teams.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -67,7 +68,7 @@ export function useTeams({ org, showNotice }: UseTeamsOptions) {
       showNotice('success', t('teams.created', 'Team Created.'));
       refresh();
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('teams.failedToCreate', 'Failed To Create Team.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'teams.failedToCreate', 'Failed To Create Team.'));
     } finally {
       setCreating(false);
     }
@@ -80,7 +81,7 @@ export function useTeams({ org, showNotice }: UseTeamsOptions) {
       showNotice('success', t('teams.deleted', 'Team Deleted.'));
       refresh();
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('teams.failedToDelete', 'Failed To Delete Team.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'teams.failedToDelete', 'Failed To Delete Team.'));
     }
   };
 

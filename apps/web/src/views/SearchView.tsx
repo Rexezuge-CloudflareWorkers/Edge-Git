@@ -93,7 +93,7 @@ export function SearchView({ showNotice }: { showNotice: (type: 'success' | 'err
         }
       />
       <AppPage>
-        <SegmentedTabs ariaLabel="Search categories" tabs={searchTabs} value={type} onChange={(id) => switchTab(id as SearchTab)} />
+        <SegmentedTabs ariaLabel={t('search.categories', 'Search Categories')} tabs={searchTabs} value={type} onChange={(id) => switchTab(id as SearchTab)} />
         {loading ? (
           <p className="text-sm text-[var(--color-text-secondary)]">{t('common.loading', 'Loading…')}</p>
         ) : query.length < 2 ? (

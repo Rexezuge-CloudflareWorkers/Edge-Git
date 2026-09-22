@@ -73,7 +73,7 @@ export function OrgTeamsManager({ org, showNotice }: { org: string; showNotice: 
             <Select
               value={detailHook.memberRole}
               onChange={(e) => detailHook.setMemberRole(e.target.value as 'admin' | 'member')}
-              aria-label="Role"
+              aria-label={t('orgs.role', 'Role')}
             >
               <option value="member">{t('teams.member', 'Member')}</option>
               <option value="admin">{t('teams.admin', 'Admin')}</option>
@@ -120,7 +120,7 @@ export function OrgTeamsManager({ org, showNotice }: { org: string; showNotice: 
             <Select
               value={detailHook.grantRole}
               onChange={(e) => detailHook.setGrantRole(e.target.value as 'admin' | 'write' | 'read')}
-              aria-label="Grant role"
+              aria-label={t('orgs.grantRole', 'Grant Role')}
             >
               <option value="read">{t('collaborators.read', 'Read')}</option>
               <option value="write">{t('collaborators.write', 'Write')}</option>

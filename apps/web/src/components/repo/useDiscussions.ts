@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Discussion, DiscussionCategory } from '../../types';
 import { listDiscussionCategories, listDiscussions } from '../../services/discussionService';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export interface UseDiscussionsOptions {
   owner: string;
@@ -34,7 +35,7 @@ export function useDiscussions({ owner, repo, category, authorized, showNotice }
         setCategories(cats);
         setDiscussions(list);
       } catch (error) {
-        showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadDiscussions', 'Failed To Load Discussions.'));
+        showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToLoadDiscussions', 'Failed To Load Discussions.'));
       } finally {
         setLoading(false);
       }

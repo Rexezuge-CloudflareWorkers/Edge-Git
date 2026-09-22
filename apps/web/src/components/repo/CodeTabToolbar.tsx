@@ -1,4 +1,5 @@
 import type { TagInfo } from '../../types';
+import { useTranslation } from 'react-i18next';
 import { Select } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { RefreshButton } from '../shared/RefreshButton';
@@ -68,6 +69,7 @@ export function CodeTabToolbar(props: CodeTabToolbarProps) {
     setCreateDir,
     onRefresh,
   } = props;
+  const { t } = useTranslation();
   return (
     <div className="flex flex-wrap items-center gap-3">
       <Select
@@ -79,7 +81,7 @@ export function CodeTabToolbar(props: CodeTabToolbarProps) {
           setBlobBinary(false);
           setReadme(null);
         }}
-        aria-label="Branch"
+        aria-label={t('repos.branch', 'Branch')}
         disabled={branches.length === 0}
       >
         {!branches.includes(selectedRef) && <option value="">{placeholderLabel}</option>}
@@ -128,7 +130,7 @@ export function CodeTabToolbar(props: CodeTabToolbarProps) {
             setBlobBinary(false);
           }}
         >
-          New File
+          {t('files.newFile', 'New File')}
         </Button>
       )}
       {path && (

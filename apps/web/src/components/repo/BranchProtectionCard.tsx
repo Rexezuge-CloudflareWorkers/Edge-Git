@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Input } from '../ui/Input';
 import { RefreshButton } from '../shared/RefreshButton';
 import { ConfirmDeleteModal } from '../modals/ConfirmDeleteModal';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export function BranchProtectionCard({
   owner,
@@ -39,7 +40,7 @@ export function BranchProtectionCard({
         if (!cancelled) setRules(list);
       } catch (error) {
         if (!cancelled)
-          showNotice('error', error instanceof Error ? error.message : t('rules.failedToLoad', 'Failed To Load Protection Rules.'));
+          showNotice('error', toLocalizedErrorMessage(t, error, 'rules.failedToLoad', 'Failed To Load Protection Rules.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -81,7 +82,7 @@ export function BranchProtectionCard({
       showNotice('success', t('rules.ruleCreated', 'Protection Rule Created.'));
       refresh();
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('rules.failedToCreate', 'Failed To Create Protection Rule.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'rules.failedToCreate', 'Failed To Create Protection Rule.'));
     } finally {
       setSaving(false);
     }
@@ -94,7 +95,7 @@ export function BranchProtectionCard({
       showNotice('success', t('rules.ruleDeleted', 'Protection Rule Deleted.'));
       refresh();
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('rules.failedToDelete', 'Failed To Delete Protection Rule.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'rules.failedToDelete', 'Failed To Delete Protection Rule.'));
     } finally {
       setRemoving(null);
     }

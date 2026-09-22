@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Repo } from '../types';
+import { getBackendErrorStatus } from '../lib/api';
 import { loadRepoAuthed, loadRepoPublic } from '../services/repoService';
 
 export type RepoShellStatus = 'loading' | 'ready' | 'missing' | 'forbidden';
@@ -38,8 +39,7 @@ export function useRepoData(owner: string, repo: string, authorized: boolean | n
         }
       } catch (error) {
         if (cancelled) return;
-        const message = error instanceof Error ? error.message : '';
-        const kind: RepoShellStatus = message.includes('404') || message.includes('Not found') ? 'missing' : 'forbidden';
+        const kind: RepoShellStatus = getBackendErrorStatus(error) === 404 ? 'missing' : 'forbidden';
         if (authorized === null) {
           pendingErrorRef.current = { key: `${owner}/${repo}`, kind };
           return;
