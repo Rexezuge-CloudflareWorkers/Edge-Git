@@ -59,12 +59,10 @@ describe('IdentityResolver (email stable ID, username display)', () => {
     expect(await r.resolveEmail('unknown')).toBeNull();
   });
 
-  it('degrades to ghost instead of throwing on DB errors', async () => {
-    const r = new IdentityResolver({
-      DB: fakeDb([]),
-      userDAO: () => Promise.reject(new Error('no table')),
-    });
-    expect(await r.resolveUsername('a@x.co')).toBe(GHOST_USERNAME);
-    expect(await r.resolveEmail('alice')).toBeNull();
+  it('fails closed (throws) instead of ghosting on DB errors', async () => {
+    const r = new IdentityResolver({ DB: fakeDb([]) }, { userDAO: () => Promise.reject(new Error('no table')) });
+    await expect(r.resolveUsername('a@x.co')).rejects.toThrow();
+    const r2 = new IdentityResolver({ DB: fakeDb([]) }, { userDAO: () => Promise.reject(new Error('no table')) });
+    expect(await r2.resolveEmail('alice')).toBeNull();
   });
 });

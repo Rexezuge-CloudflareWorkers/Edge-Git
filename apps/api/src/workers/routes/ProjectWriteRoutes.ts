@@ -1,7 +1,7 @@
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { recordAndNotify } from './SocialEmit';
-import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 import { parseProjectNumber } from './ProjectRouteParsers';
 import type { ProjectApp } from './ProjectRouteParsers';
@@ -27,7 +27,7 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
     const { malformed, body } = await readJsonBody<{ title: unknown; description?: unknown }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const project = await scope.get(Tokens.ProjectService).createProject(row.id, body, email);
       void recordAndNotify(c.env, {
         repositoryId: row.id,
@@ -57,7 +57,7 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
     const { malformed, body } = await readJsonBody<{ title?: unknown; description?: unknown; status?: unknown }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const project =
         body.status === undefined
           ? await scope.get(Tokens.ProjectService).updateProject(row.id, number, body)
@@ -90,7 +90,7 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
     const number = parseProjectNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Invalid project number', 400);
     try {
-      await createRequestScope(c.env).get(Tokens.ProjectService).deleteProject(row.id, number);
+      await getScope(c).get(Tokens.ProjectService).deleteProject(row.id, number);
       return c.json({ ok: true });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
@@ -109,7 +109,7 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
     const { malformed, body } = await readJsonBody<{ title?: unknown }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const column = await createRequestScope(c.env)
+      const column = await getScope(c)
         .get(Tokens.ProjectService)
         .createColumn(row.id, number, body as { title: unknown });
       return c.json({ column }, 201);
@@ -130,7 +130,7 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
     const { malformed, body } = await readJsonBody<{ title?: unknown }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const column = await createRequestScope(c.env)
+      const column = await getScope(c)
         .get(Tokens.ProjectService)
         .renameColumn(row.id, number, c.req.param('columnId'), body as { title: unknown });
       return c.json({ column });
@@ -149,7 +149,7 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
     const number = parseProjectNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Invalid project number', 400);
     try {
-      await createRequestScope(c.env).get(Tokens.ProjectService).deleteColumn(row.id, number, c.req.param('columnId'));
+      await getScope(c).get(Tokens.ProjectService).deleteColumn(row.id, number, c.req.param('columnId'));
       return c.json({ ok: true });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
@@ -175,7 +175,7 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
     }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const card = await scope.get(Tokens.ProjectService).createCard(row.id, number, body, email);
       return c.json({ card: await presentSingle(scope, card) }, 201);
     } catch (error) {
@@ -195,7 +195,7 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
     const { malformed, body } = await readJsonBody<{ toColumnId: unknown; position?: unknown }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const card = await scope.get(Tokens.ProjectService).moveCard(row.id, number, c.req.param('cardId'), body);
       return c.json({ card: await presentSingle(scope, card) });
     } catch (error) {
@@ -215,7 +215,7 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
     const { malformed, body } = await readJsonBody<{ archived?: unknown }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const card = await scope
         .get(Tokens.ProjectService)
         .setCardArchived(row.id, number, c.req.param('cardId'), body.archived);
@@ -235,7 +235,7 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
     const number = parseProjectNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Invalid project number', 400);
     try {
-      await createRequestScope(c.env).get(Tokens.ProjectService).deleteCard(row.id, number, c.req.param('cardId'));
+      await getScope(c).get(Tokens.ProjectService).deleteCard(row.id, number, c.req.param('cardId'));
       return c.json({ ok: true });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));

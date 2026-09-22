@@ -1,8 +1,8 @@
 import type { Hono } from 'hono';
-import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { Tokens } from '@edge-git/backend-services/composition';
 import { WEBHOOK_EVENTS } from '@edge-git/backend-services/webhook';
 import { RepoFullName } from '@edge-git/shared/utils';
-import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 import { presentMany, presentSingle } from './IdentityPresenter';
 
@@ -24,7 +24,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const { owner, repoName } = repoParams(c);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'read');
       const hooks = await scope.get(Tokens.WebhookService).listHooks(repo.id);
       return c.json({ hooks: await presentMany(scope, hooks), events: [...WEBHOOK_EVENTS] });
@@ -40,7 +40,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.url !== 'string' || !body.url.trim()) return jsonError(c, 'url is required', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       const { hook, secret } = await scope.get(Tokens.WebhookService).createHook({
         repositoryId: repo.id,
@@ -61,7 +61,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
     const { owner, repoName } = repoParams(c);
     const id = c.req.param('id');
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'read');
       const hook = await scope.get(Tokens.WebhookService).getHook(id, repo.id);
       return c.json({ hook: await presentSingle(scope, hook) });
@@ -77,7 +77,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
     const { malformed, body } = await readJsonBody<{ url?: unknown; events?: unknown; isActive?: unknown }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       const hook = await scope.get(Tokens.WebhookService).updateHook(id, repo.id, {
         url: typeof body.url === 'string' ? body.url : undefined,
@@ -95,7 +95,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
     const { owner, repoName } = repoParams(c);
     const id = c.req.param('id');
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       await scope.get(Tokens.WebhookService).deleteHook(id, repo.id);
       return c.json({ ok: true });
@@ -109,7 +109,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
     const { owner, repoName } = repoParams(c);
     const id = c.req.param('id');
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       const { hook, secret } = await scope.get(Tokens.WebhookService).rotateHookSecret(id, repo.id);
       return c.json({ hook: await presentSingle(scope, hook), secret });
@@ -123,7 +123,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
     const { owner, repoName } = repoParams(c);
     const id = c.req.param('id');
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       let actorUsername = 'ghost';
       try {
@@ -143,7 +143,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
     const { owner, repoName } = repoParams(c);
     const id = c.req.param('id');
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'read');
       const url = new URL(c.req.url);
       const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 20, 1), 50);
@@ -160,7 +160,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
     const { owner, repoName } = repoParams(c);
     const deliveryId = c.req.param('deliveryId');
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       const delivery = await scope.get(Tokens.WebhookDeliveryService).redeliver(deliveryId, repo.id);
       return c.json({ delivery });

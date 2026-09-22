@@ -1,8 +1,8 @@
 import type { Hono } from 'hono';
-import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { Tokens } from '@edge-git/backend-services/composition';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { SecuritySettingsService } from '@edge-git/backend-services/security';
-import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type SecurityApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -16,7 +16,7 @@ function registerSecurityRoutes(app: SecurityApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'read');
       const settings = await scope.get(Tokens.SecuritySettingsService).getSettings(repo.id);
       return c.json({ settings });
@@ -34,7 +34,7 @@ function registerSecurityRoutes(app: SecurityApp): void {
     if (body.secretScanMode === undefined) return jsonError(c, 'secretScanMode is required', 400);
     try {
       const mode = SecuritySettingsService.normalizeMode(body.secretScanMode);
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       const settings = await scope.get(Tokens.SecuritySettingsService).setMode(repo.id, mode, email);
       return c.json({ settings });

@@ -3,7 +3,7 @@ import { Tokens, createRequestScope } from '@edge-git/backend-services/compositi
 import { RepoFullName } from '@edge-git/shared/utils';
 import { BadRequestError } from '@edge-git/backend-errors';
 import { clampAuditLimit, truncateAuditFilter } from '@edge-git/shared/validation';
-import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { resolveFilterEmail, usernameFor, usernameMap } from './IdentityPresenter';
 
 type AuditApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -121,7 +121,7 @@ function registerAuditRoutes(app: AuditApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const query = parseAuditQuery(c.req.url);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       let repoId: string | undefined;
       if (query.repo) {
         const name = query.repo.includes('/') ? (query.repo.split('/').at(-1) ?? query.repo) : query.repo;
@@ -149,7 +149,7 @@ function registerAuditRoutes(app: AuditApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const query = parseAuditQuery(c.req.url);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { logs, nextCursor } = await scope
         .get(Tokens.AuditService)
         .queryMine(email, { action: query.action, startTime: query.startTime, endTime: query.endTime }, query.limit, query.cursor);

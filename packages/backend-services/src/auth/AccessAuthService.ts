@@ -2,6 +2,7 @@ import { jwtVerify, createRemoteJWKSet } from 'jose';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { UnauthorizedError } from '@edge-git/backend-errors';
 import { DEMO_USER_EMAIL } from '@edge-git/shared/constants';
+import { isValidEmailFormat } from '@edge-git/shared/utils';
 
 interface AccessAuthEnv {
   TEAM_DOMAIN?: string;
@@ -29,8 +30,8 @@ function demoModeStrategy(env: AccessAuthEnv): Promise<string | null> {
 }
 
 function isValidAuthEmail(raw: string): boolean {
-  if (!raw || raw.length > 254 || /\s/.test(raw)) return false;
-  return /^[^@\s]+@[^\s@][^\s.@]*\.[^\s@]+$/.test(raw);
+  if (!raw || /\s/.test(raw)) return false;
+  return isValidEmailFormat(raw);
 }
 
 function devEmailStrategy(env: AccessAuthEnv): Promise<string | null> {
@@ -134,12 +135,9 @@ class AccessAuthService {
       throw new UnauthorizedError('Missing required JWT verification configuration.');
     }
 
-    let normalizedTeamDomainEnd: number = teamDomain.trim().length;
-    const trimmedDomain = teamDomain.trim();
-    while (normalizedTeamDomainEnd > 0 && trimmedDomain.codePointAt(normalizedTeamDomainEnd - 1) === 47) {
-      normalizedTeamDomainEnd -= 1;
-    }
-    const normalizedTeamDomain: string = trimmedDomain.slice(0, normalizedTeamDomainEnd).toLowerCase();
+    // Single trailing-slash normalizer (Strategy/Policy reuse): domain casing
+    // is normalized, audience stays case-sensitive per JWT spec.
+    const normalizedTeamDomain = trimTrailingSlashes(teamDomain.trim()).toLowerCase();
     const normalizedPolicyAud: string = policyAud.trim();
     if (!normalizedPolicyAud) {
       throw new UnauthorizedError('Missing required JWT verification configuration.');

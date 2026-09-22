@@ -1,9 +1,9 @@
 import type { Hono } from 'hono';
-import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { Tokens } from '@edge-git/backend-services/composition';
 import { presentMany } from './IdentityPresenter';
 import { SearchService } from '@edge-git/backend-services/search';
 import { RepoFullName } from '@edge-git/shared/utils';
-import { jsonError, requireVisibleRepo, resolvePublicViewer, toRepoJson, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, resolvePublicViewer, toRepoJson, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import type { RequestContext } from '@/middleware';
 
 type SearchApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -39,7 +39,7 @@ function registerSearchRoutes(app: SearchApp): void {
     }
 
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const svc = scope.get(Tokens.SearchService);
       if (owner && repoParam) {
         const repoName = RepoFullName.normalizeRepo(repoParam);

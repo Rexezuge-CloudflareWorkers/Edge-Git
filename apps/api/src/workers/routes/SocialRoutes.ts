@@ -1,5 +1,5 @@
 import type { Hono } from 'hono';
-import { jsonError, requireVisibleRepo, resolvePublicViewer, toRepoJson, withPublicRepo } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, resolvePublicViewer, toRepoJson, withPublicRepo, getScope } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { emitWebhookEvent, publishLiveUpdate } from './SocialEmit';
@@ -28,7 +28,7 @@ async function getCounts(env: Env, repoId: string): Promise<{ starsCount: number
 function registerSocialRoutes(app: SocialApp): void {
   app.get('/repos/:owner/:repo/stars', async (c) => {
     return withPublicRepo(c, async (row) => {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const viewerEmail = await resolvePublicViewer(c);
       const [starsCount, viewerStarred] = await Promise.all([
         scope
@@ -48,7 +48,7 @@ function registerSocialRoutes(app: SocialApp): void {
 
   app.get('/repos/:owner/:repo/watches', async (c) => {
     return withPublicRepo(c, async (row) => {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const viewerEmail = await resolvePublicViewer(c);
       const [watchersCount, viewerWatching] = await Promise.all([
         scope
@@ -71,7 +71,7 @@ function registerSocialRoutes(app: SocialApp): void {
       const url = new URL(c.req.url);
       const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 30, 1), 100);
       const cursor = url.searchParams.get('cursor') ?? undefined;
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { events, nextCursor } = await scope.get(Tokens.ActivityService).listByRepo(row.id, limit, cursor);
       const map = await usernameMap(scope, events.map((e) => e.actor_email));
       const presented = events.map(({ actor_email, ...rest }) => ({ ...rest, actor: usernameFor(map, actor_email) }));
@@ -88,7 +88,7 @@ function registerUserSocialRoutes(app: SocialApp): void {
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
-    const scope = createRequestScope(c.env);
+    const scope = getScope(c);
     await scope.get(Tokens.StarService).star(row.id, email);
     await emitWebhookEvent(c.env, {
       repositoryId: row.id,
@@ -113,7 +113,7 @@ function registerUserSocialRoutes(app: SocialApp): void {
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
-    const scope = createRequestScope(c.env);
+    const scope = getScope(c);
     await scope.get(Tokens.StarService).unstar(row.id, email);
     await emitWebhookEvent(c.env, {
       repositoryId: row.id,
@@ -131,7 +131,7 @@ function registerUserSocialRoutes(app: SocialApp): void {
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
-    const scope = createRequestScope(c.env);
+    const scope = getScope(c);
     await scope.get(Tokens.WatchService).watch(row.id, email);
     await emitWebhookEvent(c.env, {
       repositoryId: row.id,
@@ -156,7 +156,7 @@ function registerUserSocialRoutes(app: SocialApp): void {
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
-    const scope = createRequestScope(c.env);
+    const scope = getScope(c);
     await scope.get(Tokens.WatchService).unwatch(row.id, email);
     await emitWebhookEvent(c.env, {
       repositoryId: row.id,

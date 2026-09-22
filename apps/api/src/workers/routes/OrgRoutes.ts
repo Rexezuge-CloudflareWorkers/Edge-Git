@@ -1,8 +1,8 @@
 import type { Hono } from 'hono';
-import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { Tokens } from '@edge-git/backend-services/composition';
 import { usernameFor, usernameMap } from './IdentityPresenter';
 import { RepoFullName } from '@edge-git/shared/utils';
-import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type OrgApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -14,7 +14,7 @@ function registerOrgRoutes(app: OrgApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (!body.username) return jsonError(c, 'username is required', 400);
     try {
-      const org = await createRequestScope(c.env).get(Tokens.OrganizationService).createOrganization(email, body.username);
+      const org = await getScope(c).get(Tokens.OrganizationService).createOrganization(email, body.username);
       return c.json({ id: org.id, username: org.username }, 201);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create organization';
@@ -26,7 +26,7 @@ function registerOrgRoutes(app: OrgApp): void {
 
   app.get('/user/orgs', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const orgs = await createRequestScope(c.env).get(Tokens.OrganizationService).listOrgsForUser(email);
+    const orgs = await getScope(c).get(Tokens.OrganizationService).listOrgsForUser(email);
     return c.json({ orgs: orgs.map((o) => ({ id: o.id, username: o.username })) });
   });
 
@@ -34,7 +34,7 @@ function registerOrgRoutes(app: OrgApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const orgName = c.req.param('org');
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const org = await scope.get(Tokens.OrganizationService).requireMember(orgName, email);
       const members = await scope.get(Tokens.OrganizationService).listMembers(org.username, email);
       const viewerRole = await scope
@@ -53,7 +53,7 @@ function registerOrgRoutes(app: OrgApp): void {
     const { malformed, body } = await readJsonBody<{ username?: string }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       let org = await scope.get(Tokens.OrganizationService).requireOwner(orgName, email);
       if (body.username) {
         const before = org.username;
@@ -122,7 +122,7 @@ function registerOrgRoutes(app: OrgApp): void {
   app.delete('/user/orgs/:org', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     try {
-      await createRequestScope(c.env).get(Tokens.OrganizationService).disband(c.req.param('org'), email);
+      await getScope(c).get(Tokens.OrganizationService).disband(c.req.param('org'), email);
       return c.json({ ok: true });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
@@ -132,7 +132,7 @@ function registerOrgRoutes(app: OrgApp): void {
   app.get('/user/orgs/:org/members', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     try {
-      const members = await createRequestScope(c.env).get(Tokens.OrganizationService).listMembers(c.req.param('org'), email);
+      const members = await getScope(c).get(Tokens.OrganizationService).listMembers(c.req.param('org'), email);
       return c.json({ members });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
@@ -148,7 +148,7 @@ function registerOrgRoutes(app: OrgApp): void {
     const role = body.role ?? 'member';
     if (role !== 'owner' && role !== 'member') return jsonError(c, 'Invalid role', 400);
     try {
-      await createRequestScope(c.env).get(Tokens.OrganizationService).addMember(c.req.param('org'), email, target, role);
+      await getScope(c).get(Tokens.OrganizationService).addMember(c.req.param('org'), email, target, role);
       return c.json({ ok: true }, 201);
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
@@ -161,7 +161,7 @@ function registerOrgRoutes(app: OrgApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (body.role !== 'owner' && body.role !== 'member') return jsonError(c, 'Invalid role', 400);
     try {
-      await createRequestScope(c.env)
+      await getScope(c)
         .get(Tokens.OrganizationService)
         .setMemberRole(c.req.param('org'), email, decodeURIComponent(c.req.param('member')), body.role);
       return c.json({ ok: true });
@@ -173,7 +173,7 @@ function registerOrgRoutes(app: OrgApp): void {
   app.delete('/user/orgs/:org/members/:member', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     try {
-      await createRequestScope(c.env)
+      await getScope(c)
         .get(Tokens.OrganizationService)
         .removeMember(c.req.param('org'), email, decodeURIComponent(c.req.param('member')));
       return c.json({ ok: true });
@@ -188,7 +188,7 @@ function registerOrgRoutes(app: OrgApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       const repo = await scope.get(Tokens.RepoService).getByOwnerAndName(owner, repoName);
       if (!repo) return jsonError(c, 'Not found', 404);
@@ -211,7 +211,7 @@ function registerOrgRoutes(app: OrgApp): void {
     const role = body.role ?? 'read';
     if (role !== 'admin' && role !== 'write' && role !== 'read') return jsonError(c, 'Invalid role', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       const targetEmail = member.includes('@') ? member.toLowerCase() : await scope.get(Tokens.OrganizationService).resolveEmail(member);
       const now = Math.floor(Date.now() / 1000);
@@ -229,7 +229,7 @@ function registerOrgRoutes(app: OrgApp): void {
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const member = decodeURIComponent(c.req.param('member'));
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       const targetEmail = member.includes('@') ? member.toLowerCase() : await scope.get(Tokens.OrganizationService).resolveEmail(member);
       const collabDao = await scope.get(Tokens.RepoCollaboratorDAO)();

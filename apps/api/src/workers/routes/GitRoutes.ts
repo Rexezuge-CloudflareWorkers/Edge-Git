@@ -1,3 +1,4 @@
+import { getScope } from './PublicViewerResolver';
 import type { Hono } from 'hono';
 import { gitAuthForRepo } from '@/middleware';
 import { getRepoStub } from '../doStubs';
@@ -109,7 +110,7 @@ function registerGitRoutes(app: GitApp): void {
     // the DO stays D1-free.
     let secretWarning = 0;
     try {
-      const mode = await createRequestScope(c.env).get(Tokens.SecuritySettingsService).getMode(auth.repo.id);
+      const mode = await getScope(c).get(Tokens.SecuritySettingsService).getMode(auth.repo.id);
       if (mode !== 'off') {
         const findings = scanBytes(body);
         if (findings.length > 0) {

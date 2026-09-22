@@ -1,6 +1,6 @@
 import { getRepoStub } from '../doStubs';
-import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
-import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
+import { Tokens } from '@edge-git/backend-services/composition';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { ensureHeadObjects, getCrossRepoPreview, isPackLimitError, resolveHeadRepo } from './CrossFork';
 import { parsePullNumber } from './PullShared';
@@ -13,7 +13,7 @@ function registerUserPullReadRoutes(app: PullApp): void {
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, c.get('AuthenticatedUserEmailAddress'));
     if (!row) return jsonError(c, 'Not found', 404);
-    const scope = createRequestScope(c.env);
+    const scope = getScope(c);
     const q = (c.req.query('q') ?? '').trim();
     let pulls = q
       ? await scope
@@ -47,7 +47,7 @@ function registerUserPullReadRoutes(app: PullApp): void {
     const number = parsePullNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
       return c.json({ pull: await presentSingle(scope, pull) });
     } catch (error) {
@@ -65,7 +65,7 @@ function registerUserPullReadRoutes(app: PullApp): void {
     const number = parsePullNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const comments = await scope.get(Tokens.PullRequestService).listComments(row.id, number);
       return c.json({ comments: await presentMany(scope, comments) });
     } catch (error) {
@@ -83,7 +83,7 @@ function registerUserPullReadRoutes(app: PullApp): void {
     const number = parsePullNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const reviews = await scope.get(Tokens.PullRequestService).listReviews(row.id, number);
       return c.json({ reviews: await presentMany(scope, reviews) });
     } catch (error) {
@@ -101,12 +101,12 @@ function registerUserPullReadRoutes(app: PullApp): void {
     const number = parsePullNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
     try {
-      const pull = await createRequestScope(c.env).get(Tokens.PullRequestService).getByNumber(row.id, number);
+      const pull = await getScope(c).get(Tokens.PullRequestService).getByNumber(row.id, number);
       if (!pull.head_oid) return jsonError(c, 'Pull request has no head commit', 400);
       const fullName = `${owner}/${repoName}`;
       const head = await resolveHeadRepo(c.env, pull);
       if (head) {
-        const headRole = await createRequestScope(c.env)
+        const headRole = await getScope(c)
           .get(Tokens.PermissionService)
           .getRole(email, head.row)
           .catch(() => null);
@@ -135,11 +135,11 @@ function registerUserPullReadRoutes(app: PullApp): void {
     const number = parsePullNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
     try {
-      const pull = await createRequestScope(c.env).get(Tokens.PullRequestService).getByNumber(row.id, number);
+      const pull = await getScope(c).get(Tokens.PullRequestService).getByNumber(row.id, number);
       const fullName = `${owner}/${repoName}`;
       const head = await resolveHeadRepo(c.env, pull);
       if (head) {
-        const headRole = await createRequestScope(c.env)
+        const headRole = await getScope(c)
           .get(Tokens.PermissionService)
           .getRole(email, head.row)
           .catch(() => null);

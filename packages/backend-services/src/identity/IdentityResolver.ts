@@ -1,5 +1,7 @@
 import { UserDAO } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
+import { DatabaseError } from '@edge-git/backend-errors';
+import { isValidEmailFormat } from '@edge-git/shared/utils';
 
 interface IdentityResolverEnv {
   DB: D1Queryable;
@@ -42,27 +44,37 @@ class IdentityResolver {
     for (const raw of emails) {
       if (typeof raw !== 'string' || !raw) continue;
       const key = normalizeEmail(raw);
-      if (!key || key.length > 254 || !/^[^@\s]+@[^\s@]+\.[^\s@]+$/.test(key)) continue;
+      if (!isValidEmailFormat(key)) continue;
       if (seen.has(key)) continue;
       seen.add(key);
       deduped.push(key);
     }
     if (deduped.length === 0) return out;
+    // Fail closed on outage (breaking change): a DAO throw means the identity
+    // store is unavailable, which must surface as 500 — not as `ghost` for
+    // every key. `ghost` is reserved for genuinely unknown/deleted users.
+    // Callers (IdentityPresenter.usernameMap) propagate so attribution is
+    // never silently rewritten during an outage.
+    const dao = await this.deps.userDAO().catch((error) => {
+      throw error instanceof DatabaseError
+        ? error
+        : new DatabaseError(`Failed to resolve usernames: ${error instanceof Error ? error.message : String(error)}`);
+    });
+    let rows: Array<{ email?: string | null; username?: string | null }>;
     try {
-      const dao = await this.deps.userDAO();
-      const rows = await dao.getByEmails(deduped);
-      const byEmail = new Map<string, string>();
-      for (const row of rows) {
-        const username = row.username?.trim();
-        if (username && row.email) byEmail.set(normalizeEmail(row.email), username);
-      }
-      for (const key of deduped) {
-        out.set(key, byEmail.get(key) ?? GHOST_USERNAME);
-      }
-    } catch {
-      for (const key of deduped) {
-        if (!out.has(key)) out.set(key, GHOST_USERNAME);
-      }
+      rows = await dao.getByEmails(deduped);
+    } catch (error) {
+      throw error instanceof DatabaseError
+        ? error
+        : new DatabaseError(`Failed to resolve usernames: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    const byEmail = new Map<string, string>();
+    for (const row of rows) {
+      const username = row.username?.trim();
+      if (username && row.email) byEmail.set(normalizeEmail(row.email), username);
+    }
+    for (const key of deduped) {
+      out.set(key, byEmail.get(key) ?? GHOST_USERNAME);
     }
     return out;
   }
@@ -82,7 +94,7 @@ class IdentityResolver {
     if (!raw || raw.length > 254) return null;
     if (raw.includes('@')) {
       const normalized = normalizeEmail(raw);
-      if (!/^[^@\s]+@[^\s@]+\.[^\s@]+$/.test(normalized)) return null;
+      if (!isValidEmailFormat(normalized)) return null;
       return normalized;
     }
     try {

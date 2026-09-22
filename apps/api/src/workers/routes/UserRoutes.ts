@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
-import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
-import { jsonError, resolvePublicViewer, toRepoJson, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { Tokens } from '@edge-git/backend-services/composition';
+import { jsonError, resolvePublicViewer, toRepoJson, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type UserApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -51,7 +51,7 @@ async function hasVisibleRepo(
 function registerUserProfileRoutes(app: UserApp): void {
   app.get('/users/:username', async (c) => {
     const username = c.req.param('username');
-    const scope = createRequestScope(c.env);
+    const scope = getScope(c);
     const rawViewer = await resolvePublicViewer(c).catch(() => null);
     const viewerEmail = rawViewer?.toLowerCase() ?? null;
     const user = await scope
@@ -171,7 +171,7 @@ function registerUserProfileRoutes(app: UserApp): void {
   app.get('/users/:username/repos', async (c) => {
     const username = c.req.param('username');
     const limit = parseLimit(c.req.url);
-    const scope = createRequestScope(c.env);
+    const scope = getScope(c);
     const rawViewer = await resolvePublicViewer(c).catch(() => null);
     const viewerEmail = rawViewer?.toLowerCase() ?? null;
     const permission = scope.get(Tokens.PermissionService);
@@ -213,7 +213,7 @@ function registerUserProfileRoutes(app: UserApp): void {
   // Public org memberships for a user profile — filtered to viewer-visible orgs.
   app.get('/users/:username/orgs', async (c) => {
     const username = c.req.param('username');
-    const scope = createRequestScope(c.env);
+    const scope = getScope(c);
     const rawViewer = await resolvePublicViewer(c).catch(() => null);
     const viewerEmail = rawViewer?.toLowerCase() ?? null;
     const user = await scope
@@ -255,7 +255,7 @@ function registerUserSettingsRoutes(app: UserApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (!body.username || typeof body.username !== 'string') return jsonError(c, 'username is required', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const before = await scope
         .get(Tokens.UserService)
         .getProfileByEmail(email)

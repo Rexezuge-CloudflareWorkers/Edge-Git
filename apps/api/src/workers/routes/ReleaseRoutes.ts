@@ -4,7 +4,7 @@ import { presentMany, presentSingle } from './IdentityPresenter';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { getRepoStub } from '../doStubs';
 import { recordAndNotify } from './SocialEmit';
-import { jsonError, requireVisibleRepo, resolvePublicViewer, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, resolvePublicViewer, toSafeErrorMessage, toServiceStatus, withPublicRepo, getScope } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type ReleaseApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -36,7 +36,7 @@ function registerReleasePublicRoutes(app: ReleaseApp): void {
       try {
         const viewerEmail = await resolvePublicViewer(c);
         const canSeeDrafts = await viewerCanSeeDrafts(c.env, viewerEmail, row.owner, row.name);
-        const scope = createRequestScope(c.env);
+        const scope = getScope(c);
         const releases = await scope.get(Tokens.ReleaseService).listReleases(row.id);
         const visible = canSeeDrafts ? releases : releases.filter((r) => !r.isDraft);
         return c.json({ releases: await presentMany(scope, visible) });
@@ -49,7 +49,7 @@ function registerReleasePublicRoutes(app: ReleaseApp): void {
   app.get('/repos/:owner/:repo/releases/:tag', async (c) => {
     return withPublicRepo(c, async (row) => {
       try {
-        const scope = createRequestScope(c.env);
+        const scope = getScope(c);
         const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
         if (release.isDraft) {
           const viewerEmail = await resolvePublicViewer(c);
@@ -72,7 +72,7 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const releases = await scope.get(Tokens.ReleaseService).listReleases(row.id);
       const canSeeDrafts = await viewerCanSeeDrafts(c.env, email, owner, repoName);
       const visible = canSeeDrafts ? releases : releases.filter((r) => !r.isDraft);
@@ -89,7 +89,7 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
-      await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
+      await getScope(c).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
       return jsonError(c, 'Forbidden', 403);
     }
@@ -102,7 +102,7 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
     }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const isDraft = body.isDraft === undefined || body.isDraft === true;
       if (!isDraft && typeof body.tagName === 'string') {
         const fullName = `${row.owner}/${row.name}`;
@@ -141,7 +141,7 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
       if (release.isDraft && !(await viewerCanSeeDrafts(c.env, email, owner, repoName))) return jsonError(c, 'Not found', 404);
       const assets = await scope.get(Tokens.ReleaseService).listAssets(row.id, release.tagName);
@@ -158,14 +158,14 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
-      await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
+      await getScope(c).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
       return jsonError(c, 'Forbidden', 403);
     }
     const { malformed, body } = await readJsonBody<{ name?: unknown; body?: unknown; isDraft?: unknown; isPrerelease?: unknown }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const before = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
       if (before.isDraft && body.isDraft === false) {
         const fullName = `${row.owner}/${row.name}`;
@@ -200,12 +200,12 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
-      await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
+      await getScope(c).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
       return jsonError(c, 'Forbidden', 403);
     }
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
       try {
         await getRepoStub(c.env, `${row.owner}/${row.name}`).deleteReleaseAssets({ releaseId: release.id });

@@ -1,10 +1,10 @@
 import type { Hono } from 'hono';
-import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { Tokens } from '@edge-git/backend-services/composition';
 import { presentMany, presentSingle } from './IdentityPresenter';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { parsePositiveInt } from '@edge-git/shared/validation';
 import { recordAndNotify } from './SocialEmit';
-import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo, getScope } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type DiscussionApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -17,7 +17,7 @@ function registerDiscussionPublicRoutes(app: DiscussionApp): void {
   app.get('/repos/:owner/:repo/discussions/categories', async (c) => {
     return withPublicRepo(c, async (row) => {
       try {
-        const categories = await createRequestScope(c.env).get(Tokens.DiscussionService).listCategories(row.id);
+        const categories = await getScope(c).get(Tokens.DiscussionService).listCategories(row.id);
         return c.json({ categories });
       } catch {
         return c.json({ categories: [] });
@@ -29,7 +29,7 @@ function registerDiscussionPublicRoutes(app: DiscussionApp): void {
     return withPublicRepo(c, async (row) => {
       try {
         const url = new URL(c.req.url);
-        const scope = createRequestScope(c.env);
+        const scope = getScope(c);
         const discussions = await scope
           .get(Tokens.DiscussionService)
           .listDiscussions(row.id, url.searchParams.get('category') ?? undefined);
@@ -45,7 +45,7 @@ function registerDiscussionPublicRoutes(app: DiscussionApp): void {
       const number = parseNumber(c.req.param('number'));
       if (number === null) return jsonError(c, 'Invalid discussion number', 400);
       try {
-        const scope = createRequestScope(c.env);
+        const scope = getScope(c);
         const result = await scope.get(Tokens.DiscussionService).getDiscussionWithComments(row.id, number);
         return c.json({ discussion: await presentSingle(scope, result.discussion), comments: await presentMany(scope, result.comments) });
       } catch (error) {
@@ -61,7 +61,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
     const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoFullName.normalizeRepo(c.req.param('repo')), email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
-      const categories = await createRequestScope(c.env).get(Tokens.DiscussionService).listCategories(row.id);
+      const categories = await getScope(c).get(Tokens.DiscussionService).listCategories(row.id);
       return c.json({ categories });
     } catch {
       return c.json({ categories: [] });
@@ -74,7 +74,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
     if (!row) return jsonError(c, 'Not found', 404);
     try {
       const url = new URL(c.req.url);
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const discussions = await scope
         .get(Tokens.DiscussionService)
         .listDiscussions(row.id, url.searchParams.get('category') ?? undefined);
@@ -91,7 +91,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
     const { malformed, body } = await readJsonBody<{ title: unknown; body?: unknown; categorySlug?: unknown }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const discussion = await scope.get(Tokens.DiscussionService).createDiscussion(row.id, body, email);
       void recordAndNotify(c.env, {
         repositoryId: row.id,
@@ -117,7 +117,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
     const number = parseNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Invalid discussion number', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const result = await scope.get(Tokens.DiscussionService).getDiscussionWithComments(row.id, number);
       return c.json({ discussion: await presentSingle(scope, result.discussion), comments: await presentMany(scope, result.comments) });
     } catch (error) {
@@ -136,7 +136,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
     const { malformed, body } = await readJsonBody<{ title?: unknown; body?: unknown; categorySlug?: unknown; status?: unknown }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const svc = scope.get(Tokens.DiscussionService);
       const before = await svc.getDiscussion(row.id, number);
       const isAuthor = before.authorEmail.toLowerCase() === email.toLowerCase();
@@ -182,7 +182,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
     const number = parseNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Invalid discussion number', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const before = await scope.get(Tokens.DiscussionService).getDiscussion(row.id, number);
       const isAuthor = before.authorEmail.toLowerCase() === email.toLowerCase();
       try {
@@ -206,7 +206,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
     const { malformed, body } = await readJsonBody<{ body?: unknown }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const comment = await scope
         .get(Tokens.DiscussionService)
         .addComment(row.id, number, body as { body: unknown }, email);
@@ -236,7 +236,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
     const number = parseNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Invalid discussion number', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       try {
         await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
       } catch {

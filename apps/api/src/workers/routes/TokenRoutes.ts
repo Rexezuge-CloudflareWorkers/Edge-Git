@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
-import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { Tokens } from '@edge-git/backend-services/composition';
 import { tokenIdSchema } from '@edge-git/shared/validation';
-import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type TokenApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -9,7 +9,7 @@ type TokenApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress
 function registerTokenRoutes(app: TokenApp): void {
   app.get('/user/tokens', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const svc = createRequestScope(c.env).get(Tokens.TokenService);
+    const svc = getScope(c).get(Tokens.TokenService);
     const tokens = await svc.listTokens(email);
     return c.json({
       tokens: tokens.map((t) => ({
@@ -36,7 +36,7 @@ function registerTokenRoutes(app: TokenApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (!body.name) return jsonError(c, 'name is required', 400);
     try {
-      const svc = createRequestScope(c.env).get(Tokens.TokenService);
+      const svc = getScope(c).get(Tokens.TokenService);
       const created = await svc.createToken(email, body.name, body.expiresInDays, body.scopes, body.repoGrants);
       return c.json(created, 201);
     } catch (error) {
@@ -51,7 +51,7 @@ function registerTokenRoutes(app: TokenApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     if (!tokenIdSchema.safeParse(c.req.param('id')).success) return jsonError(c, 'Invalid token id', 400);
     try {
-      const svc = createRequestScope(c.env).get(Tokens.TokenService);
+      const svc = getScope(c).get(Tokens.TokenService);
       const rotated = await svc.rotateToken(c.req.param('id'), email);
       return c.json(rotated, 201);
     } catch (error) {
@@ -63,7 +63,7 @@ function registerTokenRoutes(app: TokenApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     if (!tokenIdSchema.safeParse(c.req.param('id')).success) return jsonError(c, 'Invalid token id', 400);
     try {
-      const svc = createRequestScope(c.env).get(Tokens.TokenService);
+      const svc = getScope(c).get(Tokens.TokenService);
       await svc.deleteToken(c.req.param('id'), email);
       return c.json({ ok: true });
     } catch (error) {

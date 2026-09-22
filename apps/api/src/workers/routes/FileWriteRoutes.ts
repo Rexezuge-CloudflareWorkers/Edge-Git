@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { getRepoStub } from '../doStubs';
-import { jsonError, requireVisibleRepo, toErrorBody, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, toErrorBody, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { branchNameSchema, decodeBase64Strict, sanitizeCommitMessage } from '@edge-git/shared/validation';
@@ -254,7 +254,7 @@ function registerFileWriteRoutes(app: RepoApp): void {
       const { body: out, status } = toFileResponse(result, 200);
       if (result.ok) {
         try {
-          await createRequestScope(c.env).get(Tokens.SearchService).removeFile(gate.repo.id, filePath);
+          await getScope(c).get(Tokens.SearchService).removeFile(gate.repo.id, filePath);
         } catch {
           // Index failures must never fail the file delete.
         }

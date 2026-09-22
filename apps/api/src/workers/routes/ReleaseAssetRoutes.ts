@@ -1,11 +1,11 @@
 import type { Hono } from 'hono';
-import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { Tokens } from '@edge-git/backend-services/composition';
 import { presentMany, presentSingle } from './IdentityPresenter';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { assetNameSchema, decodeBase64Strict, normalizeAssetContentType } from '@edge-git/shared/validation';
 import { getRepoStub } from '../doStubs';
-import { jsonError, requireVisibleRepo, resolvePublicViewer, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, resolvePublicViewer, toSafeErrorMessage, toServiceStatus, withPublicRepo, getScope } from './PublicViewerResolver';
 import { viewerCanSeeDrafts } from './ReleaseRoutes';
 import { readJsonBody } from './BodyParser';
 
@@ -43,7 +43,7 @@ function registerReleaseAssetPublicRoutes(app: ReleaseAssetApp): void {
   app.get('/repos/:owner/:repo/releases/:tag/assets', async (c) => {
     return withPublicRepo(c, async (row) => {
       try {
-        const scope = createRequestScope(c.env);
+        const scope = getScope(c);
         const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
         if (release.isDraft) {
           const viewerEmail = await resolvePublicViewer(c);
@@ -60,7 +60,7 @@ function registerReleaseAssetPublicRoutes(app: ReleaseAssetApp): void {
   app.get('/repos/:owner/:repo/releases/:tag/assets/:assetId/download', async (c) => {
     return withPublicRepo(c, async (row) => {
       try {
-        const scope = createRequestScope(c.env);
+        const scope = getScope(c);
         const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
         if (release.isDraft) {
           const viewerEmail = await resolvePublicViewer(c);
@@ -88,7 +88,7 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
       if (release.isDraft && !(await viewerCanSeeDrafts(c.env, email, owner, repoName))) return jsonError(c, 'Not found', 404);
       const assets = await scope.get(Tokens.ReleaseService).listAssets(row.id, release.tagName);
@@ -105,7 +105,7 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
-      await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
+      await getScope(c).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
       return jsonError(c, 'Forbidden', 403);
     }
@@ -127,7 +127,7 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
       return jsonError(c, `asset size must be 1-${maxBytes} bytes`, 413);
     }
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const sha256 = await sha256HexBytes(bytes);
       const asset = await scope
         .get(Tokens.ReleaseService)
@@ -158,7 +158,7 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
       if (release.isDraft && !(await viewerCanSeeDrafts(c.env, email, owner, repoName))) return jsonError(c, 'Not found', 404);
       const asset = await scope.get(Tokens.ReleaseService).getAsset(row.id, release.tagName, c.req.param('assetId'));
@@ -177,12 +177,12 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
-      await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
+      await getScope(c).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
       return jsonError(c, 'Forbidden', 403);
     }
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const asset = await scope.get(Tokens.ReleaseService).getAsset(row.id, c.req.param('tag'), c.req.param('assetId'));
       try {
         await getRepoStub(c.env, `${row.owner}/${row.name}`).deleteReleaseAsset({ releaseId: asset.releaseId, assetId: asset.id });

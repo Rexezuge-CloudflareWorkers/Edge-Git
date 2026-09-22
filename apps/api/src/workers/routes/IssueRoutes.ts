@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
-import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo, getScope } from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
-import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { Tokens } from '@edge-git/backend-services/composition';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { parsePositiveInt } from '@edge-git/shared/validation';
 import { readJsonBody } from './BodyParser';
@@ -16,7 +16,7 @@ function parseIssueNumber(raw: string | undefined): number | null {
 function registerIssueRoutes(app: IssueApp): void {
   app.get('/repos/:owner/:repo/issues', async (c) => {
     return withPublicRepo(c, async (row) => {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const issues = await scope.get(Tokens.IssueService).listByRepo(row.id, 50);
       const label = c.req.query('label');
       const assignee = c.req.query('assignee')?.toLowerCase();
@@ -44,7 +44,7 @@ function registerIssueRoutes(app: IssueApp): void {
       const number = parseIssueNumber(c.req.param('number'));
       if (number === null) return jsonError(c, 'Not found', 404);
       try {
-        const scope = createRequestScope(c.env);
+        const scope = getScope(c);
         const issue = await scope.get(Tokens.IssueService).getByNumber(row.id, number);
         return c.json({ issue: await presentSingle(scope, issue) });
       } catch (error) {
@@ -58,7 +58,7 @@ function registerIssueRoutes(app: IssueApp): void {
       const number = parseIssueNumber(c.req.param('number'));
       if (number === null) return jsonError(c, 'Not found', 404);
       try {
-        const scope = createRequestScope(c.env);
+        const scope = getScope(c);
         const comments = await scope.get(Tokens.IssueService).listComments(row.id, number);
         return c.json({ comments: await presentMany(scope, comments) });
       } catch (error) {
@@ -74,7 +74,7 @@ function registerUserIssueRoutes(app: IssueApp): void {
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, c.get('AuthenticatedUserEmailAddress'));
     if (!row) return jsonError(c, 'Not found', 404);
-    const scope = createRequestScope(c.env);
+    const scope = getScope(c);
     const issues = await scope.get(Tokens.IssueService).listByRepo(row.id, 50);
     const label = c.req.query('label');
     const assignee = c.req.query('assignee')?.toLowerCase();
@@ -105,7 +105,7 @@ function registerUserIssueRoutes(app: IssueApp): void {
     const { malformed, body } = await readJsonBody<{ title?: string; body?: string }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (!body.title) return jsonError(c, 'title is required', 400);
-    const scope = createRequestScope(c.env);
+    const scope = getScope(c);
     const created = await scope
       .get(Tokens.IssueService)
       .createIssue({
@@ -137,7 +137,7 @@ function registerUserIssueRoutes(app: IssueApp): void {
     const number = parseIssueNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const issue = await scope.get(Tokens.IssueService).getByNumber(row.id, number);
       return c.json({ issue: await presentSingle(scope, issue) });
     } catch (error) {
@@ -153,7 +153,7 @@ function registerUserIssueRoutes(app: IssueApp): void {
     if (!row) return jsonError(c, 'Not found', 404);
     // Write+ (collaborator write, org member with grant, or admin/owner) may triage issues.
     try {
-      await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
+      await getScope(c).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
       return jsonError(c, 'Forbidden', 403);
     }
@@ -162,7 +162,7 @@ function registerUserIssueRoutes(app: IssueApp): void {
     const { malformed, body } = await readJsonBody<{ status?: string }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const issue = await scope
         .get(Tokens.IssueService)
         .updateStatus({ repositoryId: row.id, number, status: body.status ?? '' });
@@ -191,7 +191,7 @@ function registerUserIssueRoutes(app: IssueApp): void {
     const number = parseIssueNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const comments = await scope.get(Tokens.IssueService).listComments(row.id, number);
       return c.json({ comments: await presentMany(scope, comments) });
     } catch (error) {
@@ -211,7 +211,7 @@ function registerUserIssueRoutes(app: IssueApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.body !== 'string' || !body.body.trim()) return jsonError(c, 'body is required', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const issue = await scope.get(Tokens.IssueService).getByNumber(row.id, number);
       const comment = await scope.get(Tokens.IssueService).addComment({
         repositoryId: row.id,

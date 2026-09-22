@@ -6,7 +6,6 @@ import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import type { ReleaseAssetMetadata, ReleaseMetadata } from '@edge-git/shared';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 import {
-  TAG_NAME_RE,
   isValidTagName,
   normalizeAssetName,
   normalizeAssetSha256,
@@ -252,5 +251,6 @@ class ReleaseService {
   }
 }
 
-export { ReleaseService, TAG_NAME_RE };
+export { ReleaseService };
+export { TAG_NAME_RE } from './ReleaseValidation';
 export type { ReleaseServiceDeps, ReleaseServiceEnv };

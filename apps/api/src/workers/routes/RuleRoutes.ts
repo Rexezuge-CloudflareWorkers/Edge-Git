@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
-import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { Tokens } from '@edge-git/backend-services/composition';
 import { RepoFullName } from '@edge-git/shared/utils';
-import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type RuleApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -15,7 +15,7 @@ function registerRuleRoutes(app: RuleApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'read');
       const rules = await scope.get(Tokens.BranchProtectionService).listRules(repo.id);
       return c.json({ rules });
@@ -39,7 +39,7 @@ function registerRuleRoutes(app: RuleApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.pattern !== 'string' || !body.pattern.trim()) return jsonError(c, 'pattern is required', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       const rule = await scope.get(Tokens.BranchProtectionService).createRule({
         repositoryId: repo.id,
@@ -63,7 +63,7 @@ function registerRuleRoutes(app: RuleApp): void {
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const id = c.req.param('id');
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       await scope.get(Tokens.BranchProtectionService).deleteRule(repo.id, id);
       return c.json({ ok: true });
