@@ -5,6 +5,7 @@ import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import type { BranchProtectionRuleMetadata } from '@edge-git/shared';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 import { PullRequestService } from '../pull/PullRequestService';
+import { countApprovals as countApprovalsPolicy, matchRule as matchRulePolicy, matchesPattern as matchesPatternPolicy } from './BranchProtectionPolicy';
 
 interface BranchProtectionServiceEnv {
   DB: D1Queryable;
@@ -28,13 +29,8 @@ function isValidRulePattern(pattern: string): boolean {
   return pattern.split('/').every((seg) => seg.length > 0 && seg !== '.' && seg !== '..');
 }
 
-function patternToRegExp(pattern: string): RegExp {
-  const escaped = pattern.replaceAll(/[.+?^${}()|[\]\\]/g, String.raw`\$&`);
-  return new RegExp(`^${escaped.replaceAll('*', '.*')}$`);
-}
-
 function matchesPattern(pattern: string, branch: string): boolean {
-  return patternToRegExp(pattern).test(branch);
+  return matchesPatternPolicy(pattern, branch);
 }
 
 class BranchProtectionService {
@@ -63,18 +59,7 @@ class BranchProtectionService {
    * lexicographically smaller pattern for determinism.
    */
   public static matchRule(rules: readonly BranchProtectionRuleMetadata[], branch: string): BranchProtectionRuleMetadata | null {
-    let best: BranchProtectionRuleMetadata | null = null;
-    for (const rule of rules) {
-      if (!matchesPattern(rule.pattern, branch)) continue;
-      if (
-        !best ||
-        rule.pattern.length > best.pattern.length ||
-        (rule.pattern.length === best.pattern.length && rule.pattern < best.pattern)
-      ) {
-        best = rule;
-      }
-    }
-    return best;
+    return matchRulePolicy(rules, branch);
   }
 
   /**
@@ -86,17 +71,7 @@ class BranchProtectionService {
     reviews: Array<{ author_email: string; state: string; dismissed?: number | null }>,
     creatorEmail: string,
   ): number {
-    const creator = creatorEmail.toLowerCase();
-    const latestByAuthor = new Map<string, string>();
-    for (const review of reviews) {
-      if (review.dismissed === 1) continue;
-      latestByAuthor.set(review.author_email.toLowerCase(), review.state);
-    }
-    let approvals = 0;
-    for (const [author, state] of latestByAuthor) {
-      if (author !== creator && state === 'approved') approvals += 1;
-    }
-    return approvals;
+    return countApprovalsPolicy(reviews, creatorEmail);
   }
 
   /**

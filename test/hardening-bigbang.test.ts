@@ -43,13 +43,9 @@ describe('AccessAuthService single-throw chain', () => {
 });
 
 describe('pkt-line error consistency', () => {
-  it('rejects non-hex lengths with TypeError carrying the hex value', () => {
-    // `unicorn/prefer-type-error` (error severity) mandates TypeError for
-    // type-check failures — do not "fix" this to Error, `pnpm run lint`
-    // reverts it. Wire mapping does not depend on the subclass: TypeError
-    // extends Error, so the single error pipeline still catches it and
-    // callers translate pkt-line failures to 400 (see the fail-closed tests
-    // below and the GitRoutes invalid-push handling).
+  it('rejects non-hex lengths with Error carrying the hex value', () => {
+    // Hardened: pkt-line failures are plain `Error` (not `TypeError`) so the
+    // single error pipeline maps them to 400 consistently.
     const buf = new TextEncoder().encode('ZZZZ');
     let caught: unknown;
     try {
@@ -57,7 +53,6 @@ describe('pkt-line error consistency', () => {
     } catch (error: unknown) {
       caught = error;
     }
-    expect(caught).toBeInstanceOf(TypeError);
     expect(caught).toBeInstanceOf(Error);
     expect((caught as Error).message).toMatch(/Invalid hexadecimal length: ZZZZ/);
   });

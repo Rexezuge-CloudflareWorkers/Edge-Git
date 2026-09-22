@@ -1,5 +1,7 @@
 function extractErrorMessage(payloadText: string, status: number): string {
   if (!payloadText) return `HTTP ${status}`;
+  const MAX_MESSAGE_CHARS = 500;
+  const truncate = (s: string): string => (s.length > MAX_MESSAGE_CHARS ? `${s.slice(0, MAX_MESSAGE_CHARS)}…` : s);
   try {
     const data = JSON.parse(payloadText) as {
       Exception?: { Type?: string; Message?: string };
@@ -8,15 +10,16 @@ function extractErrorMessage(payloadText: string, status: number): string {
     };
     // AWS envelope first, then legacy `{error,message}`, then raw text.
     const exceptionMessage = data?.Exception?.Message;
-    if (typeof exceptionMessage === 'string' && exceptionMessage.length > 0) return exceptionMessage;
+    if (typeof exceptionMessage === 'string' && exceptionMessage.length > 0) return truncate(exceptionMessage);
     const legacy = data?.message ?? data?.error;
-    if (typeof legacy === 'string' && legacy.length > 0) return legacy;
+    if (typeof legacy === 'string' && legacy.length > 0) return truncate(legacy);
     const type = data?.Exception?.Type;
     if (typeof type === 'string' && type.length > 0) return `${type} (HTTP ${status})`;
   } catch {
-    // Plain-text body (git paths, proxies): surface as-is.
+    // Plain-text body (git paths, proxies): surface truncated as-is so an
+    // Access-login HTML page cannot become an unbounded error string.
   }
-  return payloadText || `HTTP ${status}`;
+  return truncate(payloadText) || `HTTP ${status}`;
 }
 
 export async function readJson<T>(response: Response): Promise<T> {
@@ -81,7 +84,12 @@ export async function apiAuthedFirst<T>(authedPath: string, publicPath: string, 
   }
   try {
     return await apiGet<T>(authedPath);
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    // Fail closed on permission signals: 401/403/404 on the authed path must
+    // surface instead of silently falling back to public (which masks denials
+    // and doubles latency on every denied request).
+    if (/HTTP 40[134]/.test(message) || /forbidden|unauthorized|not found/i.test(message)) throw error;
     return apiGet<T>(publicPath);
   }
 }

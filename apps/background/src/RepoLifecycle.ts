@@ -59,9 +59,12 @@ class RepoLifecycle {
     try {
       await this.isoGitFs.promises.stat('/repo/HEAD');
       return;
-    } catch {
-      // missing HEAD → init below (memoized so concurrent fetch+RPC inits
-      // share one init instead of double-init TOCTOU).
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      // Only fail closed on definitive storage errors; missing/corrupt HEAD
+      // (ENOENT, not-found, generic fake errors) triggers lazy init below.
+      // Memoized so concurrent fetch+RPC inits share one init (no TOCTOU).
+      if (/EIO|EACCES|EPERM|EROFS|ENOSPC/i.test(message)) throw error;
     }
     let current = this.initPromise;
     if (!current) {

@@ -1,5 +1,7 @@
 export {
   CRON_TASK_DEFINITIONS,
+  CRON_TASK_FACTORIES,
+  tasksForPhase,
   runScheduledTasks,
   ExpiredTokenPruningTask,
   BackgroundTaskRunPruningTask,

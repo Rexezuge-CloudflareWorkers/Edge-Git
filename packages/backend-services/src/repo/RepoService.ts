@@ -1,5 +1,8 @@
 import {
+  AuditLogDAO,
   BranchProtectionDAO,
+  CheckRunDAO,
+  CollaborationDAO,
   DiscussionDAO,
   EventDAO,
   ImportDAO,
@@ -18,9 +21,12 @@ import {
   RepositoryDAO,
   SecuritySettingsDAO,
   StarDAO,
+  TeamRepoGrantDAO,
   TokenRepoGrantDAO,
   UserDAO,
   WatchDAO,
+  WebhookDAO,
+  WebhookDeliveryDAO,
   WikiDAO,
 } from '@edge-git/backend-data/dao';
 import type { RepositoryRow, RepoRole } from '@edge-git/backend-data/dao';
@@ -62,6 +68,12 @@ interface RepoServiceDeps {
   deployKeyDAO?: () => Promise<DeployKeyDAO>;
   tokenGrantDAO?: () => Promise<TokenRepoGrantDAO>;
   securitySettingsDAO?: () => Promise<SecuritySettingsDAO>;
+  collaborationDAO?: () => Promise<CollaborationDAO>;
+  webhookDAO?: () => Promise<WebhookDAO>;
+  webhookDeliveryDAO?: () => Promise<WebhookDeliveryDAO>;
+  auditLogDAO?: () => Promise<AuditLogDAO>;
+  teamGrantDAO?: () => Promise<TeamRepoGrantDAO>;
+  checkRunDAO?: () => Promise<CheckRunDAO>;
   permissionService?: () => Promise<PermissionService>;
   config?: AppConfiguration;
 }
@@ -109,6 +121,12 @@ class RepoService {
       deployKeyDAO: () => Promise.resolve(new DeployKeyDAO(env.DB)),
       tokenGrantDAO: () => Promise.resolve(new TokenRepoGrantDAO(env.DB)),
       securitySettingsDAO: () => Promise.resolve(new SecuritySettingsDAO(env.DB)),
+      collaborationDAO: () => Promise.resolve(new CollaborationDAO(env.DB)),
+      webhookDAO: () => Promise.resolve(new WebhookDAO(env.DB)),
+      webhookDeliveryDAO: () => Promise.resolve(new WebhookDeliveryDAO(env.DB)),
+      auditLogDAO: () => Promise.resolve(new AuditLogDAO(env.DB)),
+      teamGrantDAO: () => Promise.resolve(new TeamRepoGrantDAO(env.DB)),
+      checkRunDAO: () => Promise.resolve(new CheckRunDAO(env.DB)),
       permissionService,
       config: AppConfiguration.fromEnv(env),
       ...deps,

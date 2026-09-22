@@ -35,14 +35,15 @@ class IdentityResolver {
     return GHOST_USERNAME;
   }
 
-  public async resolveUsernames(emails: string[]): Promise<Map<string, string>> {
+  public async resolveUsernames(emails: unknown[]): Promise<Map<string, string>> {
     const out = new Map<string, string>();
     const deduped: string[] = [];
     const seen = new Set<string>();
     for (const raw of emails) {
-      if (!raw) continue;
+      if (typeof raw !== 'string' || !raw) continue;
       const key = normalizeEmail(raw);
-      if (!key || seen.has(key)) continue;
+      if (!key || key.length > 254 || !/^[^@\s]+@[^\s@]+\.[^\s@]+$/.test(key)) continue;
+      if (seen.has(key)) continue;
       seen.add(key);
       deduped.push(key);
     }
@@ -75,10 +76,15 @@ class IdentityResolver {
 
   // Accepts `username` or `email` (for filters like `?user=` / `?userEmail=`).
   // Returns the canonical stored email, or null when unknown.
-  public async resolveEmail(usernameOrEmail: string): Promise<string | null> {
+  public async resolveEmail(usernameOrEmail: unknown): Promise<string | null> {
+    if (typeof usernameOrEmail !== 'string') return null;
     const raw = usernameOrEmail.trim();
-    if (!raw) return null;
-    if (raw.includes('@')) return normalizeEmail(raw);
+    if (!raw || raw.length > 254) return null;
+    if (raw.includes('@')) {
+      const normalized = normalizeEmail(raw);
+      if (!/^[^@\s]+@[^\s@]+\.[^\s@]+$/.test(normalized)) return null;
+      return normalized;
+    }
     try {
       const dao = await this.deps.userDAO();
       const row = await dao.getByUsernameCi(raw.toLowerCase());

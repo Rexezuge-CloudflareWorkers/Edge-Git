@@ -1,5 +1,8 @@
 import type {
+  AuditLogDAO,
   BranchProtectionDAO,
+  CheckRunDAO,
+  CollaborationDAO,
   DeployKeyDAO,
   DiscussionDAO,
   EventDAO,
@@ -14,8 +17,11 @@ import type {
   RepoCollaboratorDAO,
   SecuritySettingsDAO,
   StarDAO,
+  TeamRepoGrantDAO,
   TokenRepoGrantDAO,
   WatchDAO,
+  WebhookDAO,
+  WebhookDeliveryDAO,
   WikiDAO,
 } from '@edge-git/backend-data/dao';
 
@@ -42,6 +48,12 @@ interface RepoCleanupDeps {
   deployKeyDAO: () => Promise<DeployKeyDAO>;
   tokenGrantDAO: () => Promise<TokenRepoGrantDAO>;
   securitySettingsDAO: () => Promise<SecuritySettingsDAO>;
+  collaborationDAO: () => Promise<CollaborationDAO>;
+  webhookDAO: () => Promise<WebhookDAO>;
+  webhookDeliveryDAO: () => Promise<WebhookDeliveryDAO>;
+  auditLogDAO: () => Promise<AuditLogDAO>;
+  teamGrantDAO: () => Promise<TeamRepoGrantDAO>;
+  checkRunDAO: () => Promise<CheckRunDAO>;
 }
 
 async function cleanupRepoSidecars(deps: RepoCleanupDeps, repoId: string): Promise<void> {
@@ -65,6 +77,11 @@ async function cleanupRepoSidecars(deps: RepoCleanupDeps, repoId: string): Promi
     deps.deployKeyDAO,
     deps.tokenGrantDAO,
     deps.securitySettingsDAO,
+    deps.collaborationDAO,
+    deps.webhookDAO,
+    deps.webhookDeliveryDAO,
+    deps.auditLogDAO,
+    deps.teamGrantDAO,
   ];
   for (const factory of factories) {
     try {
@@ -73,6 +90,16 @@ async function cleanupRepoSidecars(deps: RepoCleanupDeps, repoId: string): Promi
     } catch {
       // ignore — legacy DBs without the table
     }
+  }
+  // Check runs prune by time (no deleteByRepo); best-effort purge via a wide
+  // cutoff so deletes do not leave check history orphaned on new DBs.
+  try {
+    const checkDao = await deps.checkRunDAO();
+    if (typeof (checkDao as unknown as { deleteByRepo?: (id: string) => Promise<unknown> }).deleteByRepo === 'function') {
+      await (checkDao as unknown as { deleteByRepo: (id: string) => Promise<unknown> }).deleteByRepo(repoId);
+    }
+  } catch {
+    // ignore — legacy DBs without the table
   }
 }
 
