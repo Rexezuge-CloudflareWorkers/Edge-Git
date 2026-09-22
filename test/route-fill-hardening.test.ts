@@ -1107,6 +1107,34 @@ describe('ReleaseAsset auth + content-type', () => {
     expect(res.status).toBe(413);
   });
 
+  it('parses asset JSON bodies over the shared 1MB cap up to the asset cap', async () => {
+    const { db } = createFillFakeDb();
+    // Default MAX_ASSET_BYTES (25MB) allows ~36MB JSON. A 2MB Content-Length
+    // must not be rejected as malformed — the small invalid-base64 body below
+    // proves parsing happened (400 invalid base64, not 400 Invalid JSON body).
+    const res = await callWorker(
+      createEnv(db),
+      '/user/repos/alice/demo/releases/v1/assets',
+      postJson('/x', { name: 'a.zip', contentBase64: '!!!not-base64!!!' }, { 'content-length': '2000000' }),
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { Exception: { Message: string } };
+    expect(body.Exception.Message).toBe('contentBase64 must be valid base64');
+  });
+
+  it('returns 413 when asset Content-Length exceeds the asset cap', async () => {
+    const { db } = createFillFakeDb();
+    // Default cap is ~36MB JSON; 40MB must map to 413 (not 400 malformed).
+    const res = await callWorker(
+      createEnv(db),
+      '/user/repos/alice/demo/releases/v1/assets',
+      postJson('/x', { name: 'a.zip', contentBase64: 'eA==' }, { 'content-length': '40000000' }),
+    );
+    expect(res.status).toBe(413);
+    const body = (await res.json()) as { Exception: { Message: string } };
+    expect(body.Exception.Message).toContain('asset size must be 1-');
+  });
+
   it('normalizes unsafe content types to octet-stream', () => {
     expect(normalizeAssetContentType('text/html')).toBe('application/octet-stream');
     expect(normalizeAssetContentType('image/svg+xml')).toBe('application/octet-stream');

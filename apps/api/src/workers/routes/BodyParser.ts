@@ -10,30 +10,42 @@ type JsonContext = {
  * collapsing to `{}` and surfacing a misleading `required` error.
  * Non-object JSON (null, array, string, number) is malformed — callers
  * expecting an object must not coerce it to `{}`.
- * BREAKING: oversized JSON bodies (Content-Length > 1MB) are malformed so
- * large issue/PR bodies rely on service caps instead of unbounded parses.
+ * Oversized `Content-Length` is reported as `oversized: true` (alongside
+ * `malformed: true` so legacy callers still fail closed with 400). Callers
+ * with domain size caps (release assets, file writes) must check `oversized`
+ * first and return 413 so large-but-valid payloads are not masked as 400.
+ * The default cap is 1MB; base64 upload routes pass a higher per-route cap
+ * derived from their configured max bytes.
  */
 const MAX_JSON_BYTES = 1_000_000;
 
-async function readJsonBody<T>(c: JsonContext | Context): Promise<{ malformed: boolean; body: T }> {
+type ReadJsonOptions = {
+  maxBytes?: number;
+};
+
+type ReadJsonResult<T> = { malformed: boolean; oversized: boolean; body: T };
+
+async function readJsonBody<T>(c: JsonContext | Context, opts?: ReadJsonOptions): Promise<ReadJsonResult<T>> {
+  const limit = opts?.maxBytes ?? MAX_JSON_BYTES;
   try {
     try {
       const lenHeader = (c as Context).req?.header?.('content-length');
-      if (lenHeader !== undefined) {
+      if (typeof lenHeader === 'string') {
         const len = Number(lenHeader);
-        if (Number.isSafeInteger(len) && len > MAX_JSON_BYTES) return { malformed: true, body: {} as T };
+        if (Number.isSafeInteger(len) && len > limit) return { malformed: true, oversized: true, body: {} as T };
       }
     } catch {
       // Header check must never fail the read.
     }
     const body = (await (c as JsonContext).req.json()) as T;
     const value: unknown = body;
-    if (value === null || value === undefined) return { malformed: true, body: {} as T };
-    if (typeof value !== 'object' || Array.isArray(value)) return { malformed: true, body: {} as T };
-    return { malformed: false, body };
+    if (value === null || value === undefined) return { malformed: true, oversized: false, body: {} as T };
+    if (typeof value !== 'object' || Array.isArray(value)) return { malformed: true, oversized: false, body: {} as T };
+    return { malformed: false, oversized: false, body };
   } catch {
-    return { malformed: true, body: {} as T };
+    return { malformed: true, oversized: false, body: {} as T };
   }
 }
 
 export { readJsonBody, MAX_JSON_BYTES };
+export type { ReadJsonOptions, ReadJsonResult };

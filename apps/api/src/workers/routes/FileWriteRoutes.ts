@@ -154,13 +154,19 @@ function registerFileWriteRoutes(app: RepoApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
-    const { malformed, body } = await readJsonBody<{
+    // Per-route JSON cap before parsing: base64 inflates ~4/3x, so the shared
+    // 1MB default would reject max-size file writes with a misleading 400.
+    // The byte-exact tripwire below still enforces the file cap as 413.
+    const maxFileBytesForCap = ConfigurationManager.repo.getMaxFileBytes(c.env);
+    const maxJsonBytes = Math.ceil(maxFileBytesForCap * 1.4) + 4096;
+    const { malformed, oversized, body } = await readJsonBody<{
       branch?: string;
       path?: string;
       contentBase64?: string;
       message?: string;
       expectedOid?: string | null;
-    }>(c);
+    }>(c, { maxBytes: maxJsonBytes });
+    if (oversized) return jsonError(c, `file too large (max ${maxFileBytesForCap} bytes)`, 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const branch = (body.branch ?? '').trim();
     if (!branch) return jsonError(c, 'branch is required', 400);

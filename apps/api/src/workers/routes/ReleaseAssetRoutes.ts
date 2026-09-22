@@ -117,13 +117,21 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
     } catch {
       return jsonError(c, 'Forbidden', 403);
     }
-    const { malformed, body } = await readJsonBody<{ name?: unknown; contentBase64?: unknown; contentType?: unknown }>(c);
+    const maxBytes = ConfigurationManager.releases.getMaxAssetBytes(c.env);
+    // Per-route JSON cap: base64 inflates ~4/3x, so the shared 1MB
+    // `readJsonBody` default would reject any asset over ~700KB raw with a
+    // misleading 400. Allow up to the configured asset cap plus JSON overhead;
+    // the base64 tripwire below still enforces the exact byte limit as 413.
+    const maxJsonBytes = Math.ceil(maxBytes * 1.4) + 4096;
+    const { malformed, oversized, body } = await readJsonBody<{ name?: unknown; contentBase64?: unknown; contentType?: unknown }>(c, {
+      maxBytes: maxJsonBytes,
+    });
+    if (oversized) return jsonError(c, `asset size must be 1-${maxBytes} bytes`, 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.name !== 'string' || typeof body.contentBase64 !== 'string' || !body.contentBase64) {
       return jsonError(c, 'name and contentBase64 are required', 400);
     }
     if (!assetNameSchema.safeParse(body.name).success) return jsonError(c, 'Invalid asset name', 400);
-    const maxBytes = ConfigurationManager.releases.getMaxAssetBytes(c.env);
     // Pre-decode tripwire on base64 length so oversized bodies 413 without a
     // full `atob` allocation burn.
     if (body.contentBase64.length > Math.ceil(maxBytes * 1.4) + 4) {

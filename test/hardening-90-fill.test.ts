@@ -271,7 +271,20 @@ describe('harden-90 body + repo param caps', () => {
         json: async () => ({ ok: true }),
       },
     } as never;
-    await expect(readJsonBody(c)).resolves.toMatchObject({ malformed: true });
+    await expect(readJsonBody(c)).resolves.toMatchObject({ malformed: true, oversized: true });
+  });
+
+  it('honors a per-route cap above the shared default', async () => {
+    const c = {
+      req: {
+        header: () => String(MAX_JSON_BYTES + 1),
+        json: async () => ({ ok: true }),
+      },
+    } as never;
+    await expect(readJsonBody(c, { maxBytes: MAX_JSON_BYTES + 2 })).resolves.toMatchObject({
+      malformed: false,
+      oversized: false,
+    });
   });
 
   it('caps ref/path/depth at edge', () => {

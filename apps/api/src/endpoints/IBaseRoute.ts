@@ -54,7 +54,7 @@ abstract class BaseRoute {
    */
   public static async readJson<T>(
     c: HonoContext | Context | { req: { json: () => Promise<unknown>; header?: (name: string) => string | undefined } },
-  ): Promise<{ malformed: boolean; body: T }> {
+  ): Promise<{ malformed: boolean; oversized: boolean; body: T }> {
     return readJsonBody<T>(c);
   }
 
