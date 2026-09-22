@@ -130,23 +130,5 @@ async function resolveHeadRepo(env: Env, pull: PullHeadRef): Promise<ResolvedHea
   return null;
 }
 
-// Read access check on the head repo (hides private forks via null).
-async function getHeadRole(env: Env, head: ResolvedHeadRepo, viewerEmail: string | null): Promise<'admin' | 'write' | 'read' | null> {
-  const scope = createRequestScope(env);
-  return scope
-    .get(Tokens.PermissionService)
-    .getRole(viewerEmail, head.row)
-    .catch(() => null);
-}
-
-export {
-  copyRepoGit,
-  ensureHeadObjects,
-  getCrossRepoPreview,
-  getHeadRole,
-  isCrossRepoPull,
-  isPackLimitError,
-  resolveCrossOids,
-  resolveHeadRepo,
-};
+export { copyRepoGit, ensureHeadObjects, getCrossRepoPreview, isCrossRepoPull, isPackLimitError, resolveCrossOids, resolveHeadRepo };
 export type { ForkCopyResult };
