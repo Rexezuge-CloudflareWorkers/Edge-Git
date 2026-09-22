@@ -76,7 +76,16 @@ function loadAdapter() {
   const fakeRequire = (id: string) => (id === 'dofs' ? { Fs: FakeFs } : nodeRequire(id));
   const mod = { exports: {} as Record<string, never> };
   new Function('require', 'exports', 'module', outputText)(fakeRequire, mod.exports, mod);
-  return { adapter: mod.exports as unknown as { createDofsFs(c: unknown, e: unknown, o?: unknown): unknown; setDofsDeviceSize(d: unknown, n: number): void; DEFAULT_CHUNK_SIZE: number }, ctorArgs, sizes, FakeFs };
+  return {
+    adapter: mod.exports as unknown as {
+      createDofsFs(c: unknown, e: unknown, o?: unknown): unknown;
+      setDofsDeviceSize(d: unknown, n: number): void;
+      DEFAULT_CHUNK_SIZE: number;
+    },
+    ctorArgs,
+    sizes,
+    FakeFs,
+  };
 }
 
 /** Legacy redirect shim: `applyRefUpdates` used to hardcode `/repo`; it now honors `this.gitdir`. Kept so older branches calling with `/repo` still resolve onto tmp. */
@@ -347,9 +356,9 @@ describe('RefService applyRefUpdates', () => {
     await expect(svc.applyRefUpdates([{ oldOid: ZERO_OID, newOid: c1, ref: 'refs/heads/new' }], false)).resolves.toEqual([
       { ref: 'refs/heads/new', ok: false, error: 'ref already exists' },
     ]);
-    await expect(
-      svc.applyRefUpdates([{ oldOid: c1, newOid: ZERO_OID, ref: 'refs/heads/ghost' }], false),
-    ).resolves.toEqual([{ ref: 'refs/heads/ghost', ok: false, error: "ref doesn't exist" }]);
+    await expect(svc.applyRefUpdates([{ oldOid: c1, newOid: ZERO_OID, ref: 'refs/heads/ghost' }], false)).resolves.toEqual([
+      { ref: 'refs/heads/ghost', ok: false, error: "ref doesn't exist" },
+    ]);
   });
 
   it('deletes existing refs', async () => {
@@ -384,7 +393,9 @@ describe('GitService delegation', () => {
     }
   });
 
-  async function makeSvc(files: Record<string, string> = { 'hello.txt': 'hello\n' }): Promise<{ svc: GitService; dir: string; gitdir: string; commitOid: string; blobOid: string }> {
+  async function makeSvc(
+    files: Record<string, string> = { 'hello.txt': 'hello\n' },
+  ): Promise<{ svc: GitService; dir: string; gitdir: string; commitOid: string; blobOid: string }> {
     const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'edge-git-svc-'));
     tmpDirs.push(dir);
     await git.init({ fs, dir });

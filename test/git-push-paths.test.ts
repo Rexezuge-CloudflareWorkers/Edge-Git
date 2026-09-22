@@ -13,11 +13,7 @@ const WANT = 'a'.repeat(40);
 const HEAD = 'b'.repeat(40);
 
 function pushPayload(packBytes: Uint8Array): Uint8Array {
-  const parts = [
-    PktLine.encode(`${ZERO} ${WANT} refs/heads/main\0report-status\n`),
-    PktLine.encodeFlush(),
-    packBytes,
-  ];
+  const parts = [PktLine.encode(`${ZERO} ${WANT} refs/heads/main\0report-status\n`), PktLine.encodeFlush(), packBytes];
   const total = parts.reduce((n, p) => n + p.length, 0);
   const out = new Uint8Array(total);
   let off = 0;
@@ -117,7 +113,11 @@ const CTX = { waitUntil: () => undefined, passThroughOnException: () => undefine
 async function push(data: Uint8Array, env: unknown, headers: Record<string, string> = {}): Promise<Response> {
   const worker = new EdgeGitWorker() as unknown as { onRequest(r: Request, e: unknown, c: unknown): Promise<Response> };
   return worker.onRequest(
-    new Request('https://git.example.com/alice/demo/git-receive-pack', { method: 'POST', headers: { authorization: `Bearer ${PAT}`, ...headers }, body: data as unknown as BodyInit }),
+    new Request('https://git.example.com/alice/demo/git-receive-pack', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${PAT}`, ...headers },
+      body: data as unknown as BodyInit,
+    }),
     env,
     CTX,
   );
@@ -160,7 +160,10 @@ describe('slice5: git-receive-pack secret scan + protections', () => {
 
   it('fails closed with 503 when protections cannot load', async () => {
     const received: Array<{ protections: unknown }> = [];
-    const res = await push(pushPayload(new TextEncoder().encode('PACK clean')), pushEnv(pushFakeDb(tokenHash, { protectionsThrow: true }), received));
+    const res = await push(
+      pushPayload(new TextEncoder().encode('PACK clean')),
+      pushEnv(pushFakeDb(tokenHash, { protectionsThrow: true }), received),
+    );
     expect(res.status).toBe(503);
     expect(received).toHaveLength(0);
   });
@@ -234,7 +237,20 @@ describe('slice5: triggerRequiredChecks', () => {
   it('reports required contexts and enqueues the runner', async () => {
     const enqueued: unknown[] = [];
     const env = {
-      DB: checkFakeDb([{ id: 'rule1', repository_id: 'r1', pattern: '*', require_pr: 0, required_approvals: 0, block_force_push: 0, block_deletion: 0, require_status_checks: '["ci"]', created_by: ALICE, created_at: 1 }]),
+      DB: checkFakeDb([
+        {
+          id: 'rule1',
+          repository_id: 'r1',
+          pattern: '*',
+          require_pr: 0,
+          required_approvals: 0,
+          block_force_push: 0,
+          block_deletion: 0,
+          require_status_checks: '["ci"]',
+          created_by: ALICE,
+          created_at: 1,
+        },
+      ]),
       ENVIRONMENT: 'development',
       CHECK_RUNNER: { getByName: () => ({ enqueueChecks: async (args: unknown) => void enqueued.push(args) }) },
     } as unknown as Env;
@@ -245,14 +261,34 @@ describe('slice5: triggerRequiredChecks', () => {
 
   it('survives a missing CHECK_RUNNER binding (cron sweeps later)', async () => {
     const env = {
-      DB: checkFakeDb([{ id: 'rule1', repository_id: 'r1', pattern: '*', require_pr: 0, required_approvals: 0, block_force_push: 0, block_deletion: 0, require_status_checks: '["ci"]', created_by: ALICE, created_at: 1 }]),
+      DB: checkFakeDb([
+        {
+          id: 'rule1',
+          repository_id: 'r1',
+          pattern: '*',
+          require_pr: 0,
+          required_approvals: 0,
+          block_force_push: 0,
+          block_deletion: 0,
+          require_status_checks: '["ci"]',
+          created_by: ALICE,
+          created_at: 1,
+        },
+      ]),
       ENVIRONMENT: 'development',
     } as unknown as Env;
     await expect(triggerRequiredChecks(env, input)).resolves.toEqual({ triggered: ['ci'] });
   });
 
   it('never throws when the rule lookup fails', async () => {
-    const env = { DB: { prepare: () => { throw new Error('D1 down'); } }, ENVIRONMENT: 'development' } as unknown as Env;
+    const env = {
+      DB: {
+        prepare: () => {
+          throw new Error('D1 down');
+        },
+      },
+      ENVIRONMENT: 'development',
+    } as unknown as Env;
     await expect(triggerRequiredChecks(env, input)).resolves.toEqual({ triggered: [] });
   });
 });

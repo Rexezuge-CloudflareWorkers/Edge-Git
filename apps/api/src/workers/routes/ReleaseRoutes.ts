@@ -4,7 +4,15 @@ import { presentMany, presentSingle } from './IdentityPresenter';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { getRepoStub } from '../doStubs';
 import { recordAndNotify } from './SocialEmit';
-import { jsonError, requireVisibleRepo, resolvePublicViewer, toSafeErrorMessage, toServiceStatus, withPublicRepo, getScope } from './PublicViewerResolver';
+import {
+  jsonError,
+  requireVisibleRepo,
+  resolvePublicViewer,
+  toSafeErrorMessage,
+  toServiceStatus,
+  withPublicRepo,
+  getScope,
+} from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type ReleaseApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;

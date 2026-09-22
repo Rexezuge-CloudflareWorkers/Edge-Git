@@ -81,17 +81,20 @@ describe('harden-90 token concurrency guard', () => {
 
   it('deleteToken normalizes email case', async () => {
     const seen: string[] = [];
-    const svc = new TokenService({ DB: {} as never }, {
-      tokenDAO: () =>
-        Promise.resolve({
-          delete: async (_id: string, email: string) => {
-            seen.push(email);
-            return true;
-          },
-        } as never),
-      tokenGrantDAO: () => Promise.resolve({ deleteByToken: async () => undefined } as never),
-      repositoryDAO: () => Promise.resolve({} as never),
-    });
+    const svc = new TokenService(
+      { DB: {} as never },
+      {
+        tokenDAO: () =>
+          Promise.resolve({
+            delete: async (_id: string, email: string) => {
+              seen.push(email);
+              return true;
+            },
+          } as never),
+        tokenGrantDAO: () => Promise.resolve({ deleteByToken: async () => undefined } as never),
+        repositoryDAO: () => Promise.resolve({} as never),
+      },
+    );
     await svc.deleteToken('tid', 'User@Example.COM');
     expect(seen).toEqual(['user@example.com']);
   });
@@ -106,9 +109,12 @@ describe('harden-90 import cancel scoping', () => {
   }
 
   it('cancels when repository matches', async () => {
-    const svc = new ImportService({ DB: {} as never }, {
-      importDAO: () => Promise.resolve(fakeDao({ repository_id: 'r1', status: 'pending' })),
-    });
+    const svc = new ImportService(
+      { DB: {} as never },
+      {
+        importDAO: () => Promise.resolve(fakeDao({ repository_id: 'r1', status: 'pending' })),
+      },
+    );
     // getById returns minimal row; toMetadata tolerates missing fields via cast
     const out = await svc.cancelJob('job-1', 'r1').catch(() => null);
     expect(out === null || typeof out === 'object').toBe(true);
@@ -116,13 +122,16 @@ describe('harden-90 import cancel scoping', () => {
 
   it('returns NotFound when repository mismatches', async () => {
     const { NotFoundError } = await import('@edge-git/backend-errors');
-    const svc = new ImportService({ DB: {} as never }, {
-      importDAO: () =>
-        Promise.resolve({
-          getById: async () => ({ id: 'job-1', repository_id: 'other', status: 'pending' }),
-          markCancelled: async () => undefined,
-        } as never),
-    });
+    const svc = new ImportService(
+      { DB: {} as never },
+      {
+        importDAO: () =>
+          Promise.resolve({
+            getById: async () => ({ id: 'job-1', repository_id: 'other', status: 'pending' }),
+            markCancelled: async () => undefined,
+          } as never),
+      },
+    );
     await expect(svc.cancelJob('job-1', 'r1')).rejects.toBeInstanceOf(NotFoundError);
   });
 });
@@ -146,15 +155,21 @@ describe('harden-90 webhook payload allowlist', () => {
 
 describe('harden-90 webhook https-only in production', () => {
   it('blocks http in production, allows in dev', async () => {
-    const prod = new WebhookService({ DB: {} as never, ENVIRONMENT: 'production' }, {
-      webhookDAO: () => Promise.resolve({ countByRepo: async () => 0, create: async () => undefined } as never),
-    });
+    const prod = new WebhookService(
+      { DB: {} as never, ENVIRONMENT: 'production' },
+      {
+        webhookDAO: () => Promise.resolve({ countByRepo: async () => 0, create: async () => undefined } as never),
+      },
+    );
     await expect(
       prod.createHook({ repositoryId: 'r', fullName: 'a/b', url: 'http://example.com/hook', creatorEmail: 'a@b.co' }),
     ).rejects.toThrow(/https/);
-    const dev = new WebhookService({ DB: {} as never, ENVIRONMENT: 'development' }, {
-      webhookDAO: () => Promise.resolve({ countByRepo: async () => 0, create: async () => undefined } as never),
-    });
+    const dev = new WebhookService(
+      { DB: {} as never, ENVIRONMENT: 'development' },
+      {
+        webhookDAO: () => Promise.resolve({ countByRepo: async () => 0, create: async () => undefined } as never),
+      },
+    );
     const out = await dev.createHook({
       repositoryId: 'r',
       fullName: 'a/b',
@@ -168,16 +183,19 @@ describe('harden-90 webhook https-only in production', () => {
 
 describe('harden-90 detailsUrl SSRF guard', () => {
   function svcWithExisting() {
-    return new CheckService({ DB: {} as never }, {
-      checkRunDAO: () =>
-        Promise.resolve({
-          getByRepoShaContext: async () => null,
-          countBySha: async () => 0,
-          create: async () => undefined,
-          updateStatus: async () => undefined,
-          getById: async () => ({ id: '1', context: 'c', status: 'queued', conclusion: null }),
-        } as never),
-    });
+    return new CheckService(
+      { DB: {} as never },
+      {
+        checkRunDAO: () =>
+          Promise.resolve({
+            getByRepoShaContext: async () => null,
+            countBySha: async () => 0,
+            create: async () => undefined,
+            updateStatus: async () => undefined,
+            getById: async () => ({ id: '1', context: 'c', status: 'queued', conclusion: null }),
+          } as never),
+      },
+    );
   }
 
   it('rejects literal private detailsUrl', async () => {

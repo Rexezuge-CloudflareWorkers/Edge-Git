@@ -43,7 +43,21 @@ function seedState(): GapState {
       { username_ci: 'acme', kind: 'org', user_email: null, org_id: 'org-acme' },
     ],
     repos: [
-      { id: 'r-demo', owner_email: ALICE, owner_user_email: ALICE, owner: 'alice', name: 'demo', description: null, is_private: 0, created_at: 1, updated_at: 2, owner_type: 'user', owner_ci: 'alice', name_ci: 'demo', org_id: null },
+      {
+        id: 'r-demo',
+        owner_email: ALICE,
+        owner_user_email: ALICE,
+        owner: 'alice',
+        name: 'demo',
+        description: null,
+        is_private: 0,
+        created_at: 1,
+        updated_at: 2,
+        owner_type: 'user',
+        owner_ci: 'alice',
+        name_ci: 'demo',
+        org_id: null,
+      },
     ],
     orgs: [{ id: 'org-acme', username: 'acme', username_ci: 'acme', creator_email: ALICE, created_at: 1, updated_at: 1 }],
     orgMembers: [{ org_id: 'org-acme', user_email: ALICE, role: 'owner', created_at: 1 }],
@@ -86,13 +100,19 @@ function gapDb(state: GapState): D1Queryable {
           return Promise.resolve((row ?? null) as T | null);
         }
         if (q.includes('FROM organization_members WHERE org_id = ? AND')) {
-          return Promise.resolve((state.orgMembers.find((m) => m.org_id === params[0] && lower(m.user_email) === lower(params[1])) ?? null) as T | null);
+          return Promise.resolve(
+            (state.orgMembers.find((m) => m.org_id === params[0] && lower(m.user_email) === lower(params[1])) ?? null) as T | null,
+          );
         }
         if (q.includes('COUNT(*) AS n FROM organization_members')) {
-          return Promise.resolve({ n: state.orgMembers.filter((m) => m.org_id === params[0] && m.role === 'owner').length } as unknown as T);
+          return Promise.resolve({
+            n: state.orgMembers.filter((m) => m.org_id === params[0] && m.role === 'owner').length,
+          } as unknown as T);
         }
         if (q.includes('FROM repo_collaborators WHERE repo_id = ? AND')) {
-          return Promise.resolve((state.collaborators.find((c) => c.repo_id === params[0] && lower(c.user_email) === lower(params[1])) ?? null) as T | null);
+          return Promise.resolve(
+            (state.collaborators.find((c) => c.repo_id === params[0] && lower(c.user_email) === lower(params[1])) ?? null) as T | null,
+          );
         }
         if (q.includes('COUNT(*) AS n FROM repo_stars WHERE')) {
           return Promise.resolve({ n: state.stars.filter((s) => s.repo_id === params[0]).length } as unknown as T);
@@ -110,17 +130,23 @@ function gapDb(state: GapState): D1Queryable {
           return Promise.resolve({ count: state.snippets.filter((s) => lower(s.owner_email) === lower(params[0])).length } as unknown as T);
         }
         if (q.includes('FROM repo_stars WHERE repo_id = ? AND user_email = ?')) {
-          return Promise.resolve((state.stars.find((s) => s.repo_id === params[0] && lower(s.user_email) === lower(params[1])) ?? null) as T | null);
+          return Promise.resolve(
+            (state.stars.find((s) => s.repo_id === params[0] && lower(s.user_email) === lower(params[1])) ?? null) as T | null,
+          );
         }
         if (q.includes('FROM repo_security_settings WHERE')) {
           const mode = state.security[String(params[0])];
-          return Promise.resolve((mode ? { repository_id: params[0], secret_scan_mode: mode, updated_by: ALICE, updated_at: 1 } : null) as T | null);
+          return Promise.resolve(
+            (mode ? { repository_id: params[0], secret_scan_mode: mode, updated_by: ALICE, updated_at: 1 } : null) as T | null,
+          );
         }
         if (q.includes('FROM snippets WHERE id = ?')) {
           return Promise.resolve((state.snippets.find((s) => s.id === params[0]) ?? null) as T | null);
         }
         if (q.includes('FROM repo_watches WHERE repo_id = ? AND user_email = ?')) {
-          return Promise.resolve((state.watches.find((s) => s.repo_id === params[0] && lower(s.user_email) === lower(params[1])) ?? null) as T | null);
+          return Promise.resolve(
+            (state.watches.find((s) => s.repo_id === params[0] && lower(s.user_email) === lower(params[1])) ?? null) as T | null,
+          );
         }
         if (q.includes('FROM branch_protection_rules WHERE id = ?')) {
           return Promise.resolve((state.rules.find((r) => r.id === params[0]) ?? null) as T | null);
@@ -171,7 +197,9 @@ function gapDb(state: GapState): D1Queryable {
           return Promise.resolve({ results: state.notifications.filter((n) => lower(n.user_email) === lower(params[0])) as T[] });
         }
         if (q.includes('FROM snippets WHERE')) {
-          return Promise.resolve({ results: state.snippets.filter((s) => lower(s.owner_email) === lower(params[0]) || s.visibility === 'public') as T[] });
+          return Promise.resolve({
+            results: state.snippets.filter((s) => lower(s.owner_email) === lower(params[0]) || s.visibility === 'public') as T[],
+          });
         }
         if (q.includes('FROM snippet_files WHERE')) {
           return Promise.resolve({ results: state.snippetFiles.filter((f) => f.snippet_id === params[0]) as T[] });
@@ -180,15 +208,34 @@ function gapDb(state: GapState): D1Queryable {
       },
       run(): Promise<{ success: boolean; meta?: { changes?: number } }> {
         if (q.startsWith('DELETE FROM repo_collaborators WHERE')) {
-          state.collaborators = state.collaborators.filter((c) => !(c.repo_id === params[0] && (params.length === 1 || lower(c.user_email) === lower(params[1]))));
+          state.collaborators = state.collaborators.filter(
+            (c) => !(c.repo_id === params[0] && (params.length === 1 || lower(c.user_email) === lower(params[1]))),
+          );
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO repo_collaborators')) {
-          state.collaborators.push({ repo_id: params[0], user_email: lower(params[1]), role: params[2], granted_by: params[3] ?? null, created_at: params[4] ?? 1 });
+          state.collaborators.push({
+            repo_id: params[0],
+            user_email: lower(params[1]),
+            role: params[2],
+            granted_by: params[3] ?? null,
+            created_at: params[4] ?? 1,
+          });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO branch_protection_rules')) {
-          state.rules.push({ id: params[0], repository_id: params[1], pattern: params[2], require_pr: params[3], required_approvals: params[4], block_force_push: params[5], block_deletion: params[6], require_status_checks: params[7], created_by: params[8], created_at: params[9] });
+          state.rules.push({
+            id: params[0],
+            repository_id: params[1],
+            pattern: params[2],
+            require_pr: params[3],
+            required_approvals: params[4],
+            block_force_push: params[5],
+            block_deletion: params[6],
+            require_status_checks: params[7],
+            created_by: params[8],
+            created_at: params[9],
+          });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('DELETE FROM branch_protection_rules WHERE')) {
@@ -227,7 +274,19 @@ function gapDb(state: GapState): D1Queryable {
             existing.enabled = 1;
             existing.updated_at = params[5];
           } else {
-            state.mirrors.push({ repository_id: params[0], source_url: params[1], interval_minutes: params[2], enabled: 1, last_run_at: null, last_status: null, last_error: null, consecutive_failures: 0, created_by: params[3], created_at: params[4], updated_at: params[5] });
+            state.mirrors.push({
+              repository_id: params[0],
+              source_url: params[1],
+              interval_minutes: params[2],
+              enabled: 1,
+              last_run_at: null,
+              last_status: null,
+              last_error: null,
+              consecutive_failures: 0,
+              created_by: params[3],
+              created_at: params[4],
+              updated_at: params[5],
+            });
           }
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
@@ -245,7 +304,18 @@ function gapDb(state: GapState): D1Queryable {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO deploy_keys')) {
-          state.keys.push({ id: params[0], repository_id: params[1], name: params[2], token_hash: params[3], token_prefix: params[4], permission: params[5], expires_at: params[6], last_used_at: null, created_by: params[7], created_at: params[8] });
+          state.keys.push({
+            id: params[0],
+            repository_id: params[1],
+            name: params[2],
+            token_hash: params[3],
+            token_prefix: params[4],
+            permission: params[5],
+            expires_at: params[6],
+            last_used_at: null,
+            created_by: params[7],
+            created_at: params[8],
+          });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('DELETE FROM deploy_keys WHERE id = ?')) {
@@ -257,7 +327,14 @@ function gapDb(state: GapState): D1Queryable {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO snippets')) {
-          state.snippets.push({ id: params[0], owner_email: lower(params[1]), title: params[2], visibility: params[3], created_at: params[4], updated_at: params[5] });
+          state.snippets.push({
+            id: params[0],
+            owner_email: lower(params[1]),
+            title: params[2],
+            visibility: params[3],
+            created_at: params[4],
+            updated_at: params[5],
+          });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO snippet_files')) {
@@ -292,7 +369,12 @@ function gapDb(state: GapState): D1Queryable {
         }
         if (q.startsWith('INSERT INTO namespaces') || q.startsWith('INSERT OR IGNORE INTO namespaces')) {
           if (!state.namespaces.some((n) => n.username_ci === params[0])) {
-            state.namespaces.push({ username_ci: params[0], kind: params[1] ?? 'user', user_email: params[2] ?? null, org_id: params[3] ?? null });
+            state.namespaces.push({
+              username_ci: params[0],
+              kind: params[1] ?? 'user',
+              user_email: params[2] ?? null,
+              org_id: params[3] ?? null,
+            });
           }
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
@@ -368,7 +450,9 @@ describe('gap fill: collaborators (OrgRoutes 185-253)', () => {
     const state = seedState();
     const env = gapEnv(gapDb(state));
     expect((await callGap(env, '/user/repos/alice/demo/collaborators/bob', putJson({ role: 'superadmin' }))).status).toBe(400);
-    expect((await callGap(env, '/user/repos/alice/demo/collaborators/bob', { method: 'PUT', headers: JSON_HEADERS, body: '{broken' })).status).toBe(400);
+    expect(
+      (await callGap(env, '/user/repos/alice/demo/collaborators/bob', { method: 'PUT', headers: JSON_HEADERS, body: '{broken' })).status,
+    ).toBe(400);
     expect((await callGap(env, '/user/repos/alice/demo/collaborators/nonexistent', putJson({ role: 'read' }))).status).toBe(404);
   });
 
@@ -408,7 +492,9 @@ describe('gap fill: rules (RuleRoutes)', () => {
     const env = gapEnv(gapDb(state));
     expect((await callGap(env, '/user/repos/alice/demo/rules', postJson({}))).status).toBe(400);
     expect((await callGap(env, '/user/repos/alice/demo/rules', postJson({ pattern: '  ' }))).status).toBe(400);
-    expect((await callGap(env, '/user/repos/alice/demo/rules', { method: 'POST', headers: JSON_HEADERS, body: '{broken' })).status).toBe(400);
+    expect((await callGap(env, '/user/repos/alice/demo/rules', { method: 'POST', headers: JSON_HEADERS, body: '{broken' })).status).toBe(
+      400,
+    );
   });
 
   it('forbids rule mutation for non-admins', async () => {
@@ -422,12 +508,22 @@ describe('gap fill: social star/watch flows', () => {
   it('stars, unstars, watches, un watches with counts', async () => {
     const state = seedState();
     const env = gapEnv(gapDb(state));
-    const starred = (await (await callGap(env, '/user/repos/alice/demo/star', { method: 'PUT' })).json()) as { starred: boolean; starsCount: number };
+    const starred = (await (await callGap(env, '/user/repos/alice/demo/star', { method: 'PUT' })).json()) as {
+      starred: boolean;
+      starsCount: number;
+    };
     expect(starred.starred).toBe(true);
     expect(starred.starsCount).toBe(1);
-    const watched = (await (await callGap(env, '/user/repos/alice/demo/watch', { method: 'PUT' })).json()) as { watched?: boolean; watching?: boolean; watchersCount: number };
+    const watched = (await (await callGap(env, '/user/repos/alice/demo/watch', { method: 'PUT' })).json()) as {
+      watched?: boolean;
+      watching?: boolean;
+      watchersCount: number;
+    };
     expect(watched.watchersCount).toBe(1);
-    const unstarred = (await (await callGap(env, '/user/repos/alice/demo/star', { method: 'DELETE' })).json()) as { starred: boolean; starsCount: number };
+    const unstarred = (await (await callGap(env, '/user/repos/alice/demo/star', { method: 'DELETE' })).json()) as {
+      starred: boolean;
+      starsCount: number;
+    };
     expect(unstarred.starred).toBe(false);
     expect(unstarred.starsCount).toBe(0);
     const unwatched = await callGap(env, '/user/repos/alice/demo/watch', { method: 'DELETE' });
@@ -509,9 +605,15 @@ describe('gap fill: mirrors and imports', () => {
   it('configures, toggles, sync-guards, and removes mirrors', async () => {
     const state = seedState();
     const env = gapEnv(gapDb(state));
-    const configured = await callGap(env, '/user/repos/alice/demo/mirror', putJson({ sourceUrl: 'https://github.com/o/r', intervalMinutes: 60 }));
+    const configured = await callGap(
+      env,
+      '/user/repos/alice/demo/mirror',
+      putJson({ sourceUrl: 'https://github.com/o/r', intervalMinutes: 60 }),
+    );
     expect(configured.status).toBe(200);
-    expect((await callGap(env, '/user/repos/alice/demo/mirror', putJson({ sourceUrl: 'http://github.com/o/r', intervalMinutes: 60 }))).status).toBe(400);
+    expect(
+      (await callGap(env, '/user/repos/alice/demo/mirror', putJson({ sourceUrl: 'http://github.com/o/r', intervalMinutes: 60 }))).status,
+    ).toBe(400);
     const enabled = await callGap(env, '/user/repos/alice/demo/mirror/enable', postJson({ enabled: false }));
     expect(enabled.status).toBe(200);
     expect((await callGap(env, '/user/repos/alice/demo/mirror/enable', postJson({ enabled: 'yes' }))).status).toBe(400);
@@ -546,7 +648,11 @@ describe('gap fill: notifications and snippets', () => {
     const empty = (await (await callGap(env, '/user/snippets')).json()) as { snippets: unknown[] };
     expect(empty.snippets).toEqual([]);
     expect((await callGap(env, '/user/snippets', postJson({}))).status).toBe(400);
-    const created = await callGap(env, '/user/snippets', postJson({ title: 'notes', visibility: 'public', files: [{ filename: 'a.txt', body: 'hi' }] }));
+    const created = await callGap(
+      env,
+      '/user/snippets',
+      postJson({ title: 'notes', visibility: 'public', files: [{ filename: 'a.txt', body: 'hi' }] }),
+    );
     expect(created.status).toBe(201);
     expect(state.snippets).toHaveLength(1);
   });
@@ -560,7 +666,21 @@ describe('gap fill: org rename and disband', () => {
 
   it('renames an org and cascades repos', async () => {
     const state = seedState();
-    state.repos.push({ id: 'r-org', owner_email: ALICE, owner_user_email: ALICE, owner: 'acme', name: 'o1', description: null, is_private: 0, created_at: 1, updated_at: 1, owner_type: 'org', owner_ci: 'acme', name_ci: 'o1', org_id: 'org-acme' });
+    state.repos.push({
+      id: 'r-org',
+      owner_email: ALICE,
+      owner_user_email: ALICE,
+      owner: 'acme',
+      name: 'o1',
+      description: null,
+      is_private: 0,
+      created_at: 1,
+      updated_at: 1,
+      owner_type: 'org',
+      owner_ci: 'acme',
+      name_ci: 'o1',
+      org_id: 'org-acme',
+    });
     const env = gapEnv(gapDb(state));
     const res = await callGap(env, '/user/orgs/acme', patchJson({ username: 'acme2' }));
     expect(res.status).toBe(200);
@@ -568,7 +688,21 @@ describe('gap fill: org rename and disband', () => {
 
   it('blocks disband while repos exist, allows when empty', async () => {
     const blocked = seedState();
-    blocked.repos.push({ id: 'r-org', owner_email: ALICE, owner_user_email: ALICE, owner: 'acme', name: 'o1', description: null, is_private: 0, created_at: 1, updated_at: 1, owner_type: 'org', owner_ci: 'acme', name_ci: 'o1', org_id: 'org-acme' });
+    blocked.repos.push({
+      id: 'r-org',
+      owner_email: ALICE,
+      owner_user_email: ALICE,
+      owner: 'acme',
+      name: 'o1',
+      description: null,
+      is_private: 0,
+      created_at: 1,
+      updated_at: 1,
+      owner_type: 'org',
+      owner_ci: 'acme',
+      name_ci: 'o1',
+      org_id: 'org-acme',
+    });
     expect((await callGap(gapEnv(gapDb(blocked)), '/user/orgs/acme', { method: 'DELETE' })).status).toBe(400);
     const empty = seedState();
     const res = await callGap(gapEnv(gapDb(empty)), '/user/orgs/acme', { method: 'DELETE' });

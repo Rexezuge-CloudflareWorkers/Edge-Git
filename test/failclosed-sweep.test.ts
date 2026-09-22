@@ -239,7 +239,13 @@ describe('fail-closed sweep under D1 outage', () => {
       '/user/repos/alice/demo/pulls/1/threads/t1',
     ];
     for (const path of paths) {
-      for (const init of [undefined, postJson({}), { method: 'PUT', headers: JSON_HEADERS, body: '{}' }, { method: 'PATCH', headers: JSON_HEADERS, body: '{}' }, { method: 'DELETE' }] as Array<RequestInit | undefined>) {
+      for (const init of [
+        undefined,
+        postJson({}),
+        { method: 'PUT', headers: JSON_HEADERS, body: '{}' },
+        { method: 'PATCH', headers: JSON_HEADERS, body: '{}' },
+        { method: 'DELETE' },
+      ] as Array<RequestInit | undefined>) {
         const res = await callWorker(env, path, init);
         expect(res.status, `${init?.method ?? 'GET'} ${path}`).toBeGreaterThanOrEqual(200);
         expect(res.status, `${init?.method ?? 'GET'} ${path}`).toBeLessThanOrEqual(599);
@@ -252,17 +258,17 @@ describe('fail-closed sweep under D1 outage', () => {
     const env = authedEnv();
     const refs = await callWorker(env, '/alice/demo/info/refs?service=git-upload-pack');
     expect(refs.status).toBe(503);
-    const push = await callWorker(
-      env,
-      '/alice/demo/git-receive-pack',
-      { method: 'POST', headers: { 'Content-Type': 'application/x-git-receive-pack-request' }, body: new Uint8Array([1, 2, 3]) },
-    );
+    const push = await callWorker(env, '/alice/demo/git-receive-pack', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-git-receive-pack-request' },
+      body: new Uint8Array([1, 2, 3]),
+    });
     expect(push.status).toBe(503);
-    const fetch = await callWorker(
-      env,
-      '/alice/demo/git-upload-pack',
-      { method: 'POST', headers: { 'Content-Type': 'application/x-git-upload-pack-request' }, body: new Uint8Array([1, 2, 3]) },
-    );
+    const fetch = await callWorker(env, '/alice/demo/git-upload-pack', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-git-upload-pack-request' },
+      body: new Uint8Array([1, 2, 3]),
+    });
     expect(fetch.status).toBe(503);
   });
 

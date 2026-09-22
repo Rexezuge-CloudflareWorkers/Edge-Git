@@ -27,9 +27,7 @@ function tokenDb() {
       },
       all<T>(): Promise<{ results: T[] }> {
         if (q.includes('FROM user_access_tokens WHERE')) {
-          const rows = tokens.filter(
-            (t) => String(t.user_email).toLowerCase() === String(params[0]).toLowerCase(),
-          );
+          const rows = tokens.filter((t) => String(t.user_email).toLowerCase() === String(params[0]).toLowerCase());
           return Promise.resolve({ results: rows as T[] });
         }
         return Promise.resolve({ results: [] });

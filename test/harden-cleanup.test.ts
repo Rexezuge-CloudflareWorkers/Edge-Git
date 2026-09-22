@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { BRANCH_SEGMENT_RE, hasIllegalBranchChar, isValidBranchName, SLUG_RE, isValidSlug, validateSlug, RepoFullName } from '@edge-git/shared/utils';
+import {
+  BRANCH_SEGMENT_RE,
+  hasIllegalBranchChar,
+  isValidBranchName,
+  SLUG_RE,
+  isValidSlug,
+  validateSlug,
+  RepoFullName,
+} from '@edge-git/shared/utils';
 import { isBlockedByReviews, isDismissed } from '@edge-git/backend-services/pull/PullReviewGate';
 import { backoffSecondsForAttempt, isRetryableHttpStatus } from '@edge-git/backend-services/webhook/WebhookRetryPolicy';
 import { parseSymbolicHead } from '@edge-git/git-service/RefParsers';
@@ -61,15 +69,9 @@ describe('harden: route layering via RepoFullName', () => {
 describe('harden: PullReviewGate pure merge-block rule', () => {
   it('blocks on latest changes_requested, ignores dismissed and superseded', () => {
     expect(isBlockedByReviews([])).toBe(false);
-    expect(
-      isBlockedByReviews([{ author_email: 'a@x.com', state: 'approved' }]),
-    ).toBe(false);
-    expect(
-      isBlockedByReviews([{ author_email: 'a@x.com', state: 'changes_requested' }]),
-    ).toBe(true);
-    expect(
-      isBlockedByReviews([{ author_email: 'a@x.com', state: 'changes_requested', dismissed: 1 }]),
-    ).toBe(false);
+    expect(isBlockedByReviews([{ author_email: 'a@x.com', state: 'approved' }])).toBe(false);
+    expect(isBlockedByReviews([{ author_email: 'a@x.com', state: 'changes_requested' }])).toBe(true);
+    expect(isBlockedByReviews([{ author_email: 'a@x.com', state: 'changes_requested', dismissed: 1 }])).toBe(false);
     // Oldest-first: last entry per author wins.
     expect(
       isBlockedByReviews([
@@ -124,9 +126,7 @@ describe('harden: RefParsers pure HEAD parsing', () => {
 
 describe('harden: PackLimits pure budget', () => {
   it('throws PackLimitError over object or rev-walk budget', () => {
-    expect(() => checkObjectBudget({ objectsToSend: 11, visited: 1, maxObjects: 10, maxVisited: 1000 })).toThrow(
-      PackLimitError,
-    );
+    expect(() => checkObjectBudget({ objectsToSend: 11, visited: 1, maxObjects: 10, maxVisited: 1000 })).toThrow(PackLimitError);
     expect(() => checkObjectBudget({ objectsToSend: 1, visited: 1001, maxObjects: undefined, maxVisited: 1000 })).toThrow(
       'rev-walk too large',
     );
@@ -154,9 +154,27 @@ describe('harden: RealtimePolicy pure socket policy', () => {
   it('prunes 60s windows and rate-limits at cap', () => {
     const now = 1_000_000;
     expect(pruneFrameTimes([now - 61_000, now - 1000], now)).toEqual([now - 1000]);
-    expect(shouldRateLimit(Array.from({ length: 30 }, () => now - 1000), now, 30)).toBe(true);
-    expect(shouldRateLimit(Array.from({ length: 29 }, () => now - 1000), now, 30)).toBe(false);
-    expect(shouldRateLimit(Array.from({ length: 30 }, () => now - 61_000), now, 30)).toBe(false);
+    expect(
+      shouldRateLimit(
+        Array.from({ length: 30 }, () => now - 1000),
+        now,
+        30,
+      ),
+    ).toBe(true);
+    expect(
+      shouldRateLimit(
+        Array.from({ length: 29 }, () => now - 1000),
+        now,
+        30,
+      ),
+    ).toBe(false);
+    expect(
+      shouldRateLimit(
+        Array.from({ length: 30 }, () => now - 61_000),
+        now,
+        30,
+      ),
+    ).toBe(false);
   });
 
   it('makes room below cap, evicts anon for authed, denies otherwise', () => {
@@ -181,9 +199,7 @@ describe('harden: numberAllocator fail-closed fallback', () => {
     );
 
     const outage = (): Promise<never> => Promise.reject(new Error('D1 timeout'));
-    await expect(allocateNumberWithFallback(outage, () => Promise.resolve(7), 'r1', 'issue')).rejects.toThrow(
-      'D1 timeout',
-    );
+    await expect(allocateNumberWithFallback(outage, () => Promise.resolve(7), 'r1', 'issue')).rejects.toThrow('D1 timeout');
   });
 });
 

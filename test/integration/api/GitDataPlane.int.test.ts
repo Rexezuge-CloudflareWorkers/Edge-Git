@@ -75,7 +75,8 @@ describe('git data-plane on real D1+DO', () => {
     expect(traversal.status).toBe(400);
   });
 
-  it('rejects invalid git service and oversized bodies with 400/413', async () => {    expect((await api(`/${OWNER}/${REPO}/info/refs?service=nope`)).status).toBe(400);
+  it('rejects invalid git service and oversized bodies with 400/413', async () => {
+    expect((await api(`/${OWNER}/${REPO}/info/refs?service=nope`)).status).toBe(400);
 
     const bigFetch = await api(`/${OWNER}/${REPO}/git-upload-pack`, {
       method: 'POST',

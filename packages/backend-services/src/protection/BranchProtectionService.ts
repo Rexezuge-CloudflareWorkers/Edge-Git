@@ -5,7 +5,11 @@ import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import type { BranchProtectionRuleMetadata } from '@edge-git/shared';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 import { PullRequestService } from '../pull/PullRequestService';
-import { countApprovals as countApprovalsPolicy, matchRule as matchRulePolicy, matchesPattern as matchesPatternPolicy } from './BranchProtectionPolicy';
+import {
+  countApprovals as countApprovalsPolicy,
+  matchRule as matchRulePolicy,
+  matchesPattern as matchesPatternPolicy,
+} from './BranchProtectionPolicy';
 
 interface BranchProtectionServiceEnv {
   DB: D1Queryable;

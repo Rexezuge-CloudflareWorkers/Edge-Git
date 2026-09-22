@@ -85,7 +85,8 @@ class SearchDAO extends BaseDAO {
           .all<RepositoryRow>();
         return result.results ?? [];
       } catch (error) {
-        if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to search repositories: ${error instanceof Error ? error.message : String(error)}`);
+        if (!isMissingSchemaError(error))
+          throw new DatabaseError(`Failed to search repositories: ${error instanceof Error ? error.message : String(error)}`);
         return [];
       }
     }
@@ -123,7 +124,8 @@ class SearchDAO extends BaseDAO {
           .all<IssueRow>();
         return result.results ?? [];
       } catch (error) {
-        if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to search issues: ${error instanceof Error ? error.message : String(error)}`);
+        if (!isMissingSchemaError(error))
+          throw new DatabaseError(`Failed to search issues: ${error instanceof Error ? error.message : String(error)}`);
         return [];
       }
     }
@@ -160,7 +162,8 @@ class SearchDAO extends BaseDAO {
           .all<PullRequestRow>();
         return result.results ?? [];
       } catch (error) {
-        if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to search pulls: ${error instanceof Error ? error.message : String(error)}`);
+        if (!isMissingSchemaError(error))
+          throw new DatabaseError(`Failed to search pulls: ${error instanceof Error ? error.message : String(error)}`);
         return [];
       }
     }
@@ -197,7 +200,8 @@ class SearchDAO extends BaseDAO {
           .all<CodeHit>();
         return result.results ?? [];
       } catch (error) {
-        if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to search code: ${error instanceof Error ? error.message : String(error)}`);
+        if (!isMissingSchemaError(error))
+          throw new DatabaseError(`Failed to search code: ${error instanceof Error ? error.message : String(error)}`);
         return [];
       }
     }
@@ -254,13 +258,11 @@ class SearchDAO extends BaseDAO {
   // upsert entirely. Single indexed read vs ~250 rows-read per rewrite.
   public async getOidsByRepo(repoId: string): Promise<CodeOidEntry[]> {
     try {
-      const result = await this.database
-        .prepare('SELECT path, oid FROM code_index WHERE repo_id = ?')
-        .bind(repoId)
-        .all<CodeOidEntry>();
+      const result = await this.database.prepare('SELECT path, oid FROM code_index WHERE repo_id = ?').bind(repoId).all<CodeOidEntry>();
       return result.results ?? [];
     } catch (error) {
-      if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to list indexed oids: ${error instanceof Error ? error.message : String(error)}`);
+      if (!isMissingSchemaError(error))
+        throw new DatabaseError(`Failed to list indexed oids: ${error instanceof Error ? error.message : String(error)}`);
       // Legacy DBs without migration 0006.
       return [];
     }
@@ -350,7 +352,8 @@ class SearchDAO extends BaseDAO {
           .all<DiscussionRow>();
         return result.results ?? [];
       } catch (error) {
-        if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to search discussions: ${error instanceof Error ? error.message : String(error)}`);
+        if (!isMissingSchemaError(error))
+          throw new DatabaseError(`Failed to search discussions: ${error instanceof Error ? error.message : String(error)}`);
         return [];
       }
     }
@@ -380,7 +383,8 @@ class SearchDAO extends BaseDAO {
           .all<SnippetRow>();
         return result.results ?? [];
       } catch (error) {
-        if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to search snippets: ${error instanceof Error ? error.message : String(error)}`);
+        if (!isMissingSchemaError(error))
+          throw new DatabaseError(`Failed to search snippets: ${error instanceof Error ? error.message : String(error)}`);
         return [];
       }
     }

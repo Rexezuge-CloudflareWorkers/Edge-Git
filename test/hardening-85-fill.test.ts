@@ -147,7 +147,16 @@ describe('Numbering race retries', () => {
         if (calls < 2) throw new Error('UNIQUE constraint failed');
       },
       createColumn: async () => undefined,
-      getById: async () => ({ id: 'p', repository_id: 'r', number: 4, title: 't', description: null, creator_email: 'a', created_at: 1, updated_at: 1 }),
+      getById: async () => ({
+        id: 'p',
+        repository_id: 'r',
+        number: 4,
+        title: 't',
+        description: null,
+        creator_email: 'a',
+        created_at: 1,
+        updated_at: 1,
+      }),
     };
     const svc = new ProjectService({ DB: {} as never }, { projectDAO: async () => dao as never });
     const out = await svc.createProject('r', { title: 't' }, 'A@B.C');
@@ -196,7 +205,14 @@ describe('ReadModelService fan-out caps', () => {
 describe('PushHandler orphan pack cleanup', () => {
   it('unlinks pack on forceBlocked', async () => {
     let unlinked: string | null = null;
-    const isoGitFs = { promises: { writeFile: async () => undefined, unlink: async (p: string) => { unlinked = p; } } };
+    const isoGitFs = {
+      promises: {
+        writeFile: async () => undefined,
+        unlink: async (p: string) => {
+          unlinked = p;
+        },
+      },
+    };
     const git = {
       indexPack: async () => undefined,
       isAncestor: async () => false,
@@ -221,7 +237,9 @@ describe('FetchHandler masks internal errors', () => {
     const git = {
       ensureFreshCache: () => undefined,
       listRefs: async () => ({ refs: [], symbolicHead: null }),
-      findCommonCommits: async () => { throw new Error('D1 internal path /repo/objects/xx'); },
+      findCommonCommits: async () => {
+        throw new Error('D1 internal path /repo/objects/xx');
+      },
     };
     const h = new FetchHandler({ git: git as never, env: {} as never, getFullName: () => 'o/n' });
     const { buildFetchRequest } = await import('@edge-git/git-protocol');

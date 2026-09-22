@@ -170,8 +170,7 @@ class PullRequestDAO extends BaseDAO {
   // rows via the caught fallback). FTS follows via `trg_pull_fts_au`.
   public async updateFullNameByRepo(repositoryId: string, fullName: string): Promise<void> {
     await this.withRetry(
-      () =>
-        this.database.prepare('UPDATE pull_requests SET full_name = ? WHERE repository_id = ?').bind(fullName, repositoryId).run(),
+      () => this.database.prepare('UPDATE pull_requests SET full_name = ? WHERE repository_id = ?').bind(fullName, repositoryId).run(),
       'rename pull request full name',
     ).catch(() => undefined);
   }

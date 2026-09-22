@@ -32,7 +32,9 @@ function gitStubs(refs: Array<{ ref: string; oid: string }> = [], failExport = f
     setFullName: async () => undefined,
     ensureRepoInitialized: async () => undefined,
     listRefs: async () => ({ refs, symbolicHead: null }),
-    exportPack: failExport ? async () => Promise.reject(new Error('pack too large')) : async () => ({ oids: refs.map((r) => r.oid), pack: new Uint8Array([1]) }),
+    exportPack: failExport
+      ? async () => Promise.reject(new Error('pack too large'))
+      : async () => ({ oids: refs.map((r) => r.oid), pack: new Uint8Array([1]) }),
     importPack: async () => ({ importedRefs: refs.map((r) => r.ref) }),
     deleteRepo: async () => void deleted.push('x'),
     getReleaseAsset: async () => null,
@@ -44,7 +46,9 @@ describe('RepoMove fail-closed orchestration', () => {
   it('moves an empty repo without copying', async () => {
     const { make } = gitStubs([]);
     const env = moveEnv({ 'alice/demo': make(), 'bob/demo': make() });
-    const out = await moveRepoDosForRename(env, 'alice@example.com', [{ id: 'r1', name: 'demo', oldFull: 'alice/demo', newFull: 'bob/demo' }]);
+    const out = await moveRepoDosForRename(env, 'alice@example.com', [
+      { id: 'r1', name: 'demo', oldFull: 'alice/demo', newFull: 'bob/demo' },
+    ]);
     expect(out).toEqual({ moved: 1, empty: 1 });
   });
 
@@ -52,7 +56,9 @@ describe('RepoMove fail-closed orchestration', () => {
     const refs = [{ ref: 'refs/heads/main', oid: 'a'.repeat(40) }];
     const { make } = gitStubs(refs);
     const env = moveEnv({ 'alice/demo': make(), 'bob/demo': make() });
-    const out = await moveRepoDosForRename(env, 'alice@example.com', [{ id: 'r1', name: 'demo', oldFull: 'alice/demo', newFull: 'bob/demo' }]);
+    const out = await moveRepoDosForRename(env, 'alice@example.com', [
+      { id: 'r1', name: 'demo', oldFull: 'alice/demo', newFull: 'bob/demo' },
+    ]);
     expect(out).toEqual({ moved: 1, empty: 0 });
   });
 
@@ -96,7 +102,9 @@ describe('RepoMove fail-closed orchestration', () => {
     // Target purge failure on the error path still rethrows the copy error.
     const bad = gitStubs(refs, true);
     const env2 = moveEnv({ 'alice/demo': bad.make(), 'bob/demo': failingDelete });
-    await expect(moveOneRepo(env2, 'a@x.com', { id: 'r1', name: 'demo', oldFull: 'alice/demo', newFull: 'bob/demo' })).rejects.toThrow('pack too large');
+    await expect(moveOneRepo(env2, 'a@x.com', { id: 'r1', name: 'demo', oldFull: 'alice/demo', newFull: 'bob/demo' })).rejects.toThrow(
+      'pack too large',
+    );
   });
 
   it('reports false when the compensating copy-back fails', async () => {
@@ -175,7 +183,11 @@ describe('RepoMove fail-closed orchestration', () => {
     };
     const env = {
       DB: db,
-      REPO: { getByName: (name: string) => (name === 'alice/demo' ? source : target), get: (name: string) => (name === 'alice/demo' ? source : target), idFromName: (n: string) => n },
+      REPO: {
+        getByName: (name: string) => (name === 'alice/demo' ? source : target),
+        get: (name: string) => (name === 'alice/demo' ? source : target),
+        idFromName: (n: string) => n,
+      },
       ENVIRONMENT: 'development',
     } as unknown as Env;
     const out = await moveOneRepo(env, 'a@x.com', { id: 'r1', name: 'demo', oldFull: 'alice/demo', newFull: 'bob/demo' });
@@ -213,7 +225,9 @@ describe('RepoMove fail-closed orchestration', () => {
       REALTIME_ENABLED: 'true',
       REALTIME: { getByName: () => ({ publish: async () => Promise.reject(new Error('shard busy')) }) },
     } as unknown as Env;
-    const out = await moveRepoDosForRename(env, 'alice@example.com', [{ id: 'r1', name: 'demo', oldFull: 'alice/demo', newFull: 'bob/demo' }]);
+    const out = await moveRepoDosForRename(env, 'alice@example.com', [
+      { id: 'r1', name: 'demo', oldFull: 'alice/demo', newFull: 'bob/demo' },
+    ]);
     expect(out).toEqual({ moved: 1, empty: 1 });
   });
 
@@ -248,10 +262,16 @@ describe('RepoMove fail-closed orchestration', () => {
     };
     const env = {
       DB: db,
-      REPO: { getByName: (name: string) => (name === 'alice/demo' ? source : target), get: (name: string) => (name === 'alice/demo' ? source : target), idFromName: (n: string) => n },
+      REPO: {
+        getByName: (name: string) => (name === 'alice/demo' ? source : target),
+        get: (name: string) => (name === 'alice/demo' ? source : target),
+        idFromName: (n: string) => n,
+      },
       ENVIRONMENT: 'development',
     } as unknown as Env;
-    await expect(moveOneRepo(env, 'a@x.com', { id: 'r1', name: 'demo', oldFull: 'alice/demo', newFull: 'bob/demo' })).rejects.toThrow('disk full');
+    await expect(moveOneRepo(env, 'a@x.com', { id: 'r1', name: 'demo', oldFull: 'alice/demo', newFull: 'bob/demo' })).rejects.toThrow(
+      'disk full',
+    );
     expect(storeCalls).toHaveLength(1);
   });
 
@@ -275,7 +295,11 @@ describe('RepoMove fail-closed orchestration', () => {
     };
     const env = {
       DB: db,
-      REPO: { getByName: (name: string) => (name === 'alice/demo' ? source : target), get: (name: string) => (name === 'alice/demo' ? source : target), idFromName: (n: string) => n },
+      REPO: {
+        getByName: (name: string) => (name === 'alice/demo' ? source : target),
+        get: (name: string) => (name === 'alice/demo' ? source : target),
+        idFromName: (n: string) => n,
+      },
       ENVIRONMENT: 'development',
     } as unknown as Env;
     const out = await moveOneRepo(env, 'a@x.com', { id: 'r1', name: 'demo', oldFull: 'alice/demo', newFull: 'bob/demo' });

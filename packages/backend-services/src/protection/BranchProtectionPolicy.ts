@@ -9,17 +9,18 @@ function matchRule(rules: readonly BranchProtectionRuleMetadata[], branch: strin
   let best: BranchProtectionRuleMetadata | null = null;
   for (const rule of rules) {
     if (!matchesPattern(rule.pattern, branch)) continue;
-    if (!best || rule.pattern.length > best.pattern.length || (rule.pattern.length === best.pattern.length && rule.pattern < best.pattern)) {
+    if (
+      !best ||
+      rule.pattern.length > best.pattern.length ||
+      (rule.pattern.length === best.pattern.length && rule.pattern < best.pattern)
+    ) {
       best = rule;
     }
   }
   return best;
 }
 
-function countApprovals(
-  reviews: Array<{ author_email: string; state: string; dismissed?: number | null }>,
-  creatorEmail: string,
-): number {
+function countApprovals(reviews: Array<{ author_email: string; state: string; dismissed?: number | null }>, creatorEmail: string): number {
   const creator = creatorEmail.toLowerCase();
   const latestByAuthor = new Map<string, string>();
   for (const review of reviews) {

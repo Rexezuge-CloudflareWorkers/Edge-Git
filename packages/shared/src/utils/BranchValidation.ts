@@ -26,9 +26,7 @@ function isValidBranchName(branch: string): boolean {
   if (branch.startsWith('/') || branch.endsWith('/') || branch.endsWith('.')) return false;
   if (branch.includes('..') || branch.includes('//')) return false;
   if (hasIllegalBranchChar(branch)) return false;
-  return branch
-    .split('/')
-    .every((seg) => seg.length > 0 && seg !== '.' && seg !== '..' && seg !== '@' && BRANCH_SEGMENT_RE.test(seg));
+  return branch.split('/').every((seg) => seg.length > 0 && seg !== '.' && seg !== '..' && seg !== '@' && BRANCH_SEGMENT_RE.test(seg));
 }
 
 export { BRANCH_SEGMENT_RE, hasIllegalBranchChar, isValidBranchName };

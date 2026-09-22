@@ -211,15 +211,21 @@ class WebhookDeliveryService {
 
   // Attempt one delivery end-to-end (used by the /test route for inline
   // feedback). Creates a ping delivery row, POSTs once, settles the row.
-  public async sendTestPing(hookId: string, repositoryId: string, fullName: string, actorUsername: string): Promise<WebhookDeliveryMetadata> {
+  public async sendTestPing(
+    hookId: string,
+    repositoryId: string,
+    fullName: string,
+    actorUsername: string,
+  ): Promise<WebhookDeliveryMetadata> {
     const webhookDAO = await this.deps.webhookDAO();
     const hook = await webhookDAO.getByIdAndRepo(hookId, repositoryId).catch(() => null);
     if (!hook) throw new NotFoundError('Webhook not found.');
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const maxBytes = ConfigurationManager.webhooks.getMaxPayloadBytes(this.env);
-    const payload = JSON.stringify(
-      buildWebhookPayload({ event: 'ping', fullName, actorUsername, action: 'test', processedAt: now }),
-    ).slice(0, maxBytes);
+    const payload = JSON.stringify(buildWebhookPayload({ event: 'ping', fullName, actorUsername, action: 'test', processedAt: now })).slice(
+      0,
+      maxBytes,
+    );
     const deliveryDAO = await this.deps.deliveryDAO();
     const id = UUIDUtil.getRandomUUID();
     await deliveryDAO.enqueue({ id, hookId, repositoryId, event: 'ping', payload, nextRetryAt: now, now });

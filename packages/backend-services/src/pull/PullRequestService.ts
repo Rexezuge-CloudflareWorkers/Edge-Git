@@ -91,7 +91,12 @@ class PullRequestService {
     // Retry on UNIQUE(repository_id, number) races from concurrent POSTs.
     let lastError: unknown = null;
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      const number = await allocateNumberWithFallback(this.deps.numberingDAO, () => dao.nextNumber(input.repositoryId), input.repositoryId, 'pull');
+      const number = await allocateNumberWithFallback(
+        this.deps.numberingDAO,
+        () => dao.nextNumber(input.repositoryId),
+        input.repositoryId,
+        'pull',
+      );
       const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
       const id = UUIDUtil.getRandomUUID();
       try {

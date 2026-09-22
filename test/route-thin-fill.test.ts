@@ -103,8 +103,12 @@ function createThinFakeDb() {
         // --- checks ---
         if (q.includes('FROM check_runs WHERE repository_id = ? AND head_sha = ? AND context = ?')) {
           const row =
-            state.checks.find((c) => c.repository_id === params[0] && c.head_sha === P(1).toLowerCase() && String(c.context).toLowerCase() === P(2).toLowerCase()) ??
-            null;
+            state.checks.find(
+              (c) =>
+                c.repository_id === params[0] &&
+                c.head_sha === P(1).toLowerCase() &&
+                String(c.context).toLowerCase() === P(2).toLowerCase(),
+            ) ?? null;
           return Promise.resolve(row as T | null);
         }
         if (q.includes('FROM check_runs WHERE id = ? AND repository_id = ?')) {
@@ -112,7 +116,9 @@ function createThinFakeDb() {
           return Promise.resolve(row as T | null);
         }
         if (q.includes('COUNT(*) AS n FROM check_runs')) {
-          const n = state.checks.filter((c) => c.repository_id === params[0] && (params.length < 2 || c.head_sha === P(1).toLowerCase())).length;
+          const n = state.checks.filter(
+            (c) => c.repository_id === params[0] && (params.length < 2 || c.head_sha === P(1).toLowerCase()),
+          ).length;
           return Promise.resolve({ n } as unknown as T);
         }
         // --- snippets ---
@@ -120,13 +126,17 @@ function createThinFakeDb() {
           return Promise.resolve((state.snippets.find((s) => s.id === params[0]) ?? null) as T | null);
         }
         if (q.includes('COUNT(*) AS count FROM snippets')) {
-          return Promise.resolve({ count: state.snippets.filter((s) => String(s.owner_email).toLowerCase() === P(0).toLowerCase()).length } as unknown as T);
+          return Promise.resolve({
+            count: state.snippets.filter((s) => String(s.owner_email).toLowerCase() === P(0).toLowerCase()).length,
+          } as unknown as T);
         }
         if (q.includes('FROM users WHERE lower(email)')) {
           return Promise.resolve((state.users.find((u) => String(u.email).toLowerCase() === P(0).toLowerCase()) ?? null) as T | null);
         }
         if (q.includes('FROM users WHERE lower(username)')) {
-          return Promise.resolve((state.users.find((u) => String(u.username ?? '').toLowerCase() === P(0).toLowerCase()) ?? null) as T | null);
+          return Promise.resolve(
+            (state.users.find((u) => String(u.username ?? '').toLowerCase() === P(0).toLowerCase()) ?? null) as T | null,
+          );
         }
         if (q.includes('FROM users WHERE email = ?')) {
           return Promise.resolve((state.users.find((u) => u.email === params[0]) ?? null) as T | null);
@@ -136,7 +146,9 @@ function createThinFakeDb() {
         }
         if (q.includes('FROM repositories WHERE lower(owner)')) {
           return Promise.resolve(
-            (state.repos.find((r) => String(r.owner).toLowerCase() === P(0).toLowerCase() && String(r.name).toLowerCase() === P(1).toLowerCase()) ?? null) as T | null,
+            (state.repos.find(
+              (r) => String(r.owner).toLowerCase() === P(0).toLowerCase() && String(r.name).toLowerCase() === P(1).toLowerCase(),
+            ) ?? null) as T | null,
           );
         }
         if (q.includes('FROM repositories WHERE owner = ? AND name = ?')) {
@@ -153,14 +165,19 @@ function createThinFakeDb() {
         }
         if (q.includes('FROM organization_members WHERE org_id = ? AND')) {
           return Promise.resolve(
-            (state.orgMembers.find((m) => m.org_id === params[0] && String(m.user_email).toLowerCase() === P(1).toLowerCase()) ?? null) as T | null,
+            (state.orgMembers.find((m) => m.org_id === params[0] && String(m.user_email).toLowerCase() === P(1).toLowerCase()) ??
+              null) as T | null,
           );
         }
         if (q.includes('COUNT(*) AS n FROM organization_members')) {
-          return Promise.resolve({ n: state.orgMembers.filter((m) => m.org_id === params[0] && m.role === 'owner').length } as unknown as T);
+          return Promise.resolve({
+            n: state.orgMembers.filter((m) => m.org_id === params[0] && m.role === 'owner').length,
+          } as unknown as T);
         }
         if (q.includes('FROM teams WHERE org_id = ? AND slug_ci = ?')) {
-          return Promise.resolve((state.teams.find((t) => t.org_id === params[0] && String(t.slug_ci).toLowerCase() === P(1).toLowerCase()) ?? null) as T | null);
+          return Promise.resolve(
+            (state.teams.find((t) => t.org_id === params[0] && String(t.slug_ci).toLowerCase() === P(1).toLowerCase()) ?? null) as T | null,
+          );
         }
         if (q.includes('FROM teams WHERE id = ?')) {
           return Promise.resolve((state.teams.find((t) => t.id === params[0]) ?? null) as T | null);
@@ -170,11 +187,14 @@ function createThinFakeDb() {
         }
         if (q.includes('FROM team_members WHERE team_id = ? AND')) {
           return Promise.resolve(
-            (state.teamMembers.find((m) => m.team_id === params[0] && String(m.user_email).toLowerCase() === P(1).toLowerCase()) ?? null) as T | null,
+            (state.teamMembers.find((m) => m.team_id === params[0] && String(m.user_email).toLowerCase() === P(1).toLowerCase()) ??
+              null) as T | null,
           );
         }
         if (q.includes("COUNT(*) AS n FROM team_members WHERE team_id = ? AND role = 'admin'")) {
-          return Promise.resolve({ n: state.teamMembers.filter((m) => m.team_id === params[0] && m.role === 'admin').length } as unknown as T);
+          return Promise.resolve({
+            n: state.teamMembers.filter((m) => m.team_id === params[0] && m.role === 'admin').length,
+          } as unknown as T);
         }
         if (q.includes('FROM team_repo_grants WHERE team_id = ? AND repo_id = ?')) {
           return Promise.resolve((state.teamGrants.find((g) => g.team_id === params[0] && g.repo_id === params[1]) ?? null) as T | null);
@@ -184,11 +204,14 @@ function createThinFakeDb() {
         }
         if (q.includes('FROM repo_collaborators WHERE repo_id = ? AND')) {
           return Promise.resolve(
-            (state.collaborators.find((c) => c.repo_id === params[0] && String(c.user_email).toLowerCase() === P(1).toLowerCase()) ?? null) as T | null,
+            (state.collaborators.find((c) => c.repo_id === params[0] && String(c.user_email).toLowerCase() === P(1).toLowerCase()) ??
+              null) as T | null,
           );
         }
         if (q.includes('FROM releases WHERE repository_id = ? AND tag_name = ?')) {
-          return Promise.resolve((state.releases.find((r) => r.repository_id === params[0] && r.tag_name === params[1]) ?? null) as T | null);
+          return Promise.resolve(
+            (state.releases.find((r) => r.repository_id === params[0] && r.tag_name === params[1]) ?? null) as T | null,
+          );
         }
         if (q.includes('FROM releases WHERE id = ? AND repository_id = ?')) {
           return Promise.resolve((state.releases.find((r) => r.id === params[0] && r.repository_id === params[1]) ?? null) as T | null);
@@ -207,7 +230,9 @@ function createThinFakeDb() {
           return Promise.resolve((state.security.find((s) => s.repository_id === params[0]) ?? null) as T | null);
         }
         if (q.includes('FROM user_access_tokens WHERE token_hash = ?')) {
-          return Promise.resolve((state.tokens.find((t) => t.token_hash === params[0] && (t.expires_at as number) > (params[1] as number)) ?? null) as T | null);
+          return Promise.resolve(
+            (state.tokens.find((t) => t.token_hash === params[0] && (t.expires_at as number) > (params[1] as number)) ?? null) as T | null,
+          );
         }
         if (q.includes('COUNT(*)')) return Promise.resolve({ n: 0, count: 0 } as unknown as T);
         if (q.includes('COALESCE(MAX(number)')) return Promise.resolve({ max_n: 0, next_number: 1 } as unknown as T);
@@ -218,7 +243,9 @@ function createThinFakeDb() {
           return Promise.resolve({ results: state.branchRules.filter((r) => r.repository_id === params[0]) as T[] });
         }
         if (q.includes('FROM check_runs WHERE repository_id = ? AND head_sha = ?')) {
-          return Promise.resolve({ results: state.checks.filter((c) => c.repository_id === params[0] && c.head_sha === P(1).toLowerCase()) as T[] });
+          return Promise.resolve({
+            results: state.checks.filter((c) => c.repository_id === params[0] && c.head_sha === P(1).toLowerCase()) as T[],
+          });
         }
         if (q.includes('FROM snippets WHERE owner_email = ?')) {
           const onlyPublic = q.includes("visibility = 'public'");
@@ -246,7 +273,9 @@ function createThinFakeDb() {
           return Promise.resolve({ results: state.orgMembers.filter((m) => m.org_id === params[0]) as T[] });
         }
         if (q.includes('FROM organization_members WHERE lower(user_email)')) {
-          return Promise.resolve({ results: state.orgMembers.filter((m) => String(m.user_email).toLowerCase() === P(0).toLowerCase()) as T[] });
+          return Promise.resolve({
+            results: state.orgMembers.filter((m) => String(m.user_email).toLowerCase() === P(0).toLowerCase()) as T[],
+          });
         }
         if (q.includes('FROM teams WHERE org_id = ? ORDER BY')) {
           return Promise.resolve({ results: state.teams.filter((t) => t.org_id === params[0]) as T[] });
@@ -255,7 +284,9 @@ function createThinFakeDb() {
           return Promise.resolve({ results: state.teamMembers.filter((m) => m.team_id === params[0]) as T[] });
         }
         if (q.includes('FROM team_members WHERE lower(user_email)')) {
-          return Promise.resolve({ results: state.teamMembers.filter((m) => String(m.user_email).toLowerCase() === P(0).toLowerCase()) as T[] });
+          return Promise.resolve({
+            results: state.teamMembers.filter((m) => String(m.user_email).toLowerCase() === P(0).toLowerCase()) as T[],
+          });
         }
         if (q.includes('FROM team_repo_grants WHERE team_id = ? ORDER BY')) {
           return Promise.resolve({ results: state.teamGrants.filter((g) => g.team_id === params[0]) as T[] });
@@ -328,7 +359,14 @@ function createThinFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO snippets')) {
-          state.snippets.push({ id: params[0], owner_email: String(params[1]).toLowerCase(), title: params[2], visibility: params[3], created_at: params[4], updated_at: params[5] });
+          state.snippets.push({
+            id: params[0],
+            owner_email: String(params[1]).toLowerCase(),
+            title: params[2],
+            visibility: params[3],
+            created_at: params[4],
+            updated_at: params[5],
+          });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO snippet_files')) {
@@ -375,17 +413,45 @@ function createThinFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO teams')) {
-          state.teams.push({ id: params[0], org_id: params[1], slug: params[2], slug_ci: params[3], name: params[4], description: params[5], created_by: params[6], created_at: params[7], updated_at: params[8] });
+          state.teams.push({
+            id: params[0],
+            org_id: params[1],
+            slug: params[2],
+            slug_ci: params[3],
+            name: params[4],
+            description: params[5],
+            created_by: params[6],
+            created_at: params[7],
+            updated_at: params[8],
+          });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO team_repo_grants')) {
           const existing = state.teamGrants.find((g) => g.team_id === params[0] && g.repo_id === params[1]);
           if (existing) existing.role = params[2];
-          else state.teamGrants.push({ team_id: params[0], repo_id: params[1], role: params[2], granted_by: params[3], created_at: params[4] });
+          else
+            state.teamGrants.push({
+              team_id: params[0],
+              repo_id: params[1],
+              role: params[2],
+              granted_by: params[3],
+              created_at: params[4],
+            });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO releases')) {
-          state.releases.push({ id: params[0], repository_id: params[1], tag_name: params[2], name: params[3], body: params[4], is_draft: params[5], is_prerelease: params[6], created_by: params[7], created_at: params[8], published_at: params[9] });
+          state.releases.push({
+            id: params[0],
+            repository_id: params[1],
+            tag_name: params[2],
+            name: params[3],
+            body: params[4],
+            is_draft: params[5],
+            is_prerelease: params[6],
+            created_by: params[7],
+            created_at: params[8],
+            published_at: params[9],
+          });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE releases SET')) {
@@ -418,7 +484,17 @@ function createThinFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO user_access_tokens')) {
-          state.tokens.push({ token_id: params[0], user_email: params[1], token_hash: params[2], name: params[3], expires_at: params[4], last_used_at: null, created_at: params[5], scopes: params[6] ?? null, token_prefix: params[7] ?? null });
+          state.tokens.push({
+            token_id: params[0],
+            user_email: params[1],
+            token_hash: params[2],
+            name: params[3],
+            expires_at: params[4],
+            last_used_at: null,
+            created_at: params[5],
+            scopes: params[6] ?? null,
+            token_prefix: params[7] ?? null,
+          });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE user_access_tokens SET last_used_at')) {
@@ -447,7 +523,16 @@ function createDoStub(opts: { tags?: Array<{ name: string }>; publishCounter?: {
     getBlob: () => Promise.resolve(null),
     getCommits: () => Promise.resolve([]),
     getTags: () => Promise.resolve(tags),
-    getOverview: () => Promise.resolve({ branches: ['main'], currentBranch: 'main', resolvedRef: 'a'.repeat(40), tags: [], tree: [], commits: [], readme: null }),
+    getOverview: () =>
+      Promise.resolve({
+        branches: ['main'],
+        currentBranch: 'main',
+        resolvedRef: 'a'.repeat(40),
+        tags: [],
+        tree: [],
+        commits: [],
+        readme: null,
+      }),
     getBlame: () => Promise.resolve([]),
     resolveRef: () => Promise.resolve('a'.repeat(40)),
     createBranch: () => Promise.resolve({ ok: true, ref: 'refs/heads/x', oid: 'a'.repeat(40) }),
@@ -663,7 +748,11 @@ describe('SnippetRoutes thin edges', () => {
   it('enforces owner-only update/delete/get', async () => {
     const { db } = createThinFakeDb();
     const env = createEnv(db);
-    const createdRes = await callWorker(env, '/user/snippets', postJson('/x', { title: 's', visibility: 'secret', files: [{ filename: 'a.txt', body: 'hi' }] }));
+    const createdRes = await callWorker(
+      env,
+      '/user/snippets',
+      postJson('/x', { title: 's', visibility: 'secret', files: [{ filename: 'a.txt', body: 'hi' }] }),
+    );
     expect(createdRes.status).toBe(201);
     const created = (await createdRes.json()) as { snippet: { id: string } };
     const id = created.snippet.id;
@@ -768,15 +857,31 @@ describe('SocialEmit thin edges', () => {
       DEV_AUTH_EMAIL: ALICE,
       // REALTIME_ENABLED absent -> disabled
     };
-    await expect(publishLiveUpdate(env as never, { fullName: 'alice/demo', channel: 'activity', type: 'push', actorEmail: ALICE, title: 'hi' })).resolves.toBeUndefined();
+    await expect(
+      publishLiveUpdate(env as never, { fullName: 'alice/demo', channel: 'activity', type: 'push', actorEmail: ALICE, title: 'hi' }),
+    ).resolves.toBeUndefined();
     expect(counter.count).toBe(0);
     await expect(
-      publishCheckUpdate(env as never, { fullName: 'alice/demo', headSha: 'a'.repeat(40), context: 'ci', status: 'queued', actorEmail: ALICE }),
+      publishCheckUpdate(env as never, {
+        fullName: 'alice/demo',
+        headSha: 'a'.repeat(40),
+        context: 'ci',
+        status: 'queued',
+        actorEmail: ALICE,
+      }),
     ).resolves.toBeUndefined();
     expect(counter.count).toBe(0);
 
     const explicitOff = { ...env, REALTIME_ENABLED: 'false' };
-    await expect(publishLiveUpdate(explicitOff as never, { fullName: 'alice/demo', channel: 'activity', type: 'push', actorEmail: ALICE, title: 'hi' })).resolves.toBeUndefined();
+    await expect(
+      publishLiveUpdate(explicitOff as never, {
+        fullName: 'alice/demo',
+        channel: 'activity',
+        type: 'push',
+        actorEmail: ALICE,
+        title: 'hi',
+      }),
+    ).resolves.toBeUndefined();
     expect(counter.count).toBe(0);
   });
 
@@ -794,9 +899,23 @@ describe('TriggerChecks thin edges', () => {
   it('skips invalid and zero shas', async () => {
     const { db } = createThinFakeDb();
     const env = createEnv(db);
-    await expect(triggerRequiredChecks(env as never, { repositoryId: 'r-demo', fullName: 'alice/demo', branch: 'main', headSha: 'bad', actorEmail: ALICE })).resolves.toEqual({ triggered: [] });
     await expect(
-      triggerRequiredChecks(env as never, { repositoryId: 'r-demo', fullName: 'alice/demo', branch: 'main', headSha: '0'.repeat(40), actorEmail: ALICE }),
+      triggerRequiredChecks(env as never, {
+        repositoryId: 'r-demo',
+        fullName: 'alice/demo',
+        branch: 'main',
+        headSha: 'bad',
+        actorEmail: ALICE,
+      }),
+    ).resolves.toEqual({ triggered: [] });
+    await expect(
+      triggerRequiredChecks(env as never, {
+        repositoryId: 'r-demo',
+        fullName: 'alice/demo',
+        branch: 'main',
+        headSha: '0'.repeat(40),
+        actorEmail: ALICE,
+      }),
     ).resolves.toEqual({ triggered: [] });
   });
 
@@ -851,14 +970,23 @@ describe('UserRoutes thin edges', () => {
     const env = createEnv(db);
     const missing = await callWorker(env, '/user/me/username', { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({}) });
     expect(missing.status).toBe(400);
-    const invalid = await callWorker(env, '/user/me/username', { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ username: 'bad name!' }) });
+    const invalid = await callWorker(env, '/user/me/username', {
+      method: 'PATCH',
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ username: 'bad name!' }),
+    });
     expect(invalid.status).toBe(400);
   });
 });
 
 // --- FetchHandler thin edges -------------------------------------------------
 function encodeCommand(command: string, args: string[]): Uint8Array {
-  const lines = [PktLine.encode(`command=${command}\n`), PktLine.encodeDelim(), ...args.map((a) => PktLine.encode(`${a}\n`)), PktLine.encodeFlush()];
+  const lines = [
+    PktLine.encode(`command=${command}\n`),
+    PktLine.encodeDelim(),
+    ...args.map((a) => PktLine.encode(`${a}\n`)),
+    PktLine.encodeFlush(),
+  ];
   return PktLine.mergeLines(lines);
 }
 
@@ -889,7 +1017,10 @@ describe('FetchHandler thin edges', () => {
   it('rejects too many args with 400 before git I/O', async () => {
     const git = fakeGit();
     const handler = new FetchHandler({ git, env: {} as Env, getFullName: () => 'a/b' });
-    const data = encodeCommand('ls-refs', Array.from({ length: 65 }, (_, i) => `arg-${i}`));
+    const data = encodeCommand(
+      'ls-refs',
+      Array.from({ length: 65 }, (_, i) => `arg-${i}`),
+    );
     const res = await handler.uploadPack(data, limits);
     expect(res.status).toBe(400);
     expect(git.listRefs).not.toHaveBeenCalled();

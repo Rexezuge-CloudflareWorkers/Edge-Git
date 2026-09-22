@@ -37,7 +37,6 @@ function registerUserPullReadRoutes(app: PullApp): void {
     }
   });
 
-
   app.get('/user/repos/:owner/:repo/pulls/:number', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
@@ -54,7 +53,6 @@ function registerUserPullReadRoutes(app: PullApp): void {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
-
 
   app.get('/user/repos/:owner/:repo/pulls/:number/comments', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
@@ -73,7 +71,6 @@ function registerUserPullReadRoutes(app: PullApp): void {
     }
   });
 
-
   app.get('/user/repos/:owner/:repo/pulls/:number/reviews', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
@@ -90,7 +87,6 @@ function registerUserPullReadRoutes(app: PullApp): void {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
-
 
   app.get('/user/repos/:owner/:repo/pulls/:number/diff', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
@@ -124,7 +120,6 @@ function registerUserPullReadRoutes(app: PullApp): void {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
-
 
   app.get('/user/repos/:owner/:repo/pulls/:number/preview', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
@@ -161,7 +156,6 @@ function registerUserPullReadRoutes(app: PullApp): void {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
     }
   });
-
 }
 
 export { registerUserPullReadRoutes };

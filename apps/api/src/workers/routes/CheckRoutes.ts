@@ -173,17 +173,15 @@ function registerCheckUserRoutes(app: CheckApp): void {
     if (typeof body.status !== 'string') return jsonError(c, 'status is required', 400);
     try {
       const scope = getScope(c);
-      const run = await scope
-        .get(Tokens.CheckService)
-        .updateRun({
-          repositoryId: row.id,
-          id: c.req.param('id'),
-          status: body.status as 'queued' | 'in_progress' | 'completed',
-          conclusion: body.conclusion,
-          detailsUrl: body.detailsUrl,
-          outputTitle: body.outputTitle,
-          outputSummary: body.outputSummary,
-        });
+      const run = await scope.get(Tokens.CheckService).updateRun({
+        repositoryId: row.id,
+        id: c.req.param('id'),
+        status: body.status as 'queued' | 'in_progress' | 'completed',
+        conclusion: body.conclusion,
+        detailsUrl: body.detailsUrl,
+        outputTitle: body.outputTitle,
+        outputSummary: body.outputSummary,
+      });
       if (run.status === 'completed') {
         const fullName = `${row.owner}/${row.name}`;
         await emitWebhookEvent(c.env, {

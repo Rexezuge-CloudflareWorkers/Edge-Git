@@ -348,7 +348,8 @@ export default tseslint.config(
             },
             {
               group: ['@edge-git/backend-data', '@edge-git/backend-data/*'],
-              message: 'apps/api must not import backend-data values directly; use @edge-git/backend-services instead (type-only imports are allowed)',
+              message:
+                'apps/api must not import backend-data values directly; use @edge-git/backend-services instead (type-only imports are allowed)',
               allowTypeImports: true,
             },
           ],

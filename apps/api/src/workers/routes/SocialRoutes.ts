@@ -73,7 +73,10 @@ function registerSocialRoutes(app: SocialApp): void {
       const cursor = url.searchParams.get('cursor') ?? undefined;
       const scope = getScope(c);
       const { events, nextCursor } = await scope.get(Tokens.ActivityService).listByRepo(row.id, limit, cursor);
-      const map = await usernameMap(scope, events.map((e) => e.actor_email));
+      const map = await usernameMap(
+        scope,
+        events.map((e) => e.actor_email),
+      );
       const presented = events.map(({ actor_email, ...rest }) => ({ ...rest, actor: usernameFor(map, actor_email) }));
       return c.json({ events: presented, nextCursor });
     });

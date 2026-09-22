@@ -36,10 +36,7 @@ describe('team lifecycle on real D1+DO', () => {
   });
 
   it('creates a team and rejects a missing slug', async () => {
-    const res = await api(
-      `/user/orgs/${ORG}/teams`,
-      json({ method: 'POST', body: JSON.stringify({ slug: TEAM, name: 'Core' }) }),
-    );
+    const res = await api(`/user/orgs/${ORG}/teams`, json({ method: 'POST', body: JSON.stringify({ slug: TEAM, name: 'Core' }) }));
     expect(res.status).toBe(201);
     const body = (await res.json()) as { slug: string; name: string };
     expect(body.slug).toBe(TEAM);
@@ -112,10 +109,7 @@ describe('team lifecycle on real D1+DO', () => {
     expect(grant.status).toBe(200);
 
     // `team-repo` is public, so exercise the git gate on a private repo.
-    const priv = await api(
-      '/user/repos',
-      json({ method: 'POST', body: JSON.stringify({ name: PRIV, owner: ORG, isPrivate: true }) }),
-    );
+    const priv = await api('/user/repos', json({ method: 'POST', body: JSON.stringify({ name: PRIV, owner: ORG, isPrivate: true }) }));
     expect([200, 201].includes(priv.status)).toBe(true);
 
     const grantRead = await api(

@@ -52,8 +52,7 @@ describe('TokenService scoped-grant fail-closed', () => {
   it('createToken without grants does not touch the grant DAO', async () => {
     const setGrants = vi.fn();
     const svc = new TokenService(makeEnv(), {
-      tokenDAO: () =>
-        Promise.resolve({ getByUserEmail: async () => [], create: async () => undefined } as never),
+      tokenDAO: () => Promise.resolve({ getByUserEmail: async () => [], create: async () => undefined } as never),
       tokenGrantDAO: () => Promise.resolve({ setGrants } as never),
       repositoryDAO: () => Promise.resolve({} as never),
     });

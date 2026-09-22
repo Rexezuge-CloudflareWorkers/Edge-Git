@@ -90,8 +90,7 @@ describe('IsoGitFs edge cases', () => {
           throw new Error('EACCES');
         },
       }),
-    )
-      .getPromiseFsClient().promises;
+    ).getPromiseFsClient().promises;
     await expect(bad.lstat('/x')).rejects.toMatchObject({ code: 'EACCES' });
   });
 

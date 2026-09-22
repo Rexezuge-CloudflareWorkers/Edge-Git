@@ -37,7 +37,9 @@ function bindContentServices(scope: Container, { env, daos }: ServiceGroupContex
   scope.bind(Tokens.ActivityService, () => createService(ActivityService, env, { eventDAO: daos.eventDAO }));
   scope.bind(Tokens.CollaborationService, () => createService(CollaborationService, env, { collaborationDAO: daos.collaborationDAO }));
   scope.bind(Tokens.ReleaseService, () => createService(ReleaseService, env, { releaseDAO: daos.releaseDAO }));
-  scope.bind(Tokens.ProjectService, () => createService(ProjectService, env, { projectDAO: daos.projectDAO, numberingDAO: daos.numberingDAO }));
+  scope.bind(Tokens.ProjectService, () =>
+    createService(ProjectService, env, { projectDAO: daos.projectDAO, numberingDAO: daos.numberingDAO }),
+  );
   scope.bind(Tokens.DiscussionService, () =>
     createService(DiscussionService, env, { discussionDAO: daos.discussionDAO, numberingDAO: daos.numberingDAO }),
   );
@@ -46,9 +48,7 @@ function bindContentServices(scope: Container, { env, daos }: ServiceGroupContex
   scope.bind(Tokens.ImportService, () => createService(ImportService, env, { importDAO: daos.importDAO }));
   scope.bind(Tokens.MirrorService, () => createService(MirrorService, env, { mirrorDAO: daos.mirrorDAO }));
   scope.bind(Tokens.DeployKeyService, () => createService(DeployKeyService, env, { deployKeyDAO: daos.deployKeyDAO }));
-  scope.bind(Tokens.SecuritySettingsService, () =>
-    createService(SecuritySettingsService, env, { settingsDAO: daos.securitySettingsDAO }),
-  );
+  scope.bind(Tokens.SecuritySettingsService, () => createService(SecuritySettingsService, env, { settingsDAO: daos.securitySettingsDAO }));
   scope.bind(Tokens.WebhookService, () => createService(WebhookService, env, { webhookDAO: daos.webhookDAO, userDAO: daos.userDAO }));
   scope.bind(Tokens.WebhookDeliveryService, () =>
     createService(WebhookDeliveryService, env, { webhookDAO: daos.webhookDAO, deliveryDAO: daos.webhookDeliveryDAO }),

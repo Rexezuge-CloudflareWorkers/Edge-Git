@@ -52,20 +52,20 @@ Enforced by ESLint `no-restricted-imports` in `eslint.config.mjs`: `apps/api` bl
 
 ## Index
 
-| Area                                            | Guide                                 |
-| ----------------------------------------------- | ------------------------------------- |
-| API worker, auth, routes                        | `apps/api/AGENTS.md`                  |
-| Background worker, cron phases, task visibility | `apps/background/AGENTS.md`           |
-| Web SPA, router, i18n/Title Case conventions    | `apps/web/AGENTS.md`                  |
-| Business logic, service domain map              | `packages/backend-services/AGENTS.md` |
-| D1/DAO layer                                    | `packages/backend-data/AGENTS.md`     |
-| Git pkt-line/protocol roles                     | `packages/git-protocol/AGENTS.md`     |
-| Bindings, wrangler, env vars, DI                | `docs/agents/runtime/AGENTS.md`       |
-| Tests, thresholds, mock patterns                | `docs/agents/testing/AGENTS.md`       |
-| Feature: git protocol + repos (Facade/Adapter)  | `docs/agents/features/git-protocol/AGENTS.md` |
-| Feature: permissions + visibility (Policy)      | `docs/agents/features/permissions/AGENTS.md` |
+| Area                                            | Guide                                          |
+| ----------------------------------------------- | ---------------------------------------------- |
+| API worker, auth, routes                        | `apps/api/AGENTS.md`                           |
+| Background worker, cron phases, task visibility | `apps/background/AGENTS.md`                    |
+| Web SPA, router, i18n/Title Case conventions    | `apps/web/AGENTS.md`                           |
+| Business logic, service domain map              | `packages/backend-services/AGENTS.md`          |
+| D1/DAO layer                                    | `packages/backend-data/AGENTS.md`              |
+| Git pkt-line/protocol roles                     | `packages/git-protocol/AGENTS.md`              |
+| Bindings, wrangler, env vars, DI                | `docs/agents/runtime/AGENTS.md`                |
+| Tests, thresholds, mock patterns                | `docs/agents/testing/AGENTS.md`                |
+| Feature: git protocol + repos (Facade/Adapter)  | `docs/agents/features/git-protocol/AGENTS.md`  |
+| Feature: permissions + visibility (Policy)      | `docs/agents/features/permissions/AGENTS.md`   |
 | Feature: collaboration (Observer/Numbering)     | `docs/agents/features/collaboration/AGENTS.md` |
-| Feature: automation (Template/Retry/Sandbox)    | `docs/agents/features/automation/AGENTS.md` |
+| Feature: automation (Template/Retry/Sandbox)    | `docs/agents/features/automation/AGENTS.md`    |
 
 ## Commit Policy
 

@@ -52,11 +52,7 @@ function setRequestScope(c: ScopedContext, scope: Container, ctx: ServiceContext
  * single unsafe cast here — one audited location instead of ~30 scattered
  * ones (readability/maintainability; runtime behavior identical).
  */
-function asScopedContext(c: {
-  get(key: string): unknown;
-  set?(key: string, value: unknown): void;
-  readonly env: unknown;
-}): ScopedContext {
+function asScopedContext(c: { get(key: string): unknown; set?(key: string, value: unknown): void; readonly env: unknown }): ScopedContext {
   return c as unknown as ScopedContext;
 }
 
@@ -76,5 +72,14 @@ function createRequestContext(env: ServiceEnv, overrides: ServiceContextOverride
   return createServiceContext(env, overrides);
 }
 
-export { memoizeAsync, setRequestScope, getRequestScope, getServiceContext, createRequestContext, asScopedContext, SCOPE_KEY, SERVICE_CONTEXT_KEY };
+export {
+  memoizeAsync,
+  setRequestScope,
+  getRequestScope,
+  getServiceContext,
+  createRequestContext,
+  asScopedContext,
+  SCOPE_KEY,
+  SERVICE_CONTEXT_KEY,
+};
 export type { ScopedContext };

@@ -129,10 +129,7 @@ abstract class BaseRoute {
   public static jsonError(c: HonoContext, type: string, message: string, status: number): Response;
   public static jsonError(c: HonoContext, typeOrMessage: string, messageOrStatus: string | number, status = 400): Response {
     if (typeof messageOrStatus === 'number') {
-      return c.json(
-        { Exception: { Type: this.toErrorType(messageOrStatus), Message: typeOrMessage } },
-        messageOrStatus as 400,
-      );
+      return c.json({ Exception: { Type: this.toErrorType(messageOrStatus), Message: typeOrMessage } }, messageOrStatus as 400);
     }
     return c.json({ Exception: { Type: typeOrMessage, Message: messageOrStatus } }, status as 400);
   }

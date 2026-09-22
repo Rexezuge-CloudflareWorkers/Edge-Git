@@ -27,12 +27,8 @@ describe('deploy key lifecycle on real D1', () => {
   it('validates key creation input', async () => {
     expect((await api(`/user/repos/${OWNER}/${REPO}/keys`, json({ method: 'POST', body: JSON.stringify({}) }))).status).toBe(400);
     expect(
-      (
-        await api(
-          `/user/repos/${OWNER}/${REPO}/keys`,
-          json({ method: 'POST', body: JSON.stringify({ name: 'k', permission: 'owner' }) }),
-        )
-      ).status,
+      (await api(`/user/repos/${OWNER}/${REPO}/keys`, json({ method: 'POST', body: JSON.stringify({ name: 'k', permission: 'owner' }) })))
+        .status,
     ).toBe(400);
   });
 

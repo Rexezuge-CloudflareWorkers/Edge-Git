@@ -21,10 +21,7 @@ async function presentAssignees(scope: RequestScope, emails: unknown[]): Promise
 // Reviewer rows carry `user_email` (no `role` key). `presentOne` now maps
 // those to `username` as well; this helper stays as the explicit path for
 // reviewer lists so the mapping is covered even if row shapes drift.
-async function presentReviewers(
-  scope: RequestScope,
-  rows: Array<Record<string, unknown>>,
-): Promise<Array<Record<string, unknown>>> {
+async function presentReviewers(scope: RequestScope, rows: Array<Record<string, unknown>>): Promise<Array<Record<string, unknown>>> {
   const map = await usernameMap(
     scope,
     rows.map((r) => r['user_email']).filter((e): e is string => typeof e === 'string' && e.length > 0),

@@ -16,7 +16,14 @@ describe('coverage push: AuthConfig', () => {
   });
 
   it('allows bypass in development', () => {
-    const c = new AuthConfig({ ENVIRONMENT: 'development', DEMO_MODE: 'true', DEV_AUTH_EMAIL: 'a@b.co', TEAM_DOMAIN: 'https://x', POLICY_AUD: 'aud', DEMO_USER_EMAIL: 'd@e.co' });
+    const c = new AuthConfig({
+      ENVIRONMENT: 'development',
+      DEMO_MODE: 'true',
+      DEV_AUTH_EMAIL: 'a@b.co',
+      TEAM_DOMAIN: 'https://x',
+      POLICY_AUD: 'aud',
+      DEMO_USER_EMAIL: 'd@e.co',
+    });
     expect(c.getEnvironment()).toBe('development');
     expect(c.isBypassAllowed()).toBe(true);
     expect(c.isDemoMode()).toBe(true);
@@ -49,7 +56,9 @@ describe('coverage push: CronTasksWorker', () => {
   it('404s non-/run and handles per-schedule single-flight', async () => {
     const w = Object.create(CronTasksWorker.prototype) as InstanceType<typeof CronTasksWorker>;
     (w as unknown as { runs: Map<string, Promise<void>> }).runs = new Map();
-    const notFound = await (w as unknown as { fetch(r: Request): Promise<Response> }).fetch(new Request('https://do/nope', { method: 'GET' }));
+    const notFound = await (w as unknown as { fetch(r: Request): Promise<Response> }).fetch(
+      new Request('https://do/nope', { method: 'GET' }),
+    );
     expect(notFound.status).toBe(404);
     // single-flight: an in-flight run for the same cron → 202 Already running
     (w as unknown as { runs: Map<string, Promise<void>> }).runs.set('', Promise.resolve());

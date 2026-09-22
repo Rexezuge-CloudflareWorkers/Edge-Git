@@ -84,11 +84,9 @@ function rateLimit(opts: {
       }
       if (existing.count >= opts.max) {
         const retryAfter = Math.max(1, Math.ceil((existing.resetAt - now) / 1000));
-        return c.json(
-          { Exception: { Type: 'RateLimited', Message: 'Rate limit exceeded; try again later.' } },
-          429,
-          { 'Retry-After': String(retryAfter) },
-        );
+        return c.json({ Exception: { Type: 'RateLimited', Message: 'Rate limit exceeded; try again later.' } }, 429, {
+          'Retry-After': String(retryAfter),
+        });
       }
       existing.count += 1;
       await next();

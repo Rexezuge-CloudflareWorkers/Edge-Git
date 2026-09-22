@@ -137,9 +137,23 @@ class DiscussionService {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const id = UUIDUtil.getRandomUUID();
       const attemptNow = TimestampUtil.getCurrentUnixTimestampInSeconds();
-      const number = await allocateNumberWithFallback(this.deps.numberingDAO, () => dao.nextNumber(repositoryId), repositoryId, 'discussion');
+      const number = await allocateNumberWithFallback(
+        this.deps.numberingDAO,
+        () => dao.nextNumber(repositoryId),
+        repositoryId,
+        'discussion',
+      );
       try {
-        await dao.createDiscussion({ id, repositoryId, categoryId, number, title, body, authorEmail: authorEmail.toLowerCase(), now: attemptNow });
+        await dao.createDiscussion({
+          id,
+          repositoryId,
+          categoryId,
+          number,
+          title,
+          body,
+          authorEmail: authorEmail.toLowerCase(),
+          now: attemptNow,
+        });
         const row = await dao.getByNumber(repositoryId, number);
         if (!row) throw new NotFoundError('Discussion not found');
         return toMetadata(row);

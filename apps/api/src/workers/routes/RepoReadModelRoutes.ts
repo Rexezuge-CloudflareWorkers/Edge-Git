@@ -3,13 +3,7 @@ import { getRepoStub } from '../doStubs';
 import { jsonError, withVisibleRepo } from './PublicViewerResolver';
 import { RepoFullName } from '@edge-git/shared/utils';
 import type { RequestContext } from '@/middleware';
-import {
-  parseOverviewArgs,
-  parseWithLastCommit,
-  sanitizeDepthParam,
-  sanitizePathParam,
-  sanitizeRefParam,
-} from './RepoParamParsers';
+import { parseOverviewArgs, parseWithLastCommit, sanitizeDepthParam, sanitizePathParam, sanitizeRefParam } from './RepoParamParsers';
 
 type RepoApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -108,9 +102,7 @@ function registerUserRepoReadModelRoutes(app: RepoApp): void {
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const url = new URL(c.req.url);
     const args = parseOverviewArgs(url.searchParams);
-    return withVisibleRepoLocal(c, owner, repoName, async (fullName) =>
-      c.json(await getRepoStub(c.env, fullName).getOverview(args)),
-    );
+    return withVisibleRepoLocal(c, owner, repoName, async (fullName) => c.json(await getRepoStub(c.env, fullName).getOverview(args)));
   });
 }
 

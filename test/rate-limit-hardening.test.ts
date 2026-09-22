@@ -10,8 +10,7 @@ function makeCtx(headers: Record<string, string | null> = {}, identity?: string)
       if (identity === undefined) throw new Error('no scope');
       return identity;
     },
-    json: (body: unknown, status: number, hdrs?: Record<string, string>) =>
-      new Response(JSON.stringify(body), { status, headers: hdrs }),
+    json: (body: unknown, status: number, hdrs?: Record<string, string>) => new Response(JSON.stringify(body), { status, headers: hdrs }),
   } as never;
 }
 

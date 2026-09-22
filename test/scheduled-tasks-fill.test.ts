@@ -38,7 +38,12 @@ function withFetchStub(handler: (url: string, init?: RequestInit) => Promise<Res
     calls.push({ url: String(url), init });
     return Promise.resolve(handler(String(url), init));
   }) as typeof fetch;
-  return { calls, restore: () => { globalThis.fetch = realFetch; } };
+  return {
+    calls,
+    restore: () => {
+      globalThis.fetch = realFetch;
+    },
+  };
 }
 
 interface FakeTables {
@@ -124,7 +129,9 @@ function createFakeDb(tables: FakeTables): D1Queryable {
           const now = params[0] as number;
           const limit = params[1] as number;
           const rows = tables.mirrors
-            .filter((m) => m.enabled === 1 && (m.last_run_at === null || (m.last_run_at as number) + (m.interval_minutes as number) * 60 <= now))
+            .filter(
+              (m) => m.enabled === 1 && (m.last_run_at === null || (m.last_run_at as number) + (m.interval_minutes as number) * 60 <= now),
+            )
             .slice(0, limit);
           return Promise.resolve({ results: rows as T[] });
         }
@@ -145,12 +152,41 @@ function createFakeDb(tables: FakeTables): D1Queryable {
       },
       run(): Promise<{ success: boolean; meta?: { changes?: number } }> {
         if (q.startsWith('INSERT INTO check_runs')) {
-          const [id, repository_id, head_sha, context, status, conclusion, details_url, output_title, output_summary, creator_email, created_at, updated_at, completed_at] = params as Array<string | number | null>;
-          tables.checks.push({ id, repository_id, head_sha, context, status, conclusion, details_url, output_title, output_summary, creator_email, created_at, updated_at, completed_at });
+          const [
+            id,
+            repository_id,
+            head_sha,
+            context,
+            status,
+            conclusion,
+            details_url,
+            output_title,
+            output_summary,
+            creator_email,
+            created_at,
+            updated_at,
+            completed_at,
+          ] = params as Array<string | number | null>;
+          tables.checks.push({
+            id,
+            repository_id,
+            head_sha,
+            context,
+            status,
+            conclusion,
+            details_url,
+            output_title,
+            output_summary,
+            creator_email,
+            created_at,
+            updated_at,
+            completed_at,
+          });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE check_runs SET status = ?')) {
-          const [status, conclusion, details_url, output_title, output_summary, updated_at, completed_at, id, repository_id] = params as Array<string | number | null>;
+          const [status, conclusion, details_url, output_title, output_summary, updated_at, completed_at, id, repository_id] =
+            params as Array<string | number | null>;
           const row = tables.checks.find((r) => r.id === id && r.repository_id === repository_id);
           if (row) {
             Object.assign(row, { status, conclusion, details_url, output_title, output_summary, updated_at, completed_at });
@@ -308,7 +344,12 @@ describe('SearchBackfillTask catch-up', () => {
       DB: db,
       REPO: {
         getByName: (name: string) => {
-          if (String(name).endsWith('/bad')) return { listAllFiles: async () => { throw new Error('do down'); } };
+          if (String(name).endsWith('/bad'))
+            return {
+              listAllFiles: async () => {
+                throw new Error('do down');
+              },
+            };
           return {
             listAllFiles: async () => [{ path: 'README.md', oid: OLD }],
             getBlob: async () => textBlob('hi'),
@@ -321,8 +362,19 @@ describe('SearchBackfillTask catch-up', () => {
   });
 
   it('never throws when the repo listing fails', async () => {
-    const broken = { prepare: () => { throw new Error('d1 down'); } } as unknown as D1Queryable;
-    const env = { DB: broken, REPO: { getByName: () => { throw new Error('must not be called'); } } } as unknown as Env;
+    const broken = {
+      prepare: () => {
+        throw new Error('d1 down');
+      },
+    } as unknown as D1Queryable;
+    const env = {
+      DB: broken,
+      REPO: {
+        getByName: () => {
+          throw new Error('must not be called');
+        },
+      },
+    } as unknown as Env;
     await expect(new SearchBackfillTask().run(env)).resolves.toBeUndefined();
   });
 
@@ -406,7 +458,13 @@ describe('SearchBackfillTask catch-up', () => {
     const db = createFakeDb(tables);
     const env = {
       DB: db,
-      REPO: { getByName: () => ({ listAllFiles: async () => { throw new Error('do down'); } }) },
+      REPO: {
+        getByName: () => ({
+          listAllFiles: async () => {
+            throw new Error('do down');
+          },
+        }),
+      },
     } as unknown as Env;
     await new SearchBackfillTask().run(env);
     expect(tables.codeIndex).toHaveLength(1);
@@ -514,7 +572,15 @@ describe('ImportSweeperTask stale cleanup', () => {
     let imported = 0;
     const env = {
       DB: db,
-      REPO: { getByName: () => ({ listRefs: async () => ({ refs: [], symbolicHead: null }), importPack: async () => { imported += 1; return { importedRefs: ['refs/heads/main'] }; } }) },
+      REPO: {
+        getByName: () => ({
+          listRefs: async () => ({ refs: [], symbolicHead: null }),
+          importPack: async () => {
+            imported += 1;
+            return { importedRefs: ['refs/heads/main'] };
+          },
+        }),
+      },
     } as unknown as Env;
     const stub = smartHttpStub();
     try {
@@ -529,7 +595,14 @@ describe('ImportSweeperTask stale cleanup', () => {
   it('marks jobs failed when the repository is gone', async () => {
     const tables = seedTables({ imports: [importJob()] });
     const db = createFakeDb(tables);
-    const env = { DB: db, REPO: { getByName: () => { throw new Error('must not be called'); } } } as unknown as Env;
+    const env = {
+      DB: db,
+      REPO: {
+        getByName: () => {
+          throw new Error('must not be called');
+        },
+      },
+    } as unknown as Env;
     const stub = smartHttpStub();
     try {
       await new ImportSweeperTask().run(env);
@@ -545,15 +618,31 @@ describe('ImportSweeperTask stale cleanup', () => {
     const db = createFakeDb(tables);
     const env = {
       DB: db,
-      REPO: { getByName: () => ({ listRefs: async () => ({ refs: [{ ref: 'refs/heads/main', oid: OLD }], symbolicHead: 'refs/heads/main' }), importPack: async () => ({ importedRefs: [] as string[] }) }) },
+      REPO: {
+        getByName: () => ({
+          listRefs: async () => ({ refs: [{ ref: 'refs/heads/main', oid: OLD }], symbolicHead: 'refs/heads/main' }),
+          importPack: async () => ({ importedRefs: [] as string[] }),
+        }),
+      },
     } as unknown as Env;
     await new ImportSweeperTask().run(env);
     expect(tables.imports[0]?.status).toBe('failed');
   });
 
   it('never throws when the claim query fails', async () => {
-    const broken = { prepare: () => { throw new Error('d1 down'); } } as unknown as D1Queryable;
-    const env = { DB: broken, REPO: { getByName: () => { throw new Error('must not be called'); } } } as unknown as Env;
+    const broken = {
+      prepare: () => {
+        throw new Error('d1 down');
+      },
+    } as unknown as D1Queryable;
+    const env = {
+      DB: broken,
+      REPO: {
+        getByName: () => {
+          throw new Error('must not be called');
+        },
+      },
+    } as unknown as Env;
     await expect(new ImportSweeperTask().run(env)).resolves.toBeUndefined();
   });
 });
@@ -595,7 +684,11 @@ describe('check retention and stuck-context pruning', () => {
   });
 
   it('prune and stale tasks never throw on DAO failure', async () => {
-    const broken = { prepare: () => { throw new Error('d1 down'); } } as unknown as D1Queryable;
+    const broken = {
+      prepare: () => {
+        throw new Error('d1 down');
+      },
+    } as unknown as D1Queryable;
     await expect(new CheckPruneTask().run({ DB: broken } as unknown as Env)).resolves.toBeUndefined();
     await expect(new CheckStaleTask().run({ DB: broken } as unknown as Env)).resolves.toBeUndefined();
   });
@@ -643,7 +736,14 @@ describe('MirrorSyncTask retry', () => {
   it('skips when no mirror is due (no network)', async () => {
     const now = Math.floor(Date.now() / 1000);
     const tables = seedTables({ repos: [repoRow({ id: 'r1' })], mirrors: [mirrorRow({ last_run_at: now })] });
-    const env = { DB: createFakeDb(tables), REPO: { getByName: () => { throw new Error('must not be called'); } } } as unknown as Env;
+    const env = {
+      DB: createFakeDb(tables),
+      REPO: {
+        getByName: () => {
+          throw new Error('must not be called');
+        },
+      },
+    } as unknown as Env;
     const stub = withFetchStub(() => new Response('must not be called', { status: 500 }));
     try {
       await new MirrorSyncTask().run(env);
@@ -669,7 +769,10 @@ describe('MirrorSyncTask retry', () => {
   it('continues past per-mirror failures', async () => {
     const tables = seedTables({
       repos: [repoRow({ id: 'r1' }), repoRow({ id: 'r2', owner: 'alice', name: 'other' })],
-      mirrors: [mirrorRow({ repository_id: 'r1', source_url: 'https://github.com/o/bad' }), mirrorRow({ repository_id: 'r2', source_url: 'https://github.com/o/good' })],
+      mirrors: [
+        mirrorRow({ repository_id: 'r1', source_url: 'https://github.com/o/bad' }),
+        mirrorRow({ repository_id: 'r2', source_url: 'https://github.com/o/good' }),
+      ],
     });
     const env = { DB: createFakeDb(tables), REPO: { getByName: () => mirrorStub() } } as unknown as Env;
     const stub = withFetchStub((url) => {
@@ -693,8 +796,19 @@ describe('MirrorSyncTask retry', () => {
   });
 
   it('never throws when the due listing fails', async () => {
-    const broken = { prepare: () => { throw new Error('d1 down'); } } as unknown as D1Queryable;
-    const env = { DB: broken, REPO: { getByName: () => { throw new Error('must not be called'); } } } as unknown as Env;
+    const broken = {
+      prepare: () => {
+        throw new Error('d1 down');
+      },
+    } as unknown as D1Queryable;
+    const env = {
+      DB: broken,
+      REPO: {
+        getByName: () => {
+          throw new Error('must not be called');
+        },
+      },
+    } as unknown as Env;
     await expect(new MirrorSyncTask().run(env)).resolves.toBeUndefined();
   });
 });
