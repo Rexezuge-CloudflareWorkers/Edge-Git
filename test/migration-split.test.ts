@@ -54,17 +54,17 @@ INSERT INTO trigger VALUES ('x');`);
     expect(stmts).toHaveLength(2);
   });
 
-  it('splits the rowid-linked code FTS rebuild (0018) into whole statements', () => {
-    const url = new URL('../migrations/0018_code_fts_rowid.sql', import.meta.url);
+  it('splits the squashed schema (0021) with whole trigger bodies', () => {
+    const url = new URL('../migrations/0021_squash.sql', import.meta.url);
     const sql = readFileSync(fileURLToPath(url), 'utf8');
     const stmts = splitSql(sql);
-    // 3 DROP TRIGGER + CREATE VIRTUAL + INSERT..SELECT + DROP TABLE + ALTER
-    // + 3 CREATE TRIGGER = 10 statements.
-    expect(stmts).toHaveLength(10);
+    // 3 FTS sync triggers each for repo/issue/code/pull/discussion/snippet.
     const triggers = stmts.filter((s) => s.toUpperCase().includes('CREATE TRIGGER'));
-    expect(triggers).toHaveLength(3);
+    expect(triggers).toHaveLength(18);
     for (const trigger of triggers) expect(trigger.trimEnd().toUpperCase().endsWith('END')).toBe(true);
-    expect(stmts.some((s) => s.includes('code_fts_new') && s.toUpperCase().includes('RENAME TO'))).toBe(true);
+    // Rowid-linked code maintenance survived the squash; the one-time
+    // staging-table rebuild from 0018 did not.
     expect(stmts.filter((s) => s.includes('WHERE rowid = OLD.rowid'))).toHaveLength(2);
+    expect(sql).not.toContain('code_fts_new');
   });
 });
