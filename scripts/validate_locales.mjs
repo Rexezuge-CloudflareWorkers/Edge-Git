@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 /**
  * Validate web locale bundles: JSON-valid, key parity with en (no missing or
- * extra keys), `{{placeholder}}` parity, no empty values. Key order drift vs
- * en is warn-only (keeps diffs reviewable without failing the run).
+ * extra keys), `{{placeholder}}` parity, no empty values, and bundle-dir
+ * parity with web `SUPPORTED_LANGUAGES` (parsed from `apps/web/src/i18n.ts`,
+ * so a listed-but-unshipped language fails here instead of at runtime in
+ * `loadLanguage`). Key order drift vs en is warn-only (keeps diffs reviewable
+ * without failing the run).
  *
  * Usage: `pnpm run validate:locales` from the repo root.
  */
@@ -11,6 +14,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const LOCALES_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'apps', 'web', 'src', 'locales');
+const WEB_I18N_FILE = join(dirname(fileURLToPath(import.meta.url)), '..', 'apps', 'web', 'src', 'i18n.ts');
 const PLACEHOLDER = /\{\{[^}]+\}\}/g;
 
 function flatten(node, prefix, out) {
@@ -54,6 +58,22 @@ if (!tags.includes('en')) {
   fail('missing base locale: en/translation.json');
   process.exit(1);
 }
+
+// Every tag in web `SUPPORTED_LANGUAGES` (single source of truth:
+// `apps/web/src/i18n.ts`) must ship a bundle dir, and vice versa —
+// otherwise `loadLanguage` throws at runtime for a listed language.
+let supported;
+try {
+  const i18nSource = readFileSync(WEB_I18N_FILE, 'utf8');
+  const match = i18nSource.match(/SUPPORTED_LANGUAGES\s*=\s*\[([^\]]+)\]/);
+  supported = [...(match?.[1] ?? '').matchAll(/'([^']+)'/g)].map((m) => m[1]);
+} catch (error) {
+  fail(`cannot read web i18n.ts ${WEB_I18N_FILE}: ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(1);
+}
+if (supported.length === 0) fail('could not parse SUPPORTED_LANGUAGES from web i18n.ts');
+for (const tag of supported.filter((tag) => !tags.includes(tag))) fail(`missing locale directory for supported language: ${tag}/translation.json`);
+for (const tag of tags.filter((tag) => !supported.includes(tag))) fail(`extra locale directory not in SUPPORTED_LANGUAGES: ${tag}`);
 
 const bundles = new Map();
 for (const tag of tags) {
