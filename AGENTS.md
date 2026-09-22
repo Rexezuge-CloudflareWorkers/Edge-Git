@@ -15,7 +15,7 @@ Edge-Git: Cloudflare Workers git server (`@edge-git/monorepo`, `pnpm@11.2.2`).
 
 ```bash
 pnpm install
-pnpm -r typecheck && pnpm run lint && pnpm run test:coverage && pnpm run test:integration
+pnpm run checks:all
 pnpm --filter @edge-git/web build
 pnpm run typegen
 pnpm exec wrangler dev --config ./wrangler.jsonc
