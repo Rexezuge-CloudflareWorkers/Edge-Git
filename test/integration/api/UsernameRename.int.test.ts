@@ -76,10 +76,9 @@ describe('username rename on real D1', () => {
 
     // Sidecar cascade: denormalized issue full_name follows the new owner.
     const db = (env as unknown as TestEnv).DB;
-    const issue = (await db
-      .prepare('SELECT full_name FROM issues WHERE title = ?')
-      .bind('Rename me')
-      .first<{ full_name: string }>()) as { full_name: string };
+    const issue = (await db.prepare('SELECT full_name FROM issues WHERE title = ?').bind('Rename me').first<{ full_name: string }>()) as {
+      full_name: string;
+    };
     expect(issue.full_name).toBe(`${next}/${REPO}`);
 
     // Profile lookup follows the new handle.

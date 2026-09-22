@@ -74,14 +74,13 @@ function createSearchFakeDb(opts: {
           return Promise.resolve({ results: hits.slice(0, limit) as T[] });
         }
         if (q.startsWith('SELECT path, oid FROM code_index WHERE repo_id = ?')) {
-          const rows = code
-            .filter((c) => c.repo_id === params[0])
-            .map((c) => ({ path: c.path, oid: c.oid }));
+          const rows = code.filter((c) => c.repo_id === params[0]).map((c) => ({ path: c.path, oid: c.oid }));
           return Promise.resolve({ results: rows as T[] });
         }
         if (q.includes('FROM code_index WHERE')) {
           const limit = params[params.length - 1] as number;
-          const hasRepoScope = q.includes('repo_id = ?');          const likeParams = (hasRepoScope ? params.slice(1, -1) : params.slice(0, -1)) as string[];
+          const hasRepoScope = q.includes('repo_id = ?');
+          const likeParams = (hasRepoScope ? params.slice(1, -1) : params.slice(0, -1)) as string[];
           const patterns = likeParams.map((p) => String(p).replaceAll('%', '').replaceAll('!', '').toLowerCase());
           let hay = code;
           if (hasRepoScope) hay = hay.filter((c) => c.repo_id === params[0]);

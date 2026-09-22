@@ -129,7 +129,6 @@ function registerUserPullWriteRoutes(app: PullApp): void {
     }
   });
 
-
   // Triage (close/reopen): write+ only, mirrors issue triage.
   app.patch('/user/repos/:owner/:repo/pulls/:number', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
@@ -148,9 +147,7 @@ function registerUserPullWriteRoutes(app: PullApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);
-      const pull = await scope
-        .get(Tokens.PullRequestService)
-        .updateStatus({ repositoryId: row.id, number, status: body.status ?? '' });
+      const pull = await scope.get(Tokens.PullRequestService).updateStatus({ repositoryId: row.id, number, status: body.status ?? '' });
       await recordAndNotify(c.env, {
         repositoryId: row.id,
         fullName: `${owner}/${repoName}`,
@@ -166,7 +163,6 @@ function registerUserPullWriteRoutes(app: PullApp): void {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to update pull request'), toServiceStatus(error));
     }
   });
-
 
   app.post('/user/repos/:owner/:repo/pulls/:number/comments', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
@@ -204,7 +200,6 @@ function registerUserPullWriteRoutes(app: PullApp): void {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to add comment'), toServiceStatus(error));
     }
   });
-
 
   app.post('/user/repos/:owner/:repo/pulls/:number/reviews', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
@@ -254,8 +249,6 @@ function registerUserPullWriteRoutes(app: PullApp): void {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to add review'), status === 500 ? 400 : status);
     }
   });
-
-
 }
 
 export { registerUserPullWriteRoutes };

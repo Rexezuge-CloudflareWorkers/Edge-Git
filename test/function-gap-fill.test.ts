@@ -121,7 +121,9 @@ function createGapFakeDb() {
     return {
       first<T>(): Promise<T | null> {
         if (q.includes('FROM branch_protection_rules WHERE repository_id = ? AND pattern = ?')) {
-          return Promise.resolve((state.branchRules.find((r) => r.repository_id === params[0] && r.pattern === params[1]) ?? null) as T | null);
+          return Promise.resolve(
+            (state.branchRules.find((r) => r.repository_id === params[0] && r.pattern === params[1]) ?? null) as T | null,
+          );
         }
         if (q.includes('FROM branch_protection_rules WHERE id = ?')) {
           return Promise.resolve((state.branchRules.find((r) => r.id === params[0]) ?? null) as T | null);
@@ -131,8 +133,10 @@ function createGapFakeDb() {
         }
         if (q.includes('FROM check_runs WHERE repository_id = ? AND head_sha = ? AND context = ?')) {
           const row =
-            state.checks.find((c) => c.repository_id === params[0] && String(c.head_sha).toLowerCase() === Pl(1) && String(c.context).toLowerCase() === Pl(2)) ??
-            null;
+            state.checks.find(
+              (c) =>
+                c.repository_id === params[0] && String(c.head_sha).toLowerCase() === Pl(1) && String(c.context).toLowerCase() === Pl(2),
+            ) ?? null;
           return Promise.resolve(row as T | null);
         }
         if (q.includes('FROM check_runs WHERE id = ? AND repository_id = ?')) {
@@ -155,7 +159,8 @@ function createGapFakeDb() {
         }
         if (q.includes('FROM repositories WHERE lower(owner)') && q.includes('AND lower(name)')) {
           return Promise.resolve(
-            (state.repos.find((r) => String(r.owner).toLowerCase() === Pl(0) && String(r.name).toLowerCase() === Pl(1)) ?? null) as T | null,
+            (state.repos.find((r) => String(r.owner).toLowerCase() === Pl(0) && String(r.name).toLowerCase() === Pl(1)) ??
+              null) as T | null,
           );
         }
         if (q.includes('FROM repositories WHERE owner = ? AND name = ?')) {
@@ -170,7 +175,9 @@ function createGapFakeDb() {
           );
         }
         if (q.includes('COUNT(*) AS n FROM organization_members')) {
-          return Promise.resolve({ n: state.orgMembers.filter((m) => m.org_id === params[0] && m.role === 'owner').length } as unknown as T);
+          return Promise.resolve({
+            n: state.orgMembers.filter((m) => m.org_id === params[0] && m.role === 'owner').length,
+          } as unknown as T);
         }
         if (q.includes('FROM organizations WHERE username_ci = ?')) {
           return Promise.resolve((state.organizations.find((o) => o.username_ci === params[0]) ?? null) as T | null);
@@ -198,7 +205,9 @@ function createGapFakeDb() {
           return Promise.resolve({ results: state.branchRules.filter((r) => r.repository_id === params[0]) as T[] });
         }
         if (q.includes('FROM check_runs WHERE repository_id = ? AND head_sha = ?')) {
-          return Promise.resolve({ results: state.checks.filter((c) => c.repository_id === params[0] && String(c.head_sha).toLowerCase() === Pl(1)) as T[] });
+          return Promise.resolve({
+            results: state.checks.filter((c) => c.repository_id === params[0] && String(c.head_sha).toLowerCase() === Pl(1)) as T[],
+          });
         }
         if (q.includes('FROM repositories WHERE') && q.includes('owner_email')) {
           return Promise.resolve({ results: state.repos.filter((r) => String(r.owner_email).toLowerCase() === Pl(0)) as T[] });
@@ -277,13 +286,26 @@ function createGapFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO organizations')) {
-          state.organizations.push({ id: params[0], username: params[1], username_ci: params[2], creator_email: params[3], created_at: params[4], updated_at: params[5] });
+          state.organizations.push({
+            id: params[0],
+            username: params[1],
+            username_ci: params[2],
+            creator_email: params[3],
+            created_at: params[4],
+            updated_at: params[5],
+          });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO organization_members')) {
           const existing = state.orgMembers.find((m) => m.org_id === params[0] && String(m.user_email).toLowerCase() === Pl(1));
           if (existing) existing.role = params[2];
-          else state.orgMembers.push({ org_id: params[0], user_email: String(params[1]).toLowerCase(), role: params[2], created_at: params[3] });
+          else
+            state.orgMembers.push({
+              org_id: params[0],
+              user_email: String(params[1]).toLowerCase(),
+              role: params[2],
+              created_at: params[3],
+            });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         return Promise.resolve({ success: true, meta: { changes: 1 } });
@@ -305,7 +327,8 @@ function createGapDoStub(opts: { publishCount?: { count: number }; enqueueFail?:
     getBlob: () => Promise.resolve(null),
     getCommits: () => Promise.resolve([]),
     getTags: () => Promise.resolve([]),
-    getOverview: () => Promise.resolve({ branches: ['main'], currentBranch: 'main', resolvedRef: OID_A, tags: [], tree: [], commits: [], readme: null }),
+    getOverview: () =>
+      Promise.resolve({ branches: ['main'], currentBranch: 'main', resolvedRef: OID_A, tags: [], tree: [], commits: [], readme: null }),
     getBlame: () => Promise.resolve([]),
     resolveRef: () => Promise.resolve(OID_A),
     createBranch: () => Promise.resolve({ ok: true, ref: 'refs/heads/x', oid: OID_A }),
@@ -373,9 +396,12 @@ function createRunnerDb(seed: Partial<RunnerDb> = {}): D1Queryable & { data: Run
     const q = query.replace(/\s+/g, ' ').trim();
     return {
       first<T>(): Promise<T | null> {
-        if (q.includes('FROM repo_imports WHERE id = ?')) return Promise.resolve((data.imports.find((i) => i.id === params[0]) ?? null) as T | null);
-        if (q.includes('FROM repo_mirrors WHERE repository_id = ?')) return Promise.resolve((data.mirrors.find((m) => m.repository_id === params[0]) ?? null) as T | null);
-        if (q.includes('FROM repositories WHERE id = ?')) return Promise.resolve((data.repos.find((r) => r.id === params[0]) ?? null) as T | null);
+        if (q.includes('FROM repo_imports WHERE id = ?'))
+          return Promise.resolve((data.imports.find((i) => i.id === params[0]) ?? null) as T | null);
+        if (q.includes('FROM repo_mirrors WHERE repository_id = ?'))
+          return Promise.resolve((data.mirrors.find((m) => m.repository_id === params[0]) ?? null) as T | null);
+        if (q.includes('FROM repositories WHERE id = ?'))
+          return Promise.resolve((data.repos.find((r) => r.id === params[0]) ?? null) as T | null);
         return Promise.resolve(null);
       },
       all<T>(): Promise<{ results: T[] }> {
@@ -573,110 +599,127 @@ describe('function-gap SearchService', () => {
   });
 
   it('searchRepos filters private rows via permission', async () => {
-    const svc = new SearchService({ DB: {} as D1Queryable }, {
-      searchDAO: () =>
-        Promise.resolve({ searchRepos: async () => [{ id: 'r1' }, { id: 'r2' }] } as never),
-      permissionService: () =>
-        Promise.resolve({ getRole: async (_v: unknown, row: { id: string }) => (row.id === 'r1' ? 'read' : null) } as never),
-    });
+    const svc = new SearchService(
+      { DB: {} as D1Queryable },
+      {
+        searchDAO: () => Promise.resolve({ searchRepos: async () => [{ id: 'r1' }, { id: 'r2' }] } as never),
+        permissionService: () =>
+          Promise.resolve({ getRole: async (_v: unknown, row: { id: string }) => (row.id === 'r1' ? 'read' : null) } as never),
+      },
+    );
     const out = await svc.searchRepos('demo', null, 10);
     expect(out.map((r) => (r as { id: string }).id)).toEqual(['r1']);
   });
 
   it('searchIssues skips rows with missing repos', async () => {
-    const svc = new SearchService({ DB: {} as D1Queryable }, {
-      searchDAO: () =>
-        Promise.resolve({
-          searchIssues: async () => [
-            { id: 'i1', repository_id: 'r1' },
-            { id: 'i2', repository_id: 'gone' },
-          ],
-        } as never),
-      repositoryDAO: () => Promise.resolve({ getById: async (id: string) => (id === 'r1' ? ({ id: 'r1' } as never) : null) } as never),
-      permissionService: () => Promise.resolve({ getRole: async () => 'read' } as never),
-    });
+    const svc = new SearchService(
+      { DB: {} as D1Queryable },
+      {
+        searchDAO: () =>
+          Promise.resolve({
+            searchIssues: async () => [
+              { id: 'i1', repository_id: 'r1' },
+              { id: 'i2', repository_id: 'gone' },
+            ],
+          } as never),
+        repositoryDAO: () => Promise.resolve({ getById: async (id: string) => (id === 'r1' ? ({ id: 'r1' } as never) : null) } as never),
+        permissionService: () => Promise.resolve({ getRole: async () => 'read' } as never),
+      },
+    );
     const out = await svc.searchIssues('bug', null, { limit: 10 });
     expect(out.map((r) => (r as { id: string }).id)).toEqual(['i1']);
   });
 
   it('searchPulls respects limit and caches repo lookups', async () => {
     let repoCalls = 0;
-    const svc = new SearchService({ DB: {} as D1Queryable }, {
-      searchDAO: () =>
-        Promise.resolve({
-          searchPulls: async () => [
-            { id: 'p1', repository_id: 'r1' },
-            { id: 'p2', repository_id: 'r1' },
-            { id: 'p3', repository_id: 'r1' },
-          ],
-        } as never),
-      repositoryDAO: () =>
-        Promise.resolve({
-          getById: async (id: string) => {
-            repoCalls += 1;
-            return { id } as never;
-          },
-        } as never),
-      permissionService: () => Promise.resolve({ getRole: async () => 'read' } as never),
-    });
+    const svc = new SearchService(
+      { DB: {} as D1Queryable },
+      {
+        searchDAO: () =>
+          Promise.resolve({
+            searchPulls: async () => [
+              { id: 'p1', repository_id: 'r1' },
+              { id: 'p2', repository_id: 'r1' },
+              { id: 'p3', repository_id: 'r1' },
+            ],
+          } as never),
+        repositoryDAO: () =>
+          Promise.resolve({
+            getById: async (id: string) => {
+              repoCalls += 1;
+              return { id } as never;
+            },
+          } as never),
+        permissionService: () => Promise.resolve({ getRole: async () => 'read' } as never),
+      },
+    );
     const out = await svc.searchPulls('feat', null, { limit: 2 });
     expect(out).toHaveLength(2);
     expect(repoCalls).toBe(1);
   });
 
   it('searchCode builds snippets and skips invisible repos', async () => {
-    const svc = new SearchService({ DB: {} as D1Queryable }, {
-      searchDAO: () =>
-        Promise.resolve({
-          searchCode: async () => [
-            { repo_id: 'r1', path: 'a.ts', content: 'hello world foo bar' },
-            { repo_id: 'r2', path: 'b.ts', content: 'hello world' },
-            { repo_id: 'gone', path: 'c.ts', content: 'hello' },
-          ],
-        } as never),
-      repositoryDAO: () =>
-        Promise.resolve({
-          getById: async (id: string) => {
-            if (id === 'gone') return null;
-            return { id } as never;
-          },
-        } as never),
-      permissionService: () =>
-        Promise.resolve({ getRole: async (_v: unknown, row: { id: string }) => (row.id === 'r1' ? 'read' : null) } as never),
-    });
+    const svc = new SearchService(
+      { DB: {} as D1Queryable },
+      {
+        searchDAO: () =>
+          Promise.resolve({
+            searchCode: async () => [
+              { repo_id: 'r1', path: 'a.ts', content: 'hello world foo bar' },
+              { repo_id: 'r2', path: 'b.ts', content: 'hello world' },
+              { repo_id: 'gone', path: 'c.ts', content: 'hello' },
+            ],
+          } as never),
+        repositoryDAO: () =>
+          Promise.resolve({
+            getById: async (id: string) => {
+              if (id === 'gone') return null;
+              return { id } as never;
+            },
+          } as never),
+        permissionService: () =>
+          Promise.resolve({ getRole: async (_v: unknown, row: { id: string }) => (row.id === 'r1' ? 'read' : null) } as never),
+      },
+    );
     const out = await svc.searchCode('hello', null, { limit: 10 });
     expect(out).toHaveLength(1);
     expect(out[0].snippet).toContain('hello');
     // missing-token snippet falls back to prefix
-    const svc2 = new SearchService({ DB: {} as D1Queryable }, {
-      searchDAO: () => Promise.resolve({ searchCode: async () => [{ repo_id: 'r1', path: 'a.ts', content: 'zzz' }] } as never),
-      repositoryDAO: () => Promise.resolve({ getById: async () => ({ id: 'r1' }) as never } as never),
-      permissionService: () => Promise.resolve({ getRole: async () => 'read' } as never),
-    });
+    const svc2 = new SearchService(
+      { DB: {} as D1Queryable },
+      {
+        searchDAO: () => Promise.resolve({ searchCode: async () => [{ repo_id: 'r1', path: 'a.ts', content: 'zzz' }] } as never),
+        repositoryDAO: () => Promise.resolve({ getById: async () => ({ id: 'r1' }) as never } as never),
+        permissionService: () => Promise.resolve({ getRole: async () => 'read' } as never),
+      },
+    );
     const out2 = await svc2.searchCode('hello', null, {});
     expect(out2[0].snippet).toBe('zzz');
   });
 
   it('searchDiscussions/searchSnippets/indexFile/removeFile/clearRepo delegate', async () => {
     const calls: string[] = [];
-    const svc = new SearchService({ DB: {} as D1Queryable }, {
-      searchDAO: () =>
-        Promise.resolve({
-          searchDiscussions: async () => [{ id: 'd1', repository_id: 'r1' }],
-          searchSnippets: async () => [{ id: 's1' }],
-          upsertCodeFile: async () => {
-            calls.push('upsert');
-          },
-          deleteCodeFile: async () => {
-            calls.push('delete');
-          },
-          deleteCodeByRepo: async () => {
-            calls.push('clear');
-          },
-        } as never),
-      repositoryDAO: () => Promise.resolve({ getById: async () => ({ id: 'r1' }) as never } as never),
-      permissionService: () => Promise.resolve({ getRole: async () => 'read' } as never),
-    });
+    const svc = new SearchService(
+      { DB: {} as D1Queryable },
+      {
+        searchDAO: () =>
+          Promise.resolve({
+            searchDiscussions: async () => [{ id: 'd1', repository_id: 'r1' }],
+            searchSnippets: async () => [{ id: 's1' }],
+            upsertCodeFile: async () => {
+              calls.push('upsert');
+            },
+            deleteCodeFile: async () => {
+              calls.push('delete');
+            },
+            deleteCodeByRepo: async () => {
+              calls.push('clear');
+            },
+          } as never),
+        repositoryDAO: () => Promise.resolve({ getById: async () => ({ id: 'r1' }) as never } as never),
+        permissionService: () => Promise.resolve({ getRole: async () => 'read' } as never),
+      },
+    );
     await expect(svc.searchDiscussions('hello', null, {})).resolves.toHaveLength(1);
     await expect(svc.searchSnippets('hello', {})).resolves.toHaveLength(1);
     await expect(svc.indexFile({ repoId: 'r1', path: 'ok.ts', oid: OID_A, content: 'hi' })).resolves.toBe(true);
@@ -693,24 +736,37 @@ describe('function-gap SearchService', () => {
 // ---------------------------------------------------------------------------
 describe('function-gap SocialEmit', () => {
   function nullDb(): D1Queryable {
-    return { prepare: () => ({ bind: () => ({ first: async () => null, all: async () => ({ results: [] }), run: async () => ({ success: true }) }) }) } as unknown as D1Queryable;
+    return {
+      prepare: () => ({
+        bind: () => ({ first: async () => null, all: async () => ({ results: [] }), run: async () => ({ success: true }) }),
+      }),
+    } as unknown as D1Queryable;
   }
 
   it('publishLiveUpdate no-ops when realtime is disabled', async () => {
     const counter = { count: 0 };
     const stub = createGapDoStub({ publishCount: counter });
     const env = { DB: nullDb(), REALTIME: { getByName: () => stub, get: () => stub }, ENVIRONMENT: 'development' };
-    await expect(publishLiveUpdate(env as never, { fullName: 'alice/demo', channel: 'activity', type: 'push', actorEmail: ALICE, title: 'hi' })).resolves.toBeUndefined();
+    await expect(
+      publishLiveUpdate(env as never, { fullName: 'alice/demo', channel: 'activity', type: 'push', actorEmail: ALICE, title: 'hi' }),
+    ).resolves.toBeUndefined();
     expect(counter.count).toBe(0);
     const off = { ...env, REALTIME_ENABLED: 'false' };
-    await expect(publishLiveUpdate(off as never, { fullName: 'alice/demo', channel: 'activity', type: 'push', actorEmail: ALICE, title: 'hi' })).resolves.toBeUndefined();
+    await expect(
+      publishLiveUpdate(off as never, { fullName: 'alice/demo', channel: 'activity', type: 'push', actorEmail: ALICE, title: 'hi' }),
+    ).resolves.toBeUndefined();
     expect(counter.count).toBe(0);
   });
 
   it('publishLiveUpdate publishes to the repo shard when enabled', async () => {
     const counter = { count: 0 };
     const stub = createGapDoStub({ publishCount: counter });
-    const env = { DB: nullDb(), REALTIME: { getByName: () => stub, get: () => stub }, REALTIME_ENABLED: 'true', ENVIRONMENT: 'development' };
+    const env = {
+      DB: nullDb(),
+      REALTIME: { getByName: () => stub, get: () => stub },
+      REALTIME_ENABLED: 'true',
+      ENVIRONMENT: 'development',
+    };
     await publishLiveUpdate(env as never, { fullName: 'alice/demo', channel: 'activity', type: 'push', actorEmail: ALICE, title: 'hi' });
     expect(counter.count).toBe(1);
   });
@@ -718,7 +774,12 @@ describe('function-gap SocialEmit', () => {
   it('publishLiveUpdate fans out to inbox with recipients and drops bad channels', async () => {
     const counter = { count: 0 };
     const stub = createGapDoStub({ publishCount: counter });
-    const env = { DB: nullDb(), REALTIME: { getByName: () => stub, get: () => stub }, REALTIME_ENABLED: 'true', ENVIRONMENT: 'development' };
+    const env = {
+      DB: nullDb(),
+      REALTIME: { getByName: () => stub, get: () => stub },
+      REALTIME_ENABLED: 'true',
+      ENVIRONMENT: 'development',
+    };
     await publishLiveUpdate(env as never, {
       fullName: 'alice/demo',
       channel: 'activity',
@@ -735,13 +796,36 @@ describe('function-gap SocialEmit', () => {
   it('publishCheckUpdate validates sha and honors the kill switch', async () => {
     const counter = { count: 0 };
     const stub = createGapDoStub({ publishCount: counter });
-    const enabled = { DB: nullDb(), REALTIME: { getByName: () => stub, get: () => stub }, REALTIME_ENABLED: 'true', ENVIRONMENT: 'development' };
-    await publishCheckUpdate(enabled as never, { fullName: 'alice/demo', headSha: 'not-hex', context: 'ci', status: 'queued', actorEmail: ALICE });
+    const enabled = {
+      DB: nullDb(),
+      REALTIME: { getByName: () => stub, get: () => stub },
+      REALTIME_ENABLED: 'true',
+      ENVIRONMENT: 'development',
+    };
+    await publishCheckUpdate(enabled as never, {
+      fullName: 'alice/demo',
+      headSha: 'not-hex',
+      context: 'ci',
+      status: 'queued',
+      actorEmail: ALICE,
+    });
     expect(counter.count).toBe(0);
-    await publishCheckUpdate(enabled as never, { fullName: 'alice/demo', headSha: OID_A, context: 'ci', status: 'queued', actorEmail: ALICE });
+    await publishCheckUpdate(enabled as never, {
+      fullName: 'alice/demo',
+      headSha: OID_A,
+      context: 'ci',
+      status: 'queued',
+      actorEmail: ALICE,
+    });
     expect(counter.count).toBe(1);
     const disabled = { ...enabled, REALTIME_ENABLED: 'false' };
-    await publishCheckUpdate(disabled as never, { fullName: 'alice/demo', headSha: OID_A, context: 'ci', status: 'queued', actorEmail: ALICE });
+    await publishCheckUpdate(disabled as never, {
+      fullName: 'alice/demo',
+      headSha: OID_A,
+      context: 'ci',
+      status: 'queued',
+      actorEmail: ALICE,
+    });
     expect(counter.count).toBe(1);
   });
 
@@ -752,9 +836,17 @@ describe('function-gap SocialEmit', () => {
       recordAndNotify(env as never, { repositoryId: 'r-demo', fullName: 'alice/demo', actorEmail: ALICE, type: 'push', title: 'Pushed' }),
     ).resolves.toBeUndefined();
     const noBinding = { DB: db, ENVIRONMENT: 'development', DEV_AUTH_EMAIL: ALICE };
-    await expect(publishLiveUpdate(noBinding as never, { fullName: 'alice/demo', channel: 'activity', type: 'x', actorEmail: ALICE, title: 't' })).resolves.toBeUndefined();
     await expect(
-      publishCheckUpdate(noBinding as never, { fullName: 'alice/demo', headSha: OID_A, context: 'ci', status: 'queued', actorEmail: ALICE }),
+      publishLiveUpdate(noBinding as never, { fullName: 'alice/demo', channel: 'activity', type: 'x', actorEmail: ALICE, title: 't' }),
+    ).resolves.toBeUndefined();
+    await expect(
+      publishCheckUpdate(noBinding as never, {
+        fullName: 'alice/demo',
+        headSha: OID_A,
+        context: 'ci',
+        status: 'queued',
+        actorEmail: ALICE,
+      }),
     ).resolves.toBeUndefined();
   });
 });
@@ -766,28 +858,58 @@ describe('function-gap TriggerChecks', () => {
   it('skips invalid and zero shas without I/O', async () => {
     const { db } = createGapFakeDb();
     const env = createGapEnv(db);
-    await expect(triggerRequiredChecks(env as never, { repositoryId: 'r-demo', fullName: 'alice/demo', branch: 'main', headSha: 'bad', actorEmail: ALICE })).resolves.toEqual({
+    await expect(
+      triggerRequiredChecks(env as never, {
+        repositoryId: 'r-demo',
+        fullName: 'alice/demo',
+        branch: 'main',
+        headSha: 'bad',
+        actorEmail: ALICE,
+      }),
+    ).resolves.toEqual({
       triggered: [],
     });
     await expect(
-      triggerRequiredChecks(env as never, { repositoryId: 'r-demo', fullName: 'alice/demo', branch: 'main', headSha: OID_ZERO, actorEmail: ALICE }),
+      triggerRequiredChecks(env as never, {
+        repositoryId: 'r-demo',
+        fullName: 'alice/demo',
+        branch: 'main',
+        headSha: OID_ZERO,
+        actorEmail: ALICE,
+      }),
     ).resolves.toEqual({ triggered: [] });
   });
 
   it('returns empty when no protection rule requires checks', async () => {
     const { db } = createGapFakeDb();
     const env = createGapEnv(db);
-    const out = await triggerRequiredChecks(env as never, { repositoryId: 'r-demo', fullName: 'alice/demo', branch: 'main', headSha: OID_B, actorEmail: ALICE });
+    const out = await triggerRequiredChecks(env as never, {
+      repositoryId: 'r-demo',
+      fullName: 'alice/demo',
+      branch: 'main',
+      headSha: OID_B,
+      actorEmail: ALICE,
+    });
     expect(out).toEqual({ triggered: [] });
   });
 
   it('triggers required contexts and enqueues the runner', async () => {
     const { db, state } = createGapFakeDb();
     const env = createGapEnv(db);
-    const ruleRes = await callWorker(env, '/user/repos/alice/demo/rules', postJson({ pattern: 'main', requireStatusChecks: ['ci', 'lint'] }));
+    const ruleRes = await callWorker(
+      env,
+      '/user/repos/alice/demo/rules',
+      postJson({ pattern: 'main', requireStatusChecks: ['ci', 'lint'] }),
+    );
     expect(ruleRes.status).toBe(201);
     expect(state.branchRules).toHaveLength(1);
-    const out = await triggerRequiredChecks(env as never, { repositoryId: 'r-demo', fullName: 'alice/demo', branch: 'main', headSha: OID_B, actorEmail: ALICE });
+    const out = await triggerRequiredChecks(env as never, {
+      repositoryId: 'r-demo',
+      fullName: 'alice/demo',
+      branch: 'main',
+      headSha: OID_B,
+      actorEmail: ALICE,
+    });
     expect(out.triggered.sort()).toEqual(['ci', 'lint']);
     expect(state.checks.length).toBeGreaterThanOrEqual(2);
   });
@@ -804,12 +926,20 @@ describe('function-gap TriggerChecks', () => {
       DEV_AUTH_EMAIL: ALICE,
     };
     // seed a rule directly to avoid depending on POST
-    db.prepare('INSERT INTO branch_protection_rules (id, repository_id, pattern, require_pr, required_approvals, block_force_push, block_deletion, require_status_checks, created_by, created_at)')
+    db.prepare(
+      'INSERT INTO branch_protection_rules (id, repository_id, pattern, require_pr, required_approvals, block_force_push, block_deletion, require_status_checks, created_by, created_at)',
+    )
       .bind('rule-1', 'r-demo', 'main', 0, 0, 1, 1, JSON.stringify(['ci']), ALICE, 1)
       .run();
     // wait a tick for the in-memory push (run is sync-ish but async)
     await Promise.resolve();
-    const out = await triggerRequiredChecks(env as never, { repositoryId: 'r-demo', fullName: 'alice/demo', branch: 'main', headSha: OID_B, actorEmail: ALICE });
+    const out = await triggerRequiredChecks(env as never, {
+      repositoryId: 'r-demo',
+      fullName: 'alice/demo',
+      branch: 'main',
+      headSha: OID_B,
+      actorEmail: ALICE,
+    });
     expect(out.triggered).toEqual(['ci']);
   });
 });
@@ -821,16 +951,42 @@ describe('function-gap transfer runners', () => {
   it('runMirrorSync skips disabled mirrors without I/O', async () => {
     const db = createRunnerDb({
       repos: [{ id: 'r1', owner: 'alice', name: 'demo' }],
-      mirrors: [{ repository_id: 'r1', source_url: 'https://github.com/o/r', interval_minutes: 60, enabled: 0, last_run_at: null, last_status: null, last_error: null, consecutive_failures: 0 }],
+      mirrors: [
+        {
+          repository_id: 'r1',
+          source_url: 'https://github.com/o/r',
+          interval_minutes: 60,
+          enabled: 0,
+          last_run_at: null,
+          last_status: null,
+          last_error: null,
+          consecutive_failures: 0,
+        },
+      ],
     });
-    const stub = { listRefs: () => { throw new Error('must not be called'); } };
+    const stub = {
+      listRefs: () => {
+        throw new Error('must not be called');
+      },
+    };
     await runMirrorSync({ DB: db, REPO: { getByName: () => stub } } as unknown as Env, 'r1');
     expect(db.data.mirrors[0].last_status).toBeNull();
   });
 
   it('runMirrorSync deletes mirrors whose repo is gone', async () => {
     const db = createRunnerDb({
-      mirrors: [{ repository_id: 'gone', source_url: 'https://github.com/o/r', interval_minutes: 60, enabled: 1, last_run_at: null, last_status: null, last_error: null, consecutive_failures: 0 }],
+      mirrors: [
+        {
+          repository_id: 'gone',
+          source_url: 'https://github.com/o/r',
+          interval_minutes: 60,
+          enabled: 1,
+          last_run_at: null,
+          last_status: null,
+          last_error: null,
+          consecutive_failures: 0,
+        },
+      ],
     });
     await runMirrorSync({ DB: db, REPO: { getByName: () => ({}) } } as unknown as Env, 'gone');
     expect(db.data.mirrors).toHaveLength(0);
@@ -839,9 +995,25 @@ describe('function-gap transfer runners', () => {
   it('runMirrorSync records failure without throwing on bad remote', async () => {
     const db = createRunnerDb({
       repos: [{ id: 'r1', owner: 'alice', name: 'demo' }],
-      mirrors: [{ repository_id: 'r1', source_url: 'https://github.com/o/r', interval_minutes: 60, enabled: 1, last_run_at: null, last_status: null, last_error: null, consecutive_failures: 0 }],
+      mirrors: [
+        {
+          repository_id: 'r1',
+          source_url: 'https://github.com/o/r',
+          interval_minutes: 60,
+          enabled: 1,
+          last_run_at: null,
+          last_status: null,
+          last_error: null,
+          consecutive_failures: 0,
+        },
+      ],
     });
-    const stub = { listRefs: async () => ({ refs: [], symbolicHead: null }), importPack: async () => ({ importedRefs: [] }), isAncestor: async () => true, updateRefs: async () => ({ updated: [] }) };
+    const stub = {
+      listRefs: async () => ({ refs: [], symbolicHead: null }),
+      importPack: async () => ({ importedRefs: [] }),
+      isAncestor: async () => true,
+      updateRefs: async () => ({ updated: [] }),
+    };
     const realFetch = globalThis.fetch;
     globalThis.fetch = (async () => new Response('nope', { status: 500 })) as typeof fetch;
     try {
@@ -854,11 +1026,40 @@ describe('function-gap transfer runners', () => {
 
   it('runImportJob ignores unknown jobs and refuses non-empty repos', async () => {
     const empty = createRunnerDb();
-    await expect(runImportJob({ DB: empty, REPO: { getByName: () => { throw new Error('must not be called'); } } } as unknown as Env, 'alice/empty', 'missing')).resolves.toBeUndefined();
+    await expect(
+      runImportJob(
+        {
+          DB: empty,
+          REPO: {
+            getByName: () => {
+              throw new Error('must not be called');
+            },
+          },
+        } as unknown as Env,
+        'alice/empty',
+        'missing',
+      ),
+    ).resolves.toBeUndefined();
     const db = createRunnerDb({
-      imports: [{ id: 'j2', repository_id: 'r1', source_url: 'https://github.com/o/r', status: 'pending', error: null, refs_json: null, imported_refs: 0, created_by: ALICE, created_at: 0, updated_at: 0 }],
+      imports: [
+        {
+          id: 'j2',
+          repository_id: 'r1',
+          source_url: 'https://github.com/o/r',
+          status: 'pending',
+          error: null,
+          refs_json: null,
+          imported_refs: 0,
+          created_by: ALICE,
+          created_at: 0,
+          updated_at: 0,
+        },
+      ],
     });
-    const stub = { listRefs: async () => ({ refs: [{ ref: 'refs/heads/main', oid: OID_A }], symbolicHead: 'refs/heads/main' }), importPack: vi.fn() };
+    const stub = {
+      listRefs: async () => ({ refs: [{ ref: 'refs/heads/main', oid: OID_A }], symbolicHead: 'refs/heads/main' }),
+      importPack: vi.fn(),
+    };
     await runImportJob({ DB: db, REPO: { getByName: () => stub } } as unknown as Env, 'alice/full', 'j2');
     expect(db.data.imports[0].status).toBe('failed');
     expect(stub.importPack).not.toHaveBeenCalled();
@@ -870,7 +1071,9 @@ describe('function-gap transfer runners', () => {
       get: async () => ({ status: 200, contentType: 'application/x-git-upload-pack-advertisement', body: advertisement(many) }),
       post: async () => ({ status: 200, body: packResponse() }),
     };
-    await expect(fetchRemotePack(fetcher, 'https://github.com/o/r', { maxRefs: 2, maxPackBytes: 1024, timeoutMs: 5000 })).rejects.toThrow(/too many refs/);
+    await expect(fetchRemotePack(fetcher, 'https://github.com/o/r', { maxRefs: 2, maxPackBytes: 1024, timeoutMs: 5000 })).rejects.toThrow(
+      /too many refs/,
+    );
   });
 });
 
@@ -879,11 +1082,24 @@ describe('function-gap transfer runners', () => {
 // ---------------------------------------------------------------------------
 describe('function-gap scheduled tasks', () => {
   function emptyDb(): D1Queryable {
-    return { prepare: () => ({ bind: () => ({ first: async () => null, all: async () => ({ results: [] }), run: async () => ({ success: true, meta: { changes: 0 } }) }) }) } as unknown as D1Queryable;
+    return {
+      prepare: () => ({
+        bind: () => ({
+          first: async () => null,
+          all: async () => ({ results: [] }),
+          run: async () => ({ success: true, meta: { changes: 0 } }),
+        }),
+      }),
+    } as unknown as D1Queryable;
   }
   function taskEnv(db: D1Queryable): Env {
     const stub = createGapDoStub();
-    return { DB: db, REPO: { getByName: () => stub }, REALTIME: { getByName: () => stub }, CHECK_RUNNER: { getByName: () => stub } } as unknown as Env;
+    return {
+      DB: db,
+      REPO: { getByName: () => stub },
+      REALTIME: { getByName: () => stub },
+      CHECK_RUNNER: { getByName: () => stub },
+    } as unknown as Env;
   }
 
   it('ExpiredTokenPruningTask and BackgroundTaskRunPruningTask are no-ops on empty DB', async () => {
@@ -915,7 +1131,9 @@ describe('function-gap scheduled tasks', () => {
   it('CronTasksWorker 404s unknown paths and guards single-flight', async () => {
     const w = Object.create(CronTasksWorker.prototype) as InstanceType<typeof CronTasksWorker>;
     (w as unknown as { runs: Map<string, Promise<void>> }).runs = new Map();
-    const notFound = await (w as unknown as { fetch(r: Request): Promise<Response> }).fetch(new Request('https://do/nope', { method: 'GET' }));
+    const notFound = await (w as unknown as { fetch(r: Request): Promise<Response> }).fetch(
+      new Request('https://do/nope', { method: 'GET' }),
+    );
     expect(notFound.status).toBe(404);
     (w as unknown as { runs: Map<string, Promise<void>> }).runs.set('', Promise.resolve());
     const busy = await (w as unknown as { fetch(r: Request): Promise<Response> }).fetch(new Request('https://do/run', { method: 'POST' }));
@@ -930,7 +1148,9 @@ describe('function-gap scheduled tasks', () => {
     (w as unknown as { runs: Map<string, Promise<void>> }).runs = new Map();
     (w as unknown as { env: unknown }).env = env;
     (w as unknown as { ctx: unknown }).ctx = { waitUntil: (p: Promise<unknown>) => ctxRuns.push(p) };
-    const res = await (w as unknown as { fetch(r: Request): Promise<Response> }).fetch(new Request('https://do/run', { method: 'POST', body: JSON.stringify({}) }));
+    const res = await (w as unknown as { fetch(r: Request): Promise<Response> }).fetch(
+      new Request('https://do/run', { method: 'POST', body: JSON.stringify({}) }),
+    );
     expect(res.status).toBe(202);
   });
 });
@@ -965,9 +1185,17 @@ describe('function-gap UserRoutes profiles and settings', () => {
     const env = createGapEnv(db);
     const missing = await callWorker(env, '/user/me/username', { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({}) });
     expect(missing.status).toBe(400);
-    const invalid = await callWorker(env, '/user/me/username', { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ username: 'bad name!' }) });
+    const invalid = await callWorker(env, '/user/me/username', {
+      method: 'PATCH',
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ username: 'bad name!' }),
+    });
     expect(invalid.status).toBe(400);
-    const taken = await callWorker(env, '/user/me/username', { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ username: 'bob' }) });
+    const taken = await callWorker(env, '/user/me/username', {
+      method: 'PATCH',
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ username: 'bob' }),
+    });
     expect([400, 200]).toContain(taken.status);
   });
 });
@@ -996,7 +1224,7 @@ describe('function-gap OrgRoutes and TeamRoutes', () => {
   it('validates team create and member roles', async () => {
     const { db } = createGapFakeDb();
     const env = createGapEnv(db);
-    expect((await callWorker(env, '/user/orgs/acme/teams', postJson({})) ).status).toBe(400);
+    expect((await callWorker(env, '/user/orgs/acme/teams', postJson({}))).status).toBe(400);
     expect((await callWorker(env, '/user/orgs/acme/teams/dev/members', postJson({ role: 'member' }))).status).toBe(400);
     expect((await callWorker(env, '/user/orgs/acme/teams/dev/members', postJson({ email: BOB, role: 'superadmin' }))).status).toBe(400);
     expect((await callWorker(env, '/user/orgs/acme/teams')).status).toBe(200);
@@ -1028,7 +1256,12 @@ describe('function-gap ProjectRoutes and GitRoutes and PullMerge', () => {
   it('RepoMove skips no-op moves and moves empty repos', async () => {
     const { db } = createGapFakeDb();
     const stub = createGapDoStub();
-    const env = { DB: db, REPO: { getByName: () => stub, get: () => stub, idFromName: (n: string) => n }, ENVIRONMENT: 'development', DEV_AUTH_EMAIL: ALICE } as unknown as Env;
+    const env = {
+      DB: db,
+      REPO: { getByName: () => stub, get: () => stub, idFromName: (n: string) => n },
+      ENVIRONMENT: 'development',
+      DEV_AUTH_EMAIL: ALICE,
+    } as unknown as Env;
     await expect(moveRepoDosForRename(env, ALICE, [])).resolves.toEqual({ moved: 0, empty: 0 });
     await expect(
       moveRepoDosForRename(env, ALICE, [{ id: 'r1', name: 'demo', oldFull: 'alice/demo', newFull: 'alice/demo' }]),

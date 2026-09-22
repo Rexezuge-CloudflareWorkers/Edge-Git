@@ -47,7 +47,11 @@ async function runMirrorSync(env: Env, repositoryId: string): Promise<void> {
     const local = await stub.listRefs().catch(() => null);
     const localByRef = new Map((local?.refs ?? []).map((r) => [r.ref, r.oid]));
     const limits = scope.get(Tokens.ImportService).transferLimits();
-    const { refs: remoteRefs, pack, symbolicHead } = await fetchRemotePack(workerFetchAdapter(), mirror.source_url, {
+    const {
+      refs: remoteRefs,
+      pack,
+      symbolicHead,
+    } = await fetchRemotePack(workerFetchAdapter(), mirror.source_url, {
       maxRefs: limits.maxRefs,
       maxPackBytes: limits.maxPackBytes,
       timeoutMs: limits.timeoutMs,

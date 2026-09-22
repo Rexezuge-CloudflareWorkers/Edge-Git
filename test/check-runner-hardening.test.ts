@@ -36,7 +36,12 @@ function withFetchStub(handler: (url: string, init?: RequestInit) => Promise<Res
     calls.push({ url: String(url), init });
     return Promise.resolve(handler(String(url), init));
   }) as typeof fetch;
-  return { calls, restore: () => { globalThis.fetch = realFetch; } };
+  return {
+    calls,
+    restore: () => {
+      globalThis.fetch = realFetch;
+    },
+  };
 }
 
 describe('check sandbox timeout enforcement', () => {
@@ -66,9 +71,12 @@ describe('check sandbox timeout enforcement', () => {
 
 describe('check sandbox memory cap', () => {
   it('contains huge allocations via memoryMb instead of crashing', async () => {
-    const result = await run('function main(ctx) { const s = "x".repeat(10000000); return { conclusion: "success", summary: String(s.length) }; }', {
-      limits: { ...LIMITS, memoryMb: 4, cpuMs: 3000 },
-    });
+    const result = await run(
+      'function main(ctx) { const s = "x".repeat(10000000); return { conclusion: "success", summary: String(s.length) }; }',
+      {
+        limits: { ...LIMITS, memoryMb: 4, cpuMs: 3000 },
+      },
+    );
     expect(result.conclusion).not.toBe('success');
     expect(['failure', 'timed_out', 'action_required']).toContain(result.conclusion);
   });
@@ -92,8 +100,9 @@ describe('check sandbox memory cap', () => {
 describe('check allowHosts SSRF guard', () => {
   it('rejects loopback and private literals in definitions', () => {
     for (const host of ['localhost', '127.0.0.1', '10.0.0.1', '192.168.1.1', '169.254.169.254']) {
-      expect(() =>
-        parseCheckDefinitionFile(JSON.stringify({ checks: [{ context: 'lint', script: '.edgegit/checks/a.js', allowHosts: [host] }] })),
+      expect(
+        () =>
+          parseCheckDefinitionFile(JSON.stringify({ checks: [{ context: 'lint', script: '.edgegit/checks/a.js', allowHosts: [host] }] })),
         host,
       ).toThrow(/loopback|private|reserved/);
     }
@@ -184,10 +193,9 @@ describe('check allowHosts SSRF guard', () => {
 
 describe('check fork secret isolation', () => {
   it('exposes only declared env keys to untrusted scripts', async () => {
-    const result = await run(
-      'function main(ctx) { return { conclusion: "success", summary: Object.keys(ctx.env).sort().join(",") }; }',
-      { env: { LEVEL: 'strict', TOKEN: 'abc' } },
-    );
+    const result = await run('function main(ctx) { return { conclusion: "success", summary: Object.keys(ctx.env).sort().join(",") }; }', {
+      env: { LEVEL: 'strict', TOKEN: 'abc' },
+    });
     expect(result.conclusion).toBe('success');
     expect(result.summary).toContain('LEVEL');
     expect(result.summary).toContain('TOKEN');
@@ -243,18 +251,40 @@ describe('check live publish best-effort', () => {
   });
 
   it('swallows publish rejections', async () => {
-    const env = { REALTIME: { getByName: () => ({ publish: async () => { throw new Error('down'); } }) } } as unknown as Env;
+    const env = {
+      REALTIME: {
+        getByName: () => ({
+          publish: async () => {
+            throw new Error('down');
+          },
+        }),
+      },
+    } as unknown as Env;
     await expect(publishCheckLive(env, 'alice/demo', ITEM, RUN)).resolves.toBeUndefined();
   });
 
   it('swallows getByName throws', async () => {
-    const env = { REALTIME: { getByName: () => { throw new Error('shard gone'); } } } as unknown as Env;
+    const env = {
+      REALTIME: {
+        getByName: () => {
+          throw new Error('shard gone');
+        },
+      },
+    } as unknown as Env;
     await expect(publishCheckLive(env, 'alice/demo', ITEM, RUN)).resolves.toBeUndefined();
   });
 
   it('skips invalid channels without publishing', async () => {
     let calls = 0;
-    const env = { REALTIME: { getByName: () => ({ publish: async () => { calls += 1; } }) } } as unknown as Env;
+    const env = {
+      REALTIME: {
+        getByName: () => ({
+          publish: async () => {
+            calls += 1;
+          },
+        }),
+      },
+    } as unknown as Env;
     await publishCheckLive(env, 'alice/demo', { headSha: 'not-a-sha!!', actorEmail: 'a@x.com' }, RUN);
     expect(calls).toBe(0);
   });
@@ -266,7 +296,11 @@ describe('check live publish best-effort', () => {
       REALTIME: {
         getByName: (shard: string) => {
           shards.push(shard);
-          return { publish: async (input: Record<string, unknown>) => { seen.push(input); } };
+          return {
+            publish: async (input: Record<string, unknown>) => {
+              seen.push(input);
+            },
+          };
         },
       },
     } as unknown as Env;
@@ -338,12 +372,41 @@ function createDoDb() {
       },
       run(): Promise<{ success: boolean; meta?: { changes?: number } }> {
         if (q.startsWith('INSERT INTO check_runs')) {
-          const [id, repository_id, head_sha, context, status, conclusion, details_url, output_title, output_summary, creator_email, created_at, updated_at, completed_at] = params as Array<string | number | null>;
-          checkRuns.push({ id, repository_id, head_sha, context, status, conclusion, details_url, output_title, output_summary, creator_email, created_at, updated_at, completed_at });
+          const [
+            id,
+            repository_id,
+            head_sha,
+            context,
+            status,
+            conclusion,
+            details_url,
+            output_title,
+            output_summary,
+            creator_email,
+            created_at,
+            updated_at,
+            completed_at,
+          ] = params as Array<string | number | null>;
+          checkRuns.push({
+            id,
+            repository_id,
+            head_sha,
+            context,
+            status,
+            conclusion,
+            details_url,
+            output_title,
+            output_summary,
+            creator_email,
+            created_at,
+            updated_at,
+            completed_at,
+          });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE check_runs SET status = ?')) {
-          const [status, conclusion, details_url, output_title, output_summary, updated_at, completed_at, id, repository_id] = params as Array<string | number | null>;
+          const [status, conclusion, details_url, output_title, output_summary, updated_at, completed_at, id, repository_id] =
+            params as Array<string | number | null>;
           const row = checkRuns.find((r) => r.id === id && r.repository_id === repository_id);
           if (row) {
             Object.assign(row, { status, conclusion, details_url, output_title, output_summary, updated_at, completed_at });
@@ -372,7 +435,9 @@ describe('CheckRunnerWorker dispatch', () => {
   it('validates enqueue payloads over fetch', async () => {
     const { db } = createDoDb();
     const worker = new CheckRunnerWorker(fakeState(new Map()), doEnv(db));
-    const bad = await worker.fetch(new Request('https://x/enqueue', { method: 'POST', body: '{}', headers: { 'content-type': 'application/json' } }));
+    const bad = await worker.fetch(
+      new Request('https://x/enqueue', { method: 'POST', body: '{}', headers: { 'content-type': 'application/json' } }),
+    );
     expect(bad.status).toBe(400);
     const missing = await worker.fetch(new Request('https://x/nope'));
     expect(missing.status).toBe(404);
@@ -400,7 +465,9 @@ describe('CheckRunnerWorker dispatch', () => {
     expect(queued).toEqual({ queued: 2 });
     const pending = map.get('pending') as Array<{ contexts: string[] }>;
     expect(pending[0]?.contexts).toEqual(['secret-scan', 'diff-limit']);
-    expect(await worker.enqueueChecks({ repositoryId: 'repo-1', headSha: 'a'.repeat(40), contexts: ['  '], actorEmail: 'a@x.com' })).toEqual({ queued: 0 });
+    expect(
+      await worker.enqueueChecks({ repositoryId: 'repo-1', headSha: 'a'.repeat(40), contexts: ['  '], actorEmail: 'a@x.com' }),
+    ).toEqual({ queued: 0 });
   });
 
   it('runs built-in secret-scan to a completed conclusion on alarm', async () => {

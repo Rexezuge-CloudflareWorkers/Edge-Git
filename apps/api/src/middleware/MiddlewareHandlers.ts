@@ -5,7 +5,7 @@ import { AuditService } from '@edge-git/backend-services/audit';
 import { UnauthorizedError, ForbiddenError, DefaultInternalServerError } from '@edge-git/backend-errors';
 import { ErrorSanitizationUtil } from '@edge-git/shared/utils';
 import { flushDueWebhookDeliveries } from '@/workers/routes/SocialEmit';
-import {   getScope } from './GitAuth';
+import { getScope } from './GitAuth';
 import type { RequestContext } from './GitAuth';
 
 async function authenticateUserIdentity(c: RequestContext): Promise<string> {
@@ -44,7 +44,6 @@ async function userAuthenticationHandler(c: RequestContext, next: Next): Promise
     return c.json({ Exception: { Type: type, Message: message } }, status as 401);
   }
 }
-
 
 async function webhookFlushHandler(c: RequestContext, next: Next): Promise<Response | void> {
   await next();
@@ -88,7 +87,10 @@ async function activityAuditHandler(c: RequestContext, next: Next): Promise<Resp
       // Reuse the per-request scope so audit uses the same memoized
       // singletons (no second Secrets Store round-trip).
       const scope = getScope(c);
-      const record = scope.get(Tokens.AuditService).record(event).catch(() => undefined);
+      const record = scope
+        .get(Tokens.AuditService)
+        .record(event)
+        .catch(() => undefined);
       const waitUntil = (c.executionCtx as ExecutionContext | undefined)?.waitUntil?.bind(c.executionCtx);
       if (typeof waitUntil === 'function') {
         waitUntil(record);
@@ -147,11 +149,11 @@ class MiddlewareHandlers {
   }
 }
 
-export { MiddlewareHandlers,   };
+export { MiddlewareHandlers };
 
 export type { GitAuthResult, RequestContext } from './GitAuth';
 
 export { type TokenService } from '@edge-git/backend-services/auth';
 export { NotFoundError } from '@edge-git/backend-errors';
 
-export {gitAuthForRepo, unauthorizedGit} from './GitAuth';
+export { gitAuthForRepo, unauthorizedGit } from './GitAuth';

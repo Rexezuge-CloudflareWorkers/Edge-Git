@@ -58,7 +58,12 @@ class IssueService {
     // re-read MAX(number)+1 after a conflict (3 attempts, then surface).
     let lastError: unknown = null;
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      const number = await allocateNumberWithFallback(this.deps.numberingDAO, () => dao.nextNumber(input.repositoryId), input.repositoryId, 'issue');
+      const number = await allocateNumberWithFallback(
+        this.deps.numberingDAO,
+        () => dao.nextNumber(input.repositoryId),
+        input.repositoryId,
+        'issue',
+      );
       const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
       const id = UUIDUtil.getRandomUUID();
       try {

@@ -75,9 +75,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
     try {
       const url = new URL(c.req.url);
       const scope = getScope(c);
-      const discussions = await scope
-        .get(Tokens.DiscussionService)
-        .listDiscussions(row.id, url.searchParams.get('category') ?? undefined);
+      const discussions = await scope.get(Tokens.DiscussionService).listDiscussions(row.id, url.searchParams.get('category') ?? undefined);
       return c.json({ discussions: await presentMany(scope, discussions) });
     } catch {
       return c.json({ discussions: [] });
@@ -207,9 +205,7 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);
-      const comment = await scope
-        .get(Tokens.DiscussionService)
-        .addComment(row.id, number, body as { body: unknown }, email);
+      const comment = await scope.get(Tokens.DiscussionService).addComment(row.id, number, body as { body: unknown }, email);
       void recordAndNotify(c.env, {
         repositoryId: row.id,
         fullName: `${row.owner}/${row.name}`,

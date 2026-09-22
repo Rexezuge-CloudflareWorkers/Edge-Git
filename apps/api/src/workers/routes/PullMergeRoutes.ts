@@ -1,5 +1,13 @@
 import { getRepoStub } from '../doStubs';
-import { jsonError, requireVisibleRepo, toErrorBody, toErrorType, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
+import {
+  jsonError,
+  requireVisibleRepo,
+  toErrorBody,
+  toErrorType,
+  toSafeErrorMessage,
+  toServiceStatus,
+  getScope,
+} from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
@@ -54,8 +62,7 @@ async function mergeCrossForkPull(
       return { status: 413, body: toErrorBody(413, error instanceof Error ? error.message : 'Repository too large') };
     return { status: 400, body: toErrorBody(400, 'head branch not found') };
   }
-  if (!cross.preview?.baseOid || !cross.preview?.headOid)
-    return { status: 400, body: toErrorBody(400, 'head branch not found') };
+  if (!cross.preview?.baseOid || !cross.preview?.headOid) return { status: 400, body: toErrorBody(400, 'head branch not found') };
   const headOid = cross.preview.headOid;
   try {
     await input.scope.get(Tokens.PullRequestService).refreshOids({

@@ -71,7 +71,16 @@ describe('thin-90 dofs adapter', () => {
         // swallow
       }
     }
-    expect(() => setDofsDeviceSize({ setDeviceSize: () => { throw new Error('ENOSPC'); } }, 1)).not.toThrow();
+    expect(() =>
+      setDofsDeviceSize(
+        {
+          setDeviceSize: () => {
+            throw new Error('ENOSPC');
+          },
+        },
+        1,
+      ),
+    ).not.toThrow();
   });
 });
 
@@ -110,14 +119,29 @@ describe('thin-90 fetch handler caps', () => {
 
   it('413s oversized bodies', async () => {
     const h = new FetchHandler({ git: fakeGit(), env: {} as Env, getFullName: () => 'a/b' });
-    const res = await h.uploadPack(new Uint8Array(11), { maxWants: 10, maxHaves: 10, maxObjects: 10, maxPackBytes: 100, maxFetchBodyBytes: 10 });
+    const res = await h.uploadPack(new Uint8Array(11), {
+      maxWants: 10,
+      maxHaves: 10,
+      maxObjects: 10,
+      maxPackBytes: 100,
+      maxFetchBodyBytes: 10,
+    });
     expect(res.status).toBe(413);
   });
 
   it('400s too many ls-refs args', async () => {
     const h = new FetchHandler({ git: fakeGit(), env: {} as Env, getFullName: () => 'a/b' });
-    const body = encodeCommand('ls-refs', Array.from({ length: 70 }, (_, i) => `arg-${i}`));
-    const res = await h.uploadPack(body, { maxWants: 100, maxHaves: 100, maxObjects: 100, maxPackBytes: 1_000_000, maxFetchBodyBytes: 1_000_000 });
+    const body = encodeCommand(
+      'ls-refs',
+      Array.from({ length: 70 }, (_, i) => `arg-${i}`),
+    );
+    const res = await h.uploadPack(body, {
+      maxWants: 100,
+      maxHaves: 100,
+      maxObjects: 100,
+      maxPackBytes: 1_000_000,
+      maxFetchBodyBytes: 1_000_000,
+    });
     expect(res.status).toBe(400);
   });
 });
@@ -128,8 +152,12 @@ describe('thin-90 push handler', () => {
     const files = new Map<string, Uint8Array>();
     return {
       promises: {
-        writeFile: async (p: string, b: Uint8Array) => { files.set(p, b); },
-        unlink: async (p: string) => { files.delete(p); },
+        writeFile: async (p: string, b: Uint8Array) => {
+          files.set(p, b);
+        },
+        unlink: async (p: string) => {
+          files.delete(p);
+        },
       },
     } as never;
   }

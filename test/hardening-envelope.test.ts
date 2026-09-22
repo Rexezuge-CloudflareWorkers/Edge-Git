@@ -37,9 +37,7 @@ import { readJson } from '../apps/web/src/lib/api';
 
 describe('hardening: AWS Exception envelope', () => {
   it('maps status codes to Exception types', async () => {
-    const { toErrorType, toErrorBody, jsonError } = await import(
-      '../apps/api/src/workers/routes/PublicViewerResolver'
-    );
+    const { toErrorType, toErrorBody, jsonError } = await import('../apps/api/src/workers/routes/PublicViewerResolver');
     expect(toErrorType(400)).toBe('BadRequest');
     expect(toErrorType(401)).toBe('Unauthorized');
     expect(toErrorType(403)).toBe('Forbidden');
@@ -100,9 +98,7 @@ describe('hardening: AWS Exception envelope', () => {
     // Lenient web-compat parsing: envelope, legacy, plain text.
     expect(parseErrorPayload({ Exception: { Type: 'NotFound', Message: 'gone' } }, 404)).toBeInstanceOf(NotFoundError);
     expect(parseErrorPayload({ error: 'Forbidden', message: 'stop' }, 403).getErrorMessage()).toBe('stop');
-    expect(parseErrorPayload(JSON.stringify({ Exception: { Type: 'Unauthorized', Message: 'u' } }), 401)).toBeInstanceOf(
-      UnauthorizedError,
-    );
+    expect(parseErrorPayload(JSON.stringify({ Exception: { Type: 'Unauthorized', Message: 'u' } }), 401)).toBeInstanceOf(UnauthorizedError);
     expect(parseErrorPayload('plain boom', 500).getErrorMessage()).toBe('plain boom');
     expect(parseErrorPayload('', 500).getErrorCode()).toBe(500);
     expect(parseErrorPayload(null, 404).getErrorCode()).toBe(500);
@@ -132,9 +128,9 @@ describe('hardening: secret-safe logging', () => {
     expect(ErrorSanitizationUtil.sanitizeMessage('auth Bearer abc123 trailing')).toBe('auth Bearer [REDACTED] trailing');
     expect(ErrorSanitizationUtil.sanitizeMessage('login Basic dXNlcjpwYXNz')).toBe('login Basic [REDACTED]');
     expect(ErrorSanitizationUtil.sanitizeMessage('token edge-git-pat:secret123 ok')).toBe('token [REDACTED-PAT] ok');
-    expect(ErrorSanitizationUtil.sanitizeMessage('jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJVadQssw5c!')).toBe(
-      'jwt [REDACTED-JWT]!',
-    );
+    expect(
+      ErrorSanitizationUtil.sanitizeMessage('jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJVadQssw5c!'),
+    ).toBe('jwt [REDACTED-JWT]!');
     expect(ErrorSanitizationUtil.sanitizeMessage('plain message')).toBe('plain message');
     const logged = ErrorSanitizationUtil.sanitizeErrorForLogging(new Error('Bearer tok123'));
     expect(logged).toContain('Error:');
@@ -203,7 +199,7 @@ describe('hardening: SearchQueries pure builders', () => {
     expect(tokenizeSearchQuery(Array.from({ length: 20 }, (_, i) => `t${i}`).join(' '))).toHaveLength(10);
     expect(buildFtsQuery(['a"b', 'c'])).toBe('"a""b"* AND "c"*');
     expect(buildLikeOrClause(['lower(title)', 'lower(body)'], 2)).toBe(
-      '(lower(title) LIKE ? ESCAPE \'!\' OR lower(body) LIKE ? ESCAPE \'!\') AND (lower(title) LIKE ? ESCAPE \'!\' OR lower(body) LIKE ? ESCAPE \'!\')',
+      "(lower(title) LIKE ? ESCAPE '!' OR lower(body) LIKE ? ESCAPE '!') AND (lower(title) LIKE ? ESCAPE '!' OR lower(body) LIKE ? ESCAPE '!')",
     );
     expect(likeParamsForTokens(['A%_!', 'b'], 2)).toEqual(['%a!%!_!!%', '%a!%!_!!%', '%b%', '%b%']);
     expect(buildLikePattern('X')).toBe('%x%');
@@ -266,9 +262,7 @@ describe('hardening: team grants batch without N+1 or team_id dependence', () =>
 
 describe('hardening: web error compat reads both envelopes', () => {
   it('prefers Exception.Message, falls back to legacy and plain text', async () => {
-    await expect(
-      readJson(Response.json({ Exception: { Type: 'NotFound', Message: 'gone' } }, { status: 404 })),
-    ).rejects.toThrow('gone');
+    await expect(readJson(Response.json({ Exception: { Type: 'NotFound', Message: 'gone' } }, { status: 404 }))).rejects.toThrow('gone');
     await expect(readJson(Response.json({ error: 'Forbidden', message: 'stop' }, { status: 403 }))).rejects.toThrow('stop');
     await expect(readJson(new Response('plain boom', { status: 500 }))).rejects.toThrow('plain boom');
     await expect(readJson(Response.json({ ok: true }))).resolves.toEqual({ ok: true });

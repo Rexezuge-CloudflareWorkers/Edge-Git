@@ -1,11 +1,4 @@
-import type {
-  EventDAO,
-  IssueDAO,
-  NotificationDAO,
-  PullRequestDAO,
-  RepositoryDAO,
-  WebhookDAO,
-} from '@edge-git/backend-data/dao';
+import type { EventDAO, IssueDAO, NotificationDAO, PullRequestDAO, RepositoryDAO, WebhookDAO } from '@edge-git/backend-data/dao';
 
 // D1 cascade for owner/org renames, split out of `UserService` /
 // `OrganizationService` to stay under the god-file guard (mirrors
@@ -14,9 +7,7 @@ import type {
 interface RepoRenameCascadeDeps {
   repositoryDAO: () => Promise<RepositoryDAO>;
   issueDAO?: () => Promise<Pick<IssueDAO, 'updateFullNameByRepo'>>;
-  pullRequestDAO?: () => Promise<
-    Pick<PullRequestDAO, 'updateFullNameByRepo' | 'updateHeadFullNameByHeadRepo'>
-  >;
+  pullRequestDAO?: () => Promise<Pick<PullRequestDAO, 'updateFullNameByRepo' | 'updateHeadFullNameByHeadRepo'>>;
   eventDAO?: () => Promise<Pick<EventDAO, 'updateFullNameByRepo'>>;
   notificationDAO?: () => Promise<Pick<NotificationDAO, 'updateFullNameByRepo'>>;
   webhookDAO?: () => Promise<Pick<WebhookDAO, 'updateFullNameByRepo'>>;

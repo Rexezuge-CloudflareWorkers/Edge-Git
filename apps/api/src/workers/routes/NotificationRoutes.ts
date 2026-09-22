@@ -26,7 +26,10 @@ function registerUserNotificationRoutes(app: NotificationApp): void {
       scope.get(Tokens.NotificationService).listByUser(email, limit, cursor, unreadOnly),
       scope.get(Tokens.NotificationService).unreadCount(email),
     ]);
-    const map = await usernameMap(scope, notifications.map((n) => n.actor_email));
+    const map = await usernameMap(
+      scope,
+      notifications.map((n) => n.actor_email),
+    );
     const presented = notifications.map(({ actor_email, ...rest }) => {
       const kept = { ...(rest as Record<string, unknown>) };
       delete kept['user_email'];

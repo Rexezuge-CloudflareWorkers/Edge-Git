@@ -25,15 +25,12 @@ function service(opts: {
 }) {
   return new PermissionService({ DB: {} } as never, {
     organizationDAO: async () => ({ getByUsernameCi: async () => ({ id: 'org-1' }) }) as never,
-    organizationMemberDAO: async () =>
-      ({ get: async () => (opts.memberRole ? { role: opts.memberRole } : null) }) as never,
-    repoCollaboratorDAO: async () =>
-      ({ get: async () => (opts.collabGrant ? { role: opts.collabGrant } : null) }) as never,
+    organizationMemberDAO: async () => ({ get: async () => (opts.memberRole ? { role: opts.memberRole } : null) }) as never,
+    repoCollaboratorDAO: async () => ({ get: async () => (opts.collabGrant ? { role: opts.collabGrant } : null) }) as never,
     teamDAO: async () => ({ getById: async (id: string) => ({ id, org_id: 'org-1' }) }) as never,
     teamGrantDAO: async () =>
       ({
-        listByRepo: async () =>
-          (opts.teamGrants ?? []).map((role, i) => ({ team_id: `t${i}`, role })),
+        listByRepo: async () => (opts.teamGrants ?? []).map((role, i) => ({ team_id: `t${i}`, role })),
       }) as never,
     teamMemberDAO: async () =>
       ({

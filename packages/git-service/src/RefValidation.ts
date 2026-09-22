@@ -41,14 +41,5 @@ function classifyRefCommand(cmd: RefCommand): 'delete' | 'create' | 'update' {
   return 'update';
 }
 
-export {
-  ZERO_OID,
-  COMMIT_OID_RE,
-  isCommitOid,
-  isZeroOid,
-  branchRefFor,
-  isDeleteCommand,
-  isCreateCommand,
-  classifyRefCommand,
-};
+export { ZERO_OID, COMMIT_OID_RE, isCommitOid, isZeroOid, branchRefFor, isDeleteCommand, isCreateCommand, classifyRefCommand };
 export type { RefCommand };

@@ -25,9 +25,7 @@ function numberingFake(seedIssues: Array<{ repository_id: string; number: number
               const [repoId, entity] = params as [string, string];
               const key = `${repoId}:${entity}`;
               if (!counters.has(key)) {
-                const max = seedIssues
-                  .filter((i) => i.repository_id === repoId)
-                  .reduce((m, i) => Math.max(m, i.number), 0);
+                const max = seedIssues.filter((i) => i.repository_id === repoId).reduce((m, i) => Math.max(m, i.number), 0);
                 counters.set(key, max + 2);
               }
               const current = counters.get(key) as number;
@@ -69,7 +67,11 @@ describe('slice3: NumberingDAO atomic allocator', () => {
   });
 
   it('throws a missing-schema-style error when the table is absent', async () => {
-    const dao = new NumberingDAO({ prepare: () => ({ bind: () => ({ first: async () => null, all: async () => ({ results: [] }), run: async () => ({ success: true }) }) }) } as unknown as D1Queryable);
+    const dao = new NumberingDAO({
+      prepare: () => ({
+        bind: () => ({ first: async () => null, all: async () => ({ results: [] }), run: async () => ({ success: true }) }),
+      }),
+    } as unknown as D1Queryable);
     await expect(dao.allocateNumber('r1', 'issue')).rejects.toThrow('no such table: repo_number_counters');
   });
 });
@@ -138,7 +140,11 @@ describe('slice3: IssueService numbering paths', () => {
   it('hands out distinct numbers under concurrent creates (allocator)', async () => {
     const db = issueFakeDb(true);
     const service = new IssueService({ DB: db });
-    const results = await Promise.all([service.createIssue(baseInput(1)), service.createIssue(baseInput(2)), service.createIssue(baseInput(3))]);
+    const results = await Promise.all([
+      service.createIssue(baseInput(1)),
+      service.createIssue(baseInput(2)),
+      service.createIssue(baseInput(3)),
+    ]);
     expect(new Set(results.map((r) => r.number)).size).toBe(3);
   });
 
@@ -222,7 +228,12 @@ function withFetchStub(handler: (url: string, init?: RequestInit) => Promise<Res
     calls.push({ url: String(url), init });
     return Promise.resolve(handler(String(url), init));
   }) as typeof fetch;
-  return { calls, restore: () => { globalThis.fetch = realFetch; } };
+  return {
+    calls,
+    restore: () => {
+      globalThis.fetch = realFetch;
+    },
+  };
 }
 
 describe('slice3: fetchAdapter redirect loops', () => {

@@ -3,7 +3,15 @@ import { Tokens } from '@edge-git/backend-services/composition';
 import { presentMany } from './IdentityPresenter';
 import { SearchService } from '@edge-git/backend-services/search';
 import { RepoFullName } from '@edge-git/shared/utils';
-import { jsonError, requireVisibleRepo, resolvePublicViewer, toRepoJson, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
+import {
+  jsonError,
+  requireVisibleRepo,
+  resolvePublicViewer,
+  toRepoJson,
+  toSafeErrorMessage,
+  toServiceStatus,
+  getScope,
+} from './PublicViewerResolver';
 import type { RequestContext } from '@/middleware';
 
 type SearchApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -21,10 +29,13 @@ function registerSearchRoutes(app: SearchApp): void {
     const rawQ = (url.searchParams.get('q') ?? '').trim();
     if (!rawQ) return badQuery(c, 'q is required');
     if (rawQ.length > 200) return badQuery(c, 'q must be at most 200 characters');
-    const q = [...rawQ].filter((ch) => {
-      const code = ch.codePointAt(0) ?? 0;
-      return code > 0x1f && code !== 0x7f;
-    }).join('').trim();
+    const q = [...rawQ]
+      .filter((ch) => {
+        const code = ch.codePointAt(0) ?? 0;
+        return code > 0x1f && code !== 0x7f;
+      })
+      .join('')
+      .trim();
     if (!q) return badQuery(c, 'q is required');
     const type = SearchService.parseType(url.searchParams.get('type'));
     const limit = SearchService.clampLimit(url.searchParams.get('limit'));

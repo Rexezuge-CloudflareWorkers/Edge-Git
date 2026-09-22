@@ -136,7 +136,8 @@ class RepositoryDAO extends BaseDAO {
         .first<RepositoryRow>();
       if (indexed) return indexed;
     } catch (error) {
-      if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to look up repository: ${error instanceof Error ? error.message : String(error)}`);
+      if (!isMissingSchemaError(error))
+        throw new DatabaseError(`Failed to look up repository: ${error instanceof Error ? error.message : String(error)}`);
     }
     let ci: RepositoryRow | null = null;
     try {
@@ -145,7 +146,8 @@ class RepositoryDAO extends BaseDAO {
         .bind(ownerCi, nameCi)
         .first<RepositoryRow>();
     } catch (error) {
-      if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to look up repository: ${error instanceof Error ? error.message : String(error)}`);
+      if (!isMissingSchemaError(error))
+        throw new DatabaseError(`Failed to look up repository: ${error instanceof Error ? error.message : String(error)}`);
     }
     if (ci) return ci;
     try {
@@ -202,7 +204,8 @@ class RepositoryDAO extends BaseDAO {
       return result.results ?? [];
     } catch (error) {
       // Fail closed: only legacy DBs without org columns degrade to [].
-      if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to list repositories by org: ${error instanceof Error ? error.message : String(error)}`);
+      if (!isMissingSchemaError(error))
+        throw new DatabaseError(`Failed to list repositories by org: ${error instanceof Error ? error.message : String(error)}`);
       return [];
     }
   }
@@ -217,7 +220,8 @@ class RepositoryDAO extends BaseDAO {
         .all<RepositoryRow>();
       return result.results ?? [];
     } catch (error) {
-      if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to list collaborator repositories: ${error instanceof Error ? error.message : String(error)}`);
+      if (!isMissingSchemaError(error))
+        throw new DatabaseError(`Failed to list collaborator repositories: ${error instanceof Error ? error.message : String(error)}`);
       return [];
     }
   }
@@ -283,7 +287,8 @@ class RepositoryDAO extends BaseDAO {
         .all<RepositoryRow>();
       return result.results ?? [];
     } catch (error) {
-      if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to list forks: ${error instanceof Error ? error.message : String(error)}`);
+      if (!isMissingSchemaError(error))
+        throw new DatabaseError(`Failed to list forks: ${error instanceof Error ? error.message : String(error)}`);
       // DBs without 0004 fork columns (unit fakes / old D1) have no forks.
       return [];
     }
@@ -297,7 +302,8 @@ class RepositoryDAO extends BaseDAO {
         .first<{ n: number }>();
       return row?.n ?? 0;
     } catch (error) {
-      if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to count forks: ${error instanceof Error ? error.message : String(error)}`);
+      if (!isMissingSchemaError(error))
+        throw new DatabaseError(`Failed to count forks: ${error instanceof Error ? error.message : String(error)}`);
       return 0;
     }
   }
@@ -339,7 +345,8 @@ class RepositoryDAO extends BaseDAO {
         .all<RepositoryRow>();
       return result.results ?? [];
     } catch (error) {
-      if (!isMissingSchemaError(error)) throw new DatabaseError(`Failed to list recent repositories: ${error instanceof Error ? error.message : String(error)}`);
+      if (!isMissingSchemaError(error))
+        throw new DatabaseError(`Failed to list recent repositories: ${error instanceof Error ? error.message : String(error)}`);
       return [];
     }
   }

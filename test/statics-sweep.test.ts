@@ -76,7 +76,14 @@ describe('slice5: ConfigurationManager facade parity', () => {
   });
 
   it('honors overrides', () => {
-    const env = { MAX_REPOS_PER_USER: '3', DO_DEVICE_BYTES: '456', CHECK_CUSTOMJS_ENABLED: 'false', REALTIME_ENABLED: 'true', DEBUG_MODE: 'true', SITE_URL: 'https://example.com/' };
+    const env = {
+      MAX_REPOS_PER_USER: '3',
+      DO_DEVICE_BYTES: '456',
+      CHECK_CUSTOMJS_ENABLED: 'false',
+      REALTIME_ENABLED: 'true',
+      DEBUG_MODE: 'true',
+      SITE_URL: 'https://example.com/',
+    };
     expect(ConfigurationManager.repo.getMaxPerUser(env)).toBe(3);
     expect(ConfigurationManager.repo.getDoDeviceBytes(env)).toBe(456);
     expect(ConfigurationManager.checks.isCustomJsEnabled(env)).toBe(false);

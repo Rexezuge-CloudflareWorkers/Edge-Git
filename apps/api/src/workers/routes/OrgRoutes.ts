@@ -71,12 +71,20 @@ function registerOrgRoutes(app: OrgApp): void {
           }
         };
         try {
-          remember(await scope.get(Tokens.RepositoryDAO)().then((dao) => dao.listByOrgId(org.id, 1000)));
+          remember(
+            await scope
+              .get(Tokens.RepositoryDAO)()
+              .then((dao) => dao.listByOrgId(org.id, 1000)),
+          );
         } catch {
           // ignore — owner snapshot below still applies
         }
         try {
-          remember(await scope.get(Tokens.RepositoryDAO)().then((dao) => dao.listByOwner(before, 1000)));
+          remember(
+            await scope
+              .get(Tokens.RepositoryDAO)()
+              .then((dao) => dao.listByOwner(before, 1000)),
+          );
         } catch {
           // ignore — org_id snapshot above still applies
         }
@@ -194,7 +202,10 @@ function registerOrgRoutes(app: OrgApp): void {
       if (!repo) return jsonError(c, 'Not found', 404);
       const collabDao = await scope.get(Tokens.RepoCollaboratorDAO)();
       const rows = await collabDao.listByRepo(repo.id);
-      const map = await usernameMap(scope, rows.map((r) => r.user_email));
+      const map = await usernameMap(
+        scope,
+        rows.map((r) => r.user_email),
+      );
       return c.json({ collaborators: rows.map((r) => ({ username: usernameFor(map, r.user_email), role: r.role })) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));

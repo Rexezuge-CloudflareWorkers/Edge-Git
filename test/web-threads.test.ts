@@ -37,9 +37,9 @@ describe('web thread gate parity', () => {
     expect(isBlockedByCodeowners(reviews, 'alice@example.com', [])).toBe(false);
     expect(isBlockedByCodeowners(reviews, 'alice@example.com', ['carol@example.com'])).toBe(false);
     expect(isBlockedByCodeowners(reviews, 'alice@example.com', ['dave@example.com'])).toBe(true);
-    expect(
-      isBlockedByCodeowners([{ author: 'alice@example.com', state: 'approved' }], 'alice@example.com', ['alice@example.com']),
-    ).toBe(true);
+    expect(isBlockedByCodeowners([{ author: 'alice@example.com', state: 'approved' }], 'alice@example.com', ['alice@example.com'])).toBe(
+      true,
+    );
   });
 });
 

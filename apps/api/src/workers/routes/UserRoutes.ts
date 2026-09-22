@@ -39,10 +39,7 @@ async function filterVisibleRepos(
   return visible;
 }
 
-async function hasVisibleRepo(
-  repos: RepositoryRow[],
-  getRole: (repo: RepositoryRow) => Promise<string | null>,
-): Promise<boolean> {
+async function hasVisibleRepo(repos: RepositoryRow[], getRole: (repo: RepositoryRow) => Promise<string | null>): Promise<boolean> {
   const scanned = repos.slice(0, 20);
   const roles = await Promise.all(scanned.map((repo) => getRole(repo)));
   return roles.some((role) => role !== null);
@@ -279,7 +276,11 @@ function registerUserSettingsRoutes(app: UserApp): void {
           // ignore — DAO snapshot below still applies
         }
         try {
-          remember(await scope.get(Tokens.RepositoryDAO)().then((dao) => dao.listByOwner(before.username as string, 1000)));
+          remember(
+            await scope
+              .get(Tokens.RepositoryDAO)()
+              .then((dao) => dao.listByOwner(before.username as string, 1000)),
+          );
         } catch {
           // ignore — owner_email snapshot above still applies
         }

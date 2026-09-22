@@ -122,12 +122,16 @@ class PermissionService {
           const maybeOrg = await orgDAO.getByUsernameCi(PermissionService.ownerCiOf(repo));
           if (maybeOrg && (repo.org_id === maybeOrg.id || repo.owner_type === 'org')) orgId = maybeOrg.id;
         } catch (error) {
-          if (!this.isTolerableSchemaError(error)) throw new DatabaseError(`Failed to resolve organization: ${error instanceof Error ? error.message : String(error)}`);
+          if (!this.isTolerableSchemaError(error))
+            throw new DatabaseError(`Failed to resolve organization: ${error instanceof Error ? error.message : String(error)}`);
           // ignore — legacy DB without organizations table
         }
       }
     } catch (error) {
-      if (!this.isTolerableSchemaError(error)) throw error instanceof DatabaseError ? error : new DatabaseError(`Failed to resolve permission: ${error instanceof Error ? error.message : String(error)}`);
+      if (!this.isTolerableSchemaError(error))
+        throw error instanceof DatabaseError
+          ? error
+          : new DatabaseError(`Failed to resolve permission: ${error instanceof Error ? error.message : String(error)}`);
       orgId = null;
     }
 
@@ -137,7 +141,8 @@ class PermissionService {
         const membership = await memberDAO.get(orgId, viewer);
         if (membership?.role === 'owner') return 'admin';
       } catch (error) {
-        if (!this.isTolerableSchemaError(error)) throw new DatabaseError(`Failed to check org membership: ${error instanceof Error ? error.message : String(error)}`);
+        if (!this.isTolerableSchemaError(error))
+          throw new DatabaseError(`Failed to check org membership: ${error instanceof Error ? error.message : String(error)}`);
         // missing table → fall through to collaborator/public checks
       }
       let best: RepoPermission | null = null;
@@ -146,7 +151,8 @@ class PermissionService {
         const grant = await collabDAO.get(repo.id, viewer);
         if (grant) best = grant.role;
       } catch (error) {
-        if (!this.isTolerableSchemaError(error)) throw new DatabaseError(`Failed to check collaborator grant: ${error instanceof Error ? error.message : String(error)}`);
+        if (!this.isTolerableSchemaError(error))
+          throw new DatabaseError(`Failed to check collaborator grant: ${error instanceof Error ? error.message : String(error)}`);
       }
       // Team-derived grants (org repos only): max of direct + team grants.
       // Missing team tables (legacy DBs/fakes) fall through silently.
@@ -154,7 +160,10 @@ class PermissionService {
         const teamBest = await this.getTeamRole(orgId, repo.id, viewer);
         if (teamBest && (!best || ROLE_RANK[teamBest] > ROLE_RANK[best])) best = teamBest;
       } catch (error) {
-        if (!this.isTolerableSchemaError(error)) throw error instanceof DatabaseError ? error : new DatabaseError(`Failed to check team grants: ${error instanceof Error ? error.message : String(error)}`);
+        if (!this.isTolerableSchemaError(error))
+          throw error instanceof DatabaseError
+            ? error
+            : new DatabaseError(`Failed to check team grants: ${error instanceof Error ? error.message : String(error)}`);
       }
       if (best) return best;
       return isPrivate ? null : 'read';
@@ -168,7 +177,8 @@ class PermissionService {
       const grant = await collabDAO.get(repo.id, viewer);
       if (grant) return grant.role;
     } catch (error) {
-      if (!this.isTolerableSchemaError(error)) throw new DatabaseError(`Failed to check collaborator grant: ${error instanceof Error ? error.message : String(error)}`);
+      if (!this.isTolerableSchemaError(error))
+        throw new DatabaseError(`Failed to check collaborator grant: ${error instanceof Error ? error.message : String(error)}`);
     }
     return isPrivate ? null : 'read';
   }
@@ -188,7 +198,8 @@ class PermissionService {
     try {
       grants = await grantDAO.listByRepo(repoId);
     } catch (error) {
-      if (!this.isTolerableSchemaError(error)) throw new DatabaseError(`Failed to list team grants: ${error instanceof Error ? error.message : String(error)}`);
+      if (!this.isTolerableSchemaError(error))
+        throw new DatabaseError(`Failed to list team grants: ${error instanceof Error ? error.message : String(error)}`);
       return null;
     }
     if (grants.length === 0) return null;
@@ -199,7 +210,8 @@ class PermissionService {
       try {
         return await op;
       } catch (error) {
-        if (!this.isTolerableSchemaError(error)) throw new DatabaseError(`Failed to resolve team role: ${error instanceof Error ? error.message : String(error)}`);
+        if (!this.isTolerableSchemaError(error))
+          throw new DatabaseError(`Failed to resolve team role: ${error instanceof Error ? error.message : String(error)}`);
         return null;
       }
     };
@@ -207,9 +219,7 @@ class PermissionService {
       Promise.all(uniqueTeamIds.map((id) => swallowMissing(teamDAO.getById(id)))),
       Promise.all(uniqueTeamIds.map((id) => swallowMissing(memberDAO.get(id, viewer)))),
     ]);
-    const teamById = new Map(
-      teams.filter((t): t is NonNullable<typeof t> => t !== null).map((t) => [t.id, t] as const),
-    );
+    const teamById = new Map(teams.filter((t): t is NonNullable<typeof t> => t !== null).map((t) => [t.id, t] as const));
     // Positional membership: `memberships[i]` answers `uniqueTeamIds[i]`.
     // (Do not rely on the row's `team_id` field — fakes/legacy rows may omit it.)
     const memberTeamIds = new Set(uniqueTeamIds.filter((_, i) => memberships[i] !== null));

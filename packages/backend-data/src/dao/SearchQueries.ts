@@ -17,8 +17,7 @@ const SEARCH_MAX_TOKENS = 10;
 // ~250 D1 rows-read each (FTS delete-scan + re-tokenize); unchanged files
 // must not pay that. `IS DISTINCT FROM` is NULL-safe (NULL oid = unknown
 // blob, always rewritten when content differs).
-const UPSERT_CODE_FILE_SQL =
-  `INSERT INTO code_index (repo_id, path, oid, content, updated_at) VALUES (?, ?, ?, ?, ?)
+const UPSERT_CODE_FILE_SQL = `INSERT INTO code_index (repo_id, path, oid, content, updated_at) VALUES (?, ?, ?, ?, ?)
    ON CONFLICT (repo_id, path) DO UPDATE SET oid = excluded.oid, content = excluded.content, updated_at = excluded.updated_at
    WHERE excluded.oid IS DISTINCT FROM code_index.oid OR excluded.content IS DISTINCT FROM code_index.content`;
 

@@ -37,7 +37,12 @@ function stubFetch(handler: (url: string) => Response) {
     void init;
     return Promise.resolve(handler(String(url)));
   }) as typeof fetch;
-  return { calls, restore: () => { globalThis.fetch = realFetch; } };
+  return {
+    calls,
+    restore: () => {
+      globalThis.fetch = realFetch;
+    },
+  };
 }
 
 interface RunnerState {
@@ -52,9 +57,49 @@ interface RunnerState {
 
 function seedRunnerState(): RunnerState {
   return {
-    imports: [{ id: 'job1', repository_id: 'r1', source_url: 'https://github.com/o/r', status: 'pending', error: null, refs_json: null, imported_refs: 0, created_by: 'a@x.com', created_at: 1, updated_at: 1 }],
-    mirrors: [{ repository_id: 'r1', source_url: 'https://github.com/o/r', interval_minutes: 60, enabled: 1, last_run_at: null, last_status: null, last_error: null, consecutive_failures: 0, created_by: 'a@x.com', created_at: 1, updated_at: 1 }],
-    repos: [{ id: 'r1', owner_email: 'a@x.com', owner: 'alice', name: 'demo', is_private: 0, owner_type: 'user', owner_ci: 'alice', name_ci: 'demo', created_at: 1, updated_at: 1 }],
+    imports: [
+      {
+        id: 'job1',
+        repository_id: 'r1',
+        source_url: 'https://github.com/o/r',
+        status: 'pending',
+        error: null,
+        refs_json: null,
+        imported_refs: 0,
+        created_by: 'a@x.com',
+        created_at: 1,
+        updated_at: 1,
+      },
+    ],
+    mirrors: [
+      {
+        repository_id: 'r1',
+        source_url: 'https://github.com/o/r',
+        interval_minutes: 60,
+        enabled: 1,
+        last_run_at: null,
+        last_status: null,
+        last_error: null,
+        consecutive_failures: 0,
+        created_by: 'a@x.com',
+        created_at: 1,
+        updated_at: 1,
+      },
+    ],
+    repos: [
+      {
+        id: 'r1',
+        owner_email: 'a@x.com',
+        owner: 'alice',
+        name: 'demo',
+        is_private: 0,
+        owner_type: 'user',
+        owner_ci: 'alice',
+        name_ci: 'demo',
+        created_at: 1,
+        updated_at: 1,
+      },
+    ],
     failed: [],
     done: [],
     runs: [],
@@ -176,7 +221,10 @@ describe('slice5: runImportJob', () => {
     const env = runnerEnv(runnerDb(state), { 'alice/demo': repoStub([], calls) });
     const fetch = stubFetch((url) => {
       if (url.includes('/info/refs')) {
-        return new Response(advertisement([{ ref: 'refs/heads/main', oid: OID_A }]) as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/x-git-upload-pack-advertisement' } });
+        return new Response(advertisement([{ ref: 'refs/heads/main', oid: OID_A }]) as unknown as BodyInit, {
+          status: 200,
+          headers: { 'content-type': 'application/x-git-upload-pack-advertisement' },
+        });
       }
       return new Response(sidebandPack() as unknown as BodyInit, { status: 200 });
     });
@@ -258,7 +306,9 @@ describe('slice5: runMirrorSync', () => {
   it('skips diverged branches without force-updating', async () => {
     const state = seedRunnerState();
     const calls: Record<string, unknown[]> = {};
-    const env = runnerEnv(runnerDb(state), { 'alice/demo': repoStub([{ ref: 'refs/heads/main', oid: OID_A }], calls, { ancestor: false }) });
+    const env = runnerEnv(runnerDb(state), {
+      'alice/demo': repoStub([{ ref: 'refs/heads/main', oid: OID_A }], calls, { ancestor: false }),
+    });
     const fetch = stubFetch((url) => {
       if (url.includes('/info/refs')) {
         return new Response(advertisement([{ ref: 'refs/heads/main', oid: OID_B }]) as unknown as BodyInit, {

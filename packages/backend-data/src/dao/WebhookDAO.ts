@@ -176,8 +176,7 @@ class WebhookDAO extends BaseDAO {
   // stable `repository_id` so hook rows follow the new `owner/name`.
   public async updateFullNameByRepo(repositoryId: string, fullName: string): Promise<void> {
     await this.withRetry(
-      () =>
-        this.database.prepare('UPDATE repo_webhooks SET full_name = ? WHERE repository_id = ?').bind(fullName, repositoryId).run(),
+      () => this.database.prepare('UPDATE repo_webhooks SET full_name = ? WHERE repository_id = ?').bind(fullName, repositoryId).run(),
       'rename webhook full name',
     ).catch(() => undefined);
   }

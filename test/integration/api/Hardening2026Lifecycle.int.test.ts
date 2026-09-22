@@ -50,7 +50,10 @@ describe('Hardening 2026 lifecycle on real D1', () => {
     // Mint admin-less token with only repo:write? Actually repo:write covers read, so use empty via direct DB? Use admin token then check public repo still visible anon.
     // Public repo is visible anon; scoped-token escalation is about private reads. Seed private repo.
     await seedRepo(testEnv.DB, { ownerEmail: OTHER, owner: 'other', name: 'priv-2026', isPrivate: true });
-    const { token } = await mintPatForEmail(testEnv.DB, OTHER, { scopes: [] as unknown as string[] }).catch(() => ({ token: 'bogus', tokenId: 'x' }));
+    const { token } = await mintPatForEmail(testEnv.DB, OTHER, { scopes: [] as unknown as string[] }).catch(() => ({
+      token: 'bogus',
+      tokenId: 'x',
+    }));
     // Empty scopes fail closed on git.
     const gitRes = await api(`/other/priv-2026/info/refs?service=git-upload-pack`, { headers: bearerHeader(token) });
     expect([401, 403]).toContain(gitRes.status);

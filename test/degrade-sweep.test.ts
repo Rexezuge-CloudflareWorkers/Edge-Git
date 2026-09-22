@@ -79,7 +79,9 @@ describe('slice5: WikiDAO degrade', () => {
     await expect(dao.listRevisions('p')).resolves.toEqual([]);
     await expect(dao.searchByRepo('r', 'term', 10)).resolves.toEqual([]);
     await expect(dao.deleteByRepo('r')).resolves.toBeUndefined();
-    await expect(dao.createPage({ id: 'p', repositoryId: 'r', slug: 'home', title: 'Home', body: null, updatedBy: 'a@x.com', now: 1 })).rejects.toThrow();
+    await expect(
+      dao.createPage({ id: 'p', repositoryId: 'r', slug: 'home', title: 'Home', body: null, updatedBy: 'a@x.com', now: 1 }),
+    ).rejects.toThrow();
     await expect(dao.updatePage('p', 'r', { body: 'x' }, 1)).rejects.toThrow();
     await expect(dao.deletePage('p', 'r')).rejects.toThrow();
   });
@@ -110,7 +112,8 @@ describe('slice5: RepoVisibilityService degrade', () => {
       organizationDAO: async () => new (await import('@edge-git/backend-data/dao').then((m) => m.OrganizationDAO))(db),
       organizationMemberDAO: async () => new (await import('@edge-git/backend-data/dao').then((m) => m.OrganizationMemberDAO))(db),
       repoCollaboratorDAO: async () => new (await import('@edge-git/backend-data/dao').then((m) => m.RepoCollaboratorDAO))(db),
-      permissionService: async () => new (await import('@edge-git/backend-services/permission').then((m) => m.PermissionService))({ DB: db }),
+      permissionService: async () =>
+        new (await import('@edge-git/backend-services/permission').then((m) => m.PermissionService))({ DB: db }),
     });
   }
 
@@ -118,9 +121,7 @@ describe('slice5: RepoVisibilityService degrade', () => {
     const svc = service();
     await expect(svc.listVisibleForUser('a@x.com', async () => null)).resolves.toEqual([]);
     await expect(svc.listVisibleForUser('a@x.com', async () => 'alice')).resolves.toEqual([]);
-    await expect(
-      svc.listVisibleForUser('a@x.com', async () => Promise.reject(new Error('lookup failed'))),
-    ).resolves.toEqual([]);
+    await expect(svc.listVisibleForUser('a@x.com', async () => Promise.reject(new Error('lookup failed')))).resolves.toEqual([]);
   });
 
   it('rejects role checks when persistence is gone', async () => {
@@ -133,7 +134,17 @@ describe('slice5: RepoVisibilityService degrade', () => {
 describe('slice5: DiscussionService UNIQUE retry', () => {
   it('retries once on a numbering collision then succeeds', async () => {
     let creates = 0;
-    const row = { id: 'd1', repository_id: 'r', category_id: null, number: 2, title: 't', body: null, author_email: 'a@x.com', created_at: 1, updated_at: 1 };
+    const row = {
+      id: 'd1',
+      repository_id: 'r',
+      category_id: null,
+      number: 2,
+      title: 't',
+      body: null,
+      author_email: 'a@x.com',
+      created_at: 1,
+      updated_at: 1,
+    };
     const dao = {
       countByRepo: async () => 0,
       nextNumber: async () => 1,

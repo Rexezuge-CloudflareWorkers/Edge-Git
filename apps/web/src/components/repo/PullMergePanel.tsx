@@ -75,9 +75,7 @@ export function PullMergePanel(props: PullMergePanelProps) {
         <p className="text-sm text-[var(--color-text-muted)]">{t('pulls.previewUnavailable', 'Merge Preview Unavailable.')}</p>
       )}
       {blockedByReview && (
-        <p className="mt-2 text-sm text-[var(--color-error-text)]">
-          {t('pulls.blockedByReview', 'Blocked: Unresolved Change Requests.')}
-        </p>
+        <p className="mt-2 text-sm text-[var(--color-error-text)]">{t('pulls.blockedByReview', 'Blocked: Unresolved Change Requests.')}</p>
       )}
       <PullChecks owner={owner} repo={repo} headOid={pull.head_oid} authorized={authorized} />
       {(conflicts.length > 0 || conflictReason) && (

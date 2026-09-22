@@ -101,8 +101,7 @@ async function resolvePublicViewer(c: RequestContext): Promise<string | null> {
 async function withPublicRepo(c: RequestContext, fn: (row: RepositoryRow, fullName: string) => Promise<Response>): Promise<Response> {
   const owner = c.req.param('owner');
   const repoParam = c.req.param('repo');
-  if (!owner || !repoParam)
-    return c.json({ Exception: { Type: 'NotFound', Message: 'Repository not found.' } }, 404);
+  if (!owner || !repoParam) return c.json({ Exception: { Type: 'NotFound', Message: 'Repository not found.' } }, 404);
   const repoName = RepoFullName.normalizeRepo(repoParam);
   const viewerEmail = await resolvePublicViewer(c);
   const row = await requireVisibleRepo(c.env, owner, repoName, viewerEmail, getScope(asScopedContext(c)));

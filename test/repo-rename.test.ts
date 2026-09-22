@@ -126,8 +126,7 @@ describe('rename services refresh sidecars', () => {
     const svc = new OrganizationService({ DB: {} } as never, {
       organizationDAO: async () =>
         ({
-          getByUsernameCi: async (ci: string) =>
-            ci === 'acme' ? { id: 'o1', username: 'acme', username_ci: 'acme' } : null,
+          getByUsernameCi: async (ci: string) => (ci === 'acme' ? { id: 'o1', username: 'acme', username_ci: 'acme' } : null),
           getById: async () => ({ id: 'o1', username: 'acme-new', username_ci: 'acme-new' }),
           rename: async () => undefined,
         }) as never,

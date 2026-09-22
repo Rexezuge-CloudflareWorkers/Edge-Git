@@ -40,9 +40,7 @@ function makeGit(overrides: Record<string, Fn> = {}): Record<string, Fn> {
     ensureFreshCache: vi.fn(() => undefined),
     hasObject: vi.fn(async () => true),
     isAncestor: vi.fn(async () => true),
-    applyRefUpdates: vi.fn(async (updates: Array<{ ref: string; oldOid: string; newOid: string }>) =>
-      updates.map(() => ({ ok: true })),
-    ),
+    applyRefUpdates: vi.fn(async (updates: Array<{ ref: string; oldOid: string; newOid: string }>) => updates.map(() => ({ ok: true }))),
     collectObjectsForPack: vi.fn(async () => ({ oids: [OID_A] })),
     packObjects: vi.fn(async () => new Uint8Array([1, 2, 3])),
     indexPack: vi.fn(async () => undefined),
@@ -93,13 +91,15 @@ function makeAssetStore() {
   };
 }
 
-function makeRpc(parts: {
-  gitOverrides?: Record<string, Fn>;
-  readModelOverrides?: Record<string, Fn>;
-  withFs?: boolean;
-  withAssets?: boolean;
-  limits?: { maxObjects: number; maxPackBytes: number; maxRefs?: number };
-} = {}) {
+function makeRpc(
+  parts: {
+    gitOverrides?: Record<string, Fn>;
+    readModelOverrides?: Record<string, Fn>;
+    withFs?: boolean;
+    withAssets?: boolean;
+    limits?: { maxObjects: number; maxPackBytes: number; maxRefs?: number };
+  } = {},
+) {
   const prepare = vi.fn(async () => undefined);
   const git = makeGit(parts.gitOverrides);
   const readModel = makeReadModel(parts.readModelOverrides);
@@ -326,7 +326,13 @@ describe('RepoReadRpc isAncestor guard', () => {
     await expect(ok.rpc.isAncestor(OID_A, OID_B)).resolves.toBe(true);
     expect(ok.git.isAncestor).toHaveBeenCalledWith(OID_A, OID_B);
 
-    const failing = makeRpc({ gitOverrides: { isAncestor: vi.fn(async () => { throw new Error('boom'); }) } });
+    const failing = makeRpc({
+      gitOverrides: {
+        isAncestor: vi.fn(async () => {
+          throw new Error('boom');
+        }),
+      },
+    });
     await expect(failing.rpc.isAncestor(OID_A, OID_B)).resolves.toBe(false);
   });
 });
@@ -349,10 +355,7 @@ describe('RepoReadRpc updateRefs filtering', () => {
       { ref: 'refs/notes/x', oldOid: OID_A, newOid: OID_B },
     ]);
     expect(git.applyRefUpdates).toHaveBeenCalledTimes(1);
-    expect(git.applyRefUpdates).toHaveBeenCalledWith(
-      [{ oldOid: OID_A, newOid: OID_B, ref: 'refs/heads/main' }],
-      false,
-    );
+    expect(git.applyRefUpdates).toHaveBeenCalledWith([{ oldOid: OID_A, newOid: OID_B, ref: 'refs/heads/main' }], false);
     expect(result).toEqual({ updated: ['refs/heads/main'] });
     expect(git.clearCache).toHaveBeenCalledTimes(1);
   });
@@ -377,7 +380,7 @@ describe('RepoReadRpc updateRefs filtering', () => {
     }));
     const result = (await rpc.updateRefs(updates)) as { updated: string[] };
     expect(git.applyRefUpdates).toHaveBeenCalledTimes(1);
-    expect((git.applyRefUpdates.mock.calls[0][0] as unknown[])).toHaveLength(1500);
+    expect(git.applyRefUpdates.mock.calls[0][0] as unknown[]).toHaveLength(1500);
     expect(result.updated).toHaveLength(1500);
   });
 
@@ -395,13 +398,9 @@ describe('RepoReadRpc updateRefs filtering', () => {
   it('blocks deletions and tag overwrites via direct RPC', async () => {
     const { rpc, git } = makeRpc();
     // Deletion (new zero) is dropped.
-    await expect(
-      rpc.updateRefs([{ ref: 'refs/heads/main', oldOid: OID_A, newOid: OID_ZERO }]),
-    ).resolves.toEqual({ updated: [] });
+    await expect(rpc.updateRefs([{ ref: 'refs/heads/main', oldOid: OID_A, newOid: OID_ZERO }])).resolves.toEqual({ updated: [] });
     // Tag overwrite (existing tag) is dropped; tag create (old zero) passes.
-    await expect(
-      rpc.updateRefs([{ ref: 'refs/tags/v1', oldOid: OID_A, newOid: OID_B }]),
-    ).resolves.toEqual({ updated: [] });
+    await expect(rpc.updateRefs([{ ref: 'refs/tags/v1', oldOid: OID_A, newOid: OID_B }])).resolves.toEqual({ updated: [] });
     expect(git.applyRefUpdates).not.toHaveBeenCalled();
   });
 
@@ -484,10 +483,7 @@ describe('RepoReadRpc importPack limits', () => {
     const indexedPath = git.indexPack.mock.calls[0][0] as string;
     expect(indexedPath.startsWith('objects/pack/fork-')).toBe(true);
     expect(indexedPath.startsWith('/repo')).toBe(false);
-    expect(git.applyRefUpdates).toHaveBeenCalledWith(
-      [{ oldOid: OID_ZERO, newOid: OID_A, ref: 'refs/heads/main' }],
-      false,
-    );
+    expect(git.applyRefUpdates).toHaveBeenCalledWith([{ oldOid: OID_ZERO, newOid: OID_A, ref: 'refs/heads/main' }], false);
     expect(git.clearCache).toHaveBeenCalled();
   });
 
@@ -562,9 +558,7 @@ describe('RepoReadRpc mergePull routing', () => {
     expect(result.deletedHead).toBe(true);
 
     const same = makeRpc();
-    const sameResult = (await same.rpc.mergePull(
-      mergeArgs({ headBranch: 'main', deleteHead: true }),
-    )) as Record<string, unknown>;
+    const sameResult = (await same.rpc.mergePull(mergeArgs({ headBranch: 'main', deleteHead: true }))) as Record<string, unknown>;
     expect(same.git.deleteBranch).not.toHaveBeenCalled();
     expect(sameResult.deletedHead).toBe(false);
   });
@@ -609,9 +603,9 @@ describe('RepoReadRpc getBlame path guard', () => {
 describe('RepoReadRpc release assets', () => {
   it('degrades cleanly when the asset store is not configured', async () => {
     const { rpc, prepare } = makeRpc({ withAssets: false });
-    await expect(
-      rpc.storeReleaseAsset({ releaseId: 'r1', assetId: 'a1', bytes: new Uint8Array([1]) }),
-    ).rejects.toThrow('Release assets are not configured');
+    await expect(rpc.storeReleaseAsset({ releaseId: 'r1', assetId: 'a1', bytes: new Uint8Array([1]) })).rejects.toThrow(
+      'Release assets are not configured',
+    );
     await expect(rpc.getReleaseAsset({ releaseId: 'r1', assetId: 'a1' })).resolves.toBeNull();
     await expect(rpc.deleteReleaseAsset({ releaseId: 'r1', assetId: 'a1' })).resolves.toEqual({ deleted: false });
     await expect(rpc.deleteReleaseAssets({ releaseId: 'r1' })).resolves.toEqual({ deleted: 0 });
@@ -969,9 +963,7 @@ describe('RepoMove owner/org rename moves', () => {
     const sourceStub = world.stubs.get('old/repo');
     expect(sourceStub?.exportPack).toHaveBeenCalledWith([OID_A]);
     const targetStub = world.stubs.get('new/repo');
-    expect(targetStub?.importPack).toHaveBeenCalledWith(new Uint8Array([9, 9]), [
-      { ref: 'refs/heads/main', oid: OID_A },
-    ]);
+    expect(targetStub?.importPack).toHaveBeenCalledWith(new Uint8Array([9, 9]), [{ ref: 'refs/heads/main', oid: OID_A }]);
     expect(world.deleted).toEqual(['old/repo']);
   });
 
@@ -1001,9 +993,7 @@ describe('RepoMove owner/org rename moves', () => {
     const world = makeWorld([{ id: 'rel-1' }], [{ id: 'a1' }]);
     (world.env.REPO as unknown as { getByName: (name: string) => unknown }).getByName('o/a');
     world.behaviors.get('o/a')?.assets.set('rel-1/a1', new Uint8Array([5, 6]));
-    const result = await moveRepoDosForRename(world.env, 'al@example.com', [
-      { id: 'repo-id', name: 'a', oldFull: 'o/a', newFull: 'n/a' },
-    ]);
+    const result = await moveRepoDosForRename(world.env, 'al@example.com', [{ id: 'repo-id', name: 'a', oldFull: 'o/a', newFull: 'n/a' }]);
     expect(result).toEqual({ moved: 1, empty: 1 });
     const target = world.stubs.get('n/a');
     expect(target?.storeReleaseAsset).toHaveBeenCalledWith({

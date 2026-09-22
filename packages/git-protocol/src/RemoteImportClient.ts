@@ -291,5 +291,13 @@ async function fetchRemotePack(
   return { refs, pack, symbolicHead };
 }
 
-export { fetchRemotePack, parseUploadPackAdvertisement, buildUploadPackRequest, decodeUploadPackResponse, normalizePublicGitUrl, resolveRedirectUrl, MAX_REDIRECTS };
+export {
+  fetchRemotePack,
+  parseUploadPackAdvertisement,
+  buildUploadPackRequest,
+  decodeUploadPackResponse,
+  normalizePublicGitUrl,
+  resolveRedirectUrl,
+  MAX_REDIRECTS,
+};
 export type { RemoteRef, RemotePack, RemoteGitFetcher };

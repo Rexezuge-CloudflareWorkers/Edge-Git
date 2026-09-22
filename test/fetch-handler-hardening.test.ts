@@ -41,7 +41,10 @@ describe('FetchHandler hardening', () => {
   it('rejects ls-refs arg floods before git I/O', async () => {
     const git = fakeGit();
     const handler = new FetchHandler({ git, env: {} as Env, getFullName: () => 'a/b' });
-    const data = encodeCommand('ls-refs', Array.from({ length: 65 }, (_, i) => `arg-${i}`));
+    const data = encodeCommand(
+      'ls-refs',
+      Array.from({ length: 65 }, (_, i) => `arg-${i}`),
+    );
     const res = await handler.uploadPack(data, limits);
     expect(res.status).toBe(400);
     expect(git.listRefs).not.toHaveBeenCalled();

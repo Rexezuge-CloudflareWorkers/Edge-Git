@@ -33,7 +33,11 @@ describe('hardening patterns', () => {
   });
 
   it('ftsOrLike falls back to LIKE then []', async () => {
-    const ok = await ftsOrLike(async () => [1], async () => [2], () => false);
+    const ok = await ftsOrLike(
+      async () => [1],
+      async () => [2],
+      () => false,
+    );
     expect(ok).toEqual([1]);
     const fb = await ftsOrLike(
       async () => {
@@ -48,10 +52,7 @@ describe('hardening patterns', () => {
   it('branch protection policy matches longest pattern and excludes self-approval', () => {
     expect(matchesPattern('main', 'main')).toBe(true);
     expect(matchesPattern('feat/*', 'feat/x')).toBe(true);
-    const rules = [
-      { pattern: '*' },
-      { pattern: 'main' },
-    ] as unknown as Parameters<typeof matchRule>[0];
+    const rules = [{ pattern: '*' }, { pattern: 'main' }] as unknown as Parameters<typeof matchRule>[0];
     expect(matchRule(rules, 'main')?.pattern).toBe('main');
     expect(
       countApprovals(

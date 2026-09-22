@@ -65,9 +65,9 @@ describe('harden: RefValidation policy (extracted from RefService)', () => {
       const svc = new RefService(fs as never, path.join(dir, '.git'));
       const created = await svc.createBranch('feat', c1);
       expect(created).toEqual({ ok: true, ref: 'refs/heads/feat', oid: c1 });
-      await expect(
-        svc.applyRefUpdates([{ oldOid: c1, newOid: c2, ref: 'refs/heads/feat' }], false),
-      ).resolves.toEqual([{ ref: 'refs/heads/feat', ok: true }]);
+      await expect(svc.applyRefUpdates([{ oldOid: c1, newOid: c2, ref: 'refs/heads/feat' }], false)).resolves.toEqual([
+        { ref: 'refs/heads/feat', ok: true },
+      ]);
     } finally {
       await fs.promises.rm(dir, { recursive: true, force: true });
     }

@@ -6,7 +6,8 @@ import { getCrossRepoPreview, isPackLimitError } from './CrossFork';
 import type { MergePreviewShape } from './PullShared';
 import { resolveCodeownerEmails, suggestCodeownerHandles } from './CodeownerHelpers';
 
-export interface OpenCrossForkInput {  email: string;
+export interface OpenCrossForkInput {
+  email: string;
   rowId: string;
   fullName: string;
   baseBranch: string;

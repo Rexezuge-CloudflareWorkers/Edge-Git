@@ -191,10 +191,7 @@ class OrganizationService {
     await memberDAO.remove(org.id, targetEmail);
   }
 
-  public async listMembers(
-    orgUsername: string,
-    requesterEmail: string,
-  ): Promise<Array<{ username: string; role: OrgMemberRole }>> {
+  public async listMembers(orgUsername: string, requesterEmail: string): Promise<Array<{ username: string; role: OrgMemberRole }>> {
     const org = await this.requireMember(orgUsername, requesterEmail);
     const memberDAO = await this.deps.organizationMemberDAO();
     const userDAO = await this.deps.userDAO();

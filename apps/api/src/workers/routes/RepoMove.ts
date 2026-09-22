@@ -124,11 +124,7 @@ async function moveOneRepoBack(env: Env, move: RepoMoveItem): Promise<boolean> {
 // Repos move sequentially; on the first failure, already-moved repos are
 // copied back and the original error is rethrown so the route can compensate
 // D1 (inverse rename) and surface 413/500 instead of an empty repo.
-async function moveRepoDosForRename(
-  env: Env,
-  actorEmail: string,
-  moves: RepoMoveItem[],
-): Promise<{ moved: number; empty: number }> {
+async function moveRepoDosForRename(env: Env, actorEmail: string, moves: RepoMoveItem[]): Promise<{ moved: number; empty: number }> {
   const completed: RepoMoveItem[] = [];
   let moved = 0;
   let empty = 0;

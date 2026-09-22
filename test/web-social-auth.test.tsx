@@ -35,9 +35,12 @@ describe('useSocialState auth upgrade', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    const { result, rerender } = renderHook(({ authorized }) => useSocialState({ owner: 'alice', repo: 'demo', authorized, showNotice: () => {} }), {
-      initialProps: { authorized: null as boolean | null },
-    });
+    const { result, rerender } = renderHook(
+      ({ authorized }) => useSocialState({ owner: 'alice', repo: 'demo', authorized, showNotice: () => {} }),
+      {
+        initialProps: { authorized: null as boolean | null },
+      },
+    );
 
     await waitFor(() => expect(result.current.starsCount).toBe(1));
     expect(result.current.starred).toBe(false);

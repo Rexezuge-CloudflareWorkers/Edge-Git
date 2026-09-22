@@ -216,9 +216,7 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);
-      const card = await scope
-        .get(Tokens.ProjectService)
-        .setCardArchived(row.id, number, c.req.param('cardId'), body.archived);
+      const card = await scope.get(Tokens.ProjectService).setCardArchived(row.id, number, c.req.param('cardId'), body.archived);
       return c.json({ card: await presentSingle(scope, card) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to update card'), toServiceStatus(error));

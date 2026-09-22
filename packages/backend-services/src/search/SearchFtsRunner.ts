@@ -1,8 +1,4 @@
-async function ftsOrLike<T>(
-  fts: () => Promise<T[]>,
-  like: () => Promise<T[]>,
-  isMissingSchema: (error: unknown) => boolean,
-): Promise<T[]> {
+async function ftsOrLike<T>(fts: () => Promise<T[]>, like: () => Promise<T[]>, isMissingSchema: (error: unknown) => boolean): Promise<T[]> {
   try {
     return await fts();
   } catch (error) {

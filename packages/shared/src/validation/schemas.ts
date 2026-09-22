@@ -25,15 +25,9 @@ const branchNameSchema = z
   .refine((name) => !name.includes('..'), 'Invalid branch name')
   .refine((name) => !name.includes('//'), 'Invalid branch name')
   .refine((name) => !name.includes('\0'), 'Invalid branch name')
-  .refine(
-    (name) => !name.endsWith('.') && !name.endsWith('/') && !name.endsWith('.lock'),
-    'Invalid branch name',
-  )
+  .refine((name) => !name.endsWith('.') && !name.endsWith('/') && !name.endsWith('.lock'), 'Invalid branch name')
   .refine((name) => !/[\s~^:?*[\]@{\\]/.test(name) && hasNoControlChars(name), 'Invalid branch name')
-  .refine(
-    (name) => name.split('/').every((seg) => seg.length > 0 && seg !== '.' && seg !== '..' && seg !== '@'),
-    'Invalid branch name',
-  );
+  .refine((name) => name.split('/').every((seg) => seg.length > 0 && seg !== '.' && seg !== '..' && seg !== '@'), 'Invalid branch name');
 
 const assetNameSchema = z
   .string()
@@ -85,10 +79,12 @@ function truncateAuditFilter(value: string | undefined): string | undefined {
 
 function sanitizeCommitMessage(raw: unknown, fallback: string): string {
   const text = typeof raw === 'string' && raw.trim() ? raw.trim() : fallback;
-  const stripped = [...text].filter((ch) => {
-    const code = ch.codePointAt(0) ?? 0;
-    return code > 0x1f && code !== 0x7f;
-  }).join('');
+  const stripped = [...text]
+    .filter((ch) => {
+      const code = ch.codePointAt(0) ?? 0;
+      return code > 0x1f && code !== 0x7f;
+    })
+    .join('');
   const collapsed = stripped.replaceAll(/[ \t]+/g, ' ').trim();
   const safe = collapsed || fallback;
   return safe.slice(0, 1000);

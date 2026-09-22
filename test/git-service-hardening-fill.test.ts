@@ -23,8 +23,7 @@ function redirectClient(tmpGitdir: string): { promises: unknown } {
       const orig = t[prop];
       if (typeof orig !== 'function') return orig;
       return (p: unknown, ...rest: unknown[]) => {
-        const redirected =
-          typeof p === 'string' && (p === '/repo' || p.startsWith('/repo/')) ? `${tmpGitdir}${p.slice(5)}` : p;
+        const redirected = typeof p === 'string' && (p === '/repo' || p.startsWith('/repo/')) ? `${tmpGitdir}${p.slice(5)}` : p;
         return (orig as (...a: unknown[]) => unknown).call(t, redirected, ...rest);
       };
     },
@@ -556,15 +555,9 @@ describe('GitService hardening: merge preview and operations', () => {
 
   it('mergeBranches validates inputs and handles already-merged', async () => {
     const { svc, c2 } = await makePair();
-    await expect(svc.mergeBranches({ baseBranch: 'has space', headOid: c2, author: AUTHOR })).rejects.toThrow(
-      'invalid base branch',
-    );
-    await expect(svc.mergeBranches({ baseBranch: 'master', headOid: 'bad', author: AUTHOR })).rejects.toThrow(
-      'invalid head oid',
-    );
-    await expect(svc.mergeBranches({ baseBranch: 'ghost', headOid: c2, author: AUTHOR })).rejects.toThrow(
-      'base branch not found',
-    );
+    await expect(svc.mergeBranches({ baseBranch: 'has space', headOid: c2, author: AUTHOR })).rejects.toThrow('invalid base branch');
+    await expect(svc.mergeBranches({ baseBranch: 'master', headOid: 'bad', author: AUTHOR })).rejects.toThrow('invalid head oid');
+    await expect(svc.mergeBranches({ baseBranch: 'ghost', headOid: c2, author: AUTHOR })).rejects.toThrow('base branch not found');
     await expect(svc.mergeBranches({ baseBranch: 'master', headOid: c2, author: AUTHOR })).resolves.toMatchObject({
       type: 'already-merged',
     });
@@ -619,15 +612,9 @@ describe('GitService hardening: merge preview and operations', () => {
 
   it('squashMerge and rebaseMerge validate and handle heads', async () => {
     const { svc, c1, c2 } = await makePair();
-    await expect(svc.squashMerge({ baseBranch: 'has space', headOid: c2, author: AUTHOR })).rejects.toThrow(
-      'invalid base branch',
-    );
-    await expect(svc.squashMerge({ baseBranch: 'master', headOid: 'bad', author: AUTHOR })).rejects.toThrow(
-      'invalid head oid',
-    );
-    await expect(svc.squashMerge({ baseBranch: 'ghost', headOid: c2, author: AUTHOR })).rejects.toThrow(
-      'base branch not found',
-    );
+    await expect(svc.squashMerge({ baseBranch: 'has space', headOid: c2, author: AUTHOR })).rejects.toThrow('invalid base branch');
+    await expect(svc.squashMerge({ baseBranch: 'master', headOid: 'bad', author: AUTHOR })).rejects.toThrow('invalid head oid');
+    await expect(svc.squashMerge({ baseBranch: 'ghost', headOid: c2, author: AUTHOR })).rejects.toThrow('base branch not found');
     await expect(svc.squashMerge({ baseBranch: 'master', headOid: c2, author: AUTHOR })).resolves.toMatchObject({
       type: 'already-merged',
     });
@@ -639,15 +626,9 @@ describe('GitService hardening: merge preview and operations', () => {
     const sq = await svc.squashMerge({ baseBranch: 'sq', headOid: c2, author: AUTHOR, message: 'sq it' });
     expect(sq.type).toBe('fast-forward');
 
-    await expect(svc.rebaseMerge({ baseBranch: 'has space', headOid: c2, author: AUTHOR })).rejects.toThrow(
-      'invalid base branch',
-    );
-    await expect(svc.rebaseMerge({ baseBranch: 'master', headOid: 'bad', author: AUTHOR })).rejects.toThrow(
-      'invalid head oid',
-    );
-    await expect(svc.rebaseMerge({ baseBranch: 'ghost', headOid: c2, author: AUTHOR })).rejects.toThrow(
-      'base branch not found',
-    );
+    await expect(svc.rebaseMerge({ baseBranch: 'has space', headOid: c2, author: AUTHOR })).rejects.toThrow('invalid base branch');
+    await expect(svc.rebaseMerge({ baseBranch: 'master', headOid: 'bad', author: AUTHOR })).rejects.toThrow('invalid head oid');
+    await expect(svc.rebaseMerge({ baseBranch: 'ghost', headOid: c2, author: AUTHOR })).rejects.toThrow('base branch not found');
     const missing = await svc.rebaseMerge({ baseBranch: 'master', headOid: 'a'.repeat(40), author: AUTHOR });
     expect(missing.type).toBe('conflict');
   });
@@ -683,9 +664,7 @@ describe('GitService hardening: merge preview and operations', () => {
 
   it('MergeService removeWorkdir tolerates missing rm/rmdir', async () => {
     const withoutRm = new MergeService({ promises: { rmdir: async () => undefined } } as never, '/repo');
-    await expect(
-      (withoutRm as unknown as { removeWorkdir(w: string): Promise<void> }).removeWorkdir('/tmp-nope'),
-    ).resolves.toBeUndefined();
+    await expect((withoutRm as unknown as { removeWorkdir(w: string): Promise<void> }).removeWorkdir('/tmp-nope')).resolves.toBeUndefined();
     const failing = new MergeService(
       {
         promises: {
@@ -699,9 +678,7 @@ describe('GitService hardening: merge preview and operations', () => {
       } as never,
       '/repo',
     );
-    await expect(
-      (failing as unknown as { removeWorkdir(w: string): Promise<void> }).removeWorkdir('/tmp-nope'),
-    ).resolves.toBeUndefined();
+    await expect((failing as unknown as { removeWorkdir(w: string): Promise<void> }).removeWorkdir('/tmp-nope')).resolves.toBeUndefined();
   });
 });
 
@@ -911,9 +888,9 @@ describe('GitService hardening: applyRefUpdates', () => {
     await expect(svc.applyRefUpdates([{ oldOid: zero, newOid: c1, ref: 'refs/heads/new' }], false)).resolves.toEqual([
       { ref: 'refs/heads/new', ok: false, error: 'ref already exists' },
     ]);
-    await expect(
-      svc.applyRefUpdates([{ oldOid: c1, newOid: zero, ref: 'refs/heads/ghost' }], false),
-    ).resolves.toEqual([{ ref: 'refs/heads/ghost', ok: false, error: "ref doesn't exist" }]);
+    await expect(svc.applyRefUpdates([{ oldOid: c1, newOid: zero, ref: 'refs/heads/ghost' }], false)).resolves.toEqual([
+      { ref: 'refs/heads/ghost', ok: false, error: "ref doesn't exist" },
+    ]);
     await expect(svc.applyRefUpdates([{ oldOid: c1, newOid: zero, ref: 'refs/heads/feat' }], false)).resolves.toEqual([
       { ref: 'refs/heads/feat', ok: true },
     ]);

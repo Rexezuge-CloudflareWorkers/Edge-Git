@@ -299,4 +299,3 @@ export async function runCustomCheckScript(input: SandboxInput): Promise<Sandbox
   }
   return settled;
 }
-

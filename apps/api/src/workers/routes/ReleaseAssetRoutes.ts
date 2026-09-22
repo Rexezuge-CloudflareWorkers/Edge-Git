@@ -5,7 +5,15 @@ import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { assetNameSchema, decodeBase64Strict, normalizeAssetContentType } from '@edge-git/shared/validation';
 import { getRepoStub } from '../doStubs';
-import { jsonError, requireVisibleRepo, resolvePublicViewer, toSafeErrorMessage, toServiceStatus, withPublicRepo, getScope } from './PublicViewerResolver';
+import {
+  jsonError,
+  requireVisibleRepo,
+  resolvePublicViewer,
+  toSafeErrorMessage,
+  toServiceStatus,
+  withPublicRepo,
+  getScope,
+} from './PublicViewerResolver';
 import { viewerCanSeeDrafts } from './ReleaseRoutes';
 import { readJsonBody } from './BodyParser';
 
@@ -131,7 +139,12 @@ function registerReleaseAssetUserRoutes(app: ReleaseAssetApp): void {
       const sha256 = await sha256HexBytes(bytes);
       const asset = await scope
         .get(Tokens.ReleaseService)
-        .createAsset(row.id, c.req.param('tag'), { name: body.name, size: bytes.byteLength, contentType: normalizeAssetContentType(body.contentType), sha256 }, email);
+        .createAsset(
+          row.id,
+          c.req.param('tag'),
+          { name: body.name, size: bytes.byteLength, contentType: normalizeAssetContentType(body.contentType), sha256 },
+          email,
+        );
       const stored = (await getRepoStub(c.env, `${row.owner}/${row.name}`).storeReleaseAsset({
         releaseId: asset.releaseId,
         assetId: asset.id,

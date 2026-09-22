@@ -106,15 +106,13 @@ function registerUserIssueRoutes(app: IssueApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (!body.title) return jsonError(c, 'title is required', 400);
     const scope = getScope(c);
-    const created = await scope
-      .get(Tokens.IssueService)
-      .createIssue({
-        repositoryId: row.id,
-        fullName: `${owner}/${repoName}`,
-        title: body.title,
-        body: body.body ?? null,
-        creatorEmail: email,
-      });
+    const created = await scope.get(Tokens.IssueService).createIssue({
+      repositoryId: row.id,
+      fullName: `${owner}/${repoName}`,
+      title: body.title,
+      body: body.body ?? null,
+      creatorEmail: email,
+    });
     await recordAndNotify(c.env, {
       repositoryId: row.id,
       fullName: `${owner}/${repoName}`,
@@ -163,9 +161,7 @@ function registerUserIssueRoutes(app: IssueApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);
-      const issue = await scope
-        .get(Tokens.IssueService)
-        .updateStatus({ repositoryId: row.id, number, status: body.status ?? '' });
+      const issue = await scope.get(Tokens.IssueService).updateStatus({ repositoryId: row.id, number, status: body.status ?? '' });
       await recordAndNotify(c.env, {
         repositoryId: row.id,
         fullName: `${owner}/${repoName}`,

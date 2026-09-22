@@ -103,7 +103,13 @@ describe('hardening: RepoLifecycle single-flight init', () => {
 
   it('clears only its own failed generation so the next call retries', async () => {
     let attempts = 0;
-    const fakeFs = { promises: { stat: async () => { throw new Error('no HEAD'); } } };
+    const fakeFs = {
+      promises: {
+        stat: async () => {
+          throw new Error('no HEAD');
+        },
+      },
+    };
     const fakeGit = {
       initRepo: async () => {
         attempts += 1;

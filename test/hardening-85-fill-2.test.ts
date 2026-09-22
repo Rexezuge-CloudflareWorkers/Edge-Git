@@ -54,7 +54,10 @@ describe('FetchHandler branch fill', () => {
     const h = new FetchHandler({ git: fakeGit(), env: {} as never, getFullName: () => 'o/n' });
     const big = new Uint8Array(LIMITS.maxFetchBodyBytes + 1);
     expect((await h.uploadPack(big, LIMITS)).status).toBe(413);
-    const many = encodeCommand('ls-refs', Array.from({ length: 70 }, (_, i) => `ref-prefix=${i}`));
+    const many = encodeCommand(
+      'ls-refs',
+      Array.from({ length: 70 }, (_, i) => `ref-prefix=${i}`),
+    );
     expect((await h.uploadPack(many, LIMITS)).status).toBe(400);
     const long = encodeCommand('ls-refs', [`ref-prefix=${'x'.repeat(2000)}`]);
     expect((await h.uploadPack(long, LIMITS)).status).toBe(400);
@@ -72,7 +75,11 @@ describe('FetchHandler branch fill', () => {
     expect(r1.status).toBe(200);
     // Masked internal error (non-PackLimit findCommonCommits failure)
     const masked = new FetchHandler({
-      git: fakeGit({ findCommonCommits: async () => { throw new Error('D1 internal /repo/secret'); } }),
+      git: fakeGit({
+        findCommonCommits: async () => {
+          throw new Error('D1 internal /repo/secret');
+        },
+      }),
       env: {} as never,
       getFullName: () => 'o/n',
     });
@@ -98,7 +105,9 @@ describe('FetchHandler branch fill', () => {
     const h = new FetchHandler({
       git: fakeGit({
         findCommonCommits: async () => [],
-        collectObjectsForPack: async () => { throw new PackLimitError('too many objects'); },
+        collectObjectsForPack: async () => {
+          throw new PackLimitError('too many objects');
+        },
       }),
       env: {} as never,
       getFullName: () => 'o/n',
@@ -131,8 +140,7 @@ describe('rateLimit buckets', () => {
       ({
         get: () => 'u@x.com',
         req: { header: () => null },
-        json: (body: unknown, status = 200, headers?: Record<string, string>) =>
-          new Response(JSON.stringify(body), { status, headers }),
+        json: (body: unknown, status = 200, headers?: Record<string, string>) => new Response(JSON.stringify(body), { status, headers }),
       }) as never;
     const next = vi.fn().mockResolvedValue(undefined);
     await mw(mkCtx(), next);

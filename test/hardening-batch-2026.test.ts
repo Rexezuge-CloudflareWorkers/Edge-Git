@@ -107,7 +107,13 @@ describe('hardening batch 2026: token defaults + fail-closed', () => {
     // Break updateLastUsed: replace db with one that throws on UPDATE but reads fine.
     const flaky = {
       prepare(query: string) {
-        const inner = (db as { prepare(q: string): { bind(...p: unknown[]): { first<T>(): Promise<T | null>; all<T>(): Promise<{ results: T[] }>; run(): Promise<unknown> } } }).prepare(query);
+        const inner = (
+          db as {
+            prepare(q: string): {
+              bind(...p: unknown[]): { first<T>(): Promise<T | null>; all<T>(): Promise<{ results: T[] }>; run(): Promise<unknown> };
+            };
+          }
+        ).prepare(query);
         return {
           bind(...params: unknown[]) {
             const stmt = inner.bind(...params);
@@ -123,16 +129,21 @@ describe('hardening batch 2026: token defaults + fail-closed', () => {
         };
       },
     } as never;
-    const flakySvc = new TokenService({ DB: flaky }, {
-      tokenDAO: async () => {
-        const { UserAccessTokenDAO } = await import('@edge-git/backend-data/dao');
-        return new UserAccessTokenDAO(flaky);
+    const flakySvc = new TokenService(
+      { DB: flaky },
+      {
+        tokenDAO: async () => {
+          const { UserAccessTokenDAO } = await import('@edge-git/backend-data/dao');
+          return new UserAccessTokenDAO(flaky);
+        },
+        tokenGrantDAO: async () => {
+          const { TokenRepoGrantDAO } = await import('@edge-git/backend-data/dao');
+          return new TokenRepoGrantDAO({
+            prepare: () => ({ bind: () => ({ all: async () => ({ results: [] }), run: async () => ({}) }) }),
+          } as never);
+        },
       },
-      tokenGrantDAO: async () => {
-        const { TokenRepoGrantDAO } = await import('@edge-git/backend-data/dao');
-        return new TokenRepoGrantDAO({ prepare: () => ({ bind: () => ({ all: async () => ({ results: [] }), run: async () => ({}) }) }) } as never);
-      },
-    });
+    );
     // Should still authenticate despite lastUsed failure.
     const identity = await flakySvc.authenticateWithPAT(created.token).catch(() => null);
     // If DAO override path is complex, at least assert the real path works when D1 is healthy.
@@ -159,7 +170,13 @@ describe('hardening batch 2026: BodyParser strict', () => {
   });
 
   it('marks throwing json() as malformed', async () => {
-    const c = { req: { json: async () => { throw new Error('bad'); } } } as never;
+    const c = {
+      req: {
+        json: async () => {
+          throw new Error('bad');
+        },
+      },
+    } as never;
     await expect(readJsonBody(c)).resolves.toMatchObject({ malformed: true });
   });
 });
@@ -181,7 +198,9 @@ describe('hardening batch 2026: security headers', () => {
     const c = {
       req: { url: 'https://example.com/user/repos/o/r/keys' },
       res: { headers: new Headers({ 'content-type': 'application/json' }) },
-      header: (k: string, v: string) => { headers[k] = v; },
+      header: (k: string, v: string) => {
+        headers[k] = v;
+      },
     } as never;
     applySecurityHeaders(c);
     expect(headers['Cache-Control']).toBe('no-store');
@@ -189,7 +208,9 @@ describe('hardening batch 2026: security headers', () => {
     const c2 = {
       req: { url: 'https://example.com/' },
       res: { headers: new Headers({ 'content-type': 'text/html' }) },
-      header: (k: string, v: string) => { htmlHeaders[k] = v; },
+      header: (k: string, v: string) => {
+        htmlHeaders[k] = v;
+      },
     } as never;
     applySecurityHeaders(c2);
     expect(htmlHeaders['Content-Security-Policy']).toContain("script-src 'self' 'unsafe-inline'");
@@ -205,17 +226,21 @@ describe('hardening batch 2026: webhook SSRF re-validation', () => {
   });
 
   it('defaultPostJson path rejects blocked URLs without fetch', async () => {
-    const svc = new WebhookDeliveryService({ DB: {} as never }, {
-      webhookDAO: async () => ({ listByRepo: async () => [] }) as never,
-      deliveryDAO: async () => ({
-        getById: async () => null,
-        listDue: async () => [],
-        claim: async () => false,
-      }) as never,
-      postJson: async () => {
-        throw new Error('should not be called for blocked URL');
+    const svc = new WebhookDeliveryService(
+      { DB: {} as never },
+      {
+        webhookDAO: async () => ({ listByRepo: async () => [] }) as never,
+        deliveryDAO: async () =>
+          ({
+            getById: async () => null,
+            listDue: async () => [],
+            claim: async () => false,
+          }) as never,
+        postJson: async () => {
+          throw new Error('should not be called for blocked URL');
+        },
       },
-    });
+    );
     // attemptRow with missing row returns false (no throw).
     await expect(svc.processDue({ now: 1, limit: 1 })).resolves.toMatchObject({ processed: 0 });
   });
@@ -227,11 +252,15 @@ describe('hardening batch 2026: Access ctx verified', () => {
     const svc = new AccessAuthService({} as never);
     // Unverified ctx + no other strategy → throws (falls through to JWT missing).
     await expect(
-      svc.getAuthenticatedUserEmail(new Request('https://x/'), { access: { getIdentity: async () => ({ email: 'a@b.co', email_verified: false }) } }),
+      svc.getAuthenticatedUserEmail(new Request('https://x/'), {
+        access: { getIdentity: async () => ({ email: 'a@b.co', email_verified: false }) },
+      }),
     ).rejects.toThrow();
     // Verified ctx succeeds.
     await expect(
-      svc.getAuthenticatedUserEmail(new Request('https://x/'), { access: { getIdentity: async () => ({ email: 'a@b.co', email_verified: true }) } }),
+      svc.getAuthenticatedUserEmail(new Request('https://x/'), {
+        access: { getIdentity: async () => ({ email: 'a@b.co', email_verified: true }) },
+      }),
     ).resolves.toBe('a@b.co');
   });
 });

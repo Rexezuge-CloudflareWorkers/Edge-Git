@@ -119,13 +119,41 @@ function createCheckDb() {
       },
       run(): Promise<{ success: boolean; meta?: { changes?: number } }> {
         if (q.startsWith('INSERT INTO check_runs')) {
-          const [id, repository_id, head_sha, context, status, conclusion, details_url, output_title, output_summary, creator_email, created_at, updated_at, completed_at] =
-            params as Array<string | number | null>;
-          checkRuns.push({ id, repository_id, head_sha, context, status, conclusion, details_url, output_title, output_summary, creator_email, created_at, updated_at, completed_at });
+          const [
+            id,
+            repository_id,
+            head_sha,
+            context,
+            status,
+            conclusion,
+            details_url,
+            output_title,
+            output_summary,
+            creator_email,
+            created_at,
+            updated_at,
+            completed_at,
+          ] = params as Array<string | number | null>;
+          checkRuns.push({
+            id,
+            repository_id,
+            head_sha,
+            context,
+            status,
+            conclusion,
+            details_url,
+            output_title,
+            output_summary,
+            creator_email,
+            created_at,
+            updated_at,
+            completed_at,
+          });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE check_runs SET status = ?')) {
-          const [status, conclusion, details_url, output_title, output_summary, updated_at, completed_at, id, repository_id] = params as Array<string | number | null>;
+          const [status, conclusion, details_url, output_title, output_summary, updated_at, completed_at, id, repository_id] =
+            params as Array<string | number | null>;
           const row = checkRuns.find((r) => r.id === id && r.repository_id === repository_id);
           if (row) {
             Object.assign(row, { status, conclusion, details_url, output_title, output_summary, updated_at, completed_at });
@@ -270,7 +298,9 @@ describe('background-low-fill CheckRunnerWorker queue/claim paths', () => {
   it('fetch rejects malformed enqueue with 400 and unknown paths with 404', async () => {
     const { db } = createCheckDb();
     const worker = new CheckRunnerWorker(fakeCheckState(new Map()), checkEnv(db, defaultRepoStub()));
-    const bad = await worker.fetch(new Request('https://x/enqueue', { method: 'POST', body: '{}', headers: { 'content-type': 'application/json' } }));
+    const bad = await worker.fetch(
+      new Request('https://x/enqueue', { method: 'POST', body: '{}', headers: { 'content-type': 'application/json' } }),
+    );
     expect(bad.status).toBe(400);
     const getOnEnqueue = await worker.fetch(new Request('https://x/enqueue', { method: 'GET' }));
     expect(getOnEnqueue.status).toBe(404);
@@ -283,14 +313,21 @@ describe('background-low-fill CheckRunnerWorker queue/claim paths', () => {
     const map = new Map<string, unknown>();
     const worker = new CheckRunnerWorker(fakeCheckState(map), checkEnv(db, defaultRepoStub()));
     const many = Array.from({ length: 60 }, (_, i) => `  ctx-${i} `);
-    const queued = await worker.enqueueChecks({ repositoryId: 'repo-1', headSha: OID_A.toUpperCase(), contexts: [' secret-scan ', 'secret-scan', '', ...many], actorEmail: 'a@x.com' });
+    const queued = await worker.enqueueChecks({
+      repositoryId: 'repo-1',
+      headSha: OID_A.toUpperCase(),
+      contexts: [' secret-scan ', 'secret-scan', '', ...many],
+      actorEmail: 'a@x.com',
+    });
     expect(queued.queued).toBe(50);
     const pending = map.get('pending') as Array<{ headSha: string; contexts: string[] }>;
     expect(pending).toHaveLength(1);
     expect(pending[0].headSha).toBe(OID_A);
     expect(pending[0].contexts).toHaveLength(50);
     expect(pending[0].contexts[0]).toBe('secret-scan');
-    expect(await worker.enqueueChecks({ repositoryId: 'repo-1', headSha: OID_A, contexts: ['   '], actorEmail: 'a@x.com' })).toEqual({ queued: 0 });
+    expect(await worker.enqueueChecks({ repositoryId: 'repo-1', headSha: OID_A, contexts: ['   '], actorEmail: 'a@x.com' })).toEqual({
+      queued: 0,
+    });
   });
 
   it('enqueue replaces pending for same repo+sha but keeps other shas', async () => {
@@ -299,7 +336,7 @@ describe('background-low-fill CheckRunnerWorker queue/claim paths', () => {
     const worker = new CheckRunnerWorker(fakeCheckState(map), checkEnv(db, defaultRepoStub()));
     await worker.enqueueChecks({ repositoryId: 'repo-1', headSha: OID_A, contexts: ['secret-scan'], actorEmail: 'a@x.com' });
     await worker.enqueueChecks({ repositoryId: 'repo-1', headSha: OID_B, contexts: ['diff-limit'], actorEmail: 'a@x.com' });
-    expect((map.get('pending') as unknown[])).toHaveLength(2);
+    expect(map.get('pending') as unknown[]).toHaveLength(2);
     await worker.enqueueChecks({ repositoryId: 'repo-1', headSha: OID_A, contexts: ['codeowners-exists'], actorEmail: 'a@x.com' });
     const pending = map.get('pending') as Array<{ headSha: string; contexts: string[] }>;
     expect(pending).toHaveLength(2);
@@ -355,10 +392,7 @@ describe('background-low-fill CheckRunnerWorker queue/claim paths', () => {
   it('alarm runs diff-limit failure when file count exceeds the cap', async () => {
     const { db, checkRuns } = createCheckDb();
     const stub = defaultRepoStub({ getCommitDiff: async () => ({ files: [{}, {}, {}, {}, {}] }) });
-    const worker = new CheckRunnerWorker(
-      fakeCheckState(new Map()),
-      checkEnv(db, stub, { MAX_MERGE_DIFF_FILES: '2' }),
-    );
+    const worker = new CheckRunnerWorker(fakeCheckState(new Map()), checkEnv(db, stub, { MAX_MERGE_DIFF_FILES: '2' }));
     await worker.enqueueChecks({ repositoryId: 'repo-1', headSha: OID_A, contexts: ['diff-limit'], actorEmail: 'a@x.com' });
     await worker.alarm();
     expect(checkRuns).toHaveLength(1);
@@ -388,7 +422,12 @@ describe('background-low-fill CheckRunnerWorker queue/claim paths', () => {
     const { db, checkRuns } = createCheckDb();
     const stub = defaultRepoStub({ listAllFiles: async () => [{ path: 'src/a.ts', oid: OID_A }] });
     const worker = new CheckRunnerWorker(fakeCheckState(new Map()), checkEnv(db, stub));
-    await worker.enqueueChecks({ repositoryId: 'repo-1', headSha: OID_A, contexts: ['required-files:README.md,LICENSE'], actorEmail: 'a@x.com' });
+    await worker.enqueueChecks({
+      repositoryId: 'repo-1',
+      headSha: OID_A,
+      contexts: ['required-files:README.md,LICENSE'],
+      actorEmail: 'a@x.com',
+    });
     await worker.alarm();
     expect(checkRuns).toHaveLength(1);
     expect(checkRuns[0]).toMatchObject({ status: 'completed', conclusion: 'failure' });
@@ -461,7 +500,14 @@ describe('background-low-fill CheckRunnerWorker queue/claim paths', () => {
       },
     };
     // Force processItem to throw via REPO.getByName throwing
-    const env = { DB: db, REPO: { getByName: () => { throw new Error('stub gone'); } } } as unknown as Env;
+    const env = {
+      DB: db,
+      REPO: {
+        getByName: () => {
+          throw new Error('stub gone');
+        },
+      },
+    } as unknown as Env;
     const worker = new CheckRunnerWorker(state, env);
     map.set('pending', [{ repositoryId: 'repo-1', headSha: OID_A, contexts: ['secret-scan'], actorEmail: 'a@x.com', attempts: 0 }]);
     await worker.alarm();
@@ -503,7 +549,10 @@ describe('background-low-fill ReadModelService', () => {
     const svc = new ReadModelService(git as never);
     await expect(svc.getBranches()).resolves.toEqual({ branches: ['main', 'feat'], currentBranch: 'main' });
     const gitNull = makeReadGit({ currentBranch: vi.fn(async () => null) });
-    await expect(new ReadModelService(gitNull as never).getBranches()).resolves.toEqual({ branches: ['main', 'feat'], currentBranch: null });
+    await expect(new ReadModelService(gitNull as never).getBranches()).resolves.toEqual({
+      branches: ['main', 'feat'],
+      currentBranch: null,
+    });
   });
 
   it('getTags enriches lightweight vs annotated and sorts by name', async () => {
@@ -553,7 +602,11 @@ describe('background-low-fill ReadModelService', () => {
   it('listAllFiles walks trees breadth-first and caps maxFiles', async () => {
     const git = makeReadGit({
       getTree: vi.fn(async (ref: string, dir: string) => {
-        if (dir === '') return [{ path: 'src', type: 'tree', oid: OID_A }, { path: 'a.txt', type: 'blob', oid: OID_B }];
+        if (dir === '')
+          return [
+            { path: 'src', type: 'tree', oid: OID_A },
+            { path: 'a.txt', type: 'blob', oid: OID_B },
+          ];
         if (dir === 'src') return [{ path: 'b.txt', type: 'blob', oid: OID_C }];
         return [];
       }),
@@ -569,7 +622,11 @@ describe('background-low-fill ReadModelService', () => {
   });
 
   it('listAllFiles returns [] for unresolved refs and tolerates tree errors', async () => {
-    const git = makeReadGit({ getTree: vi.fn(async () => { throw new Error('gone'); }) });
+    const git = makeReadGit({
+      getTree: vi.fn(async () => {
+        throw new Error('gone');
+      }),
+    });
     const svc = new ReadModelService(git as never);
     // unresolved ref short-circuits before getTree
     await expect(svc.listAllFiles({ ref: 'missing' })).resolves.toEqual([]);
@@ -658,7 +715,7 @@ describe('background-low-fill ReadModelService', () => {
     const single = makeReadGit({ getCommit: vi.fn(async () => ({ changes })) });
     const out1 = (await new ReadModelService(single as never).getPullDiff(null, OID_A, 2)) as Record<string, unknown>;
     expect(out1).toMatchObject({ mergeBase: null, truncated: true });
-    expect((out1.changes as unknown[])).toHaveLength(2);
+    expect(out1.changes as unknown[]).toHaveLength(2);
 
     const two = makeReadGit({ findMergeBase: vi.fn(async () => OID_B), getFileStateChanges: vi.fn(async () => changes) });
     const out2 = (await new ReadModelService(two as never).getPullDiff(OID_B, OID_A, 10)) as Record<string, unknown>;
@@ -690,7 +747,10 @@ describe('background-low-fill FetchHandler', () => {
   it('rejects too many ls-refs args with 400 before git I/O', async () => {
     const git = fakeFetchGit();
     const handler = new FetchHandler({ git, env: {} as Env, getFullName: () => 'a/b' });
-    const data = encodeCommand('ls-refs', Array.from({ length: 65 }, (_, i) => `arg-${i}`));
+    const data = encodeCommand(
+      'ls-refs',
+      Array.from({ length: 65 }, (_, i) => `arg-${i}`),
+    );
     const res = await handler.uploadPack(data, FETCH_LIMITS);
     expect(res.status).toBe(400);
     expect(await res.text()).toContain('too many');
@@ -763,7 +823,9 @@ describe('background-low-fill FetchHandler', () => {
   });
 
   it('serves ls-refs and successful fetch packs with 200', async () => {
-    const gitLs = fakeFetchGit({ listRefs: vi.fn().mockResolvedValue({ refs: [{ ref: 'refs/heads/main', oid: OID_A }], symbolicHead: null }) });
+    const gitLs = fakeFetchGit({
+      listRefs: vi.fn().mockResolvedValue({ refs: [{ ref: 'refs/heads/main', oid: OID_A }], symbolicHead: null }),
+    });
     const lsHandler = new FetchHandler({ git: gitLs, env: {} as Env, getFullName: () => 'a/b' });
     const lsRes = await lsHandler.uploadPack(encodeCommand('ls-refs', []), FETCH_LIMITS);
     expect(lsRes.status).toBe(200);
@@ -817,8 +879,12 @@ describe('background-low-fill RealtimeWorker', () => {
     const { worker } = makeRealtimeWorker('repo:alice/demo');
     await expect(worker.issueTicket({ shard: 'bogus', channels: ['activity'] })).resolves.toMatchObject({ error: expect.any(String) });
     await expect(worker.issueTicket({ shard: 'repo:alice/demo', channels: [] })).resolves.toMatchObject({ error: expect.any(String) });
-    await expect(worker.issueTicket({ shard: 'repo:alice/demo', channels: ['bogus!!'] })).resolves.toMatchObject({ error: expect.any(String) });
-    await expect(worker.issueTicket({ shard: 'repo:bob/other', channels: ['activity'] })).resolves.toMatchObject({ error: expect.any(String) });
+    await expect(worker.issueTicket({ shard: 'repo:alice/demo', channels: ['bogus!!'] })).resolves.toMatchObject({
+      error: expect.any(String),
+    });
+    await expect(worker.issueTicket({ shard: 'repo:bob/other', channels: ['activity'] })).resolves.toMatchObject({
+      error: expect.any(String),
+    });
   });
 
   it('garbage-collects expired tickets on alarm and tolerates empty stores', async () => {
@@ -843,7 +909,11 @@ describe('background-low-fill RealtimeWorker', () => {
 
     const broken = makeRealtimeWorker('repo:alice/demo');
     (broken as unknown as { worker: RealtimeWorker }).worker;
-    const throwingCtx = { getWebSockets: () => { throw new Error('gone'); } } as unknown as DurableObjectState;
+    const throwingCtx = {
+      getWebSockets: () => {
+        throw new Error('gone');
+      },
+    } as unknown as DurableObjectState;
     const throwing = new RealtimeWorker(throwingCtx, {} as Env);
     await expect(throwing.getStats()).resolves.toEqual({ connections: 0 });
   });
@@ -875,7 +945,10 @@ describe('background-low-fill RealtimeWorker', () => {
     const presenceWatcher = makeSocket();
     ctx.acceptWebSocket(presenceSock, ['presence']);
     ctx.acceptWebSocket(presenceWatcher, ['presence']);
-    await worker.webSocketMessage(presenceSock as unknown as WebSocket, JSON.stringify({ kind: 'presence.heartbeat', channel: 'presence' }));
+    await worker.webSocketMessage(
+      presenceSock as unknown as WebSocket,
+      JSON.stringify({ kind: 'presence.heartbeat', channel: 'presence' }),
+    );
     const updates = presenceWatcher.sent.map((raw) => JSON.parse(raw)).filter((e) => e.type === 'presence.update');
     expect(updates.length).toBeGreaterThan(0);
   });
@@ -952,9 +1025,7 @@ describe('background-low-fill RealtimeWorker', () => {
     store.set('ticketIds', ['t1']);
     store.set('ticket:t1', { shard: 'repo:alice/demo', channels: ['activity'], viewer: 'anonymous', expiresAt: now + 100 });
     ctx.acceptWebSocket(makeSocket({ viewer: 'anonymous', channels: ['activity'], connectedAt: 0, frameTimes: [] }), []);
-    const res = await worker.fetch(
-      new Request('https://x/ws?shard=repo:alice/demo&ticket=t1', { headers: { Upgrade: 'websocket' } }),
-    );
+    const res = await worker.fetch(new Request('https://x/ws?shard=repo:alice/demo&ticket=t1', { headers: { Upgrade: 'websocket' } }));
     expect(res.status).toBe(503);
   });
 
@@ -971,7 +1042,11 @@ describe('background-low-fill RealtimeWorker', () => {
 describe('background-low-fill RepoWorker fetch routing', () => {
   it('routes POST /git-receive-pack to the push handler', async () => {
     const storage = repoStorage();
-    const lifecycle = { ensureDeviceSize: vi.fn(), ensureRepoInitialized: vi.fn(async () => undefined), getLimits: () => ({ maxObjects: 1, maxPackBytes: 2 }) };
+    const lifecycle = {
+      ensureDeviceSize: vi.fn(),
+      ensureRepoInitialized: vi.fn(async () => undefined),
+      getLimits: () => ({ maxObjects: 1, maxPackBytes: 2 }),
+    };
     const receivePack = vi.fn(async () => new Response('pushed'));
     const worker = makeRepoWorker({
       ctx: { storage },
@@ -993,7 +1068,11 @@ describe('background-low-fill RepoWorker fetch routing', () => {
 
   it('routes POST /git-upload-pack to the fetch handler', async () => {
     const storage = repoStorage();
-    const lifecycle = { ensureDeviceSize: vi.fn(), ensureRepoInitialized: vi.fn(async () => undefined), getLimits: () => ({ maxObjects: 1, maxPackBytes: 2 }) };
+    const lifecycle = {
+      ensureDeviceSize: vi.fn(),
+      ensureRepoInitialized: vi.fn(async () => undefined),
+      getLimits: () => ({ maxObjects: 1, maxPackBytes: 2 }),
+    };
     const uploadPack = vi.fn(async () => new Response('fetched'));
     const worker = makeRepoWorker({
       ctx: { storage },

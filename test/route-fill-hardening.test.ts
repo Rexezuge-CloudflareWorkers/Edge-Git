@@ -138,9 +138,7 @@ function createFillFakeDb() {
     return {
       first<T>(): Promise<T | null> {
         if (q.includes('FROM users WHERE lower(email)')) {
-          return Promise.resolve(
-            (state.users.find((u) => String(u.email).toLowerCase() === P(0).toLowerCase()) ?? null) as T | null,
-          );
+          return Promise.resolve((state.users.find((u) => String(u.email).toLowerCase() === P(0).toLowerCase()) ?? null) as T | null);
         }
         if (q.includes('FROM users WHERE lower(username)')) {
           return Promise.resolve(
@@ -179,7 +177,9 @@ function createFillFakeDb() {
           );
         }
         if (q.includes('COUNT(*) AS n FROM organization_members')) {
-          return Promise.resolve({ n: state.orgMembers.filter((m) => m.org_id === params[0] && m.role === 'owner').length } as unknown as T);
+          return Promise.resolve({
+            n: state.orgMembers.filter((m) => m.org_id === params[0] && m.role === 'owner').length,
+          } as unknown as T);
         }
         if (q.includes('FROM teams WHERE org_id = ? AND slug_ci = ?')) {
           return Promise.resolve(
@@ -199,12 +199,12 @@ function createFillFakeDb() {
           );
         }
         if (q.includes("COUNT(*) AS n FROM team_members WHERE team_id = ? AND role = 'admin'")) {
-          return Promise.resolve({ n: state.teamMembers.filter((m) => m.team_id === params[0] && m.role === 'admin').length } as unknown as T);
+          return Promise.resolve({
+            n: state.teamMembers.filter((m) => m.team_id === params[0] && m.role === 'admin').length,
+          } as unknown as T);
         }
         if (q.includes('FROM team_repo_grants WHERE team_id = ? AND repo_id = ?')) {
-          return Promise.resolve(
-            (state.teamGrants.find((g) => g.team_id === params[0] && g.repo_id === params[1]) ?? null) as T | null,
-          );
+          return Promise.resolve((state.teamGrants.find((g) => g.team_id === params[0] && g.repo_id === params[1]) ?? null) as T | null);
         }
         if (q.includes('COUNT(*) AS n FROM team_repo_grants')) {
           return Promise.resolve({ n: state.teamGrants.filter((g) => g.team_id === params[0]).length } as unknown as T);
@@ -216,17 +216,15 @@ function createFillFakeDb() {
           );
         }
         if (q.includes('FROM projects WHERE repository_id = ? AND number = ?')) {
-          return Promise.resolve(
-            (state.projects.find((p) => p.repository_id === params[0] && p.number === params[1]) ?? null) as T | null,
-          );
+          return Promise.resolve((state.projects.find((p) => p.repository_id === params[0] && p.number === params[1]) ?? null) as T | null);
         }
         if (q.includes('FROM projects WHERE id = ? AND repository_id = ?')) {
-          return Promise.resolve(
-            (state.projects.find((p) => p.id === params[0] && p.repository_id === params[1]) ?? null) as T | null,
-          );
+          return Promise.resolve((state.projects.find((p) => p.id === params[0] && p.repository_id === params[1]) ?? null) as T | null);
         }
         if (q.includes('COALESCE(MAX(number)') && q.includes('FROM projects')) {
-          const max = state.projects.filter((p) => p.repository_id === params[0]).reduce((m, p) => Math.max(m, (p.number as number) ?? 0), 0);
+          const max = state.projects
+            .filter((p) => p.repository_id === params[0])
+            .reduce((m, p) => Math.max(m, (p.number as number) ?? 0), 0);
           return Promise.resolve({ next_number: max + 1, max_n: max } as unknown as T);
         }
         if (q.includes('COUNT(*) AS count FROM projects')) {
@@ -239,9 +237,7 @@ function createFillFakeDb() {
           return Promise.resolve((state.projectCards.find((c) => c.id === params[0] && c.project_id === params[1]) ?? null) as T | null);
         }
         if (q.includes('FROM pull_requests WHERE repository_id = ? AND number = ?')) {
-          return Promise.resolve(
-            (state.pulls.find((p) => p.repository_id === params[0] && p.number === params[1]) ?? null) as T | null,
-          );
+          return Promise.resolve((state.pulls.find((p) => p.repository_id === params[0] && p.number === params[1]) ?? null) as T | null);
         }
         if (q.includes('FROM pull_review_threads WHERE pull_request_id = ? AND id = ?')) {
           return Promise.resolve((state.threads.find((t) => t.pull_request_id === params[0] && t.id === params[1]) ?? null) as T | null);
@@ -252,9 +248,7 @@ function createFillFakeDb() {
           );
         }
         if (q.includes('FROM releases WHERE id = ? AND repository_id = ?')) {
-          return Promise.resolve(
-            (state.releases.find((r) => r.id === params[0] && r.repository_id === params[1]) ?? null) as T | null,
-          );
+          return Promise.resolve((state.releases.find((r) => r.id === params[0] && r.repository_id === params[1]) ?? null) as T | null);
         }
         if (q.includes('COUNT(*) AS count FROM releases')) {
           return Promise.resolve({ count: state.releases.filter((r) => r.repository_id === params[0]).length } as unknown as T);
@@ -366,12 +360,19 @@ function createFillFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO organizations')) {
-          state.organizations.push({ id: params[0], username: params[1], username_ci: params[2], creator_email: params[3], created_at: params[4], updated_at: params[5] });
+          state.organizations.push({
+            id: params[0],
+            username: params[1],
+            username_ci: params[2],
+            creator_email: params[3],
+            created_at: params[4],
+            updated_at: params[5],
+          });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('DELETE FROM organization_members WHERE org_id = ? AND lower(user_email)')) {
           state.orgMembers = state.orgMembers.filter(
-            !(q.includes('user_email != ?'))
+            !q.includes('user_email != ?')
               ? (m) => !(m.org_id === params[0] && String(m.user_email).toLowerCase() === P(1).toLowerCase())
               : (m) => !(m.org_id === params[0] && String(m.user_email).toLowerCase() === P(1).toLowerCase() && m.user_email !== params[2]),
           );
@@ -388,7 +389,17 @@ function createFillFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO teams')) {
-          state.teams.push({ id: params[0], org_id: params[1], slug: params[2], slug_ci: params[3], name: params[4], description: params[5], created_by: params[6], created_at: params[7], updated_at: params[8] });
+          state.teams.push({
+            id: params[0],
+            org_id: params[1],
+            slug: params[2],
+            slug_ci: params[3],
+            name: params[4],
+            description: params[5],
+            created_by: params[6],
+            created_at: params[7],
+            updated_at: params[8],
+          });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE teams SET')) {
@@ -408,9 +419,10 @@ function createFillFakeDb() {
         }
         if (q.startsWith('DELETE FROM team_members WHERE team_id = ? AND lower(user_email)')) {
           state.teamMembers = state.teamMembers.filter(
-            !(q.includes('user_email != ?'))
+            !q.includes('user_email != ?')
               ? (m) => !(m.team_id === params[0] && String(m.user_email).toLowerCase() === P(1).toLowerCase())
-              : (m) => !(m.team_id === params[0] && String(m.user_email).toLowerCase() === P(1).toLowerCase() && m.user_email !== params[2]),
+              : (m) =>
+                  !(m.team_id === params[0] && String(m.user_email).toLowerCase() === P(1).toLowerCase() && m.user_email !== params[2]),
           );
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
@@ -430,7 +442,14 @@ function createFillFakeDb() {
         if (q.startsWith('INSERT INTO team_repo_grants')) {
           const existing = state.teamGrants.find((g) => g.team_id === params[0] && g.repo_id === params[1]);
           if (existing) existing.role = params[2];
-          else state.teamGrants.push({ team_id: params[0], repo_id: params[1], role: params[2], granted_by: params[3], created_at: params[4] });
+          else
+            state.teamGrants.push({
+              team_id: params[0],
+              repo_id: params[1],
+              role: params[2],
+              granted_by: params[3],
+              created_at: params[4],
+            });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('DELETE FROM team_repo_grants WHERE team_id = ? AND repo_id = ?')) {
@@ -444,19 +463,37 @@ function createFillFakeDb() {
         if (q.startsWith('INSERT INTO repo_collaborators')) {
           const existing = state.collaborators.find((c) => c.repo_id === params[0] && c.user_email === params[1]);
           if (existing) existing.role = params[2];
-          else state.collaborators.push({ repo_id: params[0], user_email: params[1], role: params[2], granted_by: params[3], created_at: params[4] });
+          else
+            state.collaborators.push({
+              repo_id: params[0],
+              user_email: params[1],
+              role: params[2],
+              granted_by: params[3],
+              created_at: params[4],
+            });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('DELETE FROM repo_collaborators WHERE repo_id = ? AND lower(user_email)')) {
           state.collaborators = state.collaborators.filter(
-            !(q.includes('user_email != ?'))
+            !q.includes('user_email != ?')
               ? (c) => !(c.repo_id === params[0] && String(c.user_email).toLowerCase() === P(1).toLowerCase())
-              : (c) => !(c.repo_id === params[0] && String(c.user_email).toLowerCase() === P(1).toLowerCase() && c.user_email !== params[2]),
+              : (c) =>
+                  !(c.repo_id === params[0] && String(c.user_email).toLowerCase() === P(1).toLowerCase() && c.user_email !== params[2]),
           );
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO projects')) {
-          state.projects.push({ id: params[0], repository_id: params[1], number: params[2], title: params[3], description: params[4], status: 'open', creator_email: params[5], created_at: params[6], updated_at: params[7] });
+          state.projects.push({
+            id: params[0],
+            repository_id: params[1],
+            number: params[2],
+            title: params[3],
+            description: params[4],
+            status: 'open',
+            creator_email: params[5],
+            created_at: params[6],
+            updated_at: params[7],
+          });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE projects SET status = ?')) {
@@ -498,7 +535,21 @@ function createFillFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO project_cards')) {
-          state.projectCards.push({ id: params[0], project_id: params[1], column_id: params[2], kind: params[3], note_title: params[4], note_body: params[5], issue_id: params[6], pull_request_id: params[7], position: params[8], archived: 0, creator_email: params[9], created_at: params[10], updated_at: params[11] });
+          state.projectCards.push({
+            id: params[0],
+            project_id: params[1],
+            column_id: params[2],
+            kind: params[3],
+            note_title: params[4],
+            note_body: params[5],
+            issue_id: params[6],
+            pull_request_id: params[7],
+            position: params[8],
+            archived: 0,
+            creator_email: params[9],
+            created_at: params[10],
+            updated_at: params[11],
+          });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE project_cards SET column_id = ?')) {
@@ -531,11 +582,32 @@ function createFillFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO pull_review_threads')) {
-          state.threads.push({ id: params[0], pull_request_id: params[1], path: params[2], line: params[3], side: params[4], commit_oid: params[5], status: 'open', author_email: params[7], created_at: params[8] });
+          state.threads.push({
+            id: params[0],
+            pull_request_id: params[1],
+            path: params[2],
+            line: params[3],
+            side: params[4],
+            commit_oid: params[5],
+            status: 'open',
+            author_email: params[7],
+            created_at: params[8],
+          });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO releases')) {
-          state.releases.push({ id: params[0], repository_id: params[1], tag_name: params[2], name: params[3], body: params[4], is_draft: params[5], is_prerelease: params[6], created_by: params[7], created_at: params[8], published_at: params[9] });
+          state.releases.push({
+            id: params[0],
+            repository_id: params[1],
+            tag_name: params[2],
+            name: params[3],
+            body: params[4],
+            is_draft: params[5],
+            is_prerelease: params[6],
+            created_by: params[7],
+            created_at: params[8],
+            published_at: params[9],
+          });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE releases SET')) {
@@ -548,7 +620,17 @@ function createFillFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO release_assets')) {
-          state.releaseAssets.push({ id: params[0], release_id: params[1], repository_id: params[2], name: params[3], size: params[4], content_type: params[5], sha256: params[6], created_by: params[7], created_at: params[8] });
+          state.releaseAssets.push({
+            id: params[0],
+            release_id: params[1],
+            repository_id: params[2],
+            name: params[3],
+            size: params[4],
+            content_type: params[5],
+            sha256: params[6],
+            created_by: params[7],
+            created_at: params[8],
+          });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('DELETE FROM release_assets WHERE')) {
@@ -575,7 +657,17 @@ function createFillFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO user_access_tokens')) {
-          state.tokens.push({ token_id: params[0], user_email: params[1], token_hash: params[2], name: params[3], expires_at: params[4], last_used_at: null, created_at: params[5], scopes: params[6] ?? null, token_prefix: params[7] ?? null });
+          state.tokens.push({
+            token_id: params[0],
+            user_email: params[1],
+            token_hash: params[2],
+            name: params[3],
+            expires_at: params[4],
+            last_used_at: null,
+            created_at: params[5],
+            scopes: params[6] ?? null,
+            token_prefix: params[7] ?? null,
+          });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE user_access_tokens SET last_used_at')) {
@@ -597,13 +689,26 @@ function createDoStub(emptyRefs = false) {
     ensureRepoInitialized: () => Promise.resolve(),
     deleteRepo: () => Promise.resolve(),
     listRefs: () =>
-      Promise.resolve(emptyRefs ? { refs: [], symbolicHead: null } : { refs: [{ ref: 'refs/heads/main', oid: 'a'.repeat(40) }], symbolicHead: 'refs/heads/main' }),
+      Promise.resolve(
+        emptyRefs
+          ? { refs: [], symbolicHead: null }
+          : { refs: [{ ref: 'refs/heads/main', oid: 'a'.repeat(40) }], symbolicHead: 'refs/heads/main' },
+      ),
     getBranches: () => Promise.resolve({ branches: ['main'], currentBranch: 'main' }),
     getTree: () => Promise.resolve([]),
     getBlob: () => Promise.resolve(null),
     getCommits: () => Promise.resolve([]),
     getTags: () => Promise.resolve([]),
-    getOverview: () => Promise.resolve({ branches: ['main'], currentBranch: 'main', resolvedRef: 'a'.repeat(40), tags: [], tree: [], commits: [], readme: null }),
+    getOverview: () =>
+      Promise.resolve({
+        branches: ['main'],
+        currentBranch: 'main',
+        resolvedRef: 'a'.repeat(40),
+        tags: [],
+        tree: [],
+        commits: [],
+        readme: null,
+      }),
     getBlame: () => Promise.resolve([]),
     resolveRef: () => Promise.resolve('a'.repeat(40)),
     hasObject: () => Promise.resolve(false),
@@ -617,7 +722,8 @@ function createDoStub(emptyRefs = false) {
     fetch: () => Promise.resolve(new Response('PACK', { status: 200 })),
     mergePull: () => Promise.resolve({ ok: true }),
     getPullDiff: () => Promise.resolve({ mergeBase: 'a'.repeat(40), truncated: false, changes: [] }),
-    getMergePreviewByOids: () => Promise.resolve({ baseOid: 'a'.repeat(40), headOid: 'b'.repeat(40), mergeBase: null, truncated: false, files: [] }),
+    getMergePreviewByOids: () =>
+      Promise.resolve({ baseOid: 'a'.repeat(40), headOid: 'b'.repeat(40), mergeBase: null, truncated: false, files: [] }),
     getReleaseAsset: () => Promise.resolve(null),
     storeReleaseAsset: () => Promise.resolve({ ok: true }),
     deleteReleaseAsset: () => Promise.resolve({ ok: true }),
@@ -750,11 +856,11 @@ describe('ProjectRoutes CRUD + move validation', () => {
 
   it('rejects card moves without toColumnId', async () => {
     const { db } = createFillFakeDb();
-    const res = await callWorker(
-      createEnv(db),
-      '/user/repos/alice/demo/projects/1/cards/card-1/move',
-      { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({}) },
-    );
+    const res = await callWorker(createEnv(db), '/user/repos/alice/demo/projects/1/cards/card-1/move', {
+      method: 'PATCH',
+      headers: JSON_HEADERS,
+      body: JSON.stringify({}),
+    });
     expect(res.status).toBe(400);
     const body = (await res.json()) as { Exception?: { Type?: string; Message?: string } };
     expect(body.Exception?.Message ?? '').toContain('toColumnId');
@@ -913,7 +1019,13 @@ describe('SocialEmit best-effort fan-out + inbox hashing', () => {
       publishLiveUpdate(env as never, { fullName: 'alice/demo', channel: 'activity', type: 'push', actorEmail: ALICE, title: 'hi' }),
     ).resolves.toBeUndefined();
     await expect(
-      publishCheckUpdate(env as never, { fullName: 'alice/demo', headSha: 'not-a-sha', context: 'ci', status: 'queued', actorEmail: ALICE }),
+      publishCheckUpdate(env as never, {
+        fullName: 'alice/demo',
+        headSha: 'not-a-sha',
+        context: 'ci',
+        status: 'queued',
+        actorEmail: ALICE,
+      }),
     ).resolves.toBeUndefined();
   });
 
@@ -1025,7 +1137,13 @@ describe('Checks, threads, discussions, cross-fork helpers', () => {
     const { db } = createFillFakeDb();
     const env = createEnv(db);
     await expect(
-      triggerRequiredChecks(env as never, { repositoryId: 'r-demo', fullName: 'alice/demo', branch: 'main', headSha: 'bad', actorEmail: ALICE }),
+      triggerRequiredChecks(env as never, {
+        repositoryId: 'r-demo',
+        fullName: 'alice/demo',
+        branch: 'main',
+        headSha: 'bad',
+        actorEmail: ALICE,
+      }),
     ).resolves.toEqual({ triggered: [] });
     await expect(
       triggerRequiredChecks(env as never, {

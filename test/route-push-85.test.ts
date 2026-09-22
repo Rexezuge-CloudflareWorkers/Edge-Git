@@ -25,7 +25,12 @@ import {
 import { EdgeGitWorker } from '@/workers/EdgeGitWorker';
 
 function encodeCommand(command: string, args: string[]): Uint8Array {
-  const lines = [PktLine.encode(`command=${command}\n`), PktLine.encodeDelim(), ...args.map((a) => PktLine.encode(`${a}\n`)), PktLine.encodeFlush()];
+  const lines = [
+    PktLine.encode(`command=${command}\n`),
+    PktLine.encodeDelim(),
+    ...args.map((a) => PktLine.encode(`${a}\n`)),
+    PktLine.encodeFlush(),
+  ];
   return PktLine.mergeLines(lines);
 }
 
@@ -111,7 +116,9 @@ describe('slice1: SocialEmit channels and never-throw fan-out', () => {
   it('publishLiveUpdate no-ops when disabled, bad channel, or missing binding', async () => {
     const base = { fullName: 'alice/demo', channel: 'activity', type: 'push', actorEmail: 'a@x.com', title: 't' };
     await expect(publishLiveUpdate({} as Env, base)).resolves.toBeUndefined();
-    await expect(publishLiveUpdate({ REALTIME_ENABLED: 'true' } as unknown as Env, { ...base, channel: 'bogus!!' })).resolves.toBeUndefined();
+    await expect(
+      publishLiveUpdate({ REALTIME_ENABLED: 'true' } as unknown as Env, { ...base, channel: 'bogus!!' }),
+    ).resolves.toBeUndefined();
     await expect(publishLiveUpdate({ REALTIME_ENABLED: 'true' } as unknown as Env, base)).resolves.toBeUndefined();
   });
 
@@ -120,7 +127,12 @@ describe('slice1: SocialEmit channels and never-throw fan-out', () => {
     const stub = { publish: vi.fn((msg: unknown) => Promise.resolve({ delivered: 1 })) };
     const env = {
       REALTIME_ENABLED: 'true',
-      REALTIME: { getByName: (shard: string) => ({ ...stub, publish: (m: unknown) => (published.push({ shard, msg: m }), Promise.resolve({ delivered: 1 })) }) },
+      REALTIME: {
+        getByName: (shard: string) => ({
+          ...stub,
+          publish: (m: unknown) => (published.push({ shard, msg: m }), Promise.resolve({ delivered: 1 })),
+        }),
+      },
     } as unknown as Env;
     await publishLiveUpdate(env, {
       fullName: 'alice/demo',
@@ -149,7 +161,9 @@ describe('slice1: SocialEmit channels and never-throw fan-out', () => {
     await expect(
       recordAndNotify(env, { repositoryId: 'r', fullName: 'a/b', actorEmail: 'a@x.com', type: 'push', title: 'hello @bob' }),
     ).resolves.toBeUndefined();
-    await expect(emitWebhookEvent(env, { repositoryId: 'r', fullName: 'a/b', actorEmail: 'a@x.com', event: 'push' })).resolves.toBeUndefined();
+    await expect(
+      emitWebhookEvent(env, { repositoryId: 'r', fullName: 'a/b', actorEmail: 'a@x.com', event: 'push' }),
+    ).resolves.toBeUndefined();
     await expect(flushDueWebhookDeliveries(env)).resolves.toEqual({ processed: 0, succeeded: 0, failed: 0 });
   });
 });
@@ -224,7 +238,10 @@ describe('slice1: FetchHandler uncovered branches', () => {
     expect(tooMany.status).toBe(400);
     const badOid = await handler.uploadPack(encodeCommand('fetch', ['want not-an-oid', 'done']), fetchLimits);
     expect(badOid.status).toBe(400);
-    const badFilter = await handler.uploadPack(encodeCommand('fetch', [`want ${WANT}`, 'done', 'filter blob:limit=99999999999999999999']), fetchLimits);
+    const badFilter = await handler.uploadPack(
+      encodeCommand('fetch', [`want ${WANT}`, 'done', 'filter blob:limit=99999999999999999999']),
+      fetchLimits,
+    );
     expect(badFilter.status).toBe(400);
   });
 
@@ -252,7 +269,11 @@ describe('slice1: FetchHandler uncovered branches', () => {
     );
     expect(res.status).toBe(200);
     expect(git.packObjects).toHaveBeenCalledWith(expect.arrayContaining([WANT, tagOid]));
-    const bomb = fetchGit({ collectObjectsForPack: vi.fn().mockResolvedValue({ oids: Array.from({ length: 11 }, (_, i) => `${i}`.padStart(40, '0')), shallow: [] }) });
+    const bomb = fetchGit({
+      collectObjectsForPack: vi
+        .fn()
+        .mockResolvedValue({ oids: Array.from({ length: 11 }, (_, i) => `${i}`.padStart(40, '0')), shallow: [] }),
+    });
     const res2 = await new FetchHandler({ git: bomb, env: {} as Env, getFullName: () => 'a/b' }).uploadPack(
       encodeCommand('fetch', [`want ${WANT}`, 'done']),
       fetchLimits,

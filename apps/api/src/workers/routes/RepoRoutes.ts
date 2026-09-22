@@ -1,18 +1,20 @@
 import type { Hono } from 'hono';
 import { getRepoStub, ensureRepo } from '../doStubs';
-import { getScope, jsonError, requireVisibleRepo, toRepoJson, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import {
+  getScope,
+  jsonError,
+  requireVisibleRepo,
+  toRepoJson,
+  toSafeErrorMessage,
+  toServiceStatus,
+  withPublicRepo,
+} from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
 import { Tokens } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { EmailAddress, RepoFullName } from '@edge-git/shared/utils';
 import { readJsonBody } from './BodyParser';
-import {
-  parseOverviewArgs,
-  parseWithLastCommit,
-  sanitizeDepthParam,
-  sanitizePathParam,
-  sanitizeRefParam,
-} from './RepoParamParsers';
+import { parseOverviewArgs, parseWithLastCommit, sanitizeDepthParam, sanitizePathParam, sanitizeRefParam } from './RepoParamParsers';
 
 type RepoApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -111,9 +113,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
   app.get('/user/me', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     try {
-      const profile = await getScope(c)
-        .get(Tokens.UserService)
-        .getProfileByEmail(email);
+      const profile = await getScope(c).get(Tokens.UserService).getProfileByEmail(email);
       return c.json({ email: profile.email, username: profile.username });
     } catch {
       return c.json({ email });
@@ -221,9 +221,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
       return jsonError(c, 'Nothing to update', 400);
     }
     try {
-      const updated = await getScope(c)
-        .get(Tokens.RepoService)
-        .updateRepo(owner, repoName, email, patch);
+      const updated = await getScope(c).get(Tokens.RepoService).updateRepo(owner, repoName, email, patch);
       return c.json({ ...(toRepoJson(updated) as Record<string, unknown>), viewerCanManage: true });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to update repo'), toServiceStatus(error));
@@ -235,9 +233,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     try {
-      const { id } = await getScope(c)
-        .get(Tokens.RepoService)
-        .deleteRepo(owner, repoName, email);
+      const { id } = await getScope(c).get(Tokens.RepoService).deleteRepo(owner, repoName, email);
       // Purge git objects from the Durable Object (best-effort; D1 is source of truth).
       const fullName = `${owner}/${repoName}`;
       try {
@@ -246,9 +242,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
         console.error('Failed to purge repo DO', fullName, error);
       }
       try {
-        await getScope(c)
-          .get(Tokens.SearchService)
-          .clearRepo(id);
+        await getScope(c).get(Tokens.SearchService).clearRepo(id);
       } catch (error) {
         console.error('Failed to purge code index', fullName, error);
       }

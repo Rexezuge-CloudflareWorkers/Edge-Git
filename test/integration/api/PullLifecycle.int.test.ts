@@ -71,9 +71,7 @@ describe('pull request happy-path lifecycle on real D1+DO', () => {
   });
 
   it('lists #1, fetches it, comments, triages, searches, and reviews', async () => {
-    const listed = (await (
-      await api(`/user/repos/${OWNER}/${REPO}/pulls`)
-    ).json()) as { pulls: Array<{ number: number }> };
+    const listed = (await (await api(`/user/repos/${OWNER}/${REPO}/pulls`)).json()) as { pulls: Array<{ number: number }> };
     expect(listed.pulls.map((p) => p.number)).toContain(1);
 
     const fetched = await api(`/user/repos/${OWNER}/${REPO}/pulls/1`);
@@ -91,9 +89,9 @@ describe('pull request happy-path lifecycle on real D1+DO', () => {
     );
     expect([200, 400]).toContain(triaged.status);
 
-    const searched = (await (
-      await api(`/user/repos/${OWNER}/${REPO}/pulls?q=Add`)
-    ).json()) as { pulls: Array<{ number: number; title: string }> };
+    const searched = (await (await api(`/user/repos/${OWNER}/${REPO}/pulls?q=Add`)).json()) as {
+      pulls: Array<{ number: number; title: string }>;
+    };
     expect(searched.pulls.map((p) => p.number)).toContain(1);
 
     const reviewed = await api(
