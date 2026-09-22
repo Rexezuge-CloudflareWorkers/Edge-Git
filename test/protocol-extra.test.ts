@@ -137,7 +137,37 @@ describe('upload-pack parsing', () => {
     const pack = new Uint8Array([0x50, 0x41, 0x43, 0x4b, 0, 0, 0, 2, 0, 0, 0, 1]);
     const res = await buildFetchResponse({ commonCommits: ['a'.repeat(40)], packfileData: pack, noProgress: false, done: true });
     expect(res.status).toBe(200);
-    expect((await res.arrayBuffer()).byteLength).toBeGreaterThan(pack.length);
+    const buf = new Uint8Array(await res.arrayBuffer());
+    expect(buf.byteLength).toBeGreaterThan(pack.length);
+    // Sideband channel 2 is display-only progress: the git client adds the
+    // `remote:` prefix itself, so payloads must be bare LF-terminated text.
+    // A `remote:` prefix or CR terminator renders as empty `remote:` lines.
+    const decoder = new TextDecoder();
+    const progress: string[] = [];
+    let offset = 0;
+    while (offset + 4 <= buf.length) {
+      const hex = decoder.decode(buf.slice(offset, offset + 4));
+      if (hex === '0000' || hex === '0001' || hex === '0002') {
+        offset += 4;
+        continue;
+      }
+      const len = Number.parseInt(hex, 16);
+      if (!Number.isFinite(len) || len < 5 || offset + len > buf.length) break;
+      const payload = buf.slice(offset + 4, offset + len);
+      if (payload[0] === PktLine.SIDEBAND_CHANNEL_PROGRESS) {
+        progress.push(decoder.decode(payload.slice(1)));
+      }
+      offset += len;
+    }
+    expect(progress).toHaveLength(3);
+    expect(progress.join('')).toContain('Counting objects');
+    expect(progress.join('')).toContain('Compressing objects');
+    expect(progress.join('')).toContain('Total');
+    for (const message of progress) {
+      expect(message).not.toContain('remote:');
+      expect(message).not.toContain('\r');
+      expect(message.endsWith('\n')).toBe(true);
+    }
   });
 
   it('acknowledges common commits without packfile via flush', async () => {

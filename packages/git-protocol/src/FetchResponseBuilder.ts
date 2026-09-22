@@ -159,8 +159,8 @@ export function buildFetchResponse(options: FetchResponseOptions): Response {
 
     if (!noProgress && objectCount !== null) {
       lines.push(
-        PktLine.encodeProgress(`remote: Counting objects: ${objectCount}, done.\r\n`),
-        PktLine.encodeProgress(`remote: Compressing objects: 100% (${objectCount}/${objectCount}), done.\r\n`),
+        PktLine.encodeProgress(`Counting objects: ${objectCount}, done.\n`),
+        PktLine.encodeProgress(`Compressing objects: 100% (${objectCount}/${objectCount}), done.\n`),
       );
     }
 
@@ -172,9 +172,7 @@ export function buildFetchResponse(options: FetchResponseOptions): Response {
     }
 
     if (!noProgress && objectCount !== null) {
-      lines.push(
-        PktLine.encodeProgress(`remote: Total ${objectCount} (delta 0), reused ${objectCount} (delta 0), pack-reused 0        \r\n`),
-      );
+      lines.push(PktLine.encodeProgress(`Total ${objectCount} (delta 0), reused ${objectCount} (delta 0), pack-reused 0\n`));
     }
 
     lines.push(PktLine.encodeFlush());
