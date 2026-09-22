@@ -265,6 +265,11 @@ class TokenService {
     const deleted = await dao.delete(tokenId, userEmail.toLowerCase());
     if (!deleted) throw new NotFoundError('Token not found');
     await this.deps.tokenGrantDAO().then((d) => d.deleteByToken(tokenId).catch(() => undefined));
+    // Junction cleanup mirrors the grant cleanup above (never throws: the
+    // row is already gone, orphans are inert until the drop migration).
+    if (typeof dao.deleteScopes === 'function') {
+      await dao.deleteScopes(tokenId).catch(() => undefined);
+    }
   }
 }
 

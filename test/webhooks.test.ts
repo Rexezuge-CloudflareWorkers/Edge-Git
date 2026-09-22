@@ -54,11 +54,11 @@ function createWebhookFakeDb() {
         }
         if (q.includes('FROM organizations')) return Promise.resolve(null);
         if (q.includes('FROM repo_collaborators')) return Promise.resolve(null);
-        if (q.includes('FROM repositories WHERE lower(owner)')) {
+        if (q.includes('FROM repositories WHERE owner_ci = ? AND name_ci = ?')) {
           const row = state.repos.find(
             (r) =>
-              String(r.owner).toLowerCase() === String(params[0]).toLowerCase() &&
-              String(r.name).toLowerCase() === String(params[1]).toLowerCase(),
+              String(r.owner_ci ?? r.owner).toLowerCase() === String(params[0]).toLowerCase() &&
+              String(r.name_ci ?? r.name).toLowerCase() === String(params[1]).toLowerCase(),
           );
           return Promise.resolve((row ?? null) as T | null);
         }

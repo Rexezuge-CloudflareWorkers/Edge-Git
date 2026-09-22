@@ -85,6 +85,18 @@ async function resolveCreator(getUserDAO: () => Promise<UserDAO>, creatorEmail: 
   }
 }
 
+async function resolveEvents(dao: WebhookDAO, hookId: string, fallback: WebhookEventName[]): Promise<WebhookEventName[]> {
+  // Junction-first read with JSON fallback. The `typeof` guard keeps minimal
+  // test fakes (objects without the new method) on the JSON path.
+  try {
+    if (typeof dao.listEvents !== 'function') return fallback;
+    const junction = normalizeEvents(await dao.listEvents(hookId));
+    return junction.length > 0 ? junction : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 function normalizeSecret(input: unknown): string {
   if (input === undefined || input === null) return generateHookSecret();
   if (input === '') return generateHookSecret();
@@ -115,6 +127,7 @@ class WebhookService {
   private async toPublicResolved(row: RepoWebhookRow): Promise<RepoWebhookMetadata> {
     const base = toPublic(row);
     base.creator = await resolveCreator(this.deps.userDAO, row.creator_email);
+    base.events = await resolveEvents(await this.deps.webhookDAO(), row.id, base.events);
     return base;
   }
 

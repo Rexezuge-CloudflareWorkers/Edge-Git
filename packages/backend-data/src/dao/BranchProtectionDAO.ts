@@ -79,6 +79,41 @@ class BranchProtectionDAO extends BaseDAO {
           .run(),
       'create branch protection rule',
     );
+    // Dual-write the 3NF junction (0022): best-effort, JSON stays
+    // authoritative until the drop migration; reads prefer junction rows.
+    await this.replaceContexts(input.id, input.requireStatusChecks, input.now).catch(() => undefined);
+  }
+
+  public async listContexts(ruleId: string): Promise<string[]> {
+    const result = await this.database
+      .prepare('SELECT context FROM branch_protection_required_checks WHERE rule_id = ?')
+      .bind(ruleId)
+      .all<{ context: string }>();
+    return (result.results ?? []).map((row) => row.context);
+  }
+
+  public async replaceContexts(ruleId: string, contexts: readonly string[], now: number): Promise<void> {
+    await this.withRetry(
+      () => this.database.prepare('DELETE FROM branch_protection_required_checks WHERE rule_id = ?').bind(ruleId).run(),
+      'replace branch protection checks',
+    );
+    for (const context of contexts) {
+      await this.withRetry(
+        () =>
+          this.database
+            .prepare('INSERT OR IGNORE INTO branch_protection_required_checks (rule_id, context, created_at) VALUES (?, ?, ?)')
+            .bind(ruleId, context, now)
+            .run(),
+        'insert branch protection check',
+      );
+    }
+  }
+
+  private async withJunctionContexts(meta: BranchProtectionRuleMetadata): Promise<BranchProtectionRuleMetadata> {
+    // Junction-first read with JSON fallback, mirroring token scopes.
+    const junction = await this.listContexts(meta.id).catch(() => null);
+    if (junction && junction.length > 0) return { ...meta, requireStatusChecks: junction };
+    return meta;
   }
 
   public async listByRepo(repositoryId: string): Promise<BranchProtectionRuleMetadata[]> {
@@ -86,12 +121,16 @@ class BranchProtectionDAO extends BaseDAO {
       .prepare('SELECT * FROM branch_protection_rules WHERE repository_id = ? ORDER BY pattern ASC')
       .bind(repositoryId)
       .all<BranchProtectionRuleRow>();
-    return (result.results ?? []).map(toMetadata);
+    const rows = result.results ?? [];
+    const out: BranchProtectionRuleMetadata[] = [];
+    for (const row of rows) out.push(await this.withJunctionContexts(toMetadata(row)));
+    return out;
   }
 
   public async getById(id: string): Promise<BranchProtectionRuleMetadata | null> {
     const row = await this.findRowById<BranchProtectionRuleRow>('branch_protection_rules', 'id', id);
-    return row ? toMetadata(row) : null;
+    if (!row) return null;
+    return this.withJunctionContexts(toMetadata(row));
   }
 
   public async getByRepoAndPattern(repositoryId: string, pattern: string): Promise<BranchProtectionRuleMetadata | null> {
@@ -99,7 +138,8 @@ class BranchProtectionDAO extends BaseDAO {
       .prepare('SELECT * FROM branch_protection_rules WHERE repository_id = ? AND pattern = ? LIMIT 1')
       .bind(repositoryId, pattern)
       .first<BranchProtectionRuleRow>();
-    return row ? toMetadata(row) : null;
+    if (!row) return null;
+    return this.withJunctionContexts(toMetadata(row));
   }
 
   public async countByRepo(repositoryId: string): Promise<number> {
@@ -115,9 +155,23 @@ class BranchProtectionDAO extends BaseDAO {
       () => this.database.prepare('DELETE FROM branch_protection_rules WHERE id = ? AND repository_id = ?').bind(id, repositoryId).run(),
       'delete branch protection rule',
     );
+    await this.withRetry(
+      () => this.database.prepare('DELETE FROM branch_protection_required_checks WHERE rule_id = ?').bind(id).run(),
+      'delete branch protection checks',
+    ).catch(() => undefined);
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {
+    await this.withRetry(
+      () =>
+        this.database
+          .prepare(
+            'DELETE FROM branch_protection_required_checks WHERE rule_id IN (SELECT id FROM branch_protection_rules WHERE repository_id = ?)',
+          )
+          .bind(repositoryId)
+          .run(),
+      'delete branch protection checks by repo',
+    ).catch(() => undefined);
     await this.withRetry(
       () => this.database.prepare('DELETE FROM branch_protection_rules WHERE repository_id = ?').bind(repositoryId).run(),
       'delete branch protection rules by repo',

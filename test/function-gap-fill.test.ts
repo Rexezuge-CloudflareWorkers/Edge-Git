@@ -157,6 +157,13 @@ function createGapFakeDb() {
         if (q.includes('FROM namespaces WHERE username_ci = ?')) {
           return Promise.resolve((state.namespaces.find((n) => n.username_ci === params[0]) ?? null) as T | null);
         }
+        if (q.includes('FROM repositories WHERE owner_ci = ? AND name_ci = ?')) {
+          return Promise.resolve(
+            (state.repos.find(
+              (r) => String(r.owner_ci ?? r.owner).toLowerCase() === Pl(0) && String(r.name_ci ?? r.name).toLowerCase() === Pl(1),
+            ) ?? null) as T | null,
+          );
+        }
         if (q.includes('FROM repositories WHERE lower(owner)') && q.includes('AND lower(name)')) {
           return Promise.resolve(
             (state.repos.find((r) => String(r.owner).toLowerCase() === Pl(0) && String(r.name).toLowerCase() === Pl(1)) ??
@@ -211,6 +218,9 @@ function createGapFakeDb() {
         }
         if (q.includes('FROM repositories WHERE') && q.includes('owner_email')) {
           return Promise.resolve({ results: state.repos.filter((r) => String(r.owner_email).toLowerCase() === Pl(0)) as T[] });
+        }
+        if (q.includes('FROM repositories WHERE owner_ci = ?') && !q.includes('AND name_ci')) {
+          return Promise.resolve({ results: state.repos.filter((r) => String(r.owner_ci ?? r.owner).toLowerCase() === Pl(0)) as T[] });
         }
         if (q.includes('FROM repositories WHERE lower(owner) = ?') && !q.includes('AND lower(name)')) {
           return Promise.resolve({ results: state.repos.filter((r) => String(r.owner).toLowerCase() === Pl(0)) as T[] });

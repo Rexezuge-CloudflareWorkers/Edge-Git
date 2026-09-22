@@ -62,48 +62,61 @@ class UserAccessTokenDAO extends BaseDAO {
     tokenPrefix?: string | null,
   ): Promise<void> {
     const serialized = scopes && scopes.length > 0 ? JSON.stringify([...scopes]) : null;
-    try {
-      await this.withRetry(
-        () =>
-          this.database
-            .prepare(
-              'INSERT INTO user_access_tokens (token_id, user_email, token_hash, name, expires_at, last_used_at, created_at, scopes, token_prefix) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)',
-            )
-            .bind(tokenId, userEmail.toLowerCase(), tokenHash, name, expiresAt, now, serialized, tokenPrefix ?? null)
-            .run(),
-        'create access token',
-      );
-      return;
-    } catch {
-      // Fallback for DBs without the 0016 prefix column: retry with scopes.
-    }
-    if (serialized !== null) {
-      try {
-        await this.withRetry(
-          () =>
-            this.database
-              .prepare(
-                'INSERT INTO user_access_tokens (token_id, user_email, token_hash, name, expires_at, last_used_at, created_at, scopes) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)',
-              )
-              .bind(tokenId, userEmail.toLowerCase(), tokenHash, name, expiresAt, now, serialized)
-              .run(),
-          'create access token',
-        );
-        return;
-      } catch {
-        // Fallback for DBs without the 0007 scopes column: retry without it.
-      }
-    }
     await this.withRetry(
       () =>
         this.database
           .prepare(
-            'INSERT INTO user_access_tokens (token_id, user_email, token_hash, name, expires_at, last_used_at, created_at) VALUES (?, ?, ?, ?, ?, NULL, ?)',
+            'INSERT INTO user_access_tokens (token_id, user_email, token_hash, name, expires_at, last_used_at, created_at, scopes, token_prefix) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)',
           )
-          .bind(tokenId, userEmail.toLowerCase(), tokenHash, name, expiresAt, now)
+          .bind(tokenId, userEmail.toLowerCase(), tokenHash, name, expiresAt, now, serialized, tokenPrefix ?? null)
           .run(),
       'create access token',
     );
+    // Dual-write the 3NF junction (0022): best-effort so minimal fakes and
+    // DBs without the table keep working — reads prefer junction rows with a
+    // JSON fallback, so a skipped write self-heals on read.
+    await this.replaceScopes(tokenId, scopes ?? [], now).catch(() => undefined);
+  }
+
+  public async listScopes(tokenId: string): Promise<TokenScope[]> {
+    const result = await this.database
+      .prepare("SELECT scope FROM token_scopes WHERE token_id = ? AND scope IN ('repo:read', 'repo:write', 'admin')")
+      .bind(tokenId)
+      .all<{ scope: TokenScope }>();
+    return (result.results ?? []).map((row) => row.scope);
+  }
+
+  public async replaceScopes(tokenId: string, scopes: readonly TokenScope[], now: number): Promise<void> {
+    await this.withRetry(
+      () => this.database.prepare('DELETE FROM token_scopes WHERE token_id = ?').bind(tokenId).run(),
+      'replace token scopes',
+    );
+    for (const scope of scopes) {
+      await this.withRetry(
+        () =>
+          this.database
+            .prepare('INSERT OR IGNORE INTO token_scopes (token_id, scope, created_at) VALUES (?, ?, ?)')
+            .bind(tokenId, scope, now)
+            .run(),
+        'insert token scope',
+      );
+    }
+  }
+
+  public async deleteScopes(tokenId: string): Promise<void> {
+    await this.withRetry(
+      () => this.database.prepare('DELETE FROM token_scopes WHERE token_id = ?').bind(tokenId).run(),
+      'delete token scopes',
+    );
+  }
+
+  private async withJunctionScopes(meta: UserAccessTokenMetadata): Promise<UserAccessTokenMetadata> {
+    // Junction-first read with JSON fallback: pre-backfill rows and skipped
+    // dual-writes resolve to the JSON scopes; fail-closed `[]` is preserved
+    // when both are empty.
+    const junction = await this.listScopes(meta.tokenId).catch(() => null);
+    if (junction && junction.length > 0) return { ...meta, scopes: junction };
+    return meta;
   }
 
   public async getByTokenHash(tokenHash: string, nowSeconds: number): Promise<UserAccessTokenMetadata | undefined> {
@@ -111,7 +124,8 @@ class UserAccessTokenDAO extends BaseDAO {
       .prepare('SELECT * FROM user_access_tokens WHERE token_hash = ? AND expires_at > ? LIMIT 1')
       .bind(tokenHash, nowSeconds)
       .first<TokenRow>();
-    return row ? toMetadata(row) : undefined;
+    if (!row) return undefined;
+    return this.withJunctionScopes(toMetadata(row));
   }
 
   public async getByUserEmail(userEmail: string): Promise<UserAccessTokenMetadata[]> {
@@ -119,7 +133,10 @@ class UserAccessTokenDAO extends BaseDAO {
       .prepare('SELECT * FROM user_access_tokens WHERE lower(user_email) = lower(?) ORDER BY created_at DESC')
       .bind(userEmail)
       .all<TokenRow>();
-    return (result.results ?? []).map(toMetadata);
+    const rows = result.results ?? [];
+    const out: UserAccessTokenMetadata[] = [];
+    for (const row of rows) out.push(await this.withJunctionScopes(toMetadata(row)));
+    return out;
   }
 
   public async updateLastUsedByHash(tokenHash: string, now: number): Promise<void> {

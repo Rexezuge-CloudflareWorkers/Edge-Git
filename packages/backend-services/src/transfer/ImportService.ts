@@ -59,6 +59,20 @@ class ImportService {
     return toMetadata(row);
   }
 
+  private async withJunctionRefs(meta: RepoImportMetadata): Promise<RepoImportMetadata> {
+    // Junction-first read with JSON fallback. The `typeof` guard keeps
+    // minimal test fakes (objects without the new method) on the JSON path.
+    try {
+      const dao = await this.deps.importDAO();
+      if (typeof dao.listRefs !== 'function') return meta;
+      const junction = await dao.listRefs(meta.id);
+      if (junction.length > 0) return { ...meta, refs: junction.map((r) => ({ ref: r.ref, oid: r.oid ?? '' })) };
+    } catch {
+      // JSON fallback in `meta`.
+    }
+    return meta;
+  }
+
   public async createJob(repositoryId: string, sourceUrl: string, createdBy: string): Promise<RepoImportMetadata> {
     const normalized = normalizePublicGitUrl(sourceUrl);
     const dao = await this.deps.importDAO();
@@ -82,13 +96,14 @@ class ImportService {
     }
     const row = await dao.getById(id);
     if (!row) throw new NotFoundError('Import not found');
-    return toMetadata(row);
+    return this.withJunctionRefs(toMetadata(row));
   }
 
   public async latestForRepo(repositoryId: string): Promise<RepoImportMetadata | null> {
     const dao = await this.deps.importDAO();
     const row = await dao.latestByRepo(repositoryId).catch(() => null);
-    return row ? toMetadata(row) : null;
+    if (!row) return null;
+    return this.withJunctionRefs(toMetadata(row));
   }
 
   public async cancelJob(jobId: string, repositoryId?: string): Promise<RepoImportMetadata> {
@@ -104,7 +119,7 @@ class ImportService {
     await dao.markCancelled(jobId, TimestampUtil.getCurrentUnixTimestampInSeconds());
     const updated = await dao.getById(jobId);
     if (!updated) throw new NotFoundError('Import not found');
-    return toMetadata(updated);
+    return this.withJunctionRefs(toMetadata(updated));
   }
 
   public transferLimits(): { maxRefs: number; maxPackBytes: number; timeoutMs: number; staleSeconds: number } {

@@ -144,6 +144,15 @@ function createThinFakeDb() {
         if (q.includes('FROM namespaces WHERE username_ci = ?')) {
           return Promise.resolve((state.namespaces.find((n) => n.username_ci === params[0]) ?? null) as T | null);
         }
+        if (q.includes('FROM repositories WHERE owner_ci = ? AND name_ci = ?')) {
+          return Promise.resolve(
+            (state.repos.find(
+              (r) =>
+                String(r.owner_ci ?? r.owner).toLowerCase() === P(0).toLowerCase() &&
+                String(r.name_ci ?? r.name).toLowerCase() === P(1).toLowerCase(),
+            ) ?? null) as T | null,
+          );
+        }
         if (q.includes('FROM repositories WHERE lower(owner)')) {
           return Promise.resolve(
             (state.repos.find(
@@ -262,6 +271,9 @@ function createThinFakeDb() {
         }
         if (q.includes('FROM repositories WHERE') && q.includes('owner_email')) {
           return Promise.resolve({ results: state.repos.filter((r) => String(r.owner_email).toLowerCase() === P(0).toLowerCase()) as T[] });
+        }
+        if (q.includes('FROM repositories WHERE owner_ci = ? ORDER BY')) {
+          return Promise.resolve({ results: state.repos.filter((r) => String(r.owner_ci ?? r.owner).toLowerCase() === P(0).toLowerCase()) as T[] });
         }
         if (q.includes('FROM repositories WHERE lower(owner) = ?')) {
           return Promise.resolve({ results: state.repos.filter((r) => String(r.owner).toLowerCase() === P(0).toLowerCase()) as T[] });

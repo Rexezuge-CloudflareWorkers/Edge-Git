@@ -34,6 +34,14 @@ function createFakeDb(seed: { now?: number } = {}): D1Queryable & {
     const q = query.replace(/\s+/g, ' ').trim();
     return {
       first<T>(): Promise<T | null> {
+        if (q.startsWith('SELECT * FROM repositories WHERE owner_ci = ? AND name_ci = ?')) {
+          const row = state.repos.find(
+            (r) =>
+              String(r.owner_ci ?? r.owner).toLowerCase() === String(params[0]).toLowerCase() &&
+              String(r.name_ci ?? r.name).toLowerCase() === String(params[1]).toLowerCase(),
+          );
+          return Promise.resolve((row ?? null) as T | null);
+        }
         if (q.startsWith('SELECT * FROM repositories WHERE owner = ? AND name = ?')) {
           const row = state.repos.find((r) => r.owner === params[0] && r.name === params[1]);
           return Promise.resolve((row ?? null) as T | null);
@@ -65,6 +73,10 @@ function createFakeDb(seed: { now?: number } = {}): D1Queryable & {
           const rows = state.repos
             .filter((r) => String(r.owner_email).toLowerCase() === String(params[0]).toLowerCase())
             .slice(0, params[1] as number);
+          return Promise.resolve({ results: rows as T[] });
+        }
+        if (q.startsWith('SELECT * FROM repositories WHERE owner_ci = ?')) {
+          const rows = state.repos.filter((r) => String(r.owner_ci ?? r.owner).toLowerCase() === String(params[0]).toLowerCase());
           return Promise.resolve({ results: rows as T[] });
         }
         if (q.startsWith('SELECT * FROM repositories WHERE owner = ?')) {

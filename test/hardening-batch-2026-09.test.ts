@@ -60,9 +60,11 @@ describe('hardening batch: fail-closed data layer', () => {
     expect(seen[0]).toContain('owner_ci');
   });
 
-  it('RepositoryDAO listByOrgId throws on genuine errors, degrades only on missing schema', async () => {
-    await expect(new RepositoryDAO(failingDb('connection timeout')).listByOrgId('org-1')).rejects.toBeInstanceOf(DatabaseError);
-    await expect(new RepositoryDAO(failingDb('no such table: repositories')).listByOrgId('org-1')).resolves.toEqual([]);
+  it('RepositoryDAO listByOrgId propagates errors instead of degrading (0021 baseline)', async () => {
+    // Post-0021 the org columns are part of the baseline schema: no
+    // missing-schema degrade branch remains — errors propagate raw.
+    await expect(new RepositoryDAO(failingDb('connection timeout')).listByOrgId('org-1')).rejects.toThrow('connection timeout');
+    await expect(new RepositoryDAO(failingDb('no such table: repositories')).listByOrgId('org-1')).rejects.toThrow('no such table');
   });
 
   it('RepositoryDAO listForks/countForks/listRecent fail closed', async () => {
@@ -71,8 +73,8 @@ describe('hardening batch: fail-closed data layer', () => {
     await expect(new RepositoryDAO(bad).countForks('r1')).rejects.toBeInstanceOf(DatabaseError);
     await expect(new RepositoryDAO(bad).listRecent()).rejects.toBeInstanceOf(DatabaseError);
     const legacy = failingDb('no such table: repositories');
-    await expect(new RepositoryDAO(legacy).listForks('r1')).resolves.toEqual([]);
-    await expect(new RepositoryDAO(legacy).countForks('r1')).resolves.toBe(0);
+    await expect(new RepositoryDAO(legacy).listForks('r1')).rejects.toBeInstanceOf(DatabaseError);
+    await expect(new RepositoryDAO(legacy).countForks('r1')).rejects.toBeInstanceOf(DatabaseError);
   });
 
   it('RepositoryDAO create does not swallow constraint errors', async () => {

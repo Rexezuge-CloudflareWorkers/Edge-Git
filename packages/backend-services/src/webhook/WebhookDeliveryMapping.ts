@@ -29,11 +29,16 @@ function toPublicDelivery(row: WebhookDeliveryRow): WebhookDeliveryMetadata {
 
 function isHookSubscribed(hook: RepoWebhookRow, event: WebhookEventName): boolean {
   if (hook.is_active !== 1) return false;
+  return subscribedEvents(hook).includes(event);
+}
+
+function subscribedEvents(hook: RepoWebhookRow): WebhookEventName[] {
   try {
     const events: unknown = JSON.parse(hook.events);
-    return Array.isArray(events) && events.includes(event);
+    if (!Array.isArray(events)) return [];
+    return events.filter((e): e is WebhookEventName => typeof e === 'string');
   } catch {
-    return false;
+    return [];
   }
 }
 
@@ -41,4 +46,4 @@ function resolveSenderUsername(actorUsername?: string, actorEmail?: string): str
   return actorUsername ?? actorEmail?.toLowerCase() ?? 'ghost';
 }
 
-export { isHookSubscribed, resolveSenderUsername, toPublicDelivery };
+export { isHookSubscribed, resolveSenderUsername, subscribedEvents, toPublicDelivery };

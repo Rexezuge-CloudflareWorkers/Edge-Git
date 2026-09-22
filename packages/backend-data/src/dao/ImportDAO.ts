@@ -3,6 +3,23 @@ import type { D1Queryable } from '../utils/D1Types';
 
 type ImportStatus = 'pending' | 'running' | 'done' | 'failed' | 'cancelled';
 
+function parseRefsJson(raw: string): Array<{ ref: string; oid: string | null }> {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const out: Array<{ ref: string; oid: string | null }> = [];
+    for (const entry of parsed) {
+      const ref = (entry as { ref?: unknown }).ref;
+      if (typeof ref !== 'string' || ref.length === 0) continue;
+      const oid = (entry as { oid?: unknown }).oid;
+      out.push({ ref, oid: typeof oid === 'string' ? oid : null });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 interface RepoImportRow {
   id: string;
   repository_id: string;
@@ -95,6 +112,34 @@ class ImportDAO extends BaseDAO {
           .run(),
       'mark repo import done',
     );
+    // Dual-write the 3NF junction (0022): best-effort, JSON stays
+    // authoritative until the drop migration; reads prefer junction rows.
+    await this.replaceRefs(id, parseRefsJson(refsJson), now).catch(() => undefined);
+  }
+
+  public async listRefs(importId: string): Promise<Array<{ ref: string; oid: string | null }>> {
+    const result = await this.database
+      .prepare('SELECT ref_name, oid FROM repo_import_refs WHERE import_id = ?')
+      .bind(importId)
+      .all<{ ref_name: string; oid: string | null }>();
+    return (result.results ?? []).map((row) => ({ ref: row.ref_name, oid: row.oid }));
+  }
+
+  public async replaceRefs(importId: string, refs: ReadonlyArray<{ ref: string; oid: string | null }>, now: number): Promise<void> {
+    await this.withRetry(
+      () => this.database.prepare('DELETE FROM repo_import_refs WHERE import_id = ?').bind(importId).run(),
+      'replace repo import refs',
+    );
+    for (const ref of refs) {
+      await this.withRetry(
+        () =>
+          this.database
+            .prepare('INSERT OR IGNORE INTO repo_import_refs (import_id, ref_name, oid, created_at) VALUES (?, ?, ?, ?)')
+            .bind(importId, ref.ref, ref.oid, now)
+            .run(),
+        'insert repo import ref',
+      );
+    }
   }
 
   public async markFailed(id: string, error: string, now: number): Promise<void> {
@@ -120,6 +165,14 @@ class ImportDAO extends BaseDAO {
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {
+    await this.withRetry(
+      () =>
+        this.database
+          .prepare('DELETE FROM repo_import_refs WHERE import_id IN (SELECT id FROM repo_imports WHERE repository_id = ?)')
+          .bind(repositoryId)
+          .run(),
+      'delete repo import refs',
+    ).catch(() => undefined);
     await this.withRetry(
       () => this.database.prepare('DELETE FROM repo_imports WHERE repository_id = ?').bind(repositoryId).run(),
       'delete repo imports',

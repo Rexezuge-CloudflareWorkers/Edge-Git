@@ -10,7 +10,7 @@ import {
 } from '@edge-git/backend-errors';
 import { Container } from '@edge-git/backend-runtime/di/Container';
 import { ConsoleLogger, SystemClock, createServiceContext } from '@edge-git/backend-runtime/di/ServiceContext';
-import { cache } from '@edge-git/backend-runtime/cache';
+import { KvCache } from '@edge-git/backend-runtime/kv';
 import { AppConfiguration } from '@edge-git/backend-runtime/config/AppConfiguration';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config/ConfigurationManager';
 import { CryptoUtil } from '@edge-git/shared/utils/CryptoUtil';
@@ -55,12 +55,12 @@ describe('DI container', () => {
   });
 });
 
-describe('cache key builder', () => {
-  it('builds stable urls with params', () => {
-    const url = cache.buildCacheKey({ key: 'repos', params: { owner: 'alice', empty: undefined } });
-    expect(url.pathname).toBe('/__cache/repos');
-    expect(url.searchParams.get('owner')).toBe('alice');
-    expect(url.searchParams.has('empty')).toBe(false);
+describe('single-KV keyspace', () => {
+  it('builds stable domain-prefixed keys', () => {
+    const cache = new KvCache(null);
+    expect(cache.keyFor('refs', ['alice/demo', 'abc'])).toBe('refs:v1:alice%2Fdemo:abc');
+    expect(cache.keyFor('jwks', ['alice/demo', 'abc'])).not.toBe(cache.keyFor('refs', ['alice/demo', 'abc']));
+    expect(cache.available).toBe(false);
   });
 });
 

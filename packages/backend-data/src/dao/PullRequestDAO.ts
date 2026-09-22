@@ -77,44 +77,11 @@ class PullRequestDAO extends BaseDAO {
     headRepositoryId?: string | null;
     headFullName?: string | null;
   }): Promise<void> {
-    try {
-      await this.withRetry(
-        () =>
-          this.database
-            .prepare(
-              'INSERT INTO pull_requests (id, repository_id, full_name, number, title, body, status, base_branch, head_branch, base_oid, head_oid, merge_base_oid, creator_email, merged_by, merged_at, created_at, updated_at, head_repository_id, head_full_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?)',
-            )
-            .bind(
-              input.id,
-              input.repositoryId,
-              input.fullName,
-              input.number,
-              input.title,
-              input.body,
-              'open',
-              input.baseBranch,
-              input.headBranch,
-              input.baseOid,
-              input.headOid,
-              input.mergeBaseOid,
-              input.creatorEmail,
-              input.now,
-              input.now,
-              input.headRepositoryId ?? null,
-              input.headFullName ?? null,
-            )
-            .run(),
-        'create pull request',
-      );
-      return;
-    } catch {
-      // Fallback for DBs without 0004 head-repo columns: retry without them.
-    }
     await this.withRetry(
       () =>
         this.database
           .prepare(
-            'INSERT INTO pull_requests (id, repository_id, full_name, number, title, body, status, base_branch, head_branch, base_oid, head_oid, merge_base_oid, creator_email, merged_by, merged_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)',
+            'INSERT INTO pull_requests (id, repository_id, full_name, number, title, body, status, base_branch, head_branch, base_oid, head_oid, merge_base_oid, creator_email, merged_by, merged_at, created_at, updated_at, head_repository_id, head_full_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?)',
           )
           .bind(
             input.id,
@@ -132,6 +99,8 @@ class PullRequestDAO extends BaseDAO {
             input.creatorEmail,
             input.now,
             input.now,
+            input.headRepositoryId ?? null,
+            input.headFullName ?? null,
           )
           .run(),
       'create pull request',
@@ -166,8 +135,8 @@ class PullRequestDAO extends BaseDAO {
 
   // Refresh denormalized names after an owner/org rename. Base `full_name` is
   // keyed by stable `repository_id`; fork `head_full_name` by stable
-  // `head_repository_id` (0004 columns — missing-column DBs resolve to zero
-  // rows via the caught fallback). FTS follows via `trg_pull_fts_au`.
+  // `head_repository_id`. Best-effort cascade helpers (never throw).
+  // FTS follows via `trg_pull_fts_au`.
   public async updateFullNameByRepo(repositoryId: string, fullName: string): Promise<void> {
     await this.withRetry(
       () => this.database.prepare('UPDATE pull_requests SET full_name = ? WHERE repository_id = ?').bind(fullName, repositoryId).run(),
@@ -176,18 +145,14 @@ class PullRequestDAO extends BaseDAO {
   }
 
   public async updateHeadFullNameByHeadRepo(headRepositoryId: string, headFullName: string): Promise<void> {
-    try {
-      await this.withRetry(
-        () =>
-          this.database
-            .prepare('UPDATE pull_requests SET head_full_name = ? WHERE head_repository_id = ?')
-            .bind(headFullName, headRepositoryId)
-            .run(),
-        'rename pull request head full name',
-      );
-    } catch {
-      // Legacy DBs without 0004 head-repo columns — nothing to refresh.
-    }
+    await this.withRetry(
+      () =>
+        this.database
+          .prepare('UPDATE pull_requests SET head_full_name = ? WHERE head_repository_id = ?')
+          .bind(headFullName, headRepositoryId)
+          .run(),
+      'rename pull request head full name',
+    ).catch(() => undefined);
   }
 
   public async markMerged(id: string, mergedBy: string, commitOid: string | null, now: number): Promise<void> {
@@ -308,35 +273,21 @@ class PullRequestDAO extends BaseDAO {
   }
 
   public async getReviewById(pullRequestId: string, reviewId: string): Promise<PullRequestReviewRow | null> {
-    try {
-      return await this.database
-        .prepare('SELECT * FROM pull_request_reviews WHERE pull_request_id = ? AND id = ? LIMIT 1')
-        .bind(pullRequestId, reviewId)
-        .first<PullRequestReviewRow>();
-    } catch {
-      return null;
-    }
+    return this.database
+      .prepare('SELECT * FROM pull_request_reviews WHERE pull_request_id = ? AND id = ? LIMIT 1')
+      .bind(pullRequestId, reviewId)
+      .first<PullRequestReviewRow>();
   }
 
   public async dismissReview(reviewId: string, dismissedBy: string, reason: string | null, now: number): Promise<void> {
-    try {
-      await this.withRetry(
-        () =>
-          this.database
-            .prepare('UPDATE pull_request_reviews SET dismissed = 1, dismissed_by = ?, dismissed_at = ?, dismiss_reason = ? WHERE id = ?')
-            .bind(dismissedBy, now, reason, reviewId)
-            .run(),
-        'dismiss pull request review',
-      );
-      return;
-    } catch {
-      // Legacy DBs without migration 0010 dismissal columns: fall back to a
-      // plain update that older schemas accept, else leave the row untouched.
-      await this.withRetry(
-        () => this.database.prepare('UPDATE pull_request_reviews SET body = COALESCE(body, ?) WHERE id = ?').bind(reason, reviewId).run(),
-        'dismiss pull request review',
-      ).catch(() => undefined);
-    }
+    await this.withRetry(
+      () =>
+        this.database
+          .prepare('UPDATE pull_request_reviews SET dismissed = 1, dismissed_by = ?, dismissed_at = ?, dismiss_reason = ? WHERE id = ?')
+          .bind(dismissedBy, now, reason, reviewId)
+          .run(),
+      'dismiss pull request review',
+    );
   }
 }
 

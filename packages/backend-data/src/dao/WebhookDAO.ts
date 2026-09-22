@@ -19,6 +19,16 @@ interface RepoWebhookRow {
   updated_at: number;
 }
 
+function parseEventsJson(raw: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((e): e is string => typeof e === 'string' && e.length > 0);
+  } catch {
+    return [];
+  }
+}
+
 class WebhookDAO extends BaseDAO {
   constructor(database: D1Queryable) {
     super(database);
@@ -57,6 +67,38 @@ class WebhookDAO extends BaseDAO {
           )
           .run(),
       'create repo webhook',
+    );
+    // Dual-write the 3NF junction (0022): best-effort, JSON stays
+    // authoritative until the drop migration; reads prefer junction rows.
+    await this.replaceEvents(input.id, parseEventsJson(input.eventsJson), input.now).catch(() => undefined);
+  }
+
+  public async listEvents(hookId: string): Promise<string[]> {
+    const result = await this.database.prepare('SELECT event FROM webhook_events WHERE hook_id = ?').bind(hookId).all<{ event: string }>();
+    return (result.results ?? []).map((row) => row.event);
+  }
+
+  public async replaceEvents(hookId: string, events: readonly string[], now: number): Promise<void> {
+    await this.withRetry(
+      () => this.database.prepare('DELETE FROM webhook_events WHERE hook_id = ?').bind(hookId).run(),
+      'replace webhook events',
+    );
+    for (const event of events) {
+      await this.withRetry(
+        () =>
+          this.database
+            .prepare('INSERT OR IGNORE INTO webhook_events (hook_id, event, created_at) VALUES (?, ?, ?)')
+            .bind(hookId, event, now)
+            .run(),
+        'insert webhook event',
+      );
+    }
+  }
+
+  public async deleteEvents(hookId: string): Promise<void> {
+    await this.withRetry(
+      () => this.database.prepare('DELETE FROM webhook_events WHERE hook_id = ?').bind(hookId).run(),
+      'delete webhook events',
     );
   }
 
@@ -116,6 +158,9 @@ class WebhookDAO extends BaseDAO {
           .run(),
       'update repo webhook',
     );
+    if (patch.eventsJson !== undefined) {
+      await this.replaceEvents(id, parseEventsJson(patch.eventsJson), patch.now).catch(() => undefined);
+    }
   }
 
   public async rotateSecret(id: string, repositoryId: string, secret: string, secretSuffix: string, now: number): Promise<void> {
@@ -163,9 +208,18 @@ class WebhookDAO extends BaseDAO {
       () => this.database.prepare('DELETE FROM repo_webhooks WHERE id = ? AND repository_id = ?').bind(id, repositoryId).run(),
       'delete repo webhook',
     );
+    await this.deleteEvents(id).catch(() => undefined);
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {
+    await this.withRetry(
+      () =>
+        this.database
+          .prepare('DELETE FROM webhook_events WHERE hook_id IN (SELECT id FROM repo_webhooks WHERE repository_id = ?)')
+          .bind(repositoryId)
+          .run(),
+      'delete webhook events by repo',
+    ).catch(() => undefined);
     await this.withRetry(
       () => this.database.prepare('DELETE FROM repo_webhooks WHERE repository_id = ?').bind(repositoryId).run(),
       'delete webhooks by repo',

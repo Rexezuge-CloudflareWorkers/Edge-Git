@@ -7,7 +7,7 @@ import type { WebhookDeliveryMetadata, WebhookEventName } from '@edge-git/shared
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 import { buildWebhookPayload, signDelivery, validateWebhookUrl } from './WebhookEvents';
 import { backoffSecondsForAttempt, isRetryableHttpStatus } from './WebhookRetryPolicy';
-import { isHookSubscribed, resolveSenderUsername, toPublicDelivery } from './WebhookDeliveryMapping';
+import { resolveSenderUsername, subscribedEvents, toPublicDelivery } from './WebhookDeliveryMapping';
 
 interface WebhookDeliveryServiceEnv {
   DB: D1Queryable;
@@ -116,7 +116,22 @@ class WebhookDeliveryService {
     try {
       const webhookDAO = await this.deps.webhookDAO();
       const hooks = await webhookDAO.listByRepo(input.repositoryId).catch(() => [] as RepoWebhookRow[]);
-      const matching = hooks.filter((hook) => isHookSubscribed(hook, input.event));
+      const matching: RepoWebhookRow[] = [];
+      for (const hook of hooks) {
+        if (hook.is_active !== 1) continue;
+        // Junction-first subscription check with JSON fallback. Minimal test
+        // fakes without `listEvents` stay on the JSON path via the guard.
+        let subscribed = subscribedEvents(hook);
+        try {
+          if (typeof webhookDAO.listEvents === 'function') {
+            const junction = await webhookDAO.listEvents(hook.id);
+            if (junction.length > 0) subscribed = junction.filter((e): e is WebhookEventName => typeof e === 'string');
+          }
+        } catch {
+          // JSON fallback above.
+        }
+        if (subscribed.includes(input.event)) matching.push(hook);
+      }
       if (matching.length === 0) return { enqueued: 0 };
       const maxBytes = ConfigurationManager.webhooks.getMaxPayloadBytes(this.env);
       const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
