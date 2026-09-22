@@ -6,7 +6,7 @@ export const DEFAULT_UUID = '00000000-0000-0000-0000-000000000000';
 export const DEFAULT_HEX_ID = '00000000000000000000000000000000';
 export const DEFAULT_SECRET_STORE_NAME = 'default';
 export const DEFAULT_KV_NAMESPACE_NAMES: Record<string, string> = {
-  OAUTH2_TOKEN_CACHE: 'edge-git-oauth2-token-cache',
+  CACHE: 'edge-git-cache',
 };
 export const VECTORIZE_DIMENSIONS = 1024;
 

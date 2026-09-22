@@ -1,4 +1,6 @@
 import { Container, memoizeAsync } from '@edge-git/backend-runtime/di';
+import { KvCache } from '@edge-git/backend-runtime/kv';
+import type { KvNamespaceLike } from '@edge-git/backend-runtime/kv';
 import { Tokens } from './tokens';
 import type { RequestKeys, RequestScopeEnv } from './serviceFactory';
 import { bindDaoBindings } from './daoBindings';
@@ -13,6 +15,8 @@ function createRequestScope(env: RequestScopeEnv): Container {
   const scope = new Container();
   scope.bindValue(Tokens.Env, env);
   scope.bindValue(Tokens.Db, env.DB);
+  // Single CACHE binding (absent in tests / legacy deploys → fail-soft cache).
+  scope.bindValue(Tokens.KvCache, new KvCache((env as { CACHE?: KvNamespaceLike }).CACHE ?? null));
 
   const masterKey = memoizeAsync(() => {
     if (!env.AES_ENCRYPTION_KEY_SECRET) throw new Error('AES_ENCRYPTION_KEY_SECRET is not configured for this scope.');
