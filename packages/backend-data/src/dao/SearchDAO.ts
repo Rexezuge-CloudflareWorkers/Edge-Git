@@ -64,6 +64,32 @@ class SearchDAO extends BaseDAO {
     super(database);
   }
 
+  // Template Method helpers shared by the six search domains below: run the
+  // FTS statement, fall back to LIKE, degrade to `[]` on missing schema.
+  private static rowsOrEmpty<T>(result: { results?: T[] } | null | undefined): T[] {
+    return result?.results ?? [];
+  }
+
+  private static throwUnlessMissingSchema(error: unknown, resource: string): void {
+    if (!isMissingSchemaError(error)) {
+      throw new DatabaseError(`Failed to search ${resource}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async runScopedFts<T>(sql: string, params: unknown[]): Promise<T[]> {
+    const result = await this.database.prepare(sql).bind(...params).all<T>();
+    return SearchDAO.rowsOrEmpty(result);
+  }
+
+  private async runScopedLike<T>(sql: string, scopeValue: string | undefined, patterns: unknown[], limit: number): Promise<T[]> {
+    const result = await (
+      scopeValue
+        ? this.database.prepare(sql).bind(scopeValue, ...patterns, limit)
+        : this.database.prepare(sql).bind(...patterns, limit)
+    ).all<T>();
+    return SearchDAO.rowsOrEmpty(result);
+  }
+
   public async searchRepos(query: string, opts: SearchOptions = {}): Promise<RepositoryRow[]> {
     const limit = clampSearchLimit(opts.limit);
     const tokens = tokenizeSearchQuery(query);
@@ -74,7 +100,7 @@ class SearchDAO extends BaseDAO {
         .prepare(`SELECT r.* FROM repo_fts f JOIN repositories r ON r.id = f.repo_id WHERE repo_fts MATCH ? ORDER BY rank LIMIT ?`)
         .bind(ftsQuery, limit)
         .all<RepositoryRow>();
-      return result.results ?? [];
+      return SearchDAO.rowsOrEmpty(result);
     } catch {
       // FTS5 unavailable — LIKE fallback over name/description/full name.
       const likes = buildLikeOrClause(REPO_SEARCH_COLUMNS, tokens.length);
@@ -84,10 +110,9 @@ class SearchDAO extends BaseDAO {
           .prepare(`SELECT * FROM repositories WHERE ${likes} ORDER BY updated_at DESC LIMIT ?`)
           .bind(...params)
           .all<RepositoryRow>();
-        return result.results ?? [];
+        return SearchDAO.rowsOrEmpty(result);
       } catch (error) {
-        if (!isMissingSchemaError(error))
-          throw new DatabaseError(`Failed to search repositories: ${error instanceof Error ? error.message : String(error)}`);
+        SearchDAO.throwUnlessMissingSchema(error, 'repositories');
         return [];
       }
     }
@@ -102,10 +127,8 @@ class SearchDAO extends BaseDAO {
       const base = opts.repoId
         ? `SELECT i.* FROM issue_fts f JOIN issues i ON i.id = f.issue_id WHERE issue_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
         : `SELECT i.* FROM issue_fts f JOIN issues i ON i.id = f.issue_id WHERE issue_fts MATCH ? ORDER BY rank LIMIT ?`;
-      const result = await (
-        opts.repoId ? this.database.prepare(base).bind(ftsQuery, opts.repoId, limit) : this.database.prepare(base).bind(ftsQuery, limit)
-      ).all<IssueRow>();
-      return result.results ?? [];
+      const result = await this.runScopedFts<IssueRow>(base, opts.repoId ? [ftsQuery, opts.repoId, limit] : [ftsQuery, limit]);
+      return result;
     } catch {
       const like = buildScopedLikeStatement({
         table: 'issues',
@@ -118,15 +141,9 @@ class SearchDAO extends BaseDAO {
       });
       const patterns = likeParamsForTokens(tokens, TITLE_BODY_SEARCH_COLUMNS.length);
       try {
-        const result = await (
-          like.scoped
-            ? this.database.prepare(like.text).bind(opts.repoId, ...patterns, limit)
-            : this.database.prepare(like.text).bind(...patterns, limit)
-        ).all<IssueRow>();
-        return result.results ?? [];
+        return await this.runScopedLike<IssueRow>(like.text, like.scoped ? opts.repoId : undefined, patterns, limit);
       } catch (error) {
-        if (!isMissingSchemaError(error))
-          throw new DatabaseError(`Failed to search issues: ${error instanceof Error ? error.message : String(error)}`);
+        SearchDAO.throwUnlessMissingSchema(error, 'issues');
         return [];
       }
     }
@@ -141,10 +158,8 @@ class SearchDAO extends BaseDAO {
       const base = opts.repoId
         ? `SELECT p.* FROM pull_fts f JOIN pull_requests p ON p.id = f.pull_id WHERE pull_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
         : `SELECT p.* FROM pull_fts f JOIN pull_requests p ON p.id = f.pull_id WHERE pull_fts MATCH ? ORDER BY rank LIMIT ?`;
-      const result = await (
-        opts.repoId ? this.database.prepare(base).bind(ftsQuery, opts.repoId, limit) : this.database.prepare(base).bind(ftsQuery, limit)
-      ).all<PullRequestRow>();
-      return result.results ?? [];
+      const result = await this.runScopedFts<PullRequestRow>(base, opts.repoId ? [ftsQuery, opts.repoId, limit] : [ftsQuery, limit]);
+      return result;
     } catch {
       const like = buildScopedLikeStatement({
         table: 'pull_requests',
@@ -157,15 +172,9 @@ class SearchDAO extends BaseDAO {
       });
       const patterns = likeParamsForTokens(tokens, TITLE_BODY_SEARCH_COLUMNS.length);
       try {
-        const result = await (
-          like.scoped
-            ? this.database.prepare(like.text).bind(opts.repoId, ...patterns, limit)
-            : this.database.prepare(like.text).bind(...patterns, limit)
-        ).all<PullRequestRow>();
-        return result.results ?? [];
+        return await this.runScopedLike<PullRequestRow>(like.text, like.scoped ? opts.repoId : undefined, patterns, limit);
       } catch (error) {
-        if (!isMissingSchemaError(error))
-          throw new DatabaseError(`Failed to search pulls: ${error instanceof Error ? error.message : String(error)}`);
+        SearchDAO.throwUnlessMissingSchema(error, 'pulls');
         return [];
       }
     }
@@ -180,10 +189,8 @@ class SearchDAO extends BaseDAO {
       const base = opts.repoId
         ? `SELECT c.* FROM code_fts f JOIN code_index c ON c.repo_id = f.repo_id AND c.path = f.path WHERE code_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
         : `SELECT c.* FROM code_fts f JOIN code_index c ON c.repo_id = f.repo_id AND c.path = f.path WHERE code_fts MATCH ? ORDER BY rank LIMIT ?`;
-      const result = await (
-        opts.repoId ? this.database.prepare(base).bind(ftsQuery, opts.repoId, limit) : this.database.prepare(base).bind(ftsQuery, limit)
-      ).all<CodeHit>();
-      return result.results ?? [];
+      const result = await this.runScopedFts<CodeHit>(base, opts.repoId ? [ftsQuery, opts.repoId, limit] : [ftsQuery, limit]);
+      return result;
     } catch {
       const like = buildScopedLikeStatement({
         table: 'code_index',
@@ -196,21 +203,15 @@ class SearchDAO extends BaseDAO {
       });
       const patterns = likeParamsForTokens(tokens, CODE_SEARCH_COLUMNS.length);
       try {
-        const result = await (
-          like.scoped
-            ? this.database.prepare(like.text).bind(opts.repoId, ...patterns, limit)
-            : this.database.prepare(like.text).bind(...patterns, limit)
-        ).all<CodeHit>();
-        return result.results ?? [];
+        return await this.runScopedLike<CodeHit>(like.text, like.scoped ? opts.repoId : undefined, patterns, limit);
       } catch (error) {
-        if (!isMissingSchemaError(error))
-          throw new DatabaseError(`Failed to search code: ${error instanceof Error ? error.message : String(error)}`);
+        SearchDAO.throwUnlessMissingSchema(error, 'code');
         return [];
       }
     }
   }
 
-  public async upsertCodeFile(input: { repoId: string; path: string; oid: string | null; content: string; now: number }): Promise<number> {
+  public async upsertCodeFile(input: CodeFileInput): Promise<number> {
     try {
       const result = await this.withRetry(
         () => this.database.prepare(UPSERT_CODE_FILE_SQL).bind(input.repoId, input.path, input.oid, input.content, input.now).run(),
@@ -262,10 +263,9 @@ class SearchDAO extends BaseDAO {
   public async getOidsByRepo(repoId: string): Promise<CodeOidEntry[]> {
     try {
       const result = await this.database.prepare('SELECT path, oid FROM code_index WHERE repo_id = ?').bind(repoId).all<CodeOidEntry>();
-      return result.results ?? [];
+      return SearchDAO.rowsOrEmpty(result);
     } catch (error) {
-      if (!isMissingSchemaError(error))
-        throw new DatabaseError(`Failed to list indexed oids: ${error instanceof Error ? error.message : String(error)}`);
+      SearchDAO.throwUnlessMissingSchema(error, 'indexed oids');
       // Fakes/DBs without code search tables.
       return [];
     }
@@ -333,10 +333,8 @@ class SearchDAO extends BaseDAO {
       const base = opts.repoId
         ? `SELECT d.* FROM discussion_fts f JOIN discussions d ON d.id = f.discussion_id WHERE discussion_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
         : `SELECT d.* FROM discussion_fts f JOIN discussions d ON d.id = f.discussion_id WHERE discussion_fts MATCH ? ORDER BY rank LIMIT ?`;
-      const result = await (
-        opts.repoId ? this.database.prepare(base).bind(ftsQuery, opts.repoId, limit) : this.database.prepare(base).bind(ftsQuery, limit)
-      ).all<DiscussionRow>();
-      return result.results ?? [];
+      const result = await this.runScopedFts<DiscussionRow>(base, opts.repoId ? [ftsQuery, opts.repoId, limit] : [ftsQuery, limit]);
+      return result;
     } catch {
       const like = buildScopedLikeStatement({
         table: 'discussions',
@@ -349,15 +347,9 @@ class SearchDAO extends BaseDAO {
       });
       const patterns = likeParamsForTokens(tokens, TITLE_BODY_SEARCH_COLUMNS.length);
       try {
-        const result = await (
-          like.scoped
-            ? this.database.prepare(like.text).bind(opts.repoId, ...patterns, limit)
-            : this.database.prepare(like.text).bind(...patterns, limit)
-        ).all<DiscussionRow>();
-        return result.results ?? [];
+        return await this.runScopedLike<DiscussionRow>(like.text, like.scoped ? opts.repoId : undefined, patterns, limit);
       } catch (error) {
-        if (!isMissingSchemaError(error))
-          throw new DatabaseError(`Failed to search discussions: ${error instanceof Error ? error.message : String(error)}`);
+        SearchDAO.throwUnlessMissingSchema(error, 'discussions');
         return [];
       }
     }
@@ -375,7 +367,7 @@ class SearchDAO extends BaseDAO {
         )
         .bind(ftsQuery, limit)
         .all<SnippetRow>();
-      return result.results ?? [];
+      return SearchDAO.rowsOrEmpty(result);
     } catch {
       const likes = buildLikeOrClause(SNIPPET_SEARCH_COLUMNS, tokens.length);
       const params: unknown[] = likeParamsForTokens(tokens, SNIPPET_SEARCH_COLUMNS.length);
@@ -385,10 +377,9 @@ class SearchDAO extends BaseDAO {
           .prepare(`SELECT * FROM snippets WHERE visibility = 'public' AND ${likes} ORDER BY updated_at DESC LIMIT ?`)
           .bind(...params)
           .all<SnippetRow>();
-        return result.results ?? [];
+        return SearchDAO.rowsOrEmpty(result);
       } catch (error) {
-        if (!isMissingSchemaError(error))
-          throw new DatabaseError(`Failed to search snippets: ${error instanceof Error ? error.message : String(error)}`);
+        SearchDAO.throwUnlessMissingSchema(error, 'snippets');
         return [];
       }
     }

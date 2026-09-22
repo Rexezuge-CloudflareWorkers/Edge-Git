@@ -33,6 +33,55 @@ class CollaborationDAO extends BaseDAO {
     super(database);
   }
 
+  // Generic subject-label/assignee writer shared by the issue/pull mirrors
+  // below (Strategy pattern): one implementation, table names injected.
+  private async setSubjectLabels(subjectId: string, labelIds: string[], tables: { link: string; idColumn: string }): Promise<void> {
+    await this.withRetry(
+      () => this.database.prepare(`DELETE FROM ${tables.link} WHERE ${tables.idColumn} = ?`).bind(subjectId).run(),
+      `clear ${tables.link}`,
+    );
+    for (const labelId of labelIds) {
+      await this.withRetry(
+        () =>
+          this.database
+            .prepare(`INSERT OR IGNORE INTO ${tables.link} (${tables.idColumn}, label_id) VALUES (?, ?)`)
+            .bind(subjectId, labelId)
+            .run(),
+        `set ${tables.link}`,
+      );
+    }
+  }
+
+  private async setSubjectAssignees(
+    subjectId: string,
+    emails: string[],
+    now: number,
+    tables: { link: string; idColumn: string },
+  ): Promise<void> {
+    await this.withRetry(
+      () => this.database.prepare(`DELETE FROM ${tables.link} WHERE ${tables.idColumn} = ?`).bind(subjectId).run(),
+      `clear ${tables.link}`,
+    );
+    for (const email of emails) {
+      await this.withRetry(
+        () =>
+          this.database
+            .prepare(`INSERT OR IGNORE INTO ${tables.link} (${tables.idColumn}, user_email, created_at) VALUES (?, ?, ?)`)
+            .bind(subjectId, email.toLowerCase(), now)
+            .run(),
+        `set ${tables.link}`,
+      );
+    }
+  }
+
+  private async listSubjectAssignees(subjectId: string, tables: { link: string; idColumn: string }): Promise<string[]> {
+    const result = await this.database
+      .prepare(`SELECT user_email AS email FROM ${tables.link} WHERE ${tables.idColumn} = ? ORDER BY user_email ASC`)
+      .bind(subjectId)
+      .all<{ email: string }>();
+    return (result.results ?? []).map((r) => r.email);
+  }
+
   public async createLabel(input: {
     id: string;
     repositoryId: string;
@@ -133,16 +182,7 @@ class CollaborationDAO extends BaseDAO {
   }
 
   public async setIssueLabels(issueId: string, labelIds: string[]): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM issue_labels WHERE issue_id = ?').bind(issueId).run(),
-      'clear issue labels',
-    );
-    for (const labelId of labelIds) {
-      await this.withRetry(
-        () => this.database.prepare('INSERT OR IGNORE INTO issue_labels (issue_id, label_id) VALUES (?, ?)').bind(issueId, labelId).run(),
-        'set issue label',
-      );
-    }
+    await this.setSubjectLabels(issueId, labelIds, { link: 'issue_labels', idColumn: 'issue_id' });
   }
 
   public async listIssueLabels(issueId: string): Promise<LabelRow[]> {
@@ -154,28 +194,11 @@ class CollaborationDAO extends BaseDAO {
   }
 
   public async setIssueAssignees(issueId: string, emails: string[], now: number): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM issue_assignees WHERE issue_id = ?').bind(issueId).run(),
-      'clear issue assignees',
-    );
-    for (const email of emails) {
-      await this.withRetry(
-        () =>
-          this.database
-            .prepare('INSERT OR IGNORE INTO issue_assignees (issue_id, user_email, created_at) VALUES (?, ?, ?)')
-            .bind(issueId, email.toLowerCase(), now)
-            .run(),
-        'set issue assignee',
-      );
-    }
+    await this.setSubjectAssignees(issueId, emails, now, { link: 'issue_assignees', idColumn: 'issue_id' });
   }
 
   public async listIssueAssignees(issueId: string): Promise<string[]> {
-    const result = await this.database
-      .prepare('SELECT user_email AS email FROM issue_assignees WHERE issue_id = ? ORDER BY user_email ASC')
-      .bind(issueId)
-      .all<{ email: string }>();
-    return (result.results ?? []).map((r) => r.email);
+    return this.listSubjectAssignees(issueId, { link: 'issue_assignees', idColumn: 'issue_id' });
   }
 
   public async setIssueMilestone(issueId: string, milestoneId: string | null): Promise<void> {
@@ -186,20 +209,7 @@ class CollaborationDAO extends BaseDAO {
   }
 
   public async setPullLabels(pullRequestId: string, labelIds: string[]): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM pull_labels WHERE pull_request_id = ?').bind(pullRequestId).run(),
-      'clear pull labels',
-    );
-    for (const labelId of labelIds) {
-      await this.withRetry(
-        () =>
-          this.database
-            .prepare('INSERT OR IGNORE INTO pull_labels (pull_request_id, label_id) VALUES (?, ?)')
-            .bind(pullRequestId, labelId)
-            .run(),
-        'set pull label',
-      );
-    }
+    await this.setSubjectLabels(pullRequestId, labelIds, { link: 'pull_labels', idColumn: 'pull_request_id' });
   }
 
   public async listPullLabels(pullRequestId: string): Promise<LabelRow[]> {
@@ -211,28 +221,11 @@ class CollaborationDAO extends BaseDAO {
   }
 
   public async setPullAssignees(pullRequestId: string, emails: string[], now: number): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM pull_assignees WHERE pull_request_id = ?').bind(pullRequestId).run(),
-      'clear pull assignees',
-    );
-    for (const email of emails) {
-      await this.withRetry(
-        () =>
-          this.database
-            .prepare('INSERT OR IGNORE INTO pull_assignees (pull_request_id, user_email, created_at) VALUES (?, ?, ?)')
-            .bind(pullRequestId, email.toLowerCase(), now)
-            .run(),
-        'set pull assignee',
-      );
-    }
+    await this.setSubjectAssignees(pullRequestId, emails, now, { link: 'pull_assignees', idColumn: 'pull_request_id' });
   }
 
   public async listPullAssignees(pullRequestId: string): Promise<string[]> {
-    const result = await this.database
-      .prepare('SELECT user_email AS email FROM pull_assignees WHERE pull_request_id = ? ORDER BY user_email ASC')
-      .bind(pullRequestId)
-      .all<{ email: string }>();
-    return (result.results ?? []).map((r) => r.email);
+    return this.listSubjectAssignees(pullRequestId, { link: 'pull_assignees', idColumn: 'pull_request_id' });
   }
 
   public async setPullMilestone(pullId: string, milestoneId: string | null): Promise<void> {

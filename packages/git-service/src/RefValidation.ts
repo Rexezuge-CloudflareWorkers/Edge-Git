@@ -1,12 +1,8 @@
-// Pure ref-name validation + command classification (Policy pattern).
-//
-// Canonical branch rule lives in `@edge-git/shared/utils` (Layer 0) so
-// `backend-services` never imports `git-service`. This module is the
-// git-side policy facade: OID checks, ref-path builders, and receive-pack
-// command classification shared by `RefService` validate + mutate phases.
+import { ZERO_OID as SHARED_ZERO_OID } from '@edge-git/shared/constants';
+
+export { ZERO_OID } from '@edge-git/shared/constants';
 export { isValidBranchName } from '@edge-git/shared/utils';
 
-const ZERO_OID = '0'.repeat(40);
 const COMMIT_OID_RE = /^[0-9a-f]{40}$/i;
 
 function isCommitOid(value: unknown): value is string {
@@ -14,7 +10,7 @@ function isCommitOid(value: unknown): value is string {
 }
 
 function isZeroOid(value: unknown): boolean {
-  return value === ZERO_OID;
+  return value === SHARED_ZERO_OID;
 }
 
 function branchRefFor(name: string): string {
@@ -28,11 +24,11 @@ interface RefCommand {
 }
 
 function isDeleteCommand(cmd: RefCommand): boolean {
-  return cmd.newOid === ZERO_OID;
+  return cmd.newOid === SHARED_ZERO_OID;
 }
 
 function isCreateCommand(cmd: RefCommand): boolean {
-  return cmd.oldOid === ZERO_OID;
+  return cmd.oldOid === SHARED_ZERO_OID;
 }
 
 function classifyRefCommand(cmd: RefCommand): 'delete' | 'create' | 'update' {
@@ -41,5 +37,5 @@ function classifyRefCommand(cmd: RefCommand): 'delete' | 'create' | 'update' {
   return 'update';
 }
 
-export { ZERO_OID, COMMIT_OID_RE, isCommitOid, isZeroOid, branchRefFor, isDeleteCommand, isCreateCommand, classifyRefCommand };
+export { COMMIT_OID_RE, isCommitOid, isZeroOid, branchRefFor, isDeleteCommand, isCreateCommand, classifyRefCommand };
 export type { RefCommand };

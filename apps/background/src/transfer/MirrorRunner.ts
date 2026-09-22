@@ -1,11 +1,11 @@
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { createLogger } from '@edge-git/backend-runtime/logger';
 import { fetchRemotePack } from '@edge-git/git-protocol';
+import { ZERO_OID } from '@edge-git/shared/constants';
 import { TimestampUtil, repoDoKeyForFullName } from '@edge-git/shared/utils';
 import { workerFetchAdapter } from './fetchAdapter';
 
 const logger = createLogger('MirrorRunner');
-const ZERO_OID = '0'.repeat(40);
 
 interface MirrorStub {
   listRefs(): Promise<{ refs: Array<{ ref: string; oid: string }>; symbolicHead: string | null }>;

@@ -92,15 +92,14 @@ class RepoWorker extends DurableObject<Env> {
     // (rename or case-correction). The old first-writer-wins guard ignored
     // renames and left `ctx.storage.fullName` drifting from D1.
     if (this.fullNameValue === fullName) return;
-    const [owner, ...rest] = fullName.split('/');
-    const name = rest.join('/');
+    const { owner, name } = splitFullName(fullName);
     if (!owner || !name || !RepoFullName.tryParse(owner, name)) throw new Error('Invalid repository full name');
     const previousKey = this.fullNameValue ? repoDoKeyForFullName(this.fullNameValue) : null;
     this.fullNameValue = fullName;
     await this.ctx.storage.put('fullName', fullName);
     // A rename onto this isolate must not serve the previous repo's refs.
     if (previousKey !== null && previousKey !== repoDoKeyForFullName(fullName)) {
-      (this as unknown as { git?: { clearCache?: () => void } }).git?.clearCache?.();
+      this.git.clearCache();
     }
   }
 
@@ -127,8 +126,7 @@ class RepoWorker extends DurableObject<Env> {
     if (pathname === '/ensure' && request.method === 'POST') {
       const body = (await request.json().catch(() => ({}))) as { fullName?: string };
       if (typeof body.fullName === 'string' && body.fullName) {
-        const [owner, ...rest] = body.fullName.split('/');
-        const name = rest.join('/');
+        const { owner, name } = splitFullName(body.fullName);
         if (!owner || !name || !RepoFullName.tryParse(owner, name)) {
           return new Response('Invalid fullName', { status: 400 });
         }
@@ -329,4 +327,10 @@ class RepoWorker extends DurableObject<Env> {
 }
 
 export { RepoWorker };
-export { PackLimitError } from '@edge-git/git-service';
+
+// Single `owner/name[/...]` split shared by `setFullName` and the `/ensure`
+// fetch entrypoint (Value Object construction stays in `RepoFullName`).
+function splitFullName(fullName: string): { owner: string; name: string } {
+  const [owner = '', ...rest] = fullName.split('/');
+  return { owner, name: rest.join('/') };
+}

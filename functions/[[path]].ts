@@ -8,7 +8,7 @@ const FORWARDED_HOST_HEADER = 'X-Forwarded-Host';
 const FORWARDED_PROTO_HEADER = 'X-Forwarded-Proto';
 const FORWARDED_URI_HEADER = 'X-Forwarded-Uri';
 
-export const proxyToApi: PagesFunction<PagesProxyEnv> = async ({ request, env }) => {
+async function proxyToApi({ request, env }: Parameters<PagesFunction<PagesProxyEnv>>[0]): Promise<Response> {
   const originalUrl: URL = new URL(request.url);
 
   const headers: Headers = new Headers(request.headers);
@@ -29,6 +29,6 @@ export const proxyToApi: PagesFunction<PagesProxyEnv> = async ({ request, env })
   });
 
   return env.API_WORKER.fetch(proxyRequest);
-};
+}
 
 export const onRequest: PagesFunction<PagesProxyEnv> = proxyToApi;
