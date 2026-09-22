@@ -165,7 +165,34 @@ class UserService {
     let taken = false;
     try {
       const nsDao = await this.deps.namespaceDAO();
-      taken = await nsDao.isTaken(handleCi);
+      let selfOwned = false;
+      let otherOwned = false;
+      try {
+        if (typeof nsDao.get === 'function') {
+          const row = await nsDao.get(handleCi);
+          if (row) {
+            if (row.kind === 'user' && row.user_email?.toLowerCase() === normalized) {
+              selfOwned = true;
+            } else {
+              otherOwned = true;
+            }
+          }
+        }
+      } catch {
+        // get failed (legacy DB) — fall through to isTaken below.
+      }
+      if (otherOwned) {
+        taken = true;
+      } else if (!selfOwned) {
+        try {
+          taken = await nsDao.isTaken(handleCi);
+        } catch {
+          taken = false;
+        }
+      }
+      // selfOwned → taken stays false so the owner can reclaim a
+      // previously renamed-away handle; the users/orgs check below still
+      // blocks if another account actively holds the handle.
     } catch {
       taken = false;
     }
@@ -173,7 +200,8 @@ class UserService {
       try {
         const orgDao = await this.deps.organizationDAO();
         const [userMatch, orgMatch] = await Promise.all([dao.getByUsernameCi(handleCi), orgDao.getByUsernameCi(handleCi)]);
-        taken = Boolean(userMatch ?? orgMatch);
+        const userTaken = Boolean(userMatch && userMatch.email.toLowerCase() !== normalized);
+        taken = Boolean(userTaken || orgMatch);
       } catch {
         // ignore
       }
@@ -230,9 +258,10 @@ class UserService {
     }
     // Hardening: old names stay reserved (no immediate release) so a
     // concurrent attacker cannot hijack the freed handle in the window
-    // between D1 rename and DO move. BREAKING: renamed-away handles remain
-    // taken. A future tombstone/GC migration can free them after a grace
-    // period; until then rollback (rename back) always succeeds as self.
+    // between D1 rename and DO move. Renamed-away handles remain taken
+    // for other accounts, but the owning email may reclaim them (rename
+    // back / rollback after a failed DO move). A future tombstone/GC
+    // migration can free them after a grace period.
     // Simple rename: cascade owner on user-owned repos (plus denormalized
     // `full_name` sidecars).
     if (oldCi) {
