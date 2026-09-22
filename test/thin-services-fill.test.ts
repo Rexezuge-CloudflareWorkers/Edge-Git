@@ -824,7 +824,7 @@ describe('UserService rename', () => {
     db.namespaces.push({ username_ci: 'alice', kind: 'user', user_email: 'alice@example.com', org_id: null, created_at: 1 });
   }
 
-  it('renames and keeps the old name reserved', async () => {
+  it('renames, reserves the old name for others, and allows self reclaim', async () => {
     const db = createFakeDb();
     seedAlice(db);
     db.repositories.push({
@@ -840,14 +840,21 @@ describe('UserService rename', () => {
     const svc = new UserService({ DB: db });
     const renamed = await svc.renameUsername('alice@example.com', 'Alice2');
     expect(renamed).toEqual({ email: 'alice@example.com', username: 'Alice2' });
-    // Old handle stays reserved: the namespace row is never released, so
-    // renaming (back) onto it reports taken instead of hijacking the handle.
+    // Old handle stays reserved: the namespace row is never released.
     expect(db.namespaces.some((n) => n.username_ci === 'alice')).toBe(true);
-    await expect(svc.renameUsername('alice@example.com', 'alice')).rejects.toThrow('already taken');
     // Owner cascade follows the rename.
     expect(db.repositories[0].owner).toBe('Alice2');
+    // A different account cannot hijack the renamed-away handle.
+    db.users.push({ email: 'bob@x.co', created_at: 1, username: 'bob', updated_at: 1 });
+    const bobSvc = new UserService({ DB: db });
+    await expect(bobSvc.renameUsername('bob@x.co', 'alice')).rejects.toThrow('already taken');
+    // The owning email can reclaim it (rename back).
+    await expect(svc.renameUsername('alice@example.com', 'alice')).resolves.toEqual({
+      email: 'alice@example.com',
+      username: 'alice',
+    });
     // Same-handle rename is a no-op returning the stored row.
-    await expect(svc.renameUsername('alice@example.com', 'ALICE2')).resolves.toMatchObject({ username: 'Alice2' });
+    await expect(svc.renameUsername('alice@example.com', 'ALICE')).resolves.toMatchObject({ username: 'alice' });
   });
 
   it('reclaims a self-owned namespace when the claim races', async () => {
