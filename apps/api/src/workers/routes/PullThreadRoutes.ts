@@ -1,4 +1,4 @@
-import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo, getScope } from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoFullName } from '@edge-git/shared/utils';
@@ -22,7 +22,7 @@ function registerPullThreadRoutes(app: PullApp): void {
       const number = parsePullNumber(c.req.param('number'));
       if (number === null) return jsonError(c, 'Not found', 404);
       try {
-        const scope = createRequestScope(c.env);
+        const scope = getScope(c);
         const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
         const threads = await scope.get(Tokens.PullThreadService).listThreads(pull.id);
         return c.json({ threads: await presentThreads(scope, threads as unknown[]) });
@@ -43,7 +43,7 @@ function registerUserPullThreadRoutes(app: PullApp): void {
     const number = parsePullNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
       const threads = await scope.get(Tokens.PullThreadService).listThreads(pull.id);
       return c.json({ threads: await presentThreads(scope, threads as unknown[]) });
@@ -70,7 +70,7 @@ function registerUserPullThreadRoutes(app: PullApp): void {
     }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
       const thread = await scope.get(Tokens.PullThreadService).openThread({
         pullRequestId: pull.id,
@@ -110,7 +110,7 @@ function registerUserPullThreadRoutes(app: PullApp): void {
     const { malformed, body } = await readJsonBody<{ body?: string }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
       const comment = await scope.get(Tokens.PullThreadService).replyThread({
         pullRequestId: pull.id,
@@ -148,7 +148,7 @@ function registerUserPullThreadRoutes(app: PullApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.resolved !== 'boolean') return jsonError(c, 'resolved must be a boolean', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
       const threads = await scope.get(Tokens.PullThreadService).listThreads(pull.id);
       const thread = threads.find((t) => t.id === c.req.param('threadId'));
@@ -181,7 +181,7 @@ function registerUserPullThreadRoutes(app: PullApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
-      await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
+      await getScope(c).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
       return jsonError(c, 'Forbidden', 403);
     }
@@ -190,7 +190,7 @@ function registerUserPullThreadRoutes(app: PullApp): void {
     const { malformed, body } = await readJsonBody<{ reason?: string }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const review = await scope.get(Tokens.PullRequestService).dismissReview({
         repositoryId: row.id,
         number,

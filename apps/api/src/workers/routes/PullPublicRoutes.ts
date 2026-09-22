@@ -1,6 +1,6 @@
 import { getRepoStub } from '../doStubs';
-import { jsonError, resolvePublicViewer, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
-import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { jsonError, resolvePublicViewer, toSafeErrorMessage, toServiceStatus, withPublicRepo, getScope } from './PublicViewerResolver';
+import { Tokens } from '@edge-git/backend-services/composition';
 import { ensureHeadObjects, getCrossRepoPreview, isPackLimitError, resolveHeadRepo } from './CrossFork';
 import { parsePullNumber } from './PullShared';
 import { presentMany, presentSingle } from './IdentityPresenter';
@@ -9,7 +9,7 @@ import type { MergePreviewShape, PullApp } from './PullShared';
 function registerPullRoutes(app: PullApp): void {
   app.get('/repos/:owner/:repo/pulls', async (c) => {
     return withPublicRepo(c, async (row) => {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const label = c.req.query('label');
       const q = (c.req.query('q') ?? '').trim();
       let pulls = q
@@ -39,7 +39,7 @@ function registerPullRoutes(app: PullApp): void {
       const number = parsePullNumber(c.req.param('number'));
       if (number === null) return jsonError(c, 'Not found', 404);
       try {
-        const scope = createRequestScope(c.env);
+        const scope = getScope(c);
         const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
         return c.json({ pull: await presentSingle(scope, pull) });
       } catch (error) {
@@ -53,7 +53,7 @@ function registerPullRoutes(app: PullApp): void {
       const number = parsePullNumber(c.req.param('number'));
       if (number === null) return jsonError(c, 'Not found', 404);
       try {
-        const scope = createRequestScope(c.env);
+        const scope = getScope(c);
         const comments = await scope.get(Tokens.PullRequestService).listComments(row.id, number);
         return c.json({ comments: await presentMany(scope, comments) });
       } catch (error) {
@@ -67,7 +67,7 @@ function registerPullRoutes(app: PullApp): void {
       const number = parsePullNumber(c.req.param('number'));
       if (number === null) return jsonError(c, 'Not found', 404);
       try {
-        const scope = createRequestScope(c.env);
+        const scope = getScope(c);
         const reviews = await scope.get(Tokens.PullRequestService).listReviews(row.id, number);
         return c.json({ reviews: await presentMany(scope, reviews) });
       } catch (error) {
@@ -81,13 +81,13 @@ function registerPullRoutes(app: PullApp): void {
       const number = parsePullNumber(c.req.param('number'));
       if (number === null) return jsonError(c, 'Not found', 404);
       try {
-        const pull = await createRequestScope(c.env).get(Tokens.PullRequestService).getByNumber(row.id, number);
+        const pull = await getScope(c).get(Tokens.PullRequestService).getByNumber(row.id, number);
         if (!pull.head_oid) return jsonError(c, 'Pull request has no head commit', 400);
         const head = await resolveHeadRepo(c.env, pull);
         if (head) {
           // A private fork's diff must not leak through a public base repo.
           const viewerEmail = await resolvePublicViewer(c);
-          const headRole = await createRequestScope(c.env)
+          const headRole = await getScope(c)
             .get(Tokens.PermissionService)
             .getRole(viewerEmail, head.row)
             .catch(() => null);
@@ -112,11 +112,11 @@ function registerPullRoutes(app: PullApp): void {
       const number = parsePullNumber(c.req.param('number'));
       if (number === null) return jsonError(c, 'Not found', 404);
       try {
-        const pull = await createRequestScope(c.env).get(Tokens.PullRequestService).getByNumber(row.id, number);
+        const pull = await getScope(c).get(Tokens.PullRequestService).getByNumber(row.id, number);
         const head = await resolveHeadRepo(c.env, pull);
         if (head) {
           const viewerEmail = await resolvePublicViewer(c);
-          const headRole = await createRequestScope(c.env)
+          const headRole = await getScope(c)
             .get(Tokens.PermissionService)
             .getRole(viewerEmail, head.row)
             .catch(() => null);

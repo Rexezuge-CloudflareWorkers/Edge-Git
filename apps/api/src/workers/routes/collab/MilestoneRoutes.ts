@@ -1,7 +1,7 @@
-import { jsonError, withPublicRepo } from '../PublicViewerResolver';
+import { jsonError, withPublicRepo, getScope } from '../PublicViewerResolver';
 import { toSafeErrorMessage, toServiceStatus } from '../PublicViewerResolver';
 import { requireVisibleRepo } from '../PublicViewerResolver';
-import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { Tokens } from '@edge-git/backend-services/composition';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { needWrite, resolveRepoRow } from './CollabHelpers';
 import type { CollabApp } from './CollabHelpers';
@@ -11,7 +11,7 @@ function registerCollabMilestonePublicRoutes(app: CollabApp): void {
   app.get('/repos/:owner/:repo/milestones', async (c) => {
     return withPublicRepo(c, async (row) => {
       try {
-        const milestones = await createRequestScope(c.env).get(Tokens.CollaborationService).listMilestones(row.id);
+        const milestones = await getScope(c).get(Tokens.CollaborationService).listMilestones(row.id);
         return c.json({ milestones });
       } catch {
         return c.json({ milestones: [] });
@@ -25,7 +25,7 @@ function registerCollabMilestoneUserRoutes(app: CollabApp): void {
     const found = await resolveRepoRow(c.env, c.req.param('owner'), c.req.param('repo'), c.get('AuthenticatedUserEmailAddress'));
     if (!found) return jsonError(c, 'Not found', 404);
     try {
-      const milestones = await createRequestScope(c.env).get(Tokens.CollaborationService).listMilestones(found.row.id);
+      const milestones = await getScope(c).get(Tokens.CollaborationService).listMilestones(found.row.id);
       return c.json({ milestones });
     } catch {
       return c.json({ milestones: [] });
@@ -43,7 +43,7 @@ function registerCollabMilestoneUserRoutes(app: CollabApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (!body.title?.trim()) return jsonError(c, 'title is required', 400);
     try {
-      const created = await createRequestScope(c.env)
+      const created = await getScope(c)
         .get(Tokens.CollaborationService)
         .createMilestone(row.id, body as { title: string });
       return c.json(created, 201);
@@ -62,7 +62,7 @@ function registerCollabMilestoneUserRoutes(app: CollabApp): void {
     const { malformed, body } = await readJsonBody<{ status?: string }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      await createRequestScope(c.env).get(Tokens.CollaborationService).updateMilestone(row.id, c.req.param('id'), body);
+      await getScope(c).get(Tokens.CollaborationService).updateMilestone(row.id, c.req.param('id'), body);
       return c.json({ ok: true });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to update milestone'), toServiceStatus(error));
@@ -77,7 +77,7 @@ function registerCollabMilestoneUserRoutes(app: CollabApp): void {
     if (!row) return jsonError(c, 'Not found', 404);
     if (!(await needWrite(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
     try {
-      await createRequestScope(c.env).get(Tokens.CollaborationService).deleteMilestone(row.id, c.req.param('id'));
+      await getScope(c).get(Tokens.CollaborationService).deleteMilestone(row.id, c.req.param('id'));
       return c.json({ ok: true });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));

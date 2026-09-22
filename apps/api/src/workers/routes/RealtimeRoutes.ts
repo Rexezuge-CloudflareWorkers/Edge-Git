@@ -1,12 +1,12 @@
 import type { Hono } from 'hono';
-import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { Tokens } from '@edge-git/backend-services/composition';
 import { RealtimeService } from '@edge-git/backend-services/realtime';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { isShard } from '@edge-git/shared/realtime';
 import { repoNameSchema, usernameSchema } from '@edge-git/shared/validation';
 import { getRealtimeStub } from '../doStubs';
-import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type RealtimeApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -62,7 +62,7 @@ function registerRealtimeUserRoutes(app: RealtimeApp): void {
     }
     let grant;
     try {
-      grant = await createRequestScope(c.env)
+      grant = await getScope(c)
         .get(Tokens.RealtimeService)
         .authorizeRepoChannels({
           viewerEmail: email,
@@ -87,7 +87,7 @@ function registerRealtimeUserRoutes(app: RealtimeApp): void {
     if (realtimeDisabled(c.env)) return jsonError(c, 'Realtime is disabled', 503);
     try {
       const hash = await RealtimeService.inboxHashForEmail(email);
-      const grant = createRequestScope(c.env).get(Tokens.RealtimeService).inboxSubscription(hash);
+      const grant = getScope(c).get(Tokens.RealtimeService).inboxSubscription(hash);
       const issued = await getRealtimeStub(c.env, grant.shard).issueTicket({ shard: grant.shard, channels: grant.channels, viewer: email });
       if ('error' in issued) return jsonError(c, 'Unavailable', 503);
       return c.json({ shard: grant.shard, ticket: issued.ticket, expiresAt: issued.expiresAt, channels: grant.channels });

@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
-import { jsonError } from './PublicViewerResolver';
-import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { jsonError, getScope } from './PublicViewerResolver';
+import { Tokens } from '@edge-git/backend-services/composition';
 import { usernameFor, usernameMap } from './IdentityPresenter';
 
 type NotificationApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -21,7 +21,7 @@ function registerUserNotificationRoutes(app: NotificationApp): void {
     const unreadOnly = url.searchParams.get('unreadOnly') === '1' || url.searchParams.get('unreadOnly') === 'true';
     const limit = parsePositiveInt(url.searchParams.get('limit'), 30, 100);
     const cursor = url.searchParams.get('cursor') ?? undefined;
-    const scope = createRequestScope(c.env);
+    const scope = getScope(c);
     const [{ notifications, nextCursor }, unreadCount] = await Promise.all([
       scope.get(Tokens.NotificationService).listByUser(email, limit, cursor, unreadOnly),
       scope.get(Tokens.NotificationService).unreadCount(email),
@@ -37,20 +37,20 @@ function registerUserNotificationRoutes(app: NotificationApp): void {
 
   app.get('/user/notifications/unread-count', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const unreadCount = await createRequestScope(c.env).get(Tokens.NotificationService).unreadCount(email);
+    const unreadCount = await getScope(c).get(Tokens.NotificationService).unreadCount(email);
     return c.json({ unreadCount });
   });
 
   app.patch('/user/notifications/:id/read', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const ok = await createRequestScope(c.env).get(Tokens.NotificationService).markRead(c.req.param('id'), email);
+    const ok = await getScope(c).get(Tokens.NotificationService).markRead(c.req.param('id'), email);
     if (!ok) return jsonError(c, 'Not found', 404);
     return c.json({ ok: true });
   });
 
   app.post('/user/notifications/read-all', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const marked = await createRequestScope(c.env).get(Tokens.NotificationService).markAllRead(email);
+    const marked = await getScope(c).get(Tokens.NotificationService).markAllRead(email);
     return c.json({ ok: true, marked });
   });
 }

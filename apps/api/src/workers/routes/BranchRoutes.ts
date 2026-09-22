@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 import { getRepoStub } from '../doStubs';
-import { jsonError, requireVisibleRepo, toErrorBody, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, toErrorBody, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { readJsonBody } from './BodyParser';
@@ -71,7 +71,7 @@ function registerBranchRoutes(app: RepoApp): void {
       if (!gate.ok) return jsonError(c, gate.status === 404 ? 'Not found' : 'Forbidden', gate.status);
       // Branch protection applies to everyone including admins: delete the
       // rule first, then the branch.
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const row = await scope.get(Tokens.RepoService).getByOwnerAndName(owner, repoName);
       if (row) {
         const rule = await scope
@@ -101,7 +101,7 @@ function registerBranchRoutes(app: RepoApp): void {
       const row = await requireVisibleRepo(c.env, owner, repoName, email);
       if (!row) return jsonError(c, 'Not found', 404);
       try {
-        await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
+        await getScope(c).get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       } catch {
         return jsonError(c, 'Forbidden', 403);
       }

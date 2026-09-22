@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
 import { ensureRepo, getRepoStub } from '../doStubs';
-import { jsonError, requireVisibleRepo, resolvePublicViewer, toRepoJson, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
-import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { jsonError, requireVisibleRepo, resolvePublicViewer, toRepoJson, toSafeErrorMessage, toServiceStatus, withPublicRepo, getScope } from './PublicViewerResolver';
+import { Tokens } from '@edge-git/backend-services/composition';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { copyRepoGit, isPackLimitError } from './CrossFork';
 import { recordAndNotify } from './SocialEmit';
@@ -19,7 +19,7 @@ function toForkJson(row: Parameters<typeof toRepoJson>[0], forksCount?: number):
 function registerForkRoutes(app: ForkApp): void {
   app.get('/repos/:owner/:repo/forks', async (c) => {
     return withPublicRepo(c, async (row) => {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const viewerEmail = await resolvePublicViewer(c);
       const permission = scope.get(Tokens.PermissionService);
       const forks = await scope.get(Tokens.ForkService).listForks(row.id, 100);
@@ -47,7 +47,7 @@ function registerUserForkRoutes(app: ForkApp): void {
       isPrivate?: boolean;
     }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
-    const scope = createRequestScope(c.env);
+    const scope = getScope(c);
     let fork: { id: string; owner: string; name: string; fullName: string; isPrivate: boolean };
     try {
       fork = await scope.get(Tokens.ForkService).createForkRow(email, owner, repoName, body);
@@ -101,7 +101,7 @@ function registerUserForkRoutes(app: ForkApp): void {
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
-    const scope = createRequestScope(c.env);
+    const scope = getScope(c);
     const permission = scope.get(Tokens.PermissionService);
     const forks = await scope.get(Tokens.ForkService).listForks(row.id, 100);
     const visible = [];

@@ -1,9 +1,9 @@
 import type { Hono } from 'hono';
-import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { Tokens } from '@edge-git/backend-services/composition';
 import { presentSingle } from './IdentityPresenter';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { runMirrorSync } from '@edge-git/background/transfer/MirrorRunner';
-import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type MirrorApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -28,7 +28,7 @@ function registerMirrorRoutes(app: MirrorApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'read');
       const mirror = await scope.get(Tokens.MirrorService).getForRepo(repo.id);
       if (!mirror) return jsonError(c, 'No mirror configured', 404);
@@ -47,7 +47,7 @@ function registerMirrorRoutes(app: MirrorApp): void {
     if (typeof body.sourceUrl !== 'string' || !body.sourceUrl.trim()) return jsonError(c, 'sourceUrl is required', 400);
     if (typeof body.intervalMinutes !== 'number') return jsonError(c, 'intervalMinutes is required', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       const mirror = await scope.get(Tokens.MirrorService).configure(repo.id, body.sourceUrl, body.intervalMinutes, email);
       return c.json({ mirror: await presentSingle(scope, mirror) });
@@ -61,7 +61,7 @@ function registerMirrorRoutes(app: MirrorApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       const mirror = await scope.get(Tokens.MirrorService).getForRepo(repo.id);
       if (!mirror) return jsonError(c, 'No mirror configured', 404);
@@ -87,7 +87,7 @@ function registerMirrorRoutes(app: MirrorApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.enabled !== 'boolean') return jsonError(c, 'enabled is required', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       const mirror = await scope.get(Tokens.MirrorService).setEnabled(repo.id, body.enabled);
       return c.json({ mirror: await presentSingle(scope, mirror) });
@@ -101,7 +101,7 @@ function registerMirrorRoutes(app: MirrorApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       await scope.get(Tokens.MirrorService).remove(repo.id);
       return c.json({ ok: true });

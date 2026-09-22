@@ -1,8 +1,8 @@
 import { getRepoStub } from '../doStubs';
-import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
 import { triggerRequiredChecks } from './TriggerChecks';
-import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { Tokens } from '@edge-git/backend-services/composition';
 import { PullRequestService } from '@edge-git/backend-services/pull';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { openCrossForkPull } from './PullMergeRoutes';
@@ -59,7 +59,7 @@ function registerUserPullWriteRoutes(app: PullApp): void {
         body: body.body ?? null,
       });
       if (result.status === 201) {
-        const scope = createRequestScope(c.env);
+        const scope = getScope(c);
         return c.json(await presentSingle(scope, result.body as Record<string, unknown>), result.status);
       }
       return c.json(result.body, result.status);
@@ -75,7 +75,7 @@ function registerUserPullWriteRoutes(app: PullApp): void {
     }
     if (!preview?.baseOid || !preview?.headOid) return jsonError(c, 'base or head branch not found', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const created = await scope.get(Tokens.PullRequestService).createPull({
         repositoryId: row.id,
         fullName,
@@ -138,7 +138,7 @@ function registerUserPullWriteRoutes(app: PullApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
-      await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
+      await getScope(c).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
       return jsonError(c, 'Forbidden', 403);
     }
@@ -147,7 +147,7 @@ function registerUserPullWriteRoutes(app: PullApp): void {
     const { malformed, body } = await readJsonBody<{ status?: string }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const pull = await scope
         .get(Tokens.PullRequestService)
         .updateStatus({ repositoryId: row.id, number, status: body.status ?? '' });
@@ -180,7 +180,7 @@ function registerUserPullWriteRoutes(app: PullApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.body !== 'string' || !body.body.trim()) return jsonError(c, 'body is required', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
       const comment = await scope.get(Tokens.PullRequestService).addComment({
         repositoryId: row.id,
@@ -218,7 +218,7 @@ function registerUserPullWriteRoutes(app: PullApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.state !== 'string') return jsonError(c, 'state is required', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
       const review = await scope.get(Tokens.PullRequestService).addReview({
         repositoryId: row.id,

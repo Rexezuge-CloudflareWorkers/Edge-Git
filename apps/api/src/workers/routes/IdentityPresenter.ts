@@ -7,11 +7,10 @@ type Scope = ReturnType<typeof createRequestScope>;
 async function usernameMap(scope: Scope, emails: Array<string | null | undefined>): Promise<Map<string, string>> {
   const cleaned = emails.filter((e): e is string => typeof e === 'string' && e.length > 0);
   if (cleaned.length === 0) return new Map();
-  try {
-    return await scope.get(Tokens.IdentityResolver).resolveUsernames(cleaned);
-  } catch {
-    return new Map();
-  }
+  // Fail closed on outage: propagate instead of returning an empty map that
+  // would misattribute every author to `ghost`. Callers surface 500 via
+  // BaseRoute so an identity outage never rewrites history attribution.
+  return scope.get(Tokens.IdentityResolver).resolveUsernames(cleaned);
 }
 
 function usernameFor(map: Map<string, string>, email: string | null | undefined): string {
@@ -133,19 +132,32 @@ function presentOne(row: Record<string, unknown>, map: Map<string, string>): Rec
   if (typeof out['createdBy'] === 'string' && out['createdBy'].includes('@')) {
     out['createdBy'] = usernameFor(map, out['createdBy']);
   }
-  delete out['granted_by'];
+  // Preserve attribution: map to camelCase username instead of dropping.
+  if ('granted_by' in out) {
+    const v = out['granted_by'];
+    out['grantedBy'] = typeof v === 'string' && v ? usernameFor(map, v) : null;
+    delete out['granted_by'];
+  }
   if ('user_email' in out) {
-    // Member/collaborator lists map to `username`; notification recipient rows
-    // drop it (caller is the recipient).
+    // Member/collaborator lists map to `username`. Rows without a `role`
+    // (e.g. reviewer/triage lists) still expose `username` so callers do not
+    // need per-route workarounds; notification recipient rows keep the
+    // username as well since the viewer already knows the recipient set.
     const v = out['user_email'];
-    if (typeof v === 'string' && 'role' in out) {
+    if (typeof v === 'string' && v) {
       out['username'] = usernameFor(map, v);
     }
     delete out['user_email'];
   }
-  // Nested thread/discussion comments carry their own `author_email`.
-  if (Array.isArray(out['comments'])) {
-    out['comments'] = (out['comments'] as Array<Record<string, unknown>>).map((n) => presentOne({ ...n }, map));
+  // Nested thread/discussion/review collections carry their own `*_email`
+  // fields. Recurse into every known container so raw emails never leak in
+  // nested JSON (previously only `comments` was redacted).
+  for (const key of ['comments', 'reviews', 'threads', 'discussions', 'replies', 'children'] as const) {
+    if (Array.isArray(out[key])) {
+      out[key] = (out[key] as Array<unknown>).map((n) =>
+        n && typeof n === 'object' ? presentOne({ ...(n as Record<string, unknown>) }, map) : n,
+      );
+    }
   }
   return out;
 }

@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
-import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { Tokens } from '@edge-git/backend-services/composition';
 import { RepoFullName } from '@edge-git/shared/utils';
-import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type TeamApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -24,7 +24,7 @@ function registerTeamRoutes(app: TeamApp): void {
   app.get('/user/orgs/:org/teams', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     try {
-      const teams = await createRequestScope(c.env).get(Tokens.TeamService).listTeams(c.req.param('org'), email);
+      const teams = await getScope(c).get(Tokens.TeamService).listTeams(c.req.param('org'), email);
       return c.json({ teams: teams.map(teamJson) });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
@@ -37,7 +37,7 @@ function registerTeamRoutes(app: TeamApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (!body.slug) return jsonError(c, 'slug is required', 400);
     try {
-      const team = await createRequestScope(c.env)
+      const team = await getScope(c)
         .get(Tokens.TeamService)
         .createTeam(c.req.param('org'), email, body as { slug: string });
       return c.json(teamJson(team), 201);
@@ -49,7 +49,7 @@ function registerTeamRoutes(app: TeamApp): void {
   app.get('/user/orgs/:org/teams/:team', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { team } = await scope.get(Tokens.TeamService).requireTeam(c.req.param('org'), c.req.param('team'));
       await scope.get(Tokens.OrganizationService).requireMember(c.req.param('org'), email);
       return c.json(teamJson(team));
@@ -63,7 +63,7 @@ function registerTeamRoutes(app: TeamApp): void {
     const { malformed, body } = await readJsonBody<{ slug?: string; name?: string; description?: string | null }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const team = await createRequestScope(c.env).get(Tokens.TeamService).renameTeam(c.req.param('org'), c.req.param('team'), email, body);
+      const team = await getScope(c).get(Tokens.TeamService).renameTeam(c.req.param('org'), c.req.param('team'), email, body);
       return c.json(teamJson(team));
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
@@ -73,7 +73,7 @@ function registerTeamRoutes(app: TeamApp): void {
   app.delete('/user/orgs/:org/teams/:team', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     try {
-      await createRequestScope(c.env).get(Tokens.TeamService).deleteTeam(c.req.param('org'), c.req.param('team'), email);
+      await getScope(c).get(Tokens.TeamService).deleteTeam(c.req.param('org'), c.req.param('team'), email);
       return c.json({ ok: true });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
@@ -83,7 +83,7 @@ function registerTeamRoutes(app: TeamApp): void {
   app.get('/user/orgs/:org/teams/:team/members', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     try {
-      const members = await createRequestScope(c.env).get(Tokens.TeamService).listMembers(c.req.param('org'), c.req.param('team'), email);
+      const members = await getScope(c).get(Tokens.TeamService).listMembers(c.req.param('org'), c.req.param('team'), email);
       return c.json({ members });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));
@@ -99,7 +99,7 @@ function registerTeamRoutes(app: TeamApp): void {
     const role = body.role ?? 'member';
     if (role !== 'admin' && role !== 'member') return jsonError(c, 'Invalid role', 400);
     try {
-      await createRequestScope(c.env).get(Tokens.TeamService).addMember(c.req.param('org'), c.req.param('team'), email, target, role);
+      await getScope(c).get(Tokens.TeamService).addMember(c.req.param('org'), c.req.param('team'), email, target, role);
       return c.json({ ok: true }, 201);
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
@@ -112,7 +112,7 @@ function registerTeamRoutes(app: TeamApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (body.role !== 'admin' && body.role !== 'member') return jsonError(c, 'Invalid role', 400);
     try {
-      await createRequestScope(c.env)
+      await getScope(c)
         .get(Tokens.TeamService)
         .setMemberRole(c.req.param('org'), c.req.param('team'), email, decodeURIComponent(c.req.param('member')), body.role);
       return c.json({ ok: true });
@@ -124,7 +124,7 @@ function registerTeamRoutes(app: TeamApp): void {
   app.delete('/user/orgs/:org/teams/:team/members/:member', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     try {
-      await createRequestScope(c.env)
+      await getScope(c)
         .get(Tokens.TeamService)
         .removeMember(c.req.param('org'), c.req.param('team'), email, decodeURIComponent(c.req.param('member')));
       return c.json({ ok: true });
@@ -136,7 +136,7 @@ function registerTeamRoutes(app: TeamApp): void {
   app.get('/user/orgs/:org/teams/:team/repos', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const grants = await scope.get(Tokens.TeamService).listGrants(c.req.param('org'), c.req.param('team'), email);
       const repos: Array<{ repoId: string; fullName: string | null; role: string }> = [];
       for (const g of grants) {
@@ -162,7 +162,7 @@ function registerTeamRoutes(app: TeamApp): void {
     const role = body.role ?? 'read';
     if (role !== 'admin' && role !== 'write' && role !== 'read') return jsonError(c, 'Invalid role', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const repo = await scope
         .get(Tokens.RepoService)
         .getByOwnerAndName(c.req.param('owner'), RepoFullName.normalizeRepo(c.req.param('repo')));
@@ -177,7 +177,7 @@ function registerTeamRoutes(app: TeamApp): void {
   app.delete('/user/orgs/:org/teams/:team/repos/:owner/:repo', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const repo = await scope
         .get(Tokens.RepoService)
         .getByOwnerAndName(c.req.param('owner'), RepoFullName.normalizeRepo(c.req.param('repo')));

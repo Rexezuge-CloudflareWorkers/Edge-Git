@@ -1,4 +1,4 @@
-import { jsonError, toSafeErrorMessage, toServiceStatus } from '../PublicViewerResolver';
+import { jsonError, toSafeErrorMessage, toServiceStatus, getScope } from '../PublicViewerResolver';
 import { requireVisibleRepo } from '../PublicViewerResolver';
 import { recordAndNotify } from '../SocialEmit';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
@@ -18,8 +18,9 @@ async function presentAssignees(scope: RequestScope, emails: unknown[]): Promise
   return cleaned.map((e) => usernameFor(map, e));
 }
 
-// Reviewer rows carry `user_email` (no `role` key, so `presentMany` would
-// just drop it); map to `username` explicitly.
+// Reviewer rows carry `user_email` (no `role` key). `presentOne` now maps
+// those to `username` as well; this helper stays as the explicit path for
+// reviewer lists so the mapping is covered even if row shapes drift.
 async function presentReviewers(
   scope: RequestScope,
   rows: Array<Record<string, unknown>>,
@@ -44,7 +45,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
     const number = parseNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
       let meta = { labels: [], assignees: [], reviewers: [] } as { labels: unknown[]; assignees: unknown[]; reviewers: unknown[] };
       try {
@@ -76,7 +77,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
       const { malformed, body } = await readJsonBody<{ labelIds?: string[]; assignees?: string[]; milestoneId?: string | null }>(c);
       if (malformed) return jsonError(c, 'Invalid JSON body', 400);
       try {
-        const scope = createRequestScope(c.env);
+        const scope = getScope(c);
         const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
         const collab = scope.get(Tokens.CollaborationService);
         if (kind === 'labels') await collab.setPullLabels(pull.id, row.id, body.labelIds ?? []);
@@ -98,7 +99,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
     const number = parseNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
       const reviewers = await scope
         .get(Tokens.CollaborationService)
@@ -122,7 +123,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
     const { malformed, body } = await readJsonBody<{ reviewers?: string[] }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
       await scope.get(Tokens.CollaborationService).requestReviewers(pull.id, body.reviewers ?? []);
       await recordAndNotify(c.env, {
@@ -152,7 +153,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
     const number = parseNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
       await scope.get(Tokens.CollaborationService).removeReviewer(pull.id, decodeURIComponent(c.req.param('reviewer')));
       return c.json({ ok: true });
@@ -174,7 +175,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.isDraft !== 'boolean') return jsonError(c, 'isDraft must be a boolean', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const pull = await scope.get(Tokens.PullRequestService).setDraft(row.id, number, body.isDraft);
       return c.json({ pull: await presentSingle(scope, pull) });
     } catch (error) {
@@ -190,7 +191,7 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
     const number = parseNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
       const fullName = `${owner}/${repoName}`;
       // Suggest owners from files changed in the PR diff (cap 50 paths).

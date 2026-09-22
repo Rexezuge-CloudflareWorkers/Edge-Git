@@ -1,8 +1,8 @@
 import type { Hono } from 'hono';
-import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { Tokens } from '@edge-git/backend-services/composition';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { recordAndNotify } from './SocialEmit';
-import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo, getScope } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 import { presentMany, presentSingle } from './IdentityPresenter';
 
@@ -14,7 +14,7 @@ function registerWikiPublicRoutes(app: WikiApp): void {
       const url = new URL(c.req.url);
       const q = (url.searchParams.get('q') ?? '').trim();
       try {
-        const scope = createRequestScope(c.env);
+        const scope = getScope(c);
         if (q) {
           const pages = await scope.get(Tokens.WikiService).searchPages(row.id, q);
           return c.json({ pages: await presentMany(scope, pages) });
@@ -30,7 +30,7 @@ function registerWikiPublicRoutes(app: WikiApp): void {
   app.get('/repos/:owner/:repo/wiki/:slug', async (c) => {
     return withPublicRepo(c, async (row) => {
       try {
-        const scope = createRequestScope(c.env);
+        const scope = getScope(c);
         const page = await scope.get(Tokens.WikiService).getPage(row.id, c.req.param('slug'));
         return c.json({ page: await presentSingle(scope, page) });
       } catch (error) {
@@ -48,7 +48,7 @@ function registerWikiUserRoutes(app: WikiApp): void {
     try {
       const url = new URL(c.req.url);
       const q = (url.searchParams.get('q') ?? '').trim();
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const pages = q ? await scope.get(Tokens.WikiService).searchPages(row.id, q) : await scope.get(Tokens.WikiService).listPages(row.id);
       return c.json({ pages: await presentMany(scope, pages) });
     } catch {
@@ -63,14 +63,14 @@ function registerWikiUserRoutes(app: WikiApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
-      await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
+      await getScope(c).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
       return jsonError(c, 'Forbidden', 403);
     }
     const { malformed, body } = await readJsonBody<{ slug: unknown; title: unknown; body?: unknown }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const page = await scope.get(Tokens.WikiService).createPage(row.id, body, email);
       void recordAndNotify(c.env, {
         repositoryId: row.id,
@@ -93,7 +93,7 @@ function registerWikiUserRoutes(app: WikiApp): void {
     const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoFullName.normalizeRepo(c.req.param('repo')), email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const page = await scope.get(Tokens.WikiService).getPage(row.id, c.req.param('slug'));
       return c.json({ page: await presentSingle(scope, page) });
     } catch (error) {
@@ -106,7 +106,7 @@ function registerWikiUserRoutes(app: WikiApp): void {
     const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoFullName.normalizeRepo(c.req.param('repo')), email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const revisions = await scope.get(Tokens.WikiService).listRevisions(row.id, c.req.param('slug'));
       return c.json({ revisions: await presentMany(scope, revisions) });
     } catch (error) {
@@ -121,14 +121,14 @@ function registerWikiUserRoutes(app: WikiApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
-      await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
+      await getScope(c).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
       return jsonError(c, 'Forbidden', 403);
     }
     const { malformed, body } = await readJsonBody<{ title?: unknown; body?: unknown; expectedRevision?: unknown }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const page = await scope.get(Tokens.WikiService).updatePage(row.id, c.req.param('slug'), body, email);
       void recordAndNotify(c.env, {
         repositoryId: row.id,
@@ -158,12 +158,12 @@ function registerWikiUserRoutes(app: WikiApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
-      await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
+      await getScope(c).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
       return jsonError(c, 'Forbidden', 403);
     }
     try {
-      await createRequestScope(c.env).get(Tokens.WikiService).deletePage(row.id, c.req.param('slug'));
+      await getScope(c).get(Tokens.WikiService).deletePage(row.id, c.req.param('slug'));
       return c.json({ ok: true });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));

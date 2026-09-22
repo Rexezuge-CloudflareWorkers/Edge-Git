@@ -1,5 +1,5 @@
 import { getRepoStub } from '../doStubs';
-import { jsonError, requireVisibleRepo, toErrorBody, toErrorType, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, toErrorBody, toErrorType, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
@@ -140,13 +140,13 @@ function registerUserPullMergeRoutes(app: PullApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
-      await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
+      await getScope(c).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
       return jsonError(c, 'Forbidden', 403);
     }
     const number = parsePullNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
-    const scope = createRequestScope(c.env);
+    const scope = getScope(c);
     let pull;
     try {
       pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);

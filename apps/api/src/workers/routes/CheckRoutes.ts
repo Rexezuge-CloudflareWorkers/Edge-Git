@@ -1,9 +1,9 @@
 import type { Hono } from 'hono';
-import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { Tokens } from '@edge-git/backend-services/composition';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { getCheckRunnerStub } from '../doStubs';
 import { emitWebhookEvent, publishCheckUpdate } from './SocialEmit';
-import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo, getScope } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 import { presentMany, presentSingle } from './IdentityPresenter';
 
@@ -59,7 +59,7 @@ function registerCheckPublicRoutes(app: CheckApp): void {
   app.get('/repos/:owner/:repo/commits/:sha/checks', async (c) => {
     return withPublicRepo(c, async (row) => {
       try {
-        const scope = createRequestScope(c.env);
+        const scope = getScope(c);
         const { runs, state } = await scope.get(Tokens.CheckService).listForSha(row.id, c.req.param('sha'));
         return c.json({ state, checks: await presentMany(scope, runs.map(toCheckJson)) });
       } catch (error) {
@@ -77,7 +77,7 @@ function registerCheckUserRoutes(app: CheckApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { runs, state } = await scope.get(Tokens.CheckService).listForSha(row.id, c.req.param('sha'));
       return c.json({ state, checks: await presentMany(scope, runs.map(toCheckJson)) });
     } catch (error) {
@@ -94,7 +94,7 @@ function registerCheckUserRoutes(app: CheckApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
-      await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
+      await getScope(c).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
       return jsonError(c, 'Forbidden', 403);
     }
@@ -107,7 +107,7 @@ function registerCheckUserRoutes(app: CheckApp): void {
     }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const run = await scope.get(Tokens.CheckService).reportStatus({
         repositoryId: row.id,
         headSha: body.headSha,
@@ -158,7 +158,7 @@ function registerCheckUserRoutes(app: CheckApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     try {
-      await createRequestScope(c.env).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
+      await getScope(c).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
       return jsonError(c, 'Forbidden', 403);
     }
@@ -172,7 +172,7 @@ function registerCheckUserRoutes(app: CheckApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.status !== 'string') return jsonError(c, 'status is required', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const run = await scope
         .get(Tokens.CheckService)
         .updateRun({

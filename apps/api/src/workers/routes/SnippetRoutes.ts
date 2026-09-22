@@ -1,9 +1,9 @@
 import type { Hono } from 'hono';
-import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { Tokens } from '@edge-git/backend-services/composition';
 import { presentMany, presentSingle } from './IdentityPresenter';
 import type { AccessIdentityContext } from '@edge-git/backend-services/auth';
 import { emitWebhookEvent } from './SocialEmit';
-import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type SnippetApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -13,7 +13,7 @@ function registerSnippetPublicRoutes(app: SnippetApp): void {
     try {
       const url = new URL(c.req.url);
       const limit = Math.min(Math.max(Number(url.searchParams.get('limit') ?? 20) || 20, 1), 50);
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const snippets = await scope.get(Tokens.SnippetService).listPublic(limit);
       return c.json({ snippets: await presentMany(scope, snippets) });
     } catch {
@@ -27,13 +27,13 @@ function registerSnippetPublicRoutes(app: SnippetApp): void {
       // their identity via Access/PAT (best-effort, never throws).
       let viewerEmail: string | null = null;
       try {
-        viewerEmail = await createRequestScope(c.env)
+        viewerEmail = await getScope(c)
           .get(Tokens.AccessAuthService)
           .getAuthenticatedUserEmail(c.req.raw, c.executionCtx as unknown as AccessIdentityContext);
       } catch {
         viewerEmail = null;
       }
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const result = await scope.get(Tokens.SnippetService).getSnippet(c.req.param('id'), viewerEmail);
       return c.json({ snippet: await presentSingle(scope, result.snippet), files: result.files });
     } catch (error) {
@@ -44,17 +44,17 @@ function registerSnippetPublicRoutes(app: SnippetApp): void {
   app.get('/users/:username/snippets', async (c) => {
     try {
       const username = c.req.param('username');
-      const user = await createRequestScope(c.env).get(Tokens.UserService).getByUsername(username);
+      const user = await getScope(c).get(Tokens.UserService).getByUsername(username);
       if (!user) return jsonError(c, 'Not found', 404);
       let viewerEmail: string | null = null;
       try {
-        viewerEmail = await createRequestScope(c.env)
+        viewerEmail = await getScope(c)
           .get(Tokens.AccessAuthService)
           .getAuthenticatedUserEmail(c.req.raw, c.executionCtx as unknown as AccessIdentityContext);
       } catch {
         viewerEmail = null;
       }
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const snippets = await scope.get(Tokens.SnippetService).listByOwner(user.email, viewerEmail);
       return c.json({ snippets: await presentMany(scope, snippets) });
     } catch (error) {
@@ -67,7 +67,7 @@ function registerSnippetUserRoutes(app: SnippetApp): void {
   app.get('/user/snippets', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const snippets = await scope.get(Tokens.SnippetService).listByOwner(email, email);
       return c.json({ snippets: await presentMany(scope, snippets) });
     } catch {
@@ -80,7 +80,7 @@ function registerSnippetUserRoutes(app: SnippetApp): void {
     const { malformed, body } = await readJsonBody<{ title?: unknown; visibility?: unknown; files?: unknown }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const result = await scope
         .get(Tokens.SnippetService)
         .createSnippet(email, { title: body.title, visibility: body.visibility, files: body.files });
@@ -104,7 +104,7 @@ function registerSnippetUserRoutes(app: SnippetApp): void {
   app.get('/user/snippets/:id', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const result = await scope.get(Tokens.SnippetService).getSnippet(c.req.param('id'), email);
       if (result.snippet.ownerEmail.toLowerCase() !== email.toLowerCase()) return jsonError(c, 'Not found', 404);
       return c.json({ snippet: await presentSingle(scope, result.snippet), files: result.files });
@@ -118,7 +118,7 @@ function registerSnippetUserRoutes(app: SnippetApp): void {
     const { malformed, body } = await readJsonBody<{ title?: unknown; visibility?: unknown; files?: unknown }>(c);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const result = await scope.get(Tokens.SnippetService).updateSnippet(c.req.param('id'), email, body);
       return c.json({ snippet: await presentSingle(scope, result.snippet), files: result.files });
     } catch (error) {
@@ -131,7 +131,7 @@ function registerSnippetUserRoutes(app: SnippetApp): void {
   app.delete('/user/snippets/:id', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     try {
-      await createRequestScope(c.env).get(Tokens.SnippetService).deleteSnippet(c.req.param('id'), email);
+      await getScope(c).get(Tokens.SnippetService).deleteSnippet(c.req.param('id'), email);
       return c.json({ ok: true });
     } catch (error) {
       if (error instanceof Error && error.message.includes('Only the snippet owner')) return jsonError(c, error.message, 403);

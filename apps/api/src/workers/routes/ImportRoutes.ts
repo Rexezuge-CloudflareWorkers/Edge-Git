@@ -1,11 +1,11 @@
 import type { Hono } from 'hono';
-import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { Tokens } from '@edge-git/backend-services/composition';
 import { presentSingle } from './IdentityPresenter';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { runImportJob } from '@edge-git/background/transfer/ImportRunner';
 import { getRepoStub } from '../doStubs';
-import { jsonError, toSafeErrorMessage, toServiceStatus } from './PublicViewerResolver';
+import { jsonError, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
 type TransferApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -34,7 +34,7 @@ function registerImportRoutes(app: TransferApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.sourceUrl !== 'string' || !body.sourceUrl.trim()) return jsonError(c, 'sourceUrl is required', 400);
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       const job = await scope.get(Tokens.ImportService).createJob(repo.id, body.sourceUrl, email);
       const fullName = `${owner}/${repoName}`;
@@ -51,7 +51,7 @@ function registerImportRoutes(app: TransferApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'read');
       const job = await scope.get(Tokens.ImportService).latestForRepo(repo.id);
       if (!job) return jsonError(c, 'No import found', 404);
@@ -66,7 +66,7 @@ function registerImportRoutes(app: TransferApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
       const job = await scope.get(Tokens.ImportService).cancelJob(c.req.param('jobId'), repo.id);
       return c.json({ job: await presentSingle(scope, job) });
@@ -83,7 +83,7 @@ function registerImportRoutes(app: TransferApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     try {
-      const scope = createRequestScope(c.env);
+      const scope = getScope(c);
       await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'read');
       const stub = getRepoStub(c.env, `${owner}/${repoName}`);
       const listed = (await stub.listRefs()) as { refs: Array<{ ref: string; oid: string }> };
