@@ -27,3 +27,4 @@ export * from './release/index';
 export * from './transfer/index';
 export * from './deploykey/index';
 export * from './security/index';
+export * from './events/index';

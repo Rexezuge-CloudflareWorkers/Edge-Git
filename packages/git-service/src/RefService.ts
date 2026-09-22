@@ -1,8 +1,9 @@
 import * as git from 'isomorphic-git';
 import type { IsoGitFs } from './IsoGitFs';
 import type { RefUpdateResult } from '@edge-git/git-protocol';
-import { branchRefFor, classifyRefCommand, isValidBranchName, ZERO_OID } from './RefValidation';
+import { branchRefFor, classifyRefCommand, isValidBranchName } from './RefValidation';
 import { parseSymbolicHead } from './RefParsers';
+import { RefUpdatePlanner } from './RefUpdatePlanner';
 
 const logger = {
   warn: (...args: unknown[]): void => console.warn('[WARN] [GitService]', ...args),
@@ -228,96 +229,14 @@ export class RefService {
   }
 
   async applyRefUpdates(commands: Array<{ oldOid: string; newOid: string; ref: string }>, atomic: boolean): Promise<RefUpdateResult[]> {
-    const results: RefUpdateResult[] = [];
-
+    const planner = new RefUpdatePlanner(this.fs, this.gitdir);
+    let results: RefUpdateResult[] = [];
     for (const cmd of commands) {
-      const kind = classifyRefCommand(cmd);
-      const isDelete = kind === 'delete';
-      const isCreate = kind === 'create';
-
-      try {
-        let currentOid: string | null = null;
-        try {
-          currentOid = await git.resolveRef({
-            fs: this.fs,
-            gitdir: this.gitdir,
-            ref: cmd.ref,
-          });
-        } catch {
-          logger.info(`(apply-ref-updates): Ref ${cmd.ref} does not exist.`);
-        }
-
-        if (currentOid && cmd.oldOid !== ZERO_OID && currentOid !== cmd.oldOid) {
-          results.push({
-            ref: cmd.ref,
-            ok: false,
-            error: 'ref update rejected: old OID mismatch',
-          });
-          continue;
-        }
-
-        if (isDelete) {
-          if (currentOid) {
-            results.push({ ref: cmd.ref, ok: true });
-          } else {
-            results.push({
-              ref: cmd.ref,
-              ok: false,
-              error: "ref doesn't exist",
-            });
-          }
-        } else if (isCreate) {
-          if (currentOid) {
-            results.push({
-              ref: cmd.ref,
-              ok: false,
-              error: 'ref already exists',
-            });
-          } else {
-            results.push({ ref: cmd.ref, ok: true });
-          }
-        } else {
-          if (!currentOid) {
-            results.push({
-              ref: cmd.ref,
-              ok: false,
-              error: "ref doesn't exist",
-            });
-            continue;
-          }
-
-          const isFF = await git.isDescendent({
-            fs: this.fs,
-            gitdir: this.gitdir,
-            oid: cmd.newOid,
-            ancestor: currentOid,
-          });
-
-          if (isFF) {
-            results.push({ ref: cmd.ref, ok: true });
-          } else {
-            results.push({
-              ref: cmd.ref,
-              ok: false,
-              error: 'non-fast-forward update rejected',
-            });
-          }
-        }
-      } catch (error) {
-        results.push({
-          ref: cmd.ref,
-          ok: false,
-          error: (error as Error).message,
-        });
-      }
+      results.push(await planner.planCommand(cmd));
     }
 
-    if (atomic && results.some((r) => !r.ok)) {
-      return results.map((r) => ({
-        ...r,
-        ok: false,
-        error: r.error || 'atomic transaction failed',
-      }));
+    if (atomic) {
+      results = planner.applyAtomicGate(results);
     }
 
     for (const [i, cmd] of commands.entries()) {

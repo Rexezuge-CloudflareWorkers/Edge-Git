@@ -85,11 +85,12 @@ async function activityAuditHandler(c: RequestContext, next: Next): Promise<Resp
       }
       const event = AuditService.buildRequestEvent(c.req.raw, email, status);
       // Reuse the per-request scope so audit uses the same memoized
-      // singletons (no second Secrets Store round-trip).
+      // singletons (no second Secrets Store round-trip). Published through
+      // the domain event bus so fan-out stays behind the mediator.
       const scope = getScope(c);
       const record = scope
-        .get(Tokens.AuditService)
-        .record(event)
+        .get(Tokens.DomainEventBus)
+        .emit({ type: 'audit.record', event })
         .catch(() => undefined);
       const waitUntil = (c.executionCtx as ExecutionContext | undefined)?.waitUntil?.bind(c.executionCtx);
       if (typeof waitUntil === 'function') {

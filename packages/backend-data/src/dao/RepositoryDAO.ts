@@ -2,6 +2,7 @@ import { BaseDAO } from './BaseDAO';
 import type { D1Queryable } from '../utils/D1Types';
 import { isMissingSchemaError } from '../utils/D1ErrorClassifier';
 import { DatabaseError } from '@edge-git/backend-errors';
+import { buildSetClause } from './UpdateClause';
 
 export interface RepositoryRow {
   id: string;
@@ -309,22 +310,15 @@ class RepositoryDAO extends BaseDAO {
   }
 
   public async update(id: string, patch: { description?: string | null; isPrivate?: boolean; now: number }): Promise<void> {
-    const sets: string[] = ['updated_at = ?'];
-    const values: Array<string | number | null> = [patch.now];
-    if (patch.description !== undefined) {
-      sets.push('description = ?');
-      values.push(patch.description);
-    }
-    if (patch.isPrivate !== undefined) {
-      sets.push('is_private = ?');
-      values.push(patch.isPrivate ? 1 : 0);
-    }
-    values.push(id);
+    const assignments: Array<{ column: string; value: unknown }> = [{ column: 'updated_at', value: patch.now }];
+    if (patch.description !== undefined) assignments.push({ column: 'description', value: patch.description });
+    if (patch.isPrivate !== undefined) assignments.push({ column: 'is_private', value: patch.isPrivate ? 1 : 0 });
+    const { clause, values } = buildSetClause(assignments);
     await this.withRetry(
       () =>
         this.database
-          .prepare(`UPDATE repositories SET ${sets.join(', ')} WHERE id = ?`)
-          .bind(...values)
+          .prepare(`UPDATE repositories SET ${clause} WHERE id = ?`)
+          .bind(...values, id)
           .run(),
       'update repository',
     );

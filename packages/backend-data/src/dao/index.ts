@@ -8,6 +8,8 @@ export * from './social';
 export * from './collab';
 export * from './ops';
 export { BaseDAO } from './BaseDAO';
+export { buildSetClause } from './UpdateClause';
+export type { SetAssignment, SetClause } from './UpdateClause';
 export type { TeamMemberRow, TeamMemberRole } from './TeamMemberDAO';
 export type { TeamRepoGrantRow } from './TeamRepoGrantDAO';
 export type { AuditLogRow, AuditLogFilters } from './AuditLogDAO';

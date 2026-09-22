@@ -1,10 +1,10 @@
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { NotificationService } from '@edge-git/backend-services/social/NotificationService';
-import { RealtimeService } from '@edge-git/backend-services/realtime';
+import type { IRealtimePublisher } from '@edge-git/backend-services/ports';
 import { mapRepoEventToWebhookEvent } from '@edge-git/backend-services/webhook';
-import { INBOX_SHARD, isChannel, repoShardFor } from '@edge-git/shared/realtime';
 import type { WebhookEventName } from '@edge-git/shared';
 import type { RepoEventType } from '@edge-git/backend-data/dao';
+import type { RealtimeWorker } from '@edge-git/background';
 import { getRealtimeStub } from '../doStubs';
 
 interface SocialEmitInput {
@@ -106,31 +106,23 @@ interface WebhookEmitInput {
   extra?: Record<string, unknown>;
 }
 
+// DO-stub transport behind the `IRealtimePublisher` port: the bus owns fan-out
+// decisions, `apps/api` owns stub resolution (layer rule). The port message
+// stays `Record<string, unknown>` so `backend-services` never imports the
+// DO input type; the cast lives at this boundary only.
+function realtimePort(env: Env): IRealtimePublisher {
+  return {
+    publishToShard: async (shard, message) => {
+      await getRealtimeStub(env, shard).publish(message as unknown as Parameters<RealtimeWorker['publish']>[0]);
+    },
+  };
+}
+
 // Direct webhook fan-out for events without a repo_events row (star/watch).
 // Best-effort: never throws.
 async function emitWebhookEvent(env: Env, input: WebhookEmitInput): Promise<void> {
   try {
-    // Internal fan-out keys on email, but the public webhook payload exposes
-    // only the username. Resolve best-effort; fall back to ghost (never email).
-    let actorUsername = 'ghost';
-    try {
-      actorUsername = await createRequestScope(env).get(Tokens.IdentityResolver).resolveUsername(input.actorEmail);
-    } catch {
-      actorUsername = 'ghost';
-    }
-    await createRequestScope(env).get(Tokens.WebhookDeliveryService).enqueueForEvent({
-      repositoryId: input.repositoryId,
-      fullName: input.fullName,
-      event: input.event,
-      actorUsername,
-      eventId: input.eventId,
-      subjectType: input.subjectType,
-      subjectNumber: input.subjectNumber,
-      subjectOid: input.subjectOid,
-      title: input.title,
-      action: input.action,
-      extra: input.extra,
-    });
+    await createRequestScope(env).get(Tokens.DomainEventBus).emit({ type: 'webhook.emit', input });
   } catch (error) {
     console.error('Failed to enqueue webhook deliveries', input.event, input.fullName, error);
   }
@@ -174,48 +166,35 @@ interface LiveUpdateInput {
 // Best-effort live fan-out: one RPC to the repo shard plus (when D1 fan-out
 // named recipients) one RPC to the global inbox shard. Never throws; no-ops
 // when realtime is disabled or the binding is missing (tests/legacy env).
+// Fan-out decisions live in the bus subscriber; this stays a thin emitter.
 async function publishLiveUpdate(env: Env, input: LiveUpdateInput): Promise<void> {
   try {
-    if (!createRequestScope(env).get(Tokens.AppConfig).isRealtimeEnabled()) return;
-    if (!isChannel(input.channel)) return;
-    const stub = getRealtimeStub(env, repoShardFor(input.fullName));
-    await stub
-      .publish({
-        channel: input.channel,
-        type: input.type,
-        actor: input.actorEmail,
-        title: input.title,
-        subjectType: input.subjectType ?? null,
-        subjectNumber: input.subjectNumber ?? null,
-        sha: input.subjectOid ?? null,
-        extra: input.extra ?? {},
-      })
-      .catch(() => undefined);
-    const recipients = input.recipientEmails ?? [];
-    if (recipients.length === 0) return;
-    const hashes = await RealtimeService.hashRecipients(recipients).catch(() => [] as string[]);
-    if (hashes.length === 0) return;
-    const inbox = getRealtimeStub(env, INBOX_SHARD);
-    await inbox
-      .publish({
-        channel: `inbox:${hashes[0]}`,
-        type: input.type,
-        actor: input.actorEmail,
-        title: input.title,
-        subjectType: input.subjectType ?? null,
-        subjectNumber: input.subjectNumber ?? null,
-        sha: input.subjectOid ?? null,
-        extra: { ...input.extra, fullName: input.fullName },
-        recipientHashes: hashes,
-      })
-      .catch(() => undefined);
+    await createRequestScope(env)
+      .get(Tokens.DomainEventBus)
+      .emit({
+        type: 'realtime.publish',
+        input: {
+          fullName: input.fullName,
+          channel: input.channel,
+          type: input.type,
+          actorEmail: input.actorEmail,
+          title: input.title,
+          subjectType: input.subjectType,
+          subjectNumber: input.subjectNumber,
+          subjectOid: input.subjectOid,
+          extra: input.extra,
+          recipientEmails: input.recipientEmails,
+        },
+        via: realtimePort(env),
+      });
   } catch {
     // binding missing or scope unavailable — live updates are a nicety
   }
 }
 
 // Commit status changes drive the live `PullChecks` badge via a per-SHA
-// channel. Best-effort: never throws.
+// channel. Best-effort: never throws. Validation + channel mapping live in
+// the bus subscriber; this stays a thin emitter.
 async function publishCheckUpdate(
   env: Env,
   input: {
@@ -230,21 +209,22 @@ async function publishCheckUpdate(
   },
 ): Promise<void> {
   try {
-    if (!createRequestScope(env).get(Tokens.AppConfig).isRealtimeEnabled()) return;
-    if (!/^[0-9a-f]{4,64}$/i.test(input.headSha)) return;
-    const channel = `checks:${input.headSha.toLowerCase()}`;
-    if (!isChannel(channel)) return;
-    const stub = getRealtimeStub(env, repoShardFor(input.fullName));
-    await stub
-      .publish({
-        channel,
-        type: 'check_run.updated',
-        actor: input.actorEmail,
-        title: input.title ?? `${input.context}: ${input.conclusion ?? input.status}`,
-        sha: input.headSha.toLowerCase(),
-        extra: { check_run_id: input.checkId ?? null, context: input.context, status: input.status, conclusion: input.conclusion ?? null },
-      })
-      .catch(() => undefined);
+    await createRequestScope(env)
+      .get(Tokens.DomainEventBus)
+      .emit({
+        type: 'check.updated',
+        input: {
+          fullName: input.fullName,
+          headSha: input.headSha,
+          context: input.context,
+          status: input.status,
+          conclusion: input.conclusion,
+          actorEmail: input.actorEmail,
+          checkId: input.checkId,
+          title: input.title,
+        },
+        via: realtimePort(env),
+      });
   } catch {
     // live updates are a nicety
   }

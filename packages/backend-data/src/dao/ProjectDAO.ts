@@ -1,5 +1,6 @@
 import { BaseDAO } from './BaseDAO';
 import type { D1Queryable } from '../utils/D1Types';
+import { buildSetClause } from './UpdateClause';
 
 export interface ProjectRow {
   id: string;
@@ -123,23 +124,17 @@ class ProjectDAO extends BaseDAO {
     patch: { title?: string; description?: string | null },
     now: number,
   ): Promise<void> {
-    const sets: string[] = [];
-    const values: Array<string | null> = [];
-    if (patch.title !== undefined) {
-      sets.push('title = ?');
-      values.push(patch.title);
-    }
-    if (patch.description !== undefined) {
-      sets.push('description = ?');
-      values.push(patch.description);
-    }
-    if (sets.length === 0) return;
-    sets.push('updated_at = ?');
+    const assignments: Array<{ column: string; value: unknown }> = [];
+    if (patch.title !== undefined) assignments.push({ column: 'title', value: patch.title });
+    if (patch.description !== undefined) assignments.push({ column: 'description', value: patch.description });
+    if (assignments.length === 0) return;
+    assignments.push({ column: 'updated_at', value: now });
+    const { clause, values } = buildSetClause(assignments);
     await this.withRetry(
       () =>
         this.database
-          .prepare(`UPDATE projects SET ${sets.join(', ')} WHERE id = ? AND repository_id = ?`)
-          .bind(...values, now, id, repositoryId)
+          .prepare(`UPDATE projects SET ${clause} WHERE id = ? AND repository_id = ?`)
+          .bind(...values, id, repositoryId)
           .run(),
       'update project',
     );

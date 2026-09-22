@@ -13,6 +13,13 @@ const CollaborationQueries = {
   insertMilestone(): string {
     return 'INSERT INTO milestones (id, repository_id, title, description, due_on, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)';
   },
+  /**
+   * Open-state milestone insert with the `'open'` literal inline (matches
+   * `CollaborationDAO.createMilestone` exactly — 6 binds, no status param).
+   */
+  insertMilestoneOpen(): string {
+    return "INSERT INTO milestones (id, repository_id, title, description, due_on, status, created_at) VALUES (?, ?, ?, ?, ?, 'open', ?)";
+  },
   listMilestones(): string {
     return 'SELECT * FROM milestones WHERE repository_id = ? ORDER BY created_at DESC';
   },
@@ -21,6 +28,20 @@ const CollaborationQueries = {
   },
   listReviewers(): string {
     return 'SELECT * FROM pull_reviewers WHERE pull_request_id = ? ORDER BY created_at ASC';
+  },
+  /**
+   * Re-request path: `INSERT OR IGNORE` keeps an existing review state
+   * (differs from `upsertReviewer`, which overwrites status on conflict).
+   */
+  insertReviewerIgnore(): string {
+    return "INSERT OR IGNORE INTO pull_reviewers (pull_request_id, user_email, status, created_at) VALUES (?, ?, 'pending', ?)";
+  },
+  /**
+   * Reviewer listing in email order (matches `CollaborationDAO.listReviewers`;
+   * differs from `listReviewers`, which orders by creation time).
+   */
+  listReviewersByEmail(): string {
+    return 'SELECT * FROM pull_reviewers WHERE pull_request_id = ? ORDER BY user_email ASC';
   },
 } as const;
 

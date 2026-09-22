@@ -59,7 +59,13 @@
     "./security": "./src/security/index.ts",
     "./security/*": "./src/security/*.ts",
     "./composition": "./src/composition/index.ts",
-    "./composition/*": "./src/composition/*.ts"
+    "./composition/*": "./src/composition/*.ts",
+    "./events": "./src/events/index.ts",
+    "./events/*": "./src/events/*.ts",
+    "./ports": "./src/ports/index.ts",
+    "./ports/*": "./src/ports/*.ts",
+    "./policy": "./src/policy/index.ts",
+    "./policy/*": "./src/policy/*.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

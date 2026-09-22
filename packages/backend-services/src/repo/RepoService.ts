@@ -31,13 +31,14 @@ import {
 } from '@edge-git/backend-data/dao';
 import type { RepositoryRow, RepoRole } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { BadRequestError, ForbiddenError, NotFoundError } from '@edge-git/backend-errors';
+import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
 import { AppConfiguration } from '@edge-git/backend-runtime/config';
 import { isReservedNamespaceName } from '@edge-git/shared/constants';
 import { EmailAddress, RepoFullName, TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 import { PermissionService } from '../permission/PermissionService';
 import { cleanupRepoSidecars } from './repoCleanup';
 import { RepoVisibilityService } from './RepoVisibilityService';
+import { checkRepoQuota, classifyCreatePath, throwIfForbidden, validateRepoPatch } from './RepoCreatePolicy';
 
 interface RepoServiceEnv {
   DB: D1Queryable;
@@ -188,10 +189,7 @@ class RepoService {
       throw new BadRequestError('Repository already exists');
     }
     const owned = await dao.listByOwnerEmail(userEmail, 1000).catch(() => []);
-    const max = this.deps.config.getMaxReposPerUser();
-    if (owned.length >= max) {
-      throw new BadRequestError(`Maximum ${max} repositories per user`);
-    }
+    checkRepoQuota(owned.length, this.deps.config.getMaxReposPerUser());
 
     const ownerCi = normalizedOwner.toLowerCase();
     const callerCi = await this.resolveCallerUsernameCi(userEmail);
@@ -199,8 +197,40 @@ class RepoService {
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const id = UUIDUtil.getRandomUUID();
 
+    // Resolve the org/namespace lookups up front; the precedence decision
+    // itself is the pure `classifyCreatePath` policy below.
+    let org: { id: string; username: string } | null = null;
+    try {
+      const orgDao = await this.deps.organizationDAO();
+      org = await orgDao.getByUsernameCi(ownerCi);
+    } catch {
+      org = null;
+    }
+    let isOrgMember = false;
+    if (org) {
+      try {
+        const memberDao = await this.deps.organizationMemberDAO();
+        isOrgMember = (await memberDao.get(org.id, callerEmail)) !== null;
+      } catch {
+        isOrgMember = false;
+      }
+    }
+    let namespaceOwnerEmail: string | null = null;
+    if (!org && (!callerCi || ownerCi !== callerCi)) {
+      try {
+        const nsDao = await this.deps.namespaceDAO();
+        const ns = await nsDao.get(ownerCi);
+        namespaceOwnerEmail = ns?.user_email?.toLowerCase() ?? null;
+      } catch {
+        namespaceOwnerEmail = null;
+      }
+    }
+
+    const path = classifyCreatePath({ ownerCi, callerCi, org, isOrgMember, namespaceOwnerEmail, callerEmail });
+    throwIfForbidden(path);
+
     // Self-owned fast path (covers legacy fakes with no users/orgs tables).
-    if (callerCi && ownerCi === callerCi) {
+    if (path.kind === 'self' || path.kind === 'legacy') {
       await dao.create({
         id,
         ownerEmail: callerEmail,
@@ -217,64 +247,17 @@ class RepoService {
       return { id };
     }
 
-    // Org-owned path: org must exist and caller must be owner or member (both may create).
-    let org: { id: string; username: string } | null = null;
-    try {
-      const orgDao = await this.deps.organizationDAO();
-      org = await orgDao.getByUsernameCi(ownerCi);
-    } catch {
-      org = null;
-    }
-    if (org) {
-      let membership: { role: string } | null = null;
-      try {
-        const memberDao = await this.deps.organizationMemberDAO();
-        membership = await memberDao.get(org.id, callerEmail);
-      } catch {
-        membership = null;
-      }
-      if (!membership) {
-        throw new ForbiddenError('Only organization members can create repositories for this organization');
-      }
-      await dao.create({
-        id,
-        ownerEmail: callerEmail,
-        owner: org.username,
-        name,
-        description,
-        isPrivate,
-        now,
-        ownerType: 'org',
-        orgId: org.id,
-        forkedFromRepoId: opts.forkedFromRepoId ?? null,
-        forkedFromFullName: opts.forkedFromFullName ?? null,
-      });
-      return { id };
-    }
-
-    // Legacy fallback: unknown owner that is not the caller and not an org.
-    // Preserve old behavior for fakes (owner free-form) but guard hijack on real DBs:
-    // if a namespace exists for another user/org, refuse.
-    try {
-      const nsDao = await this.deps.namespaceDAO();
-      const ns = await nsDao.get(ownerCi);
-      if (ns?.user_email && ns.user_email.toLowerCase() !== callerEmail) {
-        throw new ForbiddenError('Only the repository owner can perform this action');
-      }
-    } catch (error) {
-      if (error instanceof ForbiddenError) throw error;
-      // missing namespaces table → allow legacy free-form owner
-    }
+    // Org-owned path: caller is owner or member (both may create).
     await dao.create({
       id,
       ownerEmail: callerEmail,
-      owner: normalizedOwner,
+      owner: path.owner,
       name,
       description,
       isPrivate,
       now,
-      ownerType: 'user',
-      ownerUserEmail: callerEmail,
+      ownerType: 'org',
+      orgId: path.orgId,
       forkedFromRepoId: opts.forkedFromRepoId ?? null,
       forkedFromFullName: opts.forkedFromFullName ?? null,
     });
@@ -325,12 +308,7 @@ class RepoService {
     patch: { description?: string | null; isPrivate?: boolean },
   ): Promise<RepositoryRow> {
     const repo = await this.requireOwner(owner, name, userEmail);
-    if (typeof patch.description === 'string' && patch.description.length > 500) {
-      throw new BadRequestError('Description must be 500 characters or fewer');
-    }
-    if (patch.isPrivate !== undefined && typeof patch.isPrivate !== 'boolean') {
-      throw new BadRequestError('isPrivate must be a boolean');
-    }
+    validateRepoPatch(patch);
     const dao = await this.deps.repositoryDAO();
     await dao.update(repo.id, {
       description: patch.description,

@@ -1,12 +1,43 @@
 import type { Hono } from 'hono';
 import { Tokens } from '@edge-git/backend-services/composition';
+import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { jsonError, resolvePublicViewer, toRepoJson, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
-import { PROFILE_REPO_SCAN_CAP, deduplicateRepoRows, filterVisibleRepos, hasVisibleRepo, parseLimit } from './UserProfileVisibility';
+import {
+  PROFILE_REPO_SCAN_CAP,
+  countVisibleRepos,
+  deduplicateRepoRows,
+  filterVisibleRepos,
+  filterVisibleOrgUsernames,
+  parseLimit,
+} from './UserProfileVisibility';
 
 type UserApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
-export { PROFILE_REPO_SCAN_CAP, deduplicateRepoRows, filterVisibleRepos, hasVisibleRepo, parseLimit } from './UserProfileVisibility';
+export {
+  PROFILE_REPO_SCAN_CAP,
+  countVisibleRepos,
+  deduplicateRepoRows,
+  filterVisibleRepos,
+  filterVisibleOrgUsernames,
+  hasVisibleRepo,
+  parseLimit,
+} from './UserProfileVisibility';
+
+/**
+ * Shared outsider-org lookups for one request (null-DAO tolerant).
+ */
+function orgVisibilityDeps(
+  permission: { getRole(viewerEmail: string | null, repo: RepositoryRow): Promise<string | null> },
+  repoDao: { listByOrgId(orgId: string, limit: number): Promise<RepositoryRow[]> } | null,
+  orgService: { getMemberRole(orgId: string, viewerEmail: string): Promise<string | null> },
+) {
+  return {
+    getMemberRole: (orgId: string, viewerEmail: string) => orgService.getMemberRole(orgId, viewerEmail),
+    listByOrgId: (orgId: string, limit: number) => repoDao?.listByOrgId(orgId, limit) ?? Promise.resolve([]),
+    getRole: (viewerEmail: string | null, repo: RepositoryRow) => permission.getRole(viewerEmail, repo),
+  };
+}
 
 function registerUserProfileRoutes(app: UserApp): void {
   app.get('/users/:username', async (c) => {
@@ -20,24 +51,21 @@ function registerUserProfileRoutes(app: UserApp): void {
       .catch(() => null);
     if (user?.username) {
       const permission = scope.get(Tokens.PermissionService);
+      const orgService = scope.get(Tokens.OrganizationService);
       let repoCount = 0;
       let orgCount: number | null = null;
       let viewerIsSelf = false;
       try {
         const repoDao = await scope.get(Tokens.RepositoryDAO)();
         const rows = await repoDao.listByOwner(user.username, PROFILE_REPO_SCAN_CAP).catch(() => []);
-        const visible = await filterVisibleRepos(rows, (row) => permission.getRole(viewerEmail, row), PROFILE_REPO_SCAN_CAP);
-        repoCount = visible.length;
+        repoCount = await countVisibleRepos(rows, viewerEmail, (viewer, row) => permission.getRole(viewer, row));
       } catch {
         repoCount = 0;
       }
       try {
         const targetEmail = user.email.toLowerCase();
         viewerIsSelf = (viewerEmail ?? '').toLowerCase() === targetEmail;
-        const orgs = await scope
-          .get(Tokens.OrganizationService)
-          .listOrgsForUser(user.email)
-          .catch(() => []);
+        const orgs = await orgService.listOrgsForUser(user.email).catch(() => []);
         if (viewerIsSelf) {
           orgCount = orgs.length;
         } else {
@@ -45,23 +73,8 @@ function registerUserProfileRoutes(app: UserApp): void {
           const repoDao = await scope
             .get(Tokens.RepositoryDAO)()
             .catch(() => null);
-          let count = 0;
-          for (const org of orgs) {
-            let visible = false;
-            if (viewerEmail) {
-              const role = await scope
-                .get(Tokens.OrganizationService)
-                .getMemberRole(org.id, viewerEmail)
-                .catch(() => null);
-              if (role) visible = true;
-            }
-            if (!visible && repoDao) {
-              const repos = await repoDao.listByOrgId(org.id, 5).catch(() => []);
-              visible = await hasVisibleRepo(repos, (repo) => permission.getRole(viewerEmail, repo).catch(() => null));
-            }
-            if (visible) count += 1;
-          }
-          orgCount = count;
+          const visible = await filterVisibleOrgUsernames(orgs, viewerEmail, orgVisibilityDeps(permission, repoDao, orgService));
+          orgCount = visible.length;
         }
       } catch {
         orgCount = null;
@@ -92,12 +105,9 @@ function registerUserProfileRoutes(app: UserApp): void {
       // Public read-model: degrade to [] on transient D1 failures (fail-open
       // to an empty list, never a 500 existence oracle). Auth-guarded
       // mutating routes fail closed instead — see `requireRoleForRepo`.
-      const visible = await filterVisibleRepos(
-        deduplicateRepoRows(byOrg, byOwner),
-        (row) => permission.getRole(viewerEmail, row),
-        PROFILE_REPO_SCAN_CAP,
+      repoCount = await countVisibleRepos(deduplicateRepoRows(byOrg, byOwner), viewerEmail, (viewer, row) =>
+        permission.getRole(viewer, row),
       );
-      repoCount = visible.length;
     } catch {
       repoCount = 0;
     }
@@ -190,20 +200,8 @@ function registerUserProfileRoutes(app: UserApp): void {
     const repoDao = await scope
       .get(Tokens.RepositoryDAO)()
       .catch(() => null);
-    const visible: Array<{ username: string }> = [];
-    for (const org of orgs) {
-      let show = false;
-      if (viewerEmail) {
-        const role = await orgService.getMemberRole(org.id, viewerEmail).catch(() => null);
-        if (role) show = true;
-      }
-      if (!show && repoDao) {
-        const repos = await repoDao.listByOrgId(org.id, 5).catch(() => []);
-        show = await hasVisibleRepo(repos, (repo) => permission.getRole(viewerEmail, repo).catch(() => null));
-      }
-      if (show) visible.push({ username: org.username });
-    }
-    return c.json({ username: user.username, orgs: visible });
+    const visible = await filterVisibleOrgUsernames(orgs, viewerEmail, orgVisibilityDeps(permission, repoDao, orgService));
+    return c.json({ username: user.username, orgs: visible.map((username) => ({ username })) });
   });
 }
 

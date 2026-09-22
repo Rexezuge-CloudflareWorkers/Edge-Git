@@ -4,7 +4,7 @@ import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import type { DiscussionCategoryMetadata, DiscussionCommentMetadata, DiscussionMetadata } from '@edge-git/shared';
-import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
+import { SLUG_RE, TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 import { allocateNumberWithFallback } from '../numbering/numberAllocator';
 
 interface DiscussionServiceEnv {
@@ -20,7 +20,9 @@ interface DiscussionServiceDeps {
 const MAX_TITLE = 200;
 const MAX_BODY = 20_000;
 const MAX_COMMENT_BODY = 10_000;
-const SLUG_RE = /^[a-z0-9-]{1,50}$/;
+// Canonical slug rule shared with org/team names (`@edge-git/shared/utils`);
+// previously a divergent local `/^[a-z0-9-]{1,50}$/` that allowed
+// leading/trailing hyphens. Default categories all satisfy the canonical rule.
 
 function isUniqueViolation(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);

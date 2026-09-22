@@ -17,6 +17,7 @@ import { isReservedNamespaceName } from '@edge-git/shared/constants';
 import { SLUG_RE, TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 import { cascadeOwnerRepos } from '../repo/repoRenameCascade';
 import { GHOST_USERNAME } from '../identity/IdentityResolver';
+import { assertNotLastOrgOwner } from '../policy/MembershipPolicy';
 
 interface OrganizationServiceEnv {
   DB: D1Queryable;
@@ -171,7 +172,7 @@ class OrganizationService {
     if (!existing) throw new NotFoundError('Member not found');
     if (role !== 'owner' && existing.role === 'owner') {
       const owners = await memberDAO.countOwners(org.id);
-      if (owners <= 1) throw new BadRequestError('Cannot demote the last owner');
+      assertNotLastOrgOwner(existing.role, owners, 'demote');
     }
     await memberDAO.upsert(org.id, targetEmail, role, TimestampUtil.getCurrentUnixTimestampInSeconds());
   }
@@ -184,7 +185,7 @@ class OrganizationService {
     if (!existing) throw new NotFoundError('Member not found');
     if (existing.role === 'owner') {
       const owners = await memberDAO.countOwners(org.id);
-      if (owners <= 1) throw new BadRequestError('Cannot remove the last owner');
+      assertNotLastOrgOwner(existing.role, owners, 'remove');
     }
     await memberDAO.remove(org.id, targetEmail);
   }
