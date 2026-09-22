@@ -9,6 +9,7 @@ declare global {
     CRON_TASKS: any;
     CHECK_RUNNER: any;
     REALTIME: any;
+    CACHE?: any;
     DEBUG_MODE?: string;
     DEV_AUTH_EMAIL?: string;
     DEMO_MODE?: string;

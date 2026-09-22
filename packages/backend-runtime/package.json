@@ -15,7 +15,9 @@
     "./di": "./src/di/index.ts",
     "./di/*": "./src/di/*.ts",
     "./logger": "./src/logger.ts",
-    "./cache": "./src/cache.ts"
+    "./cache": "./src/cache.ts",
+    "./kv": "./src/kv/index.ts",
+    "./kv/*": "./src/kv/*.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

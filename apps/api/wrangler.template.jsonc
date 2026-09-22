@@ -63,6 +63,12 @@
       "database_name": "edge-git-db",
     },
   ],
+  "kv_namespaces": [
+    {
+      "binding": "CACHE",
+      "id": "00000000000000000000000000000000",
+    },
+  ],
   "triggers": {
     "crons": ["*/10 * * * *", "7 */4 * * *"],
   },

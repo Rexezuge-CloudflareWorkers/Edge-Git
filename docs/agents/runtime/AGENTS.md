@@ -6,7 +6,7 @@ Scope: Wrangler bindings, build output, env vars. Parent index: `../../../AGENTS
 - `apps/web/vite.config.ts` proxies `/user` + `/repos` → `http://localhost:8787` in dev; `closeBundle` embeds `dist/index.html` into `apps/api/src/generated/spa-shell.ts` (`SPA_HTML`) on build.
 - `apps/api/wrangler.template.jsonc` is the config template — copy to `wrangler.jsonc` per deployer; no committed `wrangler.jsonc`. Local `wrangler.jsonc` uses `DEV_AUTH_EMAIL=test@example.com`.
 - The Worker always serves the SPA from `/`, `/new`, `/settings`, `/:owner/:repo`, `/user/*` catch-all in `EdgeGitWorker` (non-matching paths return `404`) so Smart HTTP routes are never intercepted.
-- Bindings: D1 `DB`, DOs `REPO` (`RepoWorker`, `getByName(canonicalDoKey)` lowercased `owner/name` via `repoDoKeyForFullName`, device size from `DO_DEVICE_BYTES`, `/repo` bare) / `CRON_TASKS` (`CronTasksWorker`, `idFromName('global')`), cron `*/10 * * * *`; no KV/R2/Queues/AI bindings.
+- Bindings: D1 `DB`, KV `CACHE` (single namespace, domain-prefixed keys via `KvCache` in `@edge-git/backend-runtime/kv`: `jwks`/`oauth2`/`code`/`searchCursor`/`refs`/`ratelimit`), DOs `REPO` (`RepoWorker`, `getByName(canonicalDoKey)` lowercased `owner/name` via `repoDoKeyForFullName`, device size from `DO_DEVICE_BYTES`, `/repo` bare) / `CRON_TASKS` (`CronTasksWorker`, `idFromName('global')`), cron `*/10 * * * *`; no R2/Queues/AI bindings.
 
 ## Required vars (no defaults)
 

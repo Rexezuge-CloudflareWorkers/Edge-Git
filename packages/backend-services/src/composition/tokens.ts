@@ -38,6 +38,7 @@ import type {
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import type { Token } from '@edge-git/backend-runtime/di';
 import type { AppConfiguration } from '@edge-git/backend-runtime/config';
+import type { KvCache } from '@edge-git/backend-runtime/kv';
 import type { AccessAuthService } from '../auth/AccessAuthService';
 import type { TokenService } from '../auth/TokenService';
 import type { CheckService } from '../checks/CheckService';
@@ -92,6 +93,7 @@ interface RequestKeysShape {
 const Tokens = {
   Env: Symbol('Env') as Token<RequestScopeEnvShape>,
   Db: Symbol('Db') as Token<D1Queryable>,
+  KvCache: Symbol('KvCache') as Token<KvCache>,
   Keys: Symbol('Keys') as Token<() => Promise<RequestKeysShape>>,
   AppConfig: Symbol('AppConfig') as Token<AppConfiguration>,
   UserDAO: Symbol('UserDAO') as Token<() => Promise<UserDAO>>,

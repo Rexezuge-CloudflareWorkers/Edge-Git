@@ -58,6 +58,7 @@ vi.mock('@edge-git/backend-data/dao', () => ({
 const EXPECTED_TOKENS = [
   'Env',
   'Db',
+  'KvCache',
   'Keys',
   'AppConfig',
   'UserDAO',
