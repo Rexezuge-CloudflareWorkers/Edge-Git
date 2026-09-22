@@ -6,6 +6,7 @@ import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Label, Select } from '../ui/Input';
 import { RefreshButton } from '../shared/RefreshButton';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 const MODES: SecretScanMode[] = ['off', 'warn', 'block'];
 
@@ -62,7 +63,7 @@ export function SecretScanCard({
       setMode(settings.secretScanMode);
       showNotice('success', t('security.scanUpdated', 'Secret Scanning Updated.'));
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('security.updateFailed', 'Failed To Update Secret Scanning.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'security.updateFailed', 'Failed To Update Secret Scanning.'));
     } finally {
       setSaving(false);
     }

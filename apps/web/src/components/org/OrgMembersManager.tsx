@@ -7,6 +7,7 @@ import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Input, Select } from '../ui/Input';
 import { RefreshButton } from '../shared/RefreshButton';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export function OrgMembersManager({ org, showNotice }: { org: string; showNotice: (type: 'success' | 'error', text: string) => void }) {
   const { t } = useTranslation();
@@ -25,7 +26,7 @@ export function OrgMembersManager({ org, showNotice }: { org: string; showNotice
         if (!cancelled) setMembers(rows);
       } catch (error) {
         if (!cancelled)
-          showNotice('error', error instanceof Error ? error.message : t('orgs.failedToLoadMembers', 'Failed To Load Members.'));
+          showNotice('error', toLocalizedErrorMessage(t, error, 'orgs.failedToLoadMembers', 'Failed To Load Members.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -52,7 +53,7 @@ export function OrgMembersManager({ org, showNotice }: { org: string; showNotice
       showNotice('success', t('orgs.memberAdded', 'Member Added.'));
       refresh();
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('orgs.failedToAddMember', 'Failed To Add Member.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'orgs.failedToAddMember', 'Failed To Add Member.'));
     } finally {
       setInviting(false);
     }
@@ -64,7 +65,7 @@ export function OrgMembersManager({ org, showNotice }: { org: string; showNotice
       showNotice('success', t('orgs.roleUpdated', 'Member Role Updated.'));
       refresh();
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('orgs.failedToUpdateRole', 'Failed To Update Member Role.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'orgs.failedToUpdateRole', 'Failed To Update Member Role.'));
     }
   };
 
@@ -74,7 +75,7 @@ export function OrgMembersManager({ org, showNotice }: { org: string; showNotice
       showNotice('success', t('orgs.memberRemoved', 'Member Removed.'));
       refresh();
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('orgs.failedToRemoveMember', 'Failed To Remove Member.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'orgs.failedToRemoveMember', 'Failed To Remove Member.'));
     }
   };
 
@@ -93,7 +94,7 @@ export function OrgMembersManager({ org, showNotice }: { org: string; showNotice
             required
           />
         </div>
-        <Select value={role} onChange={(e) => setRole(e.target.value as 'owner' | 'member')} aria-label="Role">
+        <Select value={role} onChange={(e) => setRole(e.target.value as 'owner' | 'member')} aria-label={t('orgs.role', 'Role')}>
           <option value="member">{t('orgs.member', 'Member')}</option>
           <option value="owner">{t('orgs.owner', 'Owner')}</option>
         </Select>

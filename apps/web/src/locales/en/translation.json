@@ -3,7 +3,8 @@
     "dashboard": "Dashboard",
     "new": "New",
     "settings": "Settings",
-    "snippets": "Snippets"
+    "snippets": "Snippets",
+    "home": "Edge-Git Home"
   },
   "common": {
     "cancel": "Cancel",
@@ -12,6 +13,7 @@
     "copyToClipboard": "Copy To Clipboard",
     "create": "Create",
     "delete": "Delete",
+    "deleteConfirm": "Delete {{name}}? This Cannot Be Undone.",
     "error": "Error",
     "loadMore": "Load More",
     "loading": "Loading…",
@@ -84,6 +86,7 @@
     "branch": "Branch",
     "defaultBranch": "Default Branch",
     "clone": "Clone",
+    "cloneRepository": "Clone Repository",
     "closeCloneMenu": "Close Clone Menu",
     "cloneMethod": "Clone Method",
     "cloneWithHttps": "Clone Using HTTPS",
@@ -99,7 +102,10 @@
     "tags": "Tags",
     "noTags": "No Tags Yet.",
     "annotated": "Annotated",
-    "lightweight": "Lightweight"
+    "lightweight": "Lightweight",
+    "sections": "Repository Sections",
+    "readme": "README",
+    "loadingRepository": "Loading Repository…"
   },
   "rules": {
     "branchProtection": "Branch Protection",
@@ -175,7 +181,9 @@
     "created": "Branch Created.",
     "deleted": "Branch Deleted.",
     "defaultBranch": "Default Branch",
-    "defaultUpdated": "Default Branch Updated."
+    "defaultUpdated": "Default Branch Updated.",
+    "loading": "Loading…",
+    "noBranches": "No Branches"
   },
   "checks": {
     "title": "Status Checks",
@@ -187,6 +195,8 @@
   "files": {
     "edit": "Edit",
     "newFile": "New File",
+    "blame": "Blame",
+    "hideBlame": "Hide Blame",
     "fileName": "File Name",
     "fileNamePlaceholder": "notes/todo.txt",
     "contentPlaceholder": "File Contents…",
@@ -201,6 +211,7 @@
   },
   "issues": {
     "newIssue": "New Issue",
+    "filterByLabel": "Filter By Label…",
     "titlePlaceholder": "Title",
     "descriptionPlaceholder": "Description (Optional)",
     "createIssue": "Create Issue",
@@ -290,7 +301,10 @@
     "resolveThread": "Resolve",
     "reopenThread": "Reopen",
     "resolved": "Resolved",
-    "open": "Open"
+    "open": "Open",
+    "merged": "Merged",
+    "reviewState": "Review State",
+    "side": "Side"
   },
   "releases": {
     "newRelease": "New Release",
@@ -324,12 +338,18 @@
     "compareNotFound": "Comparison Not Found.",
     "diff": "Diff",
     "diffTooLarge": "Diff Too Large To Display.",
-    "viewAll": "View All Commits"
+    "viewAll": "View All Commits",
+    "loadingCommits": "Loading Commits…"
   },
   "forks": {
     "fork": "Fork",
     "forks": "Forks",
     "forkRepository": "Fork {{fullName}}",
+    "checkSync": "Check Upstream",
+    "syncFastForward": "Sync (Fast-Forward)",
+    "syncMerge": "Sync (Merge)",
+    "synced": "Fork Synced With Upstream.",
+    "upToDate": "Fork Is Already Up To Date.",
     "ownerHint": "Your Username Or An Organization You Belong To.",
     "createFork": "Create Fork",
     "forkCreated": "Fork {{fullName}} Created.",
@@ -362,6 +382,7 @@
     "revokeToken": "Revoke Token",
     "tokenCreated": "Token Created. Copy It Now — It Will Not Be Shown Again.",
     "tokenRevoked": "Token Revoked.",
+    "failedToRotate": "Failed To Rotate Token.",
     "scopes": "Scopes (Git Only)",
     "scopesHint": "Fetch Needs repo:read. Push Needs repo:write. Admin Covers Both.",
     "selectAtLeastOneScope": "Select At Least One Scope.",
@@ -439,6 +460,8 @@
     "organizations": "Organizations",
     "people": "People",
     "manage": "Manage",
+    "sections": "Profile Sections",
+    "loadingProfile": "Loading Profile…",
     "notFound": "Profile Not Found",
     "notFoundDescription": "This User Or Organization Does Not Exist.",
     "noRepos": "No Visible Repositories.",
@@ -451,6 +474,8 @@
   },
   "orgs": {
     "newOrg": "New Organization",
+    "role": "Role",
+    "grantRole": "Grant Role",
     "created": "Organization {{username}} Created.",
     "failedToCreate": "Failed To Create Organization.",
     "general": "General",
@@ -482,6 +507,7 @@
   },
   "collaborators": {
     "title": "Collaborators",
+    "role": "Role",
     "hint": "Admins Can Grant Read, Write, Or Admin Access. Organization Owners Already Have Admin Access.",
     "invitePlaceholder": "Username Or Email",
     "read": "Read",
@@ -552,13 +578,30 @@
     "fileNotFound": "File Not Found.",
     "languageLoadFailed": "Unable To Load Language.",
     "languageSaveFailed": "Unable To Save Language.",
-    "failedToSearch": "Failed To Load Search Results."
+    "failedToSearch": "Failed To Load Search Results.",
+    "failedToSync": "Failed To Sync Fork.",
+    "failedToPreviewSync": "Failed To Preview Sync.",
+    "failedToUpdateDraft": "Failed To Update Draft.",
+    "backend": {
+      "badRequest": "Bad Request.",
+      "unauthorized": "Authentication Required.",
+      "forbidden": "Access Denied.",
+      "notFound": "Not Found.",
+      "conflict": "Conflict.",
+      "payloadTooLarge": "Payload Too Large.",
+      "rateLimited": "Too Many Requests. Try Again Later.",
+      "methodNotAllowed": "Method Not Allowed.",
+      "databaseError": "Service Temporarily Unavailable.",
+      "internalError": "Internal Server Error."
+    }
   },
   "search": {
+    "title": "Search",
     "placeholder": "Search Repositories And Issues…",
     "repos": "Repositories",
     "issues": "Issues",
     "pulls": "Pull Requests",
+    "categories": "Search Categories",
     "hint": "Type At Least 2 Characters To Search.",
     "noRepos": "No Repositories Found.",
     "noIssues": "No Issues Found.",
@@ -626,6 +669,7 @@
     "newProject": "New Project",
     "titlePlaceholder": "Project Title",
     "projectCreated": "Project Created.",
+    "untitled": "Untitled",
     "noProjects": "No Projects Yet.",
     "closed": "Closed",
     "closeProject": "Close Project",
@@ -671,7 +715,9 @@
     "conflict": "Someone Else Updated This Page. Reload And Retry."
   },
   "snippets": {
+    "title": "Snippets",
     "snippets": "Snippets",
+    "scope": "Snippet Scope",
     "public": "Public",
     "mine": "Mine",
     "secret": "Secret",

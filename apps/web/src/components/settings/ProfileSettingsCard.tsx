@@ -5,6 +5,7 @@ import { renameCurrentUsername, loadCurrentUser } from '../../services/userServi
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Input, Label } from '../ui/Input';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export function ProfileSettingsCard({
   user,
@@ -44,9 +45,7 @@ export function ProfileSettingsCard({
         'error',
         message.toLowerCase().includes('reserved')
           ? t('settings.usernameReserved', 'This Name Is Reserved For System Use.')
-          : error instanceof Error
-            ? error.message
-            : t('settings.failedToUpdate', 'Failed To Update Profile.'),
+          : toLocalizedErrorMessage(t, error, 'settings.failedToUpdate', 'Failed To Update Profile.'),
       );
     } finally {
       setSaving(false);

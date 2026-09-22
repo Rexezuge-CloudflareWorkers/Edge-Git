@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { GitCommit, OverviewResponse, TagInfo, TreeEntry } from '../../types';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 import { decodeBlobContent, loadOverview, loadTree } from '../../services/repoService';
 
 function resolveSelectedRef(ref: string, branches: string[], currentBranch: string | null, tagRefs: Set<string>): string {
@@ -75,6 +77,7 @@ function useCodeTabOverview(
   const [loading, setLoading] = useState(true);
   const [readme, setReadme] = useState<{ path: string; text: string } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const { t } = useTranslation();
   const overviewStateRef = useRef<{
     key: string | null;
     inflightKey: string | null;
@@ -172,7 +175,7 @@ function useCodeTabOverview(
           }
         }
       } catch (error) {
-        if (!cancelled) showNotice('error', error instanceof Error ? error.message : 'Failed To Load Repository Files.');
+        if (!cancelled) showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToLoadFiles', 'Failed To Load Repository Files.'));
         if (!cancelled) setLoading(false);
       }
     };

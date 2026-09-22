@@ -7,6 +7,7 @@ import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Input, Select } from '../ui/Input';
 import { RefreshButton } from '../shared/RefreshButton';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 type CollaboratorRole = 'admin' | 'write' | 'read';
 
@@ -35,7 +36,7 @@ export function CollaboratorsCard({
         if (!cancelled) setRows(list);
       } catch (error) {
         if (!cancelled)
-          showNotice('error', error instanceof Error ? error.message : t('collaborators.failedToLoad', 'Failed To Load Collaborators.'));
+          showNotice('error', toLocalizedErrorMessage(t, error, 'collaborators.failedToLoad', 'Failed To Load Collaborators.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -61,7 +62,7 @@ export function CollaboratorsCard({
       showNotice('success', t('collaborators.updated', 'Collaborator Saved.'));
       refresh();
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('collaborators.failedToSave', 'Failed To Save Collaborator.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'collaborators.failedToSave', 'Failed To Save Collaborator.'));
     } finally {
       setSaving(false);
     }
@@ -73,7 +74,7 @@ export function CollaboratorsCard({
       showNotice('success', t('collaborators.removed', 'Collaborator Removed.'));
       refresh();
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('collaborators.failedToRemove', 'Failed To Remove Collaborator.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'collaborators.failedToRemove', 'Failed To Remove Collaborator.'));
     }
   };
 
@@ -95,7 +96,7 @@ export function CollaboratorsCard({
             required
           />
         </div>
-        <Select value={role} onChange={(e) => setRole(e.target.value as CollaboratorRole)} aria-label="Role">
+        <Select value={role} onChange={(e) => setRole(e.target.value as CollaboratorRole)} aria-label={t('collaborators.role', 'Role')}>
           <option value="read">{t('collaborators.read', 'Read')}</option>
           <option value="write">{t('collaborators.write', 'Write')}</option>
           <option value="admin">{t('collaborators.admin', 'Admin')}</option>
@@ -123,7 +124,7 @@ export function CollaboratorsCard({
                     } catch (error) {
                       showNotice(
                         'error',
-                        error instanceof Error ? error.message : t('collaborators.failedToSave', 'Failed To Save Collaborator.'),
+                        toLocalizedErrorMessage(t, error, 'collaborators.failedToSave', 'Failed To Save Collaborator.'),
                       );
                     }
                   })();

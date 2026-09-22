@@ -7,6 +7,7 @@ import { Markdown } from '../shared/Markdown';
 import { Button } from '../ui/Button';
 import { CardHeader, CardTitle } from '../ui/Card';
 import { Textarea } from '../ui/Input';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export function PullComments({
   owner,
@@ -38,7 +39,7 @@ export function PullComments({
       setDraft('');
       onCommentsChange(await listPullComments(owner, repo, number));
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToAddComment', 'Failed To Add Comment.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToAddComment', 'Failed To Add Comment.'));
     } finally {
       setSaving(false);
     }

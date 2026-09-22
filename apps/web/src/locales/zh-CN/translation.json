@@ -3,7 +3,8 @@
     "dashboard": "仪表盘",
     "new": "新建",
     "settings": "设置",
-    "snippets": "代码片段"
+    "snippets": "代码片段",
+    "home": "Edge-Git 主页"
   },
   "common": {
     "cancel": "取消",
@@ -12,6 +13,7 @@
     "copyToClipboard": "复制到剪贴板",
     "create": "创建",
     "delete": "删除",
+    "deleteConfirm": "删除{{name}}？此操作无法撤销。",
     "error": "错误",
     "loadMore": "加载更多",
     "loading": "加载中…",
@@ -84,6 +86,7 @@
     "branch": "分支",
     "defaultBranch": "默认分支",
     "clone": "克隆",
+    "cloneRepository": "克隆仓库",
     "closeCloneMenu": "关闭克隆菜单",
     "cloneMethod": "克隆方式",
     "cloneWithHttps": "使用 HTTPS 克隆",
@@ -99,7 +102,10 @@
     "tags": "标签",
     "noTags": "暂无标签。",
     "annotated": "附注",
-    "lightweight": "轻量"
+    "lightweight": "轻量",
+    "sections": "仓库分区",
+    "readme": "README",
+    "loadingRepository": "正在加载仓库…"
   },
   "rules": {
     "branchProtection": "分支保护",
@@ -175,7 +181,9 @@
     "created": "分支已创建。",
     "deleted": "分支已删除。",
     "defaultBranch": "默认分支",
-    "defaultUpdated": "默认分支已更新。"
+    "defaultUpdated": "默认分支已更新。",
+    "loading": "加载中…",
+    "noBranches": "暂无分支"
   },
   "checks": {
     "title": "状态检查",
@@ -187,6 +195,8 @@
   "files": {
     "edit": "编辑",
     "newFile": "新建文件",
+    "blame": "追溯",
+    "hideBlame": "隐藏追溯",
     "fileName": "文件名",
     "fileNamePlaceholder": "notes/todo.txt",
     "contentPlaceholder": "文件内容…",
@@ -201,6 +211,7 @@
   },
   "issues": {
     "newIssue": "新建议题",
+    "filterByLabel": "按标签筛选…",
     "titlePlaceholder": "标题",
     "descriptionPlaceholder": "描述（可选）",
     "createIssue": "创建议题",
@@ -290,7 +301,10 @@
     "resolveThread": "解决",
     "reopenThread": "重新打开",
     "resolved": "已解决",
-    "open": "开放"
+    "open": "开放",
+    "merged": "已合并",
+    "reviewState": "评审状态",
+    "side": "侧"
   },
   "releases": {
     "newRelease": "新建发布",
@@ -324,12 +338,18 @@
     "compareNotFound": "对比不存在。",
     "diff": "差异",
     "diffTooLarge": "差异过大，无法显示。",
-    "viewAll": "查看全部提交"
+    "viewAll": "查看全部提交",
+    "loadingCommits": "正在加载提交…"
   },
   "forks": {
     "fork": "复刻",
     "forks": "复刻",
     "forkRepository": "复刻 {{fullName}}",
+    "checkSync": "检查上游",
+    "syncFastForward": "同步（快进）",
+    "syncMerge": "同步（合并）",
+    "synced": "复刻已与上游同步。",
+    "upToDate": "复刻已是最新。",
     "ownerHint": "你的用户名或你所属的组织。",
     "createFork": "创建复刻",
     "forkCreated": "复刻 {{fullName}} 已创建。",
@@ -362,6 +382,7 @@
     "revokeToken": "撤销令牌",
     "tokenCreated": "令牌已创建。请立即复制——之后将不再显示。",
     "tokenRevoked": "令牌已撤销。",
+    "failedToRotate": "轮换令牌失败。",
     "scopes": "权限范围（仅 Git）",
     "scopesHint": "拉取需要 repo:read。推送需要 repo:write。Admin 包含两者。",
     "selectAtLeastOneScope": "请至少选择一个权限范围。",
@@ -439,6 +460,8 @@
     "organizations": "组织",
     "people": "成员",
     "manage": "管理",
+    "sections": "个人资料分区",
+    "loadingProfile": "正在加载个人资料…",
     "notFound": "个人主页不存在",
     "notFoundDescription": "该用户或组织不存在。",
     "noRepos": "暂无可见仓库。",
@@ -451,6 +474,8 @@
   },
   "orgs": {
     "newOrg": "新建组织",
+    "role": "角色",
+    "grantRole": "授予角色",
     "created": "组织 {{username}} 已创建。",
     "failedToCreate": "创建组织失败。",
     "general": "通用",
@@ -482,6 +507,7 @@
   },
   "collaborators": {
     "title": "协作者",
+    "role": "角色",
     "hint": "管理员可授予读取、写入或管理权限。组织所有者默认拥有管理权限。",
     "invitePlaceholder": "用户名或邮箱",
     "read": "读取",
@@ -552,13 +578,30 @@
     "fileNotFound": "文件不存在。",
     "languageLoadFailed": "无法加载语言。",
     "languageSaveFailed": "无法保存语言。",
-    "failedToSearch": "加载搜索结果失败。"
+    "failedToSearch": "加载搜索结果失败。",
+    "failedToSync": "同步复刻失败。",
+    "failedToPreviewSync": "加载同步预览失败。",
+    "failedToUpdateDraft": "更新草稿失败。",
+    "backend": {
+      "badRequest": "错误的请求。",
+      "unauthorized": "需要身份验证。",
+      "forbidden": "访问被拒绝。",
+      "notFound": "未找到。",
+      "conflict": "冲突。",
+      "payloadTooLarge": "负载过大。",
+      "rateLimited": "请求过多，请稍后再试。",
+      "methodNotAllowed": "方法不允许。",
+      "databaseError": "服务暂时不可用。",
+      "internalError": "内部服务器错误。"
+    }
   },
   "search": {
+    "title": "搜索",
     "placeholder": "搜索仓库和议题…",
     "repos": "仓库",
     "issues": "议题",
     "pulls": "合并请求",
+    "categories": "搜索分类",
     "hint": "至少输入 2 个字符进行搜索。",
     "noRepos": "未找到仓库。",
     "noIssues": "未找到议题。",
@@ -626,6 +669,7 @@
     "newProject": "新建项目",
     "titlePlaceholder": "项目标题",
     "projectCreated": "项目已创建。",
+    "untitled": "未命名",
     "noProjects": "暂无项目。",
     "closed": "已关闭",
     "closeProject": "关闭项目",
@@ -671,7 +715,9 @@
     "conflict": "有人刚刚更新了此页面，请刷新后重试。"
   },
   "snippets": {
+    "title": "代码片段",
     "snippets": "代码片段",
+    "scope": "代码片段范围",
     "public": "公开",
     "mine": "我的",
     "secret": "私密",

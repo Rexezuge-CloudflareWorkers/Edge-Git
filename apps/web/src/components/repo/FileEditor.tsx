@@ -4,6 +4,7 @@ import { deleteFile, saveFile } from '../../services/repoService';
 import { Button } from '../ui/Button';
 import { Input, Label, Textarea } from '../ui/Input';
 import { ConfirmDeleteModal } from '../modals/ConfirmDeleteModal';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 interface EditorBase {
   owner: string;
@@ -59,7 +60,7 @@ export function FileEditor({
       showNotice('success', t('files.saved', 'File Saved.'));
       onSaved();
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToSaveFile', 'Failed To Save File.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToSaveFile', 'Failed To Save File.'));
     } finally {
       setSaving(false);
     }
@@ -106,7 +107,7 @@ export function NewFileForm({ owner, repo, branch, directory, expectedOid, showN
       showNotice('success', t('files.saved', 'File Saved.'));
       onSaved();
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToSaveFile', 'Failed To Save File.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToSaveFile', 'Failed To Save File.'));
     } finally {
       setSaving(false);
     }
@@ -155,7 +156,7 @@ export function DeleteFileButton({ owner, repo, branch, path, expectedOid, showN
       showNotice('success', t('files.deleted', 'File Deleted.'));
       onSaved();
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToDeleteFile', 'Failed To Delete File.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToDeleteFile', 'Failed To Delete File.'));
     } finally {
       setDeleting(false);
       setConfirming(false);

@@ -12,6 +12,7 @@ import {
 import { formatBytes, formatTimestamp } from '../../lib/format';
 import { Button } from '../ui/Button';
 import { Markdown } from '../shared/Markdown';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export interface ReleaseRowProps {
   owner: string;
@@ -56,7 +57,7 @@ export function ReleaseRow({ owner, repo, release, canWrite, authorized, showNot
       showNotice('success', t('releases.published', 'Release Published.'));
       onChanged();
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('releases.actionFailed', 'Release Action Failed.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'releases.actionFailed', 'Release Action Failed.'));
     } finally {
       setBusy(false);
     }
@@ -70,7 +71,7 @@ export function ReleaseRow({ owner, repo, release, canWrite, authorized, showNot
       showNotice('success', t('releases.deleted', 'Release Deleted.'));
       onChanged();
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('releases.actionFailed', 'Release Action Failed.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'releases.actionFailed', 'Release Action Failed.'));
     } finally {
       setBusy(false);
     }
@@ -84,7 +85,7 @@ export function ReleaseRow({ owner, repo, release, canWrite, authorized, showNot
       setAssets(await listReleaseAssets(owner, repo, release.tagName));
       showNotice('success', t('releases.assetUploaded', 'Asset Uploaded.'));
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('releases.actionFailed', 'Release Action Failed.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'releases.actionFailed', 'Release Action Failed.'));
     } finally {
       setUploading(false);
     }
@@ -96,7 +97,7 @@ export function ReleaseRow({ owner, repo, release, canWrite, authorized, showNot
       setAssets((prev) => prev.filter((a) => a.id !== asset.id));
       showNotice('success', t('releases.assetDeleted', 'Asset Deleted.'));
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('releases.actionFailed', 'Release Action Failed.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'releases.actionFailed', 'Release Action Failed.'));
     }
   };
 

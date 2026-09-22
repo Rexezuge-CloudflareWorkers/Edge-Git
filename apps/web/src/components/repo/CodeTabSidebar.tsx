@@ -30,11 +30,11 @@ export function CodeTabSidebar(props: CodeTabSidebarProps) {
   return (
     <aside className="lg:col-span-1 space-y-4 min-w-0">
       <Card>
-        <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-3">About</h2>
+        <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-3">{t('repos.about', 'About')}</h2>
         {repoMeta.description ? (
           <p className="text-sm text-[var(--color-text-secondary)]">{repoMeta.description}</p>
         ) : (
-          <p className="text-sm text-[var(--color-text-muted)] italic">No description provided.</p>
+          <p className="text-sm text-[var(--color-text-muted)] italic">{t('repos.noDescription', 'No Description Provided.')}</p>
         )}
         <div className="mt-3">
           <VisibilityBadge isPrivate={repoMeta.isPrivate} />
@@ -62,7 +62,7 @@ export function CodeTabSidebar(props: CodeTabSidebarProps) {
           <div className="flex items-center justify-between gap-2">
             <dt className="text-[var(--color-text-muted)] inline-flex items-center gap-1.5">
               <GitBranch className="h-3.5 w-3.5" />
-              Branches
+              {t('repos.branches', 'Branches')}
             </dt>
             <dd>
               <Badge variant="neutral">{branches.length}</Badge>
@@ -78,15 +78,15 @@ export function CodeTabSidebar(props: CodeTabSidebarProps) {
             </dd>
           </div>
           <div className="flex items-center justify-between gap-2">
-            <dt className="text-[var(--color-text-muted)]">Default</dt>
+            <dt className="text-[var(--color-text-muted)]">{t('repos.default', 'Default')}</dt>
             <dd className="font-mono text-xs text-[var(--color-text-primary)] truncate">{defaultBranch ?? '—'}</dd>
           </div>
           <div className="flex items-center justify-between gap-2">
-            <dt className="text-[var(--color-text-muted)]">Created</dt>
+            <dt className="text-[var(--color-text-muted)]">{t('repos.created', 'Created')}</dt>
             <dd className="text-xs text-[var(--color-text-secondary)]">{formatDateLocale(new Date(repoMeta.createdAt * 1000))}</dd>
           </div>
           <div className="flex items-center justify-between gap-2">
-            <dt className="text-[var(--color-text-muted)]">Updated</dt>
+            <dt className="text-[var(--color-text-muted)]">{t('repos.updated', 'Updated')}</dt>
             <dd className="text-xs text-[var(--color-text-secondary)]">{formatTimestamp(repoMeta.updatedAt)}</dd>
           </div>
         </dl>

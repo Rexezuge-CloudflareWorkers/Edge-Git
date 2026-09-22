@@ -4,6 +4,7 @@ import { createBranch, deleteBranch } from '../../services/repoService';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { ConfirmDeleteModal } from '../modals/ConfirmDeleteModal';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export function BranchActions({
   owner,
@@ -46,7 +47,7 @@ export function BranchActions({
       showNotice('success', t('branches.created', 'Branch Created.'));
       onChanged(ref.startsWith('refs/heads/') ? ref.slice('refs/heads/'.length) : ref);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToCreateBranch', 'Failed To Create Branch.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToCreateBranch', 'Failed To Create Branch.'));
     } finally {
       setSaving(false);
     }
@@ -60,7 +61,7 @@ export function BranchActions({
       showNotice('success', t('branches.deleted', 'Branch Deleted.'));
       onChanged('');
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToDeleteBranch', 'Failed To Delete Branch.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToDeleteBranch', 'Failed To Delete Branch.'));
     } finally {
       setDeleting(false);
       setConfirmingDelete(false);

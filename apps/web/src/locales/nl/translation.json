@@ -3,7 +3,8 @@
     "dashboard": "Dashboard",
     "new": "Nieuw",
     "settings": "Instellingen",
-    "snippets": "Snippets"
+    "snippets": "Snippets",
+    "home": "Edge-Git-home"
   },
   "common": {
     "cancel": "Annuleren",
@@ -12,6 +13,7 @@
     "copyToClipboard": "Kopiëren naar klembord",
     "create": "Aanmaken",
     "delete": "Verwijderen",
+    "deleteConfirm": "{{name}} verwijderen? Dit kan niet ongedaan worden gemaakt.",
     "error": "Fout",
     "loadMore": "Meer laden",
     "loading": "Laden…",
@@ -84,6 +86,7 @@
     "branch": "Branch",
     "defaultBranch": "Standaardbranch",
     "clone": "Klonen",
+    "cloneRepository": "Repository klonen",
     "closeCloneMenu": "Kloonmenu sluiten",
     "cloneMethod": "Kloonmethode",
     "cloneWithHttps": "Klonen via HTTPS",
@@ -99,7 +102,10 @@
     "tags": "Tags",
     "noTags": "Nog geen tags.",
     "annotated": "Met annotatie",
-    "lightweight": "Lichtgewicht"
+    "lightweight": "Lichtgewicht",
+    "sections": "Repositoryonderdelen",
+    "readme": "README",
+    "loadingRepository": "Repository laden…"
   },
   "rules": {
     "branchProtection": "Branchbeveiliging",
@@ -175,7 +181,9 @@
     "created": "Branch aangemaakt.",
     "deleted": "Branch verwijderd.",
     "defaultBranch": "Standaardbranch",
-    "defaultUpdated": "Standaardbranch bijgewerkt."
+    "defaultUpdated": "Standaardbranch bijgewerkt.",
+    "loading": "Laden…",
+    "noBranches": "Geen branches"
   },
   "checks": {
     "title": "Statuscontroles",
@@ -187,6 +195,8 @@
   "files": {
     "edit": "Bewerken",
     "newFile": "Nieuw bestand",
+    "blame": "Blame",
+    "hideBlame": "Blame verbergen",
     "fileName": "Bestandsnaam",
     "fileNamePlaceholder": "notes/todo.txt",
     "contentPlaceholder": "Bestandsinhoud…",
@@ -201,6 +211,7 @@
   },
   "issues": {
     "newIssue": "Nieuw issue",
+    "filterByLabel": "Filteren op label…",
     "titlePlaceholder": "Titel",
     "descriptionPlaceholder": "Beschrijving (optioneel)",
     "createIssue": "Issue aanmaken",
@@ -290,7 +301,10 @@
     "resolveThread": "Oplossen",
     "reopenThread": "Heropenen",
     "resolved": "Opgelost",
-    "open": "Open"
+    "open": "Open",
+    "merged": "Samengevoegd",
+    "reviewState": "Reviewstatus",
+    "side": "Zijde"
   },
   "releases": {
     "newRelease": "Nieuwe release",
@@ -324,12 +338,18 @@
     "compareNotFound": "Vergelijking niet gevonden.",
     "diff": "Verschil",
     "diffTooLarge": "Verschil te groot om weer te geven.",
-    "viewAll": "Alle commits bekijken"
+    "viewAll": "Alle commits bekijken",
+    "loadingCommits": "Commits laden…"
   },
   "forks": {
     "fork": "Fork",
     "forks": "Forks",
     "forkRepository": "{{fullName}} forken",
+    "checkSync": "Upstream controleren",
+    "syncFastForward": "Synchroniseren (fast-forward)",
+    "syncMerge": "Synchroniseren (merge)",
+    "synced": "Fork gesynchroniseerd met upstream.",
+    "upToDate": "Fork is al up-to-date.",
     "ownerHint": "Je gebruikersnaam of een organisatie waar je bij hoort.",
     "createFork": "Fork aanmaken",
     "forkCreated": "Fork {{fullName}} aangemaakt.",
@@ -362,6 +382,7 @@
     "revokeToken": "Token intrekken",
     "tokenCreated": "Token aangemaakt. Kopieer het nu — het wordt daarna niet meer getoond.",
     "tokenRevoked": "Token ingetrokken.",
+    "failedToRotate": "Token kon niet worden geroteerd.",
     "scopes": "Scopes (alleen Git)",
     "scopesHint": "Ophalen vereist repo:read. Pushen vereist repo:write. Admin dekt beide.",
     "selectAtLeastOneScope": "Selecteer minimaal één scope.",
@@ -439,6 +460,8 @@
     "organizations": "Organisaties",
     "people": "Mensen",
     "manage": "Beheren",
+    "sections": "Profielonderdelen",
+    "loadingProfile": "Profiel laden…",
     "notFound": "Profiel niet gevonden",
     "notFoundDescription": "Deze gebruiker of organisatie bestaat niet.",
     "noRepos": "Geen zichtbare repository's.",
@@ -451,6 +474,8 @@
   },
   "orgs": {
     "newOrg": "Nieuwe organisatie",
+    "role": "Rol",
+    "grantRole": "Rol toekennen",
     "created": "Organisatie {{username}} aangemaakt.",
     "failedToCreate": "Organisatie kon niet worden aangemaakt.",
     "general": "Algemeen",
@@ -482,6 +507,7 @@
   },
   "collaborators": {
     "title": "Medewerkers",
+    "role": "Rol",
     "hint": "Beheerders kunnen lees-, schrijf- of beheerderstoegang verlenen. Organisatie-eigenaren hebben al beheerderstoegang.",
     "invitePlaceholder": "Gebruikersnaam of e-mail",
     "read": "Lezen",
@@ -552,13 +578,30 @@
     "fileNotFound": "Bestand niet gevonden.",
     "languageLoadFailed": "Taal kon niet worden geladen.",
     "languageSaveFailed": "Taal kon niet worden opgeslagen.",
-    "failedToSearch": "Zoekresultaten konden niet worden geladen."
+    "failedToSearch": "Zoekresultaten konden niet worden geladen.",
+    "failedToSync": "Fork kon niet worden gesynchroniseerd.",
+    "failedToPreviewSync": "Sync-preview kon niet worden geladen.",
+    "failedToUpdateDraft": "Concept kon niet worden bijgewerkt.",
+    "backend": {
+      "badRequest": "Ongeldig verzoek.",
+      "unauthorized": "Authenticatie vereist.",
+      "forbidden": "Toegang geweigerd.",
+      "notFound": "Niet gevonden.",
+      "conflict": "Conflict.",
+      "payloadTooLarge": "Payload te groot.",
+      "rateLimited": "Te veel verzoeken. Probeer het later opnieuw.",
+      "methodNotAllowed": "Methode niet toegestaan.",
+      "databaseError": "Service tijdelijk niet beschikbaar.",
+      "internalError": "Interne serverfout."
+    }
   },
   "search": {
+    "title": "Zoeken",
     "placeholder": "Repository's en issues zoeken…",
     "repos": "Repository's",
     "issues": "Issues",
     "pulls": "Pull requests",
+    "categories": "Zoekcategorieën",
     "hint": "Typ minimaal 2 tekens om te zoeken.",
     "noRepos": "Geen repository's gevonden.",
     "noIssues": "Geen issues gevonden.",
@@ -626,6 +669,7 @@
     "newProject": "Nieuw project",
     "titlePlaceholder": "Projecttitel",
     "projectCreated": "Project aangemaakt.",
+    "untitled": "Naamloos",
     "noProjects": "Nog geen projecten.",
     "closed": "Gesloten",
     "closeProject": "Project sluiten",
@@ -671,7 +715,9 @@
     "conflict": "Iemand anders heeft deze pagina bijgewerkt. Vernieuw en probeer het opnieuw."
   },
   "snippets": {
+    "title": "Snippets",
     "snippets": "Snippets",
+    "scope": "Snippetbereik",
     "public": "Openbaar",
     "mine": "Van mij",
     "secret": "Geheim",

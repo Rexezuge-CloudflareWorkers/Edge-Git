@@ -1,4 +1,5 @@
 import { cva, type VariantProps } from 'class-variance-authority';
+import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 
 const badgeVariants = cva('inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium shrink-0', {
@@ -25,14 +26,29 @@ export function Badge({
 }
 
 export function VisibilityBadge({ isPrivate }: { isPrivate: boolean }) {
-  return <Badge variant={isPrivate ? 'warning' : 'success'}>{isPrivate ? 'Private' : 'Public'}</Badge>;
+  const { t } = useTranslation();
+  return (
+    <Badge variant={isPrivate ? 'warning' : 'success'}>
+      {isPrivate ? t('repos.private', 'Private') : t('repos.public', 'Public')}
+    </Badge>
+  );
 }
 
 export function IssueStatusBadge({ status }: { status: string }) {
-  return <Badge variant={status === 'open' ? 'success' : 'neutral'}>{status === 'open' ? 'Open' : 'Closed'}</Badge>;
+  const { t } = useTranslation();
+  return (
+    <Badge variant={status === 'open' ? 'success' : 'neutral'}>
+      {status === 'open' ? t('repos.open', 'Open') : t('repos.closed', 'Closed')}
+    </Badge>
+  );
 }
 
 export function PullStatusBadge({ status }: { status: string }) {
-  if (status === 'merged') return <Badge variant="info">Merged</Badge>;
-  return <Badge variant={status === 'open' ? 'success' : 'neutral'}>{status === 'open' ? 'Open' : 'Closed'}</Badge>;
+  const { t } = useTranslation();
+  if (status === 'merged') return <Badge variant="info">{t('pulls.merged', 'Merged')}</Badge>;
+  return (
+    <Badge variant={status === 'open' ? 'success' : 'neutral'}>
+      {status === 'open' ? t('repos.open', 'Open') : t('repos.closed', 'Closed')}
+    </Badge>
+  );
 }

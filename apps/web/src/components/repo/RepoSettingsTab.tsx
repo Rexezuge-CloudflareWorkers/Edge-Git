@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Repo } from '../../types';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 import { deleteRepo, loadBranches, setDefaultBranch, updateRepo } from '../../services/repoService';
 import { BranchProtectionCard } from './BranchProtectionCard';
 import { CollaboratorsCard } from './CollaboratorsCard';
@@ -63,7 +64,7 @@ export function RepoSettingsTab({
     } catch (error) {
       showNotice(
         'error',
-        error instanceof Error ? error.message : t('errors.failedToUpdateDefaultBranch', 'Failed To Update Default Branch.'),
+        toLocalizedErrorMessage(t, error, 'errors.failedToUpdateDefaultBranch', 'Failed To Update Default Branch.'),
       );
     } finally {
       setSavingDefault(false);
@@ -86,9 +87,9 @@ export function RepoSettingsTab({
         isPrivate,
       });
       onUpdated(updated);
-      showNotice('success', 'Repository Settings Updated.');
+      showNotice('success', t('repos.repositorySettingsUpdated', 'Repository Settings Updated.'));
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : 'Failed To Update Repository.');
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToUpdateRepository', 'Failed To Update Repository.'));
     } finally {
       setSaving(false);
     }
@@ -98,10 +99,10 @@ export function RepoSettingsTab({
     setDeleting(true);
     try {
       await deleteRepo(owner, repo);
-      showNotice('success', 'Repository Deleted.');
+      showNotice('success', t('repos.repositoryDeleted', 'Repository Deleted.'));
       onDeleted();
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : 'Failed To Delete Repository.');
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToDeleteRepository', 'Failed To Delete Repository.'));
     } finally {
       setDeleting(false);
       setConfirmingDelete(false);
@@ -112,15 +113,15 @@ export function RepoSettingsTab({
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>General</CardTitle>
+          <CardTitle>{t('repos.general', 'General')}</CardTitle>
           <RefreshButton onRefresh={reset} loading={saving} />
         </CardHeader>
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="repo-settings-description">Description</Label>
+            <Label htmlFor="repo-settings-description">{t('repos.description', 'Description')}</Label>
             <Textarea
               id="repo-settings-description"
-              placeholder="A short description of this repository"
+              placeholder={t('repos.descriptionPlaceholderSettings', 'A Short Description Of This Repository')}
               value={description}
               maxLength={500}
               rows={3}
@@ -134,11 +135,11 @@ export function RepoSettingsTab({
               onChange={(e) => setIsPrivate(e.target.checked)}
               className="h-4 w-4 accent-[var(--color-accent)]"
             />
-            Private repository
+            {t('repos.privateRepository', 'Private Repository')}
           </label>
           <div>
             <Button type="submit" variant="primary" size="sm" loading={saving} disabled={!dirty}>
-              Save Changes
+              {t('common.saveChanges', 'Save Changes')}
             </Button>
           </div>
         </form>
@@ -181,24 +182,27 @@ export function RepoSettingsTab({
 
       <Card className="border-[var(--color-error-text)]/40">
         <CardHeader>
-          <CardTitle>Danger Zone</CardTitle>
+          <CardTitle>{t('repos.dangerZone', 'Danger Zone')}</CardTitle>
         </CardHeader>
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
-            <p className="text-sm font-medium text-[var(--color-text-primary)]">Delete this repository</p>
+            <p className="text-sm font-medium text-[var(--color-text-primary)]">{t('repos.deleteThisRepository', 'Delete This Repository')}</p>
             <p className="text-sm text-[var(--color-text-secondary)]">
-              Permanently deletes the repository, its git data, issues, and comments. This cannot be undone.
+              {t(
+                'repos.deleteRepositoryDescription',
+                'Permanently Deletes The Repository, Its Git Data, Issues, And Comments. This Cannot Be Undone.',
+              )}
             </p>
           </div>
           <Button variant="danger" size="sm" loading={deleting} onClick={() => setConfirmingDelete(true)}>
-            Delete Repository
+            {t('repos.deleteRepository', 'Delete Repository')}
           </Button>
         </div>
       </Card>
 
       {confirmingDelete && (
         <ConfirmDeleteModal
-          title="Delete Repository"
+          title={t('repos.deleteRepository', 'Delete Repository')}
           displayName={`${owner}/${repo}`}
           onConfirm={() => void confirmDelete()}
           onCancel={() => setConfirmingDelete(false)}

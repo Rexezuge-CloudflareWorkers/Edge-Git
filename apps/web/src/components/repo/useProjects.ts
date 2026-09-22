@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Project } from '../../types';
 import { createProject, listProjects } from '../../services/projectService';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export interface UseProjectsOptions {
   owner: string;
@@ -31,7 +32,7 @@ export function useProjects({ owner, repo, authorized, showNotice }: UseProjects
         setProjects(list);
         setSelected((prev) => prev ?? list[0]?.number ?? null);
       } catch (error) {
-        showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadProjects', 'Failed To Load Projects.'));
+        showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToLoadProjects', 'Failed To Load Projects.'));
       } finally {
         setLoading(false);
       }
@@ -53,7 +54,7 @@ export function useProjects({ owner, repo, authorized, showNotice }: UseProjects
       refresh();
       return project.number;
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToCreateProject', 'Failed To Create Project.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToCreateProject', 'Failed To Create Project.'));
       return null;
     } finally {
       setSaving(false);

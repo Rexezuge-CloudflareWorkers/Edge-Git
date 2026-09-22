@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { BookMarked, GitFork } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { Repo } from '../../types';
 import { VisibilityBadge } from '../ui/Badge';
 import { ContextBar } from '../layout/ContextBar';
@@ -7,16 +8,16 @@ import { SegmentedTabs } from '../layout/SegmentedTabs';
 
 export type RepoTab = 'code' | 'pulls' | 'issues' | 'projects' | 'discussions' | 'wiki' | 'releases' | 'activity' | 'settings';
 
-const TABS: Array<{ id: RepoTab; label: string }> = [
-  { id: 'code', label: 'Code' },
-  { id: 'pulls', label: 'Pulls' },
-  { id: 'issues', label: 'Issues' },
-  { id: 'projects', label: 'Projects' },
-  { id: 'discussions', label: 'Discussions' },
-  { id: 'wiki', label: 'Wiki' },
-  { id: 'releases', label: 'Releases' },
-  { id: 'activity', label: 'Activity' },
-  { id: 'settings', label: 'Settings' },
+const TABS: Array<{ id: RepoTab; labelKey: string; fallback: string }> = [
+  { id: 'code', labelKey: 'repos.code', fallback: 'Code' },
+  { id: 'pulls', labelKey: 'pulls.pulls', fallback: 'Pull Requests' },
+  { id: 'issues', labelKey: 'issues.issues', fallback: 'Issues' },
+  { id: 'projects', labelKey: 'projects.projects', fallback: 'Projects' },
+  { id: 'discussions', labelKey: 'discussions.discussions', fallback: 'Discussions' },
+  { id: 'wiki', labelKey: 'wiki.wiki', fallback: 'Wiki' },
+  { id: 'releases', labelKey: 'releases.releases', fallback: 'Releases' },
+  { id: 'activity', labelKey: 'social.activity', fallback: 'Activity' },
+  { id: 'settings', labelKey: 'repos.settings', fallback: 'Settings' },
 ];
 
 export function RepoHeader({
@@ -38,6 +39,7 @@ export function RepoHeader({
   showSettings?: boolean;
   onTabChange: (tab: RepoTab) => void;
 }) {
+  const { t } = useTranslation();
   const tabs = showSettings ? TABS : TABS.filter((t) => t.id !== 'settings');
   const counts: Partial<Record<RepoTab, number>> = {
     ...(issueCount !== undefined && { issues: issueCount }),
@@ -76,8 +78,8 @@ export function RepoHeader({
       />
       <div className="max-w-7xl mx-auto px-6 py-3">
         <SegmentedTabs
-          ariaLabel="Repository sections"
-          tabs={tabs.map((t) => ({ id: t.id, label: t.label, count: counts[t.id] }))}
+          ariaLabel={t('repos.sections', 'Repository Sections')}
+          tabs={tabs.map((tab) => ({ id: tab.id, label: t(tab.labelKey, tab.fallback), count: counts[tab.id] }))}
           value={activeTab}
           onChange={(id) => onTabChange(id as RepoTab)}
         />

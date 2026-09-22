@@ -12,6 +12,7 @@ import { Input, Textarea } from '../ui/Input';
 import { IssueStatusBadge } from '../ui/Badge';
 import { RefreshButton } from '../shared/RefreshButton';
 import { Markdown } from '../shared/Markdown';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 function excerpt(body: string, max = 500): string {
   if (body.length <= max) return body;
@@ -58,7 +59,7 @@ export function IssuesTab({
         setIssues(list);
         onCountChange?.(list.length);
       } catch (error) {
-        showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadIssues', 'Failed To Load Issues.'));
+        showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToLoadIssues', 'Failed To Load Issues.'));
       } finally {
         setLoading(false);
       }
@@ -82,7 +83,7 @@ export function IssuesTab({
       setLoading(true);
       setReloadKey((k) => k + 1);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToCreateIssue', 'Failed To Create Issue.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToCreateIssue', 'Failed To Create Issue.'));
     } finally {
       setSaving(false);
     }

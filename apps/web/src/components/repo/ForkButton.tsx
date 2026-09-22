@@ -7,6 +7,7 @@ import { listMyOrgs } from '../../services/profileService';
 import { Button } from '../ui/Button';
 import { Input, Label, Select } from '../ui/Input';
 import { ModalBody, ModalHeader, ModalShell } from '../modals/ModalShell';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export function ForkButton({
   owner,
@@ -61,7 +62,7 @@ export function ForkButton({
       showNotice('success', t('forks.forkCreated', 'Fork {{fullName}} Created.', { fullName: created.fullName }));
       await navigate(`/${created.owner}/${created.name}`);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToFork', 'Failed To Fork Repository.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToFork', 'Failed To Fork Repository.'));
     } finally {
       setSaving(false);
     }

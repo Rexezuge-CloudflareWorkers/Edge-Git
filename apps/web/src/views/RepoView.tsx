@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import type { Repo } from '../types';
+import { getBackendErrorStatus } from '../lib/api';
 import { loadRepoAuthed, loadRepoPublic } from '../services/repoService';
 import { RepoHeader, type RepoTab } from '../components/repo/RepoHeader';
 import { ActivityTab } from '../components/repo/ActivityTab';
@@ -33,6 +35,7 @@ export function RepoView({
   defaultOwner: string;
 }) {
   const { owner = '', repo = '' } = useParams<{ owner: string; repo: string }>();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [repoData, setRepoData] = useState<Repo | null>(null);
@@ -90,8 +93,8 @@ export function RepoView({
         }
       } catch (error) {
         if (cancelled) return;
-        const message = error instanceof Error ? error.message : '';
-        const kind = message.includes('404') || message.includes('Not found') ? 'missing' : 'forbidden';
+        const status = getBackendErrorStatus(error);
+        const kind = status === 404 ? 'missing' : 'forbidden';
         // Private repos 404 on public while auth is still resolving — stay in
         // loading until `authorized` settles instead of flashing Not Found.
         if (authorized === null) {
@@ -120,16 +123,19 @@ export function RepoView({
   }, [authorized, status, repoData, owner, repo]);
 
   if (status === 'loading' && !repoData) {
-    return <LoadingSpinner label="Loading repository" />;
+    return <LoadingSpinner label={t('repos.loadingRepository', 'Loading Repository…')} />;
   }
 
   if (status === 'missing') {
     return (
       <AppPage>
         <Card>
-          <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">Repository Not Found</h1>
+          <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('repos.repositoryNotFound', 'Repository Not Found')}</h1>
           <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-            {owner}/{repo} does not exist or you do not have access to it.
+            {t('repos.repositoryNotFoundDescription', '{{owner}}/{{repo}} Does Not Exist Or You Do Not Have Access To It.', {
+              owner,
+              repo,
+            })}
           </p>
         </Card>
       </AppPage>
@@ -139,7 +145,7 @@ export function RepoView({
   if (status === 'forbidden' || !repoData) {
     return (
       <AppPage>
-        <Unauthorized message="This Repository Is Private. Sign In To View It." />
+        <Unauthorized message={t('repos.privateRepositoryMessage', 'This Repository Is Private. Sign In To View It.')} />
       </AppPage>
     );
   }

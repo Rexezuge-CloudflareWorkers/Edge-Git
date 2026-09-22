@@ -13,6 +13,7 @@ import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Textarea } from '../ui/Input';
 import { IssueStatusBadge } from '../ui/Badge';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export function IssueDetail({
   owner,
@@ -103,7 +104,7 @@ export function IssueDetail({
         commentsRes = await fetchUpgraded(commentsStateRef.current, `${key}/comments`, () => listComments(owner, repo, number, authOpt));
       } catch (error) {
         if (!cancelled) {
-          showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadComments', 'Failed To Load Comments.'));
+          showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToLoadComments', 'Failed To Load Comments.'));
         }
         return;
       }
@@ -140,7 +141,7 @@ export function IssueDetail({
       setIssue(updated);
       showNotice('success', next === 'closed' ? t('issues.issueClosed', 'Issue Closed.') : t('issues.issueReopened', 'Issue Reopened.'));
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToUpdateIssue', 'Failed To Update Issue.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToUpdateIssue', 'Failed To Update Issue.'));
     } finally {
       setToggling(false);
     }
@@ -157,7 +158,7 @@ export function IssueDetail({
       const list = await listComments(owner, repo, number);
       setComments(list);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToAddComment', 'Failed To Add Comment.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToAddComment', 'Failed To Add Comment.'));
     } finally {
       setSaving(false);
     }

@@ -6,6 +6,7 @@ import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Input, Label } from '../ui/Input';
 import { ConfirmDeleteModal } from '../modals/ConfirmDeleteModal';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export function OrgSettingsCard({
   org,
@@ -40,9 +41,7 @@ export function OrgSettingsCard({
         'error',
         message.toLowerCase().includes('reserved')
           ? t('orgs.usernameReserved', 'This Name Is Reserved For System Use.')
-          : error instanceof Error
-            ? error.message
-            : t('orgs.failedToUpdate', 'Failed To Update Organization.'),
+          : toLocalizedErrorMessage(t, error, 'orgs.failedToUpdate', 'Failed To Update Organization.'),
       );
     } finally {
       setSaving(false);
@@ -55,7 +54,7 @@ export function OrgSettingsCard({
       showNotice('success', t('orgs.disbanded', 'Organization Deleted.'));
       void navigate('/');
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('orgs.failedToDisband', 'Failed To Delete Organization.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'orgs.failedToDisband', 'Failed To Delete Organization.'));
     } finally {
       setConfirmingDisband(false);
     }

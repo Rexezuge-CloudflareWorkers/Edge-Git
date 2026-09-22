@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { createRepo } from '../services/repoService';
+import { toLocalizedErrorMessage } from '../lib/backendErrors';
 import { listMyOrgs } from '../services/profileService';
 import { Button } from '../components/ui/Button';
 import { Card, CardHeader, CardTitle } from '../components/ui/Card';
@@ -54,10 +55,10 @@ export function NewRepoView({
         description: description.trim() || null,
         isPrivate,
       });
-      showNotice('success', `Repository ${repo.fullName} Created.`);
+      showNotice('success', t('repos.repositoryCreated', 'Repository {{fullName}} Created.', { fullName: repo.fullName }));
       void navigate(`/${repo.owner}/${repo.name}`);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : 'Failed To Create Repository.');
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToCreateRepository', 'Failed To Create Repository.'));
     } finally {
       setSaving(false);
     }
@@ -65,15 +66,17 @@ export function NewRepoView({
 
   return (
     <div>
-      <ContextBar crumb={<span className="text-xl font-semibold text-[var(--color-text-primary)] truncate">New Repository</span>} />
+      <ContextBar
+        crumb={<span className="text-xl font-semibold text-[var(--color-text-primary)] truncate">{t('repos.newRepository', 'New Repository')}</span>}
+      />
       <AppPage variant="narrow">
         <Card>
           <CardHeader>
-            <CardTitle>New Repository</CardTitle>
+            <CardTitle>{t('repos.newRepository', 'New Repository')}</CardTitle>
           </CardHeader>
           <form onSubmit={submit} className="space-y-4">
             <div>
-              <Label className="mb-1.5">Owner</Label>
+              <Label className="mb-1.5">{t('repos.owner', 'Owner')}</Label>
               <Select value={owner} onChange={(e) => setOwner(e.target.value)} className="w-full">
                 {owners.map((o) => (
                   <option key={o} value={o}>
@@ -86,13 +89,18 @@ export function NewRepoView({
               </p>
             </div>
             <div>
-              <Label className="mb-1.5">Repository Name</Label>
-              <Input placeholder="my-project" value={name} onChange={(e) => setName(e.target.value)} required />
+              <Label className="mb-1.5">{t('repos.repositoryName', 'Repository Name')}</Label>
+              <Input
+                placeholder={t('repos.repositoryNamePlaceholder', 'my-project')}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
             </div>
             <div>
-              <Label className="mb-1.5">Description</Label>
+              <Label className="mb-1.5">{t('repos.description', 'Description')}</Label>
               <Textarea
-                placeholder="What does this repository contain?"
+                placeholder={t('repos.descriptionPlaceholder', 'What Does This Repository Contain?')}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
@@ -100,10 +108,10 @@ export function NewRepoView({
             </div>
             <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
               <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
-              Private repository
+              {t('repos.privateRepository', 'Private Repository')}
             </label>
             <Button type="submit" variant="primary" loading={saving}>
-              Create Repository
+              {t('repos.createRepository', 'Create Repository')}
             </Button>
           </form>
         </Card>

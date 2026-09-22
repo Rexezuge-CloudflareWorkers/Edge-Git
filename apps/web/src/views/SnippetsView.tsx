@@ -12,6 +12,7 @@ import { ContextBar } from '../components/layout/ContextBar';
 import { SegmentedTabs } from '../components/layout/SegmentedTabs';
 import { AppPage } from '../components/layout/AppPage';
 import { parseEnumParam, readParam, writeParams } from '../lib/urlParams';
+import { toLocalizedErrorMessage } from '../lib/backendErrors';
 
 const SNIPPET_TABS = ['public', 'mine'] as const;
 type SnippetTab = (typeof SNIPPET_TABS)[number];
@@ -57,7 +58,7 @@ export function SnippetsView({
         if (!cancelled) setSnippets(list);
       } catch (error) {
         if (!cancelled)
-          showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadSnippets', 'Failed To Load Snippets.'));
+          showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToLoadSnippets', 'Failed To Load Snippets.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -95,7 +96,7 @@ export function SnippetsView({
         setFiles(detail.files);
       } catch (error) {
         if (cancelled) return;
-        showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadSnippets', 'Failed To Load Snippets.'));
+        showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToLoadSnippets', 'Failed To Load Snippets.'));
       }
     };
     void run();
@@ -122,7 +123,7 @@ export function SnippetsView({
       reload();
       setSelected(created.snippet.id);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToCreateSnippet', 'Failed To Create Snippet.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToCreateSnippet', 'Failed To Create Snippet.'));
     } finally {
       setSaving(false);
     }
@@ -135,7 +136,7 @@ export function SnippetsView({
       />
       <AppPage>
         <SegmentedTabs
-          ariaLabel="Snippet scope"
+          ariaLabel={t('snippets.scope', 'Snippet Scope')}
           tabs={[
             { id: 'public', label: t('snippets.public', 'Public') },
             ...(signedIn ? [{ id: 'mine', label: t('snippets.mine', 'Mine') }] : []),

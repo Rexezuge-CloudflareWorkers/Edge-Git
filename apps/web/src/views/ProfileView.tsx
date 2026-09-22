@@ -89,7 +89,7 @@ export function ProfileView({ showNotice }: { showNotice: (type: 'success' | 'er
   }, [username]);
 
   if (status === 'loading') {
-    return <LoadingSpinner label="Loading profile" />;
+    return <LoadingSpinner label={t('profile.loadingProfile', 'Loading Profile…')} />;
   }
 
   if (status === 'missing' || !profile) {
@@ -156,7 +156,7 @@ export function ProfileView({ showNotice }: { showNotice: (type: 'success' | 'er
         </Card>
 
         <SegmentedTabs
-          ariaLabel="Profile sections"
+          ariaLabel={t('profile.sections', 'Profile Sections')}
           tabs={tabs.map((key) => ({
             id: key,
             label:

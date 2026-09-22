@@ -17,6 +17,7 @@ import { Input, Select, Textarea } from '../ui/Input';
 import { PullStatusBadge } from '../ui/Badge';
 import { RefreshButton } from '../shared/RefreshButton';
 import { Markdown } from '../shared/Markdown';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export function PullsTab({
   owner,
@@ -90,7 +91,7 @@ export function PullsTab({
         setHeadRepo(merged.selected);
       } catch (error) {
         if (!cancelled)
-          showNotice('error', error instanceof Error ? error.message : t('errors.failedToLoadPulls', 'Failed To Load Pull Requests.'));
+          showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToLoadPulls', 'Failed To Load Pull Requests.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -160,7 +161,7 @@ export function PullsTab({
       showNotice('success', t('pulls.pullCreated', 'Pull Request Created.'));
       await navigate(`/${owner}/${repo}/pulls/${created.number}`);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('errors.failedToCreatePull', 'Failed To Create Pull Request.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToCreatePull', 'Failed To Create Pull Request.'));
     } finally {
       setSaving(false);
     }

@@ -3,7 +3,8 @@
     "dashboard": "Painel",
     "new": "Novo",
     "settings": "Configurações",
-    "snippets": "Snippets"
+    "snippets": "Snippets",
+    "home": "Início do Edge-Git"
   },
   "common": {
     "cancel": "Cancelar",
@@ -12,6 +13,7 @@
     "copyToClipboard": "Copiar para a área de transferência",
     "create": "Criar",
     "delete": "Excluir",
+    "deleteConfirm": "Excluir {{name}}? Esta ação não pode ser desfeita.",
     "error": "Erro",
     "loadMore": "Carregar mais",
     "loading": "Carregando…",
@@ -84,6 +86,7 @@
     "branch": "Branch",
     "defaultBranch": "Branch padrão",
     "clone": "Clonar",
+    "cloneRepository": "Clonar repositório",
     "closeCloneMenu": "Fechar menu de clone",
     "cloneMethod": "Método de clone",
     "cloneWithHttps": "Clonar com HTTPS",
@@ -99,7 +102,10 @@
     "tags": "Tags",
     "noTags": "Nenhuma tag ainda.",
     "annotated": "Anotada",
-    "lightweight": "Simples"
+    "lightweight": "Simples",
+    "sections": "Seções do repositório",
+    "readme": "README",
+    "loadingRepository": "Carregando repositório…"
   },
   "rules": {
     "branchProtection": "Proteção de branch",
@@ -175,7 +181,9 @@
     "created": "Branch criada.",
     "deleted": "Branch excluída.",
     "defaultBranch": "Branch padrão",
-    "defaultUpdated": "Branch padrão atualizada."
+    "defaultUpdated": "Branch padrão atualizada.",
+    "loading": "Carregando…",
+    "noBranches": "Sem branches"
   },
   "checks": {
     "title": "Verificações de status",
@@ -187,6 +195,8 @@
   "files": {
     "edit": "Editar",
     "newFile": "Novo arquivo",
+    "blame": "Blame",
+    "hideBlame": "Ocultar blame",
     "fileName": "Nome do arquivo",
     "fileNamePlaceholder": "notes/todo.txt",
     "contentPlaceholder": "Conteúdo do arquivo…",
@@ -201,6 +211,7 @@
   },
   "issues": {
     "newIssue": "Nova issue",
+    "filterByLabel": "Filtrar por rótulo…",
     "titlePlaceholder": "Título",
     "descriptionPlaceholder": "Descrição (opcional)",
     "createIssue": "Criar issue",
@@ -290,7 +301,10 @@
     "resolveThread": "Resolver",
     "reopenThread": "Reabrir",
     "resolved": "Resolvido",
-    "open": "Aberto"
+    "open": "Aberto",
+    "merged": "Integrado",
+    "reviewState": "Estado da revisão",
+    "side": "Lado"
   },
   "releases": {
     "newRelease": "Nova release",
@@ -324,12 +338,18 @@
     "compareNotFound": "Comparação não encontrada.",
     "diff": "Diferença",
     "diffTooLarge": "Diferença grande demais para exibir.",
-    "viewAll": "Ver todos os commits"
+    "viewAll": "Ver todos os commits",
+    "loadingCommits": "Carregando commits…"
   },
   "forks": {
     "fork": "Fork",
     "forks": "Forks",
     "forkRepository": "Fazer fork de {{fullName}}",
+    "checkSync": "Verificar upstream",
+    "syncFastForward": "Sincronizar (fast-forward)",
+    "syncMerge": "Sincronizar (merge)",
+    "synced": "Fork sincronizado com o upstream.",
+    "upToDate": "O fork já está atualizado.",
     "ownerHint": "Seu nome de usuário ou uma organização à qual você pertence.",
     "createFork": "Criar fork",
     "forkCreated": "Fork {{fullName}} criado.",
@@ -362,6 +382,7 @@
     "revokeToken": "Revogar token",
     "tokenCreated": "Token criado. Copie agora — ele não será exibido novamente.",
     "tokenRevoked": "Token revogado.",
+    "failedToRotate": "Não foi possível rotacionar o token.",
     "scopes": "Escopos (somente Git)",
     "scopesHint": "Busca precisa de repo:read. Envio precisa de repo:write. Admin cobre ambos.",
     "selectAtLeastOneScope": "Selecione pelo menos um escopo.",
@@ -439,6 +460,8 @@
     "organizations": "Organizações",
     "people": "Pessoas",
     "manage": "Gerenciar",
+    "sections": "Seções do perfil",
+    "loadingProfile": "Carregando perfil…",
     "notFound": "Perfil não encontrado",
     "notFoundDescription": "Este usuário ou organização não existe.",
     "noRepos": "Nenhum repositório visível.",
@@ -451,6 +474,8 @@
   },
   "orgs": {
     "newOrg": "Nova organização",
+    "role": "Função",
+    "grantRole": "Atribuir função",
     "created": "Organização {{username}} criada.",
     "failedToCreate": "Falha ao criar organização.",
     "general": "Geral",
@@ -482,6 +507,7 @@
   },
   "collaborators": {
     "title": "Colaboradores",
+    "role": "Função",
     "hint": "Administradores podem conceder acesso de leitura, escrita ou administração. Proprietários da organização já têm acesso de administração.",
     "invitePlaceholder": "Nome de usuário ou e-mail",
     "read": "Leitura",
@@ -552,13 +578,30 @@
     "fileNotFound": "Arquivo não encontrado.",
     "languageLoadFailed": "Não foi possível carregar o idioma.",
     "languageSaveFailed": "Não foi possível salvar o idioma.",
-    "failedToSearch": "Falha ao carregar resultados da pesquisa."
+    "failedToSearch": "Falha ao carregar resultados da pesquisa.",
+    "failedToSync": "Não foi possível sincronizar o fork.",
+    "failedToPreviewSync": "Não foi possível carregar a prévia de sincronização.",
+    "failedToUpdateDraft": "Não foi possível atualizar o rascunho.",
+    "backend": {
+      "badRequest": "Requisição inválida.",
+      "unauthorized": "Autenticação necessária.",
+      "forbidden": "Acesso negado.",
+      "notFound": "Não encontrado.",
+      "conflict": "Conflito.",
+      "payloadTooLarge": "Carga muito grande.",
+      "rateLimited": "Muitas solicitações. Tente novamente mais tarde.",
+      "methodNotAllowed": "Método não permitido.",
+      "databaseError": "Serviço temporariamente indisponível.",
+      "internalError": "Erro interno do servidor."
+    }
   },
   "search": {
+    "title": "Pesquisar",
     "placeholder": "Pesquisar repositórios e issues…",
     "repos": "Repositórios",
     "issues": "Issues",
     "pulls": "Pull requests",
+    "categories": "Categorias de pesquisa",
     "hint": "Digite pelo menos 2 caracteres para pesquisar.",
     "noRepos": "Nenhum repositório encontrado.",
     "noIssues": "Nenhuma issue encontrada.",
@@ -626,6 +669,7 @@
     "newProject": "Novo projeto",
     "titlePlaceholder": "Título do projeto",
     "projectCreated": "Projeto criado.",
+    "untitled": "Sem título",
     "noProjects": "Nenhum projeto ainda.",
     "closed": "Fechado",
     "closeProject": "Fechar projeto",
@@ -671,7 +715,9 @@
     "conflict": "Outra pessoa atualizou esta página. Recarregue e tente novamente."
   },
   "snippets": {
+    "title": "Snippets",
     "snippets": "Snippets",
+    "scope": "Escopo do snippet",
     "public": "Público",
     "mine": "Meus",
     "secret": "Secreto",

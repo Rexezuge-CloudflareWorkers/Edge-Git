@@ -3,7 +3,8 @@
     "dashboard": "대시보드",
     "new": "새로 만들기",
     "settings": "설정",
-    "snippets": "스니펫"
+    "snippets": "스니펫",
+    "home": "Edge-Git 홈"
   },
   "common": {
     "cancel": "취소",
@@ -12,6 +13,7 @@
     "copyToClipboard": "클립보드에 복사",
     "create": "만들기",
     "delete": "삭제",
+    "deleteConfirm": "{{name}}을(를) 삭제할까요? 되돌릴 수 없어요.",
     "error": "오류",
     "loadMore": "더 불러오기",
     "loading": "불러오는 중…",
@@ -84,6 +86,7 @@
     "branch": "브랜치",
     "defaultBranch": "기본 브랜치",
     "clone": "클론",
+    "cloneRepository": "리포지토리 복제",
     "closeCloneMenu": "클론 메뉴 닫기",
     "cloneMethod": "클론 방식",
     "cloneWithHttps": "HTTPS로 클론",
@@ -99,7 +102,10 @@
     "tags": "태그",
     "noTags": "아직 태그가 없어요.",
     "annotated": "주석 태그",
-    "lightweight": "경량 태그"
+    "lightweight": "경량 태그",
+    "sections": "리포지토리 섹션",
+    "readme": "README",
+    "loadingRepository": "리포지토리 불러오는 중…"
   },
   "rules": {
     "branchProtection": "브랜치 보호",
@@ -175,7 +181,9 @@
     "created": "브랜치가 만들어졌어요.",
     "deleted": "브랜치가 삭제됐어요.",
     "defaultBranch": "기본 브랜치",
-    "defaultUpdated": "기본 브랜치가 바뀌었어요."
+    "defaultUpdated": "기본 브랜치가 바뀌었어요.",
+    "loading": "불러오는 중…",
+    "noBranches": "브랜치 없음"
   },
   "checks": {
     "title": "상태 검사",
@@ -187,6 +195,8 @@
   "files": {
     "edit": "편집",
     "newFile": "새 파일",
+    "blame": "Blame",
+    "hideBlame": "Blame 숨기기",
     "fileName": "파일 이름",
     "fileNamePlaceholder": "notes/todo.txt",
     "contentPlaceholder": "파일 내용…",
@@ -201,6 +211,7 @@
   },
   "issues": {
     "newIssue": "새 이슈",
+    "filterByLabel": "라벨로 필터…",
     "titlePlaceholder": "제목",
     "descriptionPlaceholder": "설명 (선택 사항)",
     "createIssue": "이슈 만들기",
@@ -290,7 +301,10 @@
     "resolveThread": "해결",
     "reopenThread": "다시 열기",
     "resolved": "해결됨",
-    "open": "열림"
+    "open": "열림",
+    "merged": "병합됨",
+    "reviewState": "리뷰 상태",
+    "side": "쪽"
   },
   "releases": {
     "newRelease": "새 릴리스",
@@ -324,12 +338,18 @@
     "compareNotFound": "비교 결과를 찾을 수 없어요.",
     "diff": "차이",
     "diffTooLarge": "차이가 너무 커서 보여줄 수 없어요.",
-    "viewAll": "모든 커밋 보기"
+    "viewAll": "모든 커밋 보기",
+    "loadingCommits": "커밋 불러오는 중…"
   },
   "forks": {
     "fork": "포크",
     "forks": "포크",
     "forkRepository": "{{fullName}} 포크하기",
+    "checkSync": "업스트림 확인",
+    "syncFastForward": "동기화 (Fast-Forward)",
+    "syncMerge": "동기화 (병합)",
+    "synced": "포크를 업스트림과 동기화했어요.",
+    "upToDate": "포크가 이미 최신이에요.",
     "ownerHint": "내 사용자 이름이나 내가 속한 조직이에요.",
     "createFork": "포크 만들기",
     "forkCreated": "포크 {{fullName}}이(가) 만들어졌어요.",
@@ -362,6 +382,7 @@
     "revokeToken": "토큰 해지",
     "tokenCreated": "토큰이 만들어졌어요. 지금 복사하세요 — 다시는 보여주지 않아요.",
     "tokenRevoked": "토큰이 해지됐어요.",
+    "failedToRotate": "토큰 교체에 실패했어요.",
     "scopes": "범위 (Git 전용)",
     "scopesHint": "가져오기에는 repo:read가, 푸시에는 repo:write가 필요해요. Admin은 둘 다 포함해요.",
     "selectAtLeastOneScope": "범위를 최소 하나는 고르세요.",
@@ -439,6 +460,8 @@
     "organizations": "조직",
     "people": "멤버",
     "manage": "관리",
+    "sections": "프로필 섹션",
+    "loadingProfile": "프로필 불러오는 중…",
     "notFound": "프로필을 찾을 수 없어요",
     "notFoundDescription": "이 사용자나 조직은 없어요.",
     "noRepos": "볼 수 있는 리포지토리가 없어요.",
@@ -451,6 +474,8 @@
   },
   "orgs": {
     "newOrg": "새 조직",
+    "role": "역할",
+    "grantRole": "역할 부여",
     "created": "조직 {{username}}이(가) 만들어졌어요.",
     "failedToCreate": "조직을 만들지 못했어요.",
     "general": "일반",
@@ -482,6 +507,7 @@
   },
   "collaborators": {
     "title": "협업자",
+    "role": "역할",
     "hint": "관리자는 읽기, 쓰기, 관리 권한을 줄 수 있어요. 조직 소유자는 이미 관리 권한이 있어요.",
     "invitePlaceholder": "사용자 이름 또는 이메일",
     "read": "읽기",
@@ -552,13 +578,30 @@
     "fileNotFound": "파일을 찾을 수 없어요.",
     "languageLoadFailed": "언어를 불러오지 못했어요.",
     "languageSaveFailed": "언어를 저장하지 못했어요.",
-    "failedToSearch": "검색 결과를 불러오지 못했어요."
+    "failedToSearch": "검색 결과를 불러오지 못했어요.",
+    "failedToSync": "포크 동기화에 실패했어요.",
+    "failedToPreviewSync": "동기화 미리보기를 불러오지 못했어요.",
+    "failedToUpdateDraft": "초안을 업데이트하지 못했어요.",
+    "backend": {
+      "badRequest": "잘못된 요청이에요.",
+      "unauthorized": "인증이 필요해요.",
+      "forbidden": "액세스가 거부됐어요.",
+      "notFound": "찾을 수 없어요.",
+      "conflict": "충돌이 발생했어요.",
+      "payloadTooLarge": "페이로드가 너무 커요.",
+      "rateLimited": "요청이 너무 많아요. 잠시 후 다시 시도하세요.",
+      "methodNotAllowed": "허용되지 않은 메소드예요.",
+      "databaseError": "서비스를 일시적으로 사용할 수 없어요.",
+      "internalError": "내부 서버 오류가 발생했어요."
+    }
   },
   "search": {
+    "title": "검색",
     "placeholder": "리포지토리와 이슈 검색…",
     "repos": "리포지토리",
     "issues": "이슈",
     "pulls": "풀 리퀘스트",
+    "categories": "검색 카테고리",
     "hint": "두 글자 이상 입력해야 검색돼요.",
     "noRepos": "리포지토리를 찾을 수 없어요.",
     "noIssues": "이슈를 찾을 수 없어요.",
@@ -626,6 +669,7 @@
     "newProject": "새 프로젝트",
     "titlePlaceholder": "프로젝트 제목",
     "projectCreated": "프로젝트가 만들어졌어요.",
+    "untitled": "제목 없음",
     "noProjects": "아직 프로젝트가 없어요.",
     "closed": "닫힘",
     "closeProject": "프로젝트 닫기",
@@ -671,7 +715,9 @@
     "conflict": "다른 사람이 이 페이지를 고쳤어요. 새로고침하고 다시 시도하세요."
   },
   "snippets": {
+    "title": "스니펫",
     "snippets": "스니펫",
+    "scope": "스니펫 범위",
     "public": "공개",
     "mine": "내 것",
     "secret": "비밀",

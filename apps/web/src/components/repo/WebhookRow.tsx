@@ -4,6 +4,7 @@ import type { RepoWebhook, WebhookDelivery } from '../../types';
 import { listWebhookDeliveries, redeliverWebhook, rotateWebhookSecret, testWebhook, updateWebhook } from '../../services/webhookService';
 import { formatTimestamp } from '../../lib/format';
 import { Button } from '../ui/Button';
+import { toLocalizedErrorMessage, type TranslateFn } from '../../lib/backendErrors';
 
 export type Notice = (type: 'success' | 'error', text: string) => void;
 
@@ -26,15 +27,17 @@ export function DeliveryStatusBadge({ status }: { status: WebhookDelivery['statu
 
 async function runHookAction(
   showNotice: Notice,
+  t: TranslateFn,
   successMessage: string,
-  failureMessage: string,
+  failureKey: string,
+  failureDefault: string,
   action: () => Promise<unknown>,
 ): Promise<void> {
   try {
     await action();
     showNotice('success', successMessage);
   } catch (error) {
-    showNotice('error', error instanceof Error ? error.message : failureMessage);
+    showNotice('error', toLocalizedErrorMessage(t, error, failureKey, failureDefault));
   }
 }
 
@@ -80,7 +83,7 @@ export function WebhookRow({
       const { deliveries: rows } = await listWebhookDeliveries(owner, repo, hook.id);
       setDeliveries(rows);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : t('webhooks.failedToLoadDeliveries', 'Failed To Load Deliveries.'));
+      showNotice('error', toLocalizedErrorMessage(t, error, 'webhooks.failedToLoadDeliveries', 'Failed To Load Deliveries.'));
     } finally {
       setLoadingDeliveries(false);
     }
@@ -90,8 +93,10 @@ export function WebhookRow({
     void withWorking(() =>
       runHookAction(
         showNotice,
+        t,
         t(hook.isActive ? 'webhooks.disabled' : 'webhooks.enabled', hook.isActive ? 'Webhook Disabled.' : 'Webhook Enabled.'),
-        t('webhooks.actionFailed', 'Webhook Action Failed.'),
+        'webhooks.actionFailed',
+        'Webhook Action Failed.',
         async () => {
           const { hook: updated } = await updateWebhook(owner, repo, hook.id, { isActive: !hook.isActive });
           onChanged(updated);
@@ -103,8 +108,10 @@ export function WebhookRow({
     void withWorking(() =>
       runHookAction(
         showNotice,
+        t,
         t('webhooks.testSent', 'Test Ping Sent. See Delivery History.'),
-        t('webhooks.actionFailed', 'Webhook Action Failed.'),
+        'webhooks.actionFailed',
+        'Webhook Action Failed.',
         async () => {
           await testWebhook(owner, repo, hook.id);
           await loadDeliveries();
@@ -120,7 +127,7 @@ export function WebhookRow({
         onSecretRevealed(hook.id, secret);
         showNotice('success', t('webhooks.secretRotated', 'Webhook Secret Rotated.'));
       } catch (error) {
-        showNotice('error', error instanceof Error ? error.message : t('webhooks.actionFailed', 'Webhook Action Failed.'));
+        showNotice('error', toLocalizedErrorMessage(t, error, 'webhooks.actionFailed', 'Webhook Action Failed.'));
       }
     });
 
@@ -139,7 +146,7 @@ export function WebhookRow({
         showNotice('success', t('webhooks.redelivered', 'Delivery Queued For Redelivery.'));
         await loadDeliveries();
       } catch (error) {
-        showNotice('error', error instanceof Error ? error.message : t('webhooks.actionFailed', 'Webhook Action Failed.'));
+        showNotice('error', toLocalizedErrorMessage(t, error, 'webhooks.actionFailed', 'Webhook Action Failed.'));
       }
     });
 

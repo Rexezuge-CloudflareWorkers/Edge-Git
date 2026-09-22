@@ -10,6 +10,7 @@ import { Input, Label, Select } from '../ui/Input';
 import { RefreshButton } from '../shared/RefreshButton';
 import { ReadOnlyField } from '../shared/ReadOnlyField';
 import { ConfirmDeleteModal } from '../modals/ConfirmDeleteModal';
+import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 const ALL_SCOPES: TokenScope[] = ['repo:read', 'repo:write', 'admin'];
 
@@ -37,7 +38,7 @@ export function TokensTab({ showNotice }: { showNotice: (type: 'success' | 'erro
       try {
         setTokens(await listTokens());
       } catch (error) {
-        showNotice('error', error instanceof Error ? error.message : 'Failed To Load Tokens.');
+        showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToLoadTokens', 'Failed To Load Tokens.'));
       } finally {
         setLoading(false);
       }
@@ -90,7 +91,7 @@ export function TokensTab({ showNotice }: { showNotice: (type: 'success' | 'erro
       setLoading(true);
       setReloadKey((k) => k + 1);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : 'Failed To Create Token.');
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToCreateToken', 'Failed To Create Token.'));
     } finally {
       setSaving(false);
     }
@@ -106,7 +107,7 @@ export function TokensTab({ showNotice }: { showNotice: (type: 'success' | 'erro
       setLoading(true);
       setReloadKey((k) => k + 1);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : 'Failed To Rotate Token.');
+      showNotice('error', toLocalizedErrorMessage(t, error, 'tokens.failedToRotate', 'Failed To Rotate Token.'));
     } finally {
       setRotatingId(null);
     }
@@ -120,7 +121,7 @@ export function TokensTab({ showNotice }: { showNotice: (type: 'success' | 'erro
       setLoading(true);
       setReloadKey((k) => k + 1);
     } catch (error) {
-      showNotice('error', error instanceof Error ? error.message : 'Failed To Revoke Token.');
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToRevokeToken', 'Failed To Revoke Token.'));
     } finally {
       setRevoking(null);
     }
