@@ -4,7 +4,10 @@ import type { RefUpdateResult } from '@edge-git/git-protocol';
 import { branchRefFor, classifyRefCommand, isValidBranchName } from './RefValidation';
 import { parseSymbolicHead } from './RefParsers';
 import { RefUpdatePlanner } from './RefUpdatePlanner';
+import { mapWithConcurrency } from '@edge-git/shared/utils';
 
+// Structured logger keeps DO logs greppable; console is the only sink
+// available in git-service (Layer 2 cannot depend on request-scoped DI).
 const logger = {
   warn: (...args: unknown[]): void => console.warn('[WARN] [GitService]', ...args),
   info: (...args: unknown[]): void => console.info('[INFO] [GitService]', ...args),
@@ -14,24 +17,9 @@ const logger = {
 type PromiseFsClient = ReturnType<IsoGitFs['getPromiseFsClient']>;
 
 // Bound parallel ref resolution so tag/branch bombs cannot fan out into
-// unbounded git I/O. Matches `ReadModelService` fan-out discipline.
+// unbounded git I/O. Canonical helper lives in @edge-git/shared/utils.
 const MAX_REF_RESOLVE_CONCURRENCY = 10;
 const OID_RE = /^[0-9a-f]{40}$/i;
-
-async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const out = Array.from({ length: items.length }, () => undefined as R);
-  let next = 0;
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (next < items.length) {
-      const index = next;
-      next += 1;
-      const item = items[index];
-      if (item !== undefined) out[index] = await fn(item);
-    }
-  });
-  await Promise.all(workers);
-  return out;
-}
 
 export class RefService {
   private readonly fs: PromiseFsClient;

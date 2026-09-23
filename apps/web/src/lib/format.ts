@@ -16,6 +16,8 @@ export function formatTimestamp(timestampSeconds: number | null | undefined, lng
 }
 
 export function formatExpiryTimestamp(timestampSeconds: number | null | undefined, lng?: string | null): string {
+  // Mirrors formatTimestamp branches with an Expires prefix; keep thresholds
+  // in sync when either changes (past/future direction is the only delta).
   if (timestampSeconds === null || timestampSeconds === undefined) return 'Never';
   const date = new Date(timestampSeconds * 1000);
   const now = new Date();
