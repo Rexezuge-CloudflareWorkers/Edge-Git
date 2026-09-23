@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
+import { encryptData } from '@edge-git/backend-data/crypto/aes-gcm';
+import { ImportDAO } from '@edge-git/backend-data/dao/ImportDAO';
+import { WebhookDAO } from '@edge-git/backend-data/dao/WebhookDAO';
 import { TeamService } from '@edge-git/backend-services/team';
 import { ImportService } from '@edge-git/backend-services/transfer';
 import { UserService } from '@edge-git/backend-services/user';
@@ -46,6 +49,12 @@ function emptyState(): FakeState {
 }
 
 const lower = (value: unknown): string => String(value).toLowerCase();
+
+// Deterministic 256-bit AES-GCM test key (32 zero bytes, base64) for the
+// encrypted webhook/import DAOs used below.
+const TEST_KEY = btoa('0'.repeat(32));
+const hookDaoFor = (db: FakeDb) => async () => new WebhookDAO(db, TEST_KEY);
+const importDaoFor = (db: FakeDb) => async () => new ImportDAO(db, TEST_KEY);
 
 // Mutate in place: `db` exposes the same array references, so run() handlers
 // must never reassign state arrays (db would keep the stale reference).
@@ -355,13 +364,14 @@ function createFakeDb(seed?: Partial<FakeState>): FakeDb {
           const removed = removeInPlace(state.namespaces, (n) => n.username_ci === params[0]);
           return Promise.resolve({ success: true, meta: { changes: removed } });
         }
-        // Repo imports
+        // Repo imports (envelope-only shape since 0027)
         if (q.startsWith('INSERT INTO repo_imports (id, repository_id')) {
-          const [id, repositoryId, sourceUrl, status, createdBy, createdAt, updatedAt] = params as Array<string | number>;
+          const [id, repositoryId, status, createdBy, createdAt, updatedAt] = params as Array<string | number>;
           state.repo_imports.push({
             id,
             repository_id: repositoryId,
-            source_url: sourceUrl,
+            encrypted_source_url: params[6],
+            source_url_iv: params[7],
             status,
             error: null,
             refs_json: null,
@@ -567,14 +577,18 @@ function seedAcme(db: FakeDb): void {
   });
 }
 
-function seedHook(db: FakeDb, patch: Partial<Row> = {}): Row {
+async function seedHook(db: FakeDb, patch: Partial<Row> = {}): Promise<Row> {
+  const { secret: _ignored, ...rest } = patch;
+  void _ignored;
+  const envelope = await encryptData('s3cret', TEST_KEY);
   const hook: Row = {
     id: 'h1',
     repository_id: 'r1',
     full_name: 'acme/demo',
     url: 'https://example.com/hook',
     url_prefix: 'https://example.com/hook',
-    secret: 's3cret',
+    encrypted_secret: envelope.encrypted,
+    secret_iv: envelope.iv,
     secret_suffix: 'cret',
     events: '["push"]',
     is_active: 1,
@@ -584,7 +598,7 @@ function seedHook(db: FakeDb, patch: Partial<Row> = {}): Row {
     creator_email: 'owner@x.co',
     created_at: 100,
     updated_at: 100,
-    ...patch,
+    ...rest,
   };
   db.repo_webhooks.push(hook);
   // Mirror the junction table: the service reads only `webhook_events`, so
@@ -746,7 +760,7 @@ describe('ImportService', () => {
 
   it('creates jobs and rejects duplicate active imports', async () => {
     const db = createFakeDb();
-    const svc = new ImportService({ DB: db });
+    const svc = new ImportService({ DB: db }, { importDAO: importDaoFor(db) });
     const job = await svc.createJob('repo1', `${source}.git`, 'Alice@X.co');
     expect(job.repositoryId).toBe('repo1');
     expect(job.status).toBe('pending');
@@ -760,7 +774,7 @@ describe('ImportService', () => {
 
   it('cancels pending jobs but rejects invalid statuses', async () => {
     const db = createFakeDb();
-    const svc = new ImportService({ DB: db });
+    const svc = new ImportService({ DB: db }, { importDAO: importDaoFor(db) });
     const job = await svc.createJob('repo1', source, 'alice@x.co');
     const cancelled = await svc.cancelJob(job.id);
     expect(cancelled.status).toBe('cancelled');
@@ -788,13 +802,16 @@ describe('ImportService', () => {
 
   it('validates import statuses and resolves refs from the junction table', async () => {
     const db = createFakeDb();
-    const svc = new ImportService({ DB: db });
+    const svc = new ImportService({ DB: db }, { importDAO: importDaoFor(db) });
     expect(svc.importStatus('pending')).toBe('pending');
     expect(() => svc.importStatus('bogus')).toThrow('Invalid import status');
+    const envelope = await encryptData(source, TEST_KEY);
     const base = {
       id: 'j1',
       repository_id: 'r1',
       source_url: source,
+      encrypted_source_url: envelope.encrypted,
+      source_url_iv: envelope.iv,
       status: 'done',
       error: null,
       imported_refs: 0,
@@ -1018,11 +1035,12 @@ describe('WebhookDeliveryService statics', () => {
 describe('WebhookDeliveryService attempt/process', () => {
   it('fails blocked URLs without POSTing', async () => {
     const db = createFakeDb();
-    seedHook(db, { url: 'http://localhost/evil' });
+    await seedHook(db, { url: 'http://localhost/evil' });
     let posted = false;
     const svc = new WebhookDeliveryService(
       { DB: db },
       {
+        webhookDAO: hookDaoFor(db),
         postJson: () => {
           posted = true;
           return Promise.resolve({ httpStatus: 200, error: null });
@@ -1042,10 +1060,10 @@ describe('WebhookDeliveryService attempt/process', () => {
 
   it('retries 5xx with backoff and settles 4xx as terminal', async () => {
     const db = createFakeDb();
-    seedHook(db);
+    await seedHook(db);
     const svc = new WebhookDeliveryService(
       { DB: db },
-      { postJson: () => Promise.resolve({ httpStatus: 500, error: 'Webhook returned HTTP 500' }) },
+      { webhookDAO: hookDaoFor(db), postJson: () => Promise.resolve({ httpStatus: 500, error: 'Webhook returned HTTP 500' }) },
     );
     await svc.enqueueForEvent({ repositoryId: 'r1', fullName: 'acme/demo', event: 'push', actorEmail: 'a@x.co' });
     const now = Math.floor(Date.now() / 1000) + 5;
@@ -1059,7 +1077,7 @@ describe('WebhookDeliveryService attempt/process', () => {
 
     const terminal = new WebhookDeliveryService(
       { DB: db },
-      { postJson: () => Promise.resolve({ httpStatus: 400, error: 'Webhook returned HTTP 400' }) },
+      { webhookDAO: hookDaoFor(db), postJson: () => Promise.resolve({ httpStatus: 400, error: 'Webhook returned HTTP 400' }) },
     );
     db.webhook_deliveries[0].status = 'pending';
     db.webhook_deliveries[0].next_retry_at = now;
@@ -1071,8 +1089,11 @@ describe('WebhookDeliveryService attempt/process', () => {
 
   it('marks successes and records hook outcomes', async () => {
     const db = createFakeDb();
-    seedHook(db);
-    const svc = new WebhookDeliveryService({ DB: db }, { postJson: () => Promise.resolve({ httpStatus: 200, error: null }) });
+    await seedHook(db);
+    const svc = new WebhookDeliveryService(
+      { DB: db },
+      { webhookDAO: hookDaoFor(db), postJson: () => Promise.resolve({ httpStatus: 200, error: null }) },
+    );
     await svc.enqueueForEvent({ repositoryId: 'r1', fullName: 'acme/demo', event: 'push', actorEmail: 'a@x.co' });
     const result = await svc.processDue({ now: Math.floor(Date.now() / 1000) + 5 });
     expect(result).toEqual({ processed: 1, succeeded: 1, failed: 0 });
@@ -1083,11 +1104,14 @@ describe('WebhookDeliveryService attempt/process', () => {
 
   it('fails deliveries for missing or disabled hooks', async () => {
     const db = createFakeDb();
-    seedHook(db, { id: 'disabled', is_active: 0 });
+    await seedHook(db, { id: 'disabled', is_active: 0 });
     // Disabled hooks never fan out; the active hook fails inline on its
     // blocked URL so both processed rows end failed.
-    seedHook(db, { id: 'blocked', url: 'http://localhost/evil' });
-    const svc = new WebhookDeliveryService({ DB: db }, { postJson: () => Promise.resolve({ httpStatus: 200, error: null }) });
+    await seedHook(db, { id: 'blocked', url: 'http://localhost/evil' });
+    const svc = new WebhookDeliveryService(
+      { DB: db },
+      { webhookDAO: hookDaoFor(db), postJson: () => Promise.resolve({ httpStatus: 200, error: null }) },
+    );
     await expect(svc.enqueueForEvent({ repositoryId: 'r1', fullName: 'acme/demo', event: 'push', actorEmail: 'a@x.co' })).resolves.toEqual({
       enqueued: 1,
     });
@@ -1115,8 +1139,11 @@ describe('WebhookDeliveryService attempt/process', () => {
 
   it('sends inline test pings', async () => {
     const db = createFakeDb();
-    seedHook(db);
-    const svc = new WebhookDeliveryService({ DB: db }, { postJson: () => Promise.resolve({ httpStatus: 200, error: null }) });
+    await seedHook(db);
+    const svc = new WebhookDeliveryService(
+      { DB: db },
+      { webhookDAO: hookDaoFor(db), postJson: () => Promise.resolve({ httpStatus: 200, error: null }) },
+    );
     const ping = await svc.sendTestPing('h1', 'r1', 'acme/demo', 'owner@x.co');
     expect(ping.status).toBe('success');
     expect(ping.event).toBe('ping');
@@ -1127,11 +1154,11 @@ describe('WebhookDeliveryService attempt/process', () => {
 describe('WebhookDeliveryService fan-out/lifecycle', () => {
   it('enqueues only active subscribed hooks and never throws', async () => {
     const db = createFakeDb();
-    seedHook(db, { id: 'active' });
-    seedHook(db, { id: 'inactive', is_active: 0 });
-    seedHook(db, { id: 'other-event', events: '["issues"]' });
-    seedHook(db, { id: 'bad-events', events: 'not-json' });
-    const svc = new WebhookDeliveryService({ DB: db });
+    await seedHook(db, { id: 'active' });
+    await seedHook(db, { id: 'inactive', is_active: 0 });
+    await seedHook(db, { id: 'other-event', events: '["issues"]' });
+    await seedHook(db, { id: 'bad-events', events: 'not-json' });
+    const svc = new WebhookDeliveryService({ DB: db }, { webhookDAO: hookDaoFor(db) });
     await expect(svc.enqueueForEvent({ repositoryId: 'r1', fullName: 'acme/demo', event: 'push', actorEmail: 'a@x.co' })).resolves.toEqual({
       enqueued: 1,
     });
@@ -1145,8 +1172,8 @@ describe('WebhookDeliveryService fan-out/lifecycle', () => {
 
   it('lists, redelivers, and prunes deliveries', async () => {
     const db = createFakeDb();
-    seedHook(db);
-    const svc = new WebhookDeliveryService({ DB: db });
+    await seedHook(db);
+    const svc = new WebhookDeliveryService({ DB: db }, { webhookDAO: hookDaoFor(db) });
     await svc.enqueueForEvent({ repositoryId: 'r1', fullName: 'acme/demo', event: 'push', actorEmail: 'a@x.co' });
     const listed = await svc.listDeliveries('h1', 'r1');
     expect(listed.deliveries).toHaveLength(1);
@@ -1183,7 +1210,7 @@ describe('WebhookDeliveryService fan-out/lifecycle', () => {
 
   it('processes nothing when no deliveries are due', async () => {
     const db = createFakeDb();
-    const svc = new WebhookDeliveryService({ DB: db });
+    const svc = new WebhookDeliveryService({ DB: db }, { webhookDAO: hookDaoFor(db) });
     await expect(svc.processDue({ now: 999 })).resolves.toEqual({ processed: 0, succeeded: 0, failed: 0 });
   });
 });

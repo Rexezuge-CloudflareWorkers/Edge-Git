@@ -55,7 +55,8 @@ class OrganizationService {
       pullRequestDAO: () => Promise.resolve(new PullRequestDAO(env.DB)),
       eventDAO: () => Promise.resolve(new EventDAO(env.DB)),
       notificationDAO: () => Promise.resolve(new NotificationDAO(env.DB)),
-      webhookDAO: () => Promise.resolve(new WebhookDAO(env.DB)),
+      webhookDAO: () =>
+        Promise.reject<WebhookDAO>(new Error('OrganizationService requires an injected webhookDAO outside request scope.')),
       ...deps,
     };
   }

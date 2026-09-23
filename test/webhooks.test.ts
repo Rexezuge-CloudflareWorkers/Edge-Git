@@ -141,17 +141,18 @@ function createWebhookFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO repo_webhooks')) {
-          const [id, repository_id, url, url_prefix, secret, secret_suffix, creator_email, created_at, updated_at] =
+          // Envelope-only shape since 0027 (no plaintext `secret` column):
+          // (id, repoId, url, urlPrefix, suffix, creator, created, updated, enc, iv).
+          const [id, repository_id, url, url_prefix, secret_suffix, creator_email, created_at, updated_at] =
             params as Array<string | number>;
           state.hooks.push({
             id,
             repository_id,
             url,
             url_prefix,
-            secret,
             secret_suffix,
-            encrypted_secret: (params[9] as string | null | undefined) ?? null,
-            secret_iv: (params[10] as string | null | undefined) ?? null,
+            encrypted_secret: params[8] as string,
+            secret_iv: params[9] as string,
             is_active: 1,
             consecutive_failures: 0,
             last_delivery_at: null,
@@ -188,21 +189,17 @@ function createWebhookFakeDb() {
           }
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
-        if (q.startsWith('UPDATE repo_webhooks SET secret = ?')) {
-          // Rotate shape is 7 params with the 0026 envelope
-          // (secret, suffix, now, encrypted, iv, id, repoId); legacy is 5
-          // (secret, suffix, now, id, repoId).
-          const id = params.length > 5 ? (params[5] as string) : (params[3] as string);
+        if (q.startsWith('UPDATE repo_webhooks SET secret_suffix = ?')) {
+          // Rotate shape since 0027 (envelope-only):
+          // (suffix, now, encrypted, iv, id, repoId).
+          const [secret_suffix, now, encrypted_secret, secret_iv, id] = params as [string, number, string, string, string];
           const hook = state.hooks.find((h) => h.id === id);
           if (hook) {
-            hook.secret = params[0] as string;
-            hook.secret_suffix = params[1] as string;
+            hook.secret_suffix = secret_suffix;
             hook.consecutive_failures = 0;
-            hook.updated_at = params[2] as number;
-            if (params.length > 5) {
-              hook.encrypted_secret = params[3] as string | null;
-              hook.secret_iv = params[4] as string | null;
-            }
+            hook.updated_at = now;
+            hook.encrypted_secret = encrypted_secret;
+            hook.secret_iv = secret_iv;
           }
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
@@ -331,10 +328,21 @@ function seedRepo(state: ReturnType<typeof createWebhookFakeDb>['state'], overri
 }
 
 function routeEnv(db: D1Queryable) {
-  return { DB: db, ENVIRONMENT: 'development', DEV_AUTH_EMAIL: 'alice@example.com' };
+  return {
+    DB: db,
+    ENVIRONMENT: 'development',
+    DEV_AUTH_EMAIL: 'alice@example.com',
+    WEBHOOK_ENCRYPTION_KEY_SECRET: { get: async () => TEST_ENCRYPTION_KEY },
+    MIRROR_ENCRYPTION_KEY_SECRET: { get: async () => TEST_ENCRYPTION_KEY },
+    IMPORT_ENCRYPTION_KEY_SECRET: { get: async () => TEST_ENCRYPTION_KEY },
+  };
 }
 
 const routeCtx = { waitUntil: () => undefined, passThroughOnException: () => undefined };
+
+// Deterministic 256-bit AES-GCM test key (32 zero bytes, base64). Valid for
+// WebCrypto import; keeps route/fake-DB tests free of async key generation.
+const TEST_ENCRYPTION_KEY = btoa('0'.repeat(32));
 
 async function callRoute(db: D1Queryable, path: string, init?: RequestInit): Promise<Response> {
   const worker = new EdgeGitWorker() as unknown as { onRequest(r: Request, e: unknown, c: unknown): Promise<Response> };
@@ -472,7 +480,7 @@ describe('webhook event helpers', () => {
 describe('webhook DAOs', () => {
   it('round-trips hooks through the DAO', async () => {
     const { db } = createWebhookFakeDb();
-    const dao = new WebhookDAO(db);
+    const dao = new WebhookDAO(db, TEST_ENCRYPTION_KEY);
     await dao.create({
       id: 'h1',
       repositoryId: 'repo-1',
@@ -852,7 +860,7 @@ describe('webhook composition and cron', () => {
   it('flushes due deliveries end to end with signed POSTs', async () => {
     const { db, state } = createWebhookFakeDb();
     seedRepo(state);
-    const hookDao = new WebhookDAO(db);
+    const hookDao = new WebhookDAO(db, TEST_ENCRYPTION_KEY);
     await hookDao.create({
       id: 'h1',
       repositoryId: 'repo-1',
@@ -882,7 +890,7 @@ describe('webhook composition and cron', () => {
         return new Response('ok', { status: 200 });
       }),
     );
-    await new WebhookDeliveryTask().run({ DB: db } as unknown as Env);
+    await new WebhookDeliveryTask().run({ DB: db, WEBHOOK_ENCRYPTION_KEY_SECRET: { get: async () => TEST_ENCRYPTION_KEY } } as unknown as Env);
     expect(posts).toHaveLength(1);
     expect(posts[0].url).toBe('https://hooks.example.com/x');
     const headers = posts[0].init.headers as Record<string, string>;
@@ -978,7 +986,14 @@ describe('webhook HTTP routes', () => {
     seedRepo(state);
     expect((await callRoute(db, '/user/repos/alice/missing/hooks')).status).toBe(404);
     // Public repo: strangers keep read access (masked list) but cannot mutate.
-    const strangerEnv = { DB: db, ENVIRONMENT: 'development', DEV_AUTH_EMAIL: 'mallory@example.com' };
+    const strangerEnv = {
+      DB: db,
+      ENVIRONMENT: 'development',
+      DEV_AUTH_EMAIL: 'mallory@example.com',
+      WEBHOOK_ENCRYPTION_KEY_SECRET: { get: async () => TEST_ENCRYPTION_KEY },
+      MIRROR_ENCRYPTION_KEY_SECRET: { get: async () => TEST_ENCRYPTION_KEY },
+      IMPORT_ENCRYPTION_KEY_SECRET: { get: async () => TEST_ENCRYPTION_KEY },
+    };
     const worker = new EdgeGitWorker() as unknown as { onRequest(r: Request, e: unknown, c: unknown): Promise<Response> };
     const listed = await worker.onRequest(new Request('https://git.example.com/user/repos/alice/demo/hooks'), strangerEnv, routeCtx);
     expect(listed.status).toBe(200);

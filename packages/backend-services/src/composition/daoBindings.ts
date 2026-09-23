@@ -56,31 +56,11 @@ function bindDaoBindings(scope: Container, env: RequestScopeEnv): void {
   const webhookKey = scope.get(Tokens.WebhookKey);
   const mirrorKey = scope.get(Tokens.MirrorKey);
   const importKey = scope.get(Tokens.ImportKey);
-  // Fail-soft without a binding (unit fakes / legacy dev DBs without Secrets
-  // Store): plaintext DAO, same as pre-0026. A present binding that fails to
-  // fetch still throws fail-closed. Production always declares the bindings
-  // (see apps/api/wrangler.template.jsonc), so it always encrypts.
-  const webhookDAO = async (): Promise<unknown> => {
-    if (!env.WEBHOOK_ENCRYPTION_KEY_SECRET) {
-      console.warn('[WARN] [daoBindings] WEBHOOK_ENCRYPTION_KEY_SECRET is not configured; webhook secrets are stored in plaintext.');
-      return new WebhookDAO(env.DB);
-    }
-    return new WebhookDAO(env.DB, await webhookKey());
-  };
-  const mirrorDAO = async (): Promise<unknown> => {
-    if (!env.MIRROR_ENCRYPTION_KEY_SECRET) {
-      console.warn('[WARN] [daoBindings] MIRROR_ENCRYPTION_KEY_SECRET is not configured; mirror source URLs are stored in plaintext.');
-      return new MirrorDAO(env.DB);
-    }
-    return new MirrorDAO(env.DB, await mirrorKey());
-  };
-  const importDAO = async (): Promise<unknown> => {
-    if (!env.IMPORT_ENCRYPTION_KEY_SECRET) {
-      console.warn('[WARN] [daoBindings] IMPORT_ENCRYPTION_KEY_SECRET is not configured; import source URLs are stored in plaintext.');
-      return new ImportDAO(env.DB);
-    }
-    return new ImportDAO(env.DB, await importKey());
-  };
+  // Encrypted DAOs fail closed: a missing binding throws from the key thunk
+  // (no plaintext fallback since 0027 dropped the plaintext columns).
+  const webhookDAO = async (): Promise<unknown> => new WebhookDAO(env.DB, await webhookKey());
+  const mirrorDAO = async (): Promise<unknown> => new MirrorDAO(env.DB, await mirrorKey());
+  const importDAO = async (): Promise<unknown> => new ImportDAO(env.DB, await importKey());
   const daoDefs: Array<[Token<() => Promise<unknown>>, () => Promise<unknown>]> = [
     [Tokens.UserDAO, () => Promise.resolve(new UserDAO(env.DB))],
     [Tokens.RepositoryDAO, () => Promise.resolve(new RepositoryDAO(env.DB))],

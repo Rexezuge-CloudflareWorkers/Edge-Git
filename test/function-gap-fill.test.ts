@@ -960,6 +960,9 @@ describe('function-gap TriggerChecks', () => {
   });
 });
 
+// Deterministic 256-bit AES-GCM test key (32 zero bytes, base64).
+const keyBinding = { get: async () => btoa('0'.repeat(32)) };
+
 // ---------------------------------------------------------------------------
 // 5. MirrorRunner / ImportRunner / fetchRemotePack edges
 // ---------------------------------------------------------------------------
@@ -970,7 +973,8 @@ describe('function-gap transfer runners', () => {
       mirrors: [
         {
           repository_id: 'r1',
-          source_url: 'https://github.com/o/r',
+          encrypted_source_url: 'kynAJLI1VjLhA4oRdSW/XRwDxJVpUovlShBx9aBhvVCd7FhqcZ4=',
+          source_url_iv: 'S+y4g1WsAFvjk/QE',
           interval_minutes: 60,
           enabled: 0,
           last_run_at: null,
@@ -985,7 +989,7 @@ describe('function-gap transfer runners', () => {
         throw new Error('must not be called');
       },
     };
-    await runMirrorSync({ DB: db, REPO: { getByName: () => stub } } as unknown as Env, 'r1');
+    await runMirrorSync({ DB: db, REPO: { getByName: () => stub }, MIRROR_ENCRYPTION_KEY_SECRET: keyBinding } as unknown as Env, 'r1');
     expect(db.data.mirrors[0].last_status).toBeNull();
   });
 
@@ -994,7 +998,8 @@ describe('function-gap transfer runners', () => {
       mirrors: [
         {
           repository_id: 'gone',
-          source_url: 'https://github.com/o/r',
+          encrypted_source_url: 'kynAJLI1VjLhA4oRdSW/XRwDxJVpUovlShBx9aBhvVCd7FhqcZ4=',
+          source_url_iv: 'S+y4g1WsAFvjk/QE',
           interval_minutes: 60,
           enabled: 1,
           last_run_at: null,
@@ -1004,7 +1009,7 @@ describe('function-gap transfer runners', () => {
         },
       ],
     });
-    await runMirrorSync({ DB: db, REPO: { getByName: () => ({}) } } as unknown as Env, 'gone');
+    await runMirrorSync({ DB: db, REPO: { getByName: () => ({}) }, MIRROR_ENCRYPTION_KEY_SECRET: keyBinding } as unknown as Env, 'gone');
     expect(db.data.mirrors).toHaveLength(0);
   });
 
@@ -1014,7 +1019,8 @@ describe('function-gap transfer runners', () => {
       mirrors: [
         {
           repository_id: 'r1',
-          source_url: 'https://github.com/o/r',
+          encrypted_source_url: 'kynAJLI1VjLhA4oRdSW/XRwDxJVpUovlShBx9aBhvVCd7FhqcZ4=',
+          source_url_iv: 'S+y4g1WsAFvjk/QE',
           interval_minutes: 60,
           enabled: 1,
           last_run_at: null,
@@ -1033,7 +1039,7 @@ describe('function-gap transfer runners', () => {
     const realFetch = globalThis.fetch;
     globalThis.fetch = (async () => new Response('nope', { status: 500 })) as typeof fetch;
     try {
-      await runMirrorSync({ DB: db, REPO: { getByName: () => stub } } as unknown as Env, 'r1');
+      await runMirrorSync({ DB: db, REPO: { getByName: () => stub }, MIRROR_ENCRYPTION_KEY_SECRET: keyBinding } as unknown as Env, 'r1');
     } finally {
       globalThis.fetch = realFetch;
     }
@@ -1046,6 +1052,7 @@ describe('function-gap transfer runners', () => {
       runImportJob(
         {
           DB: empty,
+          IMPORT_ENCRYPTION_KEY_SECRET: keyBinding,
           REPO: {
             getByName: () => {
               throw new Error('must not be called');
@@ -1061,7 +1068,8 @@ describe('function-gap transfer runners', () => {
         {
           id: 'j2',
           repository_id: 'r1',
-          source_url: 'https://github.com/o/r',
+          encrypted_source_url: 'kynAJLI1VjLhA4oRdSW/XRwDxJVpUovlShBx9aBhvVCd7FhqcZ4=',
+          source_url_iv: 'S+y4g1WsAFvjk/QE',
           status: 'pending',
           error: null,
           refs_json: null,
@@ -1076,7 +1084,7 @@ describe('function-gap transfer runners', () => {
       listRefs: async () => ({ refs: [{ ref: 'refs/heads/main', oid: OID_A }], symbolicHead: 'refs/heads/main' }),
       importPack: vi.fn(),
     };
-    await runImportJob({ DB: db, REPO: { getByName: () => stub } } as unknown as Env, 'alice/full', 'j2');
+    await runImportJob({ DB: db, REPO: { getByName: () => stub }, IMPORT_ENCRYPTION_KEY_SECRET: keyBinding } as unknown as Env, 'alice/full', 'j2');
     expect(db.data.imports[0].status).toBe('failed');
     expect(stub.importPack).not.toHaveBeenCalled();
   });
@@ -1112,6 +1120,9 @@ describe('function-gap scheduled tasks', () => {
     const stub = createGapDoStub();
     return {
       DB: db,
+      WEBHOOK_ENCRYPTION_KEY_SECRET: keyBinding,
+      MIRROR_ENCRYPTION_KEY_SECRET: keyBinding,
+      IMPORT_ENCRYPTION_KEY_SECRET: keyBinding,
       REPO: { getByName: () => stub },
       REALTIME: { getByName: () => stub },
       CHECK_RUNNER: { getByName: () => stub },

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PktLine } from '@edge-git/git-protocol';
+import { encryptData } from '@edge-git/backend-data/crypto/aes-gcm';
 import { workerFetchAdapter } from '@edge-git/background/transfer/fetchAdapter';
 import { SearchBackfillTask } from '@edge-git/background/scheduled/SearchBackfillTask';
 import { SEARCH_TICK_CRON, isSearchTick, runScheduledTasks } from '@edge-git/background/scheduled/TaskRegistry';
@@ -9,6 +10,11 @@ import { CheckPruneTask } from '@edge-git/background/scheduled/CheckPruneTask';
 import { CheckStaleTask } from '@edge-git/background/scheduled/CheckStaleTask';
 import { MirrorSyncTask } from '@edge-git/background/scheduled/MirrorSyncTask';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
+
+// Deterministic 256-bit AES-GCM test key (32 zero bytes, base64) for the
+// encrypted transfer rows seeded below.
+const TEST_KEY = btoa('0'.repeat(32));
+const keyBinding = { get: async () => TEST_KEY };
 
 const OLD = 'a'.repeat(40);
 const NEW = 'b'.repeat(40);
@@ -549,11 +555,16 @@ describe('SearchBackfill scheduling', () => {
 });
 
 describe('ImportSweeperTask stale cleanup', () => {
-  function importJob(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  async function importJob(overrides: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
+    const url = (overrides.source_url as string | undefined) ?? 'https://github.com/o/r';
+    const { source_url: _dropped, ...rest } = overrides;
+    void _dropped;
+    const envelope = await encryptData(url, TEST_KEY);
     return {
       id: 'j1',
       repository_id: 'r1',
-      source_url: 'https://github.com/o/r',
+      encrypted_source_url: envelope.encrypted,
+      source_url_iv: envelope.iv,
       status: 'pending',
       error: null,
       refs_json: null,
@@ -561,16 +572,17 @@ describe('ImportSweeperTask stale cleanup', () => {
       created_by: 'a@x.com',
       created_at: 10,
       updated_at: 10,
-      ...overrides,
+      ...rest,
     };
   }
 
   it('runs due pending jobs to done over Smart HTTP', async () => {
-    const tables = seedTables({ repos: [repoRow({ id: 'r1' })], imports: [importJob()] });
+    const tables = seedTables({ repos: [repoRow({ id: 'r1' })], imports: [await importJob()] });
     const db = createFakeDb(tables);
     let imported = 0;
     const env = {
       DB: db,
+      IMPORT_ENCRYPTION_KEY_SECRET: keyBinding,
       REPO: {
         getByName: () => ({
           listRefs: async () => ({ refs: [], symbolicHead: null }),
@@ -592,10 +604,11 @@ describe('ImportSweeperTask stale cleanup', () => {
   });
 
   it('marks jobs failed when the repository is gone', async () => {
-    const tables = seedTables({ imports: [importJob()] });
+    const tables = seedTables({ imports: [await importJob()] });
     const db = createFakeDb(tables);
     const env = {
       DB: db,
+      IMPORT_ENCRYPTION_KEY_SECRET: keyBinding,
       REPO: {
         getByName: () => {
           throw new Error('must not be called');
@@ -613,10 +626,11 @@ describe('ImportSweeperTask stale cleanup', () => {
   });
 
   it('reclaims stale-running jobs for retry', async () => {
-    const tables = seedTables({ repos: [repoRow({ id: 'r1' })], imports: [importJob({ id: 'stale', status: 'running', updated_at: 1 })] });
+    const tables = seedTables({ repos: [repoRow({ id: 'r1' })], imports: [await importJob({ id: 'stale', status: 'running', updated_at: 1 })] });
     const db = createFakeDb(tables);
     const env = {
       DB: db,
+      IMPORT_ENCRYPTION_KEY_SECRET: keyBinding,
       REPO: {
         getByName: () => ({
           listRefs: async () => ({ refs: [{ ref: 'refs/heads/main', oid: OLD }], symbolicHead: 'refs/heads/main' }),
@@ -636,6 +650,7 @@ describe('ImportSweeperTask stale cleanup', () => {
     } as unknown as D1Queryable;
     const env = {
       DB: broken,
+      IMPORT_ENCRYPTION_KEY_SECRET: keyBinding,
       REPO: {
         getByName: () => {
           throw new Error('must not be called');
@@ -694,10 +709,15 @@ describe('check retention and stuck-context pruning', () => {
 });
 
 describe('MirrorSyncTask retry', () => {
-  function mirrorRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  async function mirrorRow(overrides: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
+    const url = (overrides.source_url as string | undefined) ?? 'https://github.com/o/r';
+    const { source_url: _dropped, ...rest } = overrides;
+    void _dropped;
+    const envelope = await encryptData(url, TEST_KEY);
     return {
       repository_id: 'r1',
-      source_url: 'https://github.com/o/r',
+      encrypted_source_url: envelope.encrypted,
+      source_url_iv: envelope.iv,
       interval_minutes: 60,
       enabled: 1,
       last_run_at: null,
@@ -707,7 +727,7 @@ describe('MirrorSyncTask retry', () => {
       created_by: 'a@x.com',
       created_at: 0,
       updated_at: 0,
-      ...overrides,
+      ...rest,
     };
   }
 
@@ -721,8 +741,8 @@ describe('MirrorSyncTask retry', () => {
   }
 
   it('syncs due mirrors and records ok', async () => {
-    const tables = seedTables({ repos: [repoRow({ id: 'r1' })], mirrors: [mirrorRow()] });
-    const env = { DB: createFakeDb(tables), REPO: { getByName: () => mirrorStub() } } as unknown as Env;
+    const tables = seedTables({ repos: [repoRow({ id: 'r1' })], mirrors: [await mirrorRow()] });
+    const env = { DB: createFakeDb(tables), MIRROR_ENCRYPTION_KEY_SECRET: keyBinding, REPO: { getByName: () => mirrorStub() } } as unknown as Env;
     const stub = smartHttpStub();
     try {
       await new MirrorSyncTask().run(env);
@@ -734,9 +754,10 @@ describe('MirrorSyncTask retry', () => {
 
   it('skips when no mirror is due (no network)', async () => {
     const now = Math.floor(Date.now() / 1000);
-    const tables = seedTables({ repos: [repoRow({ id: 'r1' })], mirrors: [mirrorRow({ last_run_at: now })] });
+    const tables = seedTables({ repos: [repoRow({ id: 'r1' })], mirrors: [await mirrorRow({ last_run_at: now })] });
     const env = {
       DB: createFakeDb(tables),
+      MIRROR_ENCRYPTION_KEY_SECRET: keyBinding,
       REPO: {
         getByName: () => {
           throw new Error('must not be called');
@@ -754,8 +775,8 @@ describe('MirrorSyncTask retry', () => {
   });
 
   it('records failures with retry state instead of throwing', async () => {
-    const tables = seedTables({ repos: [repoRow({ id: 'r1' })], mirrors: [mirrorRow()] });
-    const env = { DB: createFakeDb(tables), REPO: { getByName: () => mirrorStub() } } as unknown as Env;
+    const tables = seedTables({ repos: [repoRow({ id: 'r1' })], mirrors: [await mirrorRow()] });
+    const env = { DB: createFakeDb(tables), MIRROR_ENCRYPTION_KEY_SECRET: keyBinding, REPO: { getByName: () => mirrorStub() } } as unknown as Env;
     const stub = withFetchStub(() => new Response('nope', { status: 500 }));
     try {
       await new MirrorSyncTask().run(env);
@@ -769,11 +790,11 @@ describe('MirrorSyncTask retry', () => {
     const tables = seedTables({
       repos: [repoRow({ id: 'r1' }), repoRow({ id: 'r2', owner: 'alice', name: 'other' })],
       mirrors: [
-        mirrorRow({ repository_id: 'r1', source_url: 'https://github.com/o/bad' }),
-        mirrorRow({ repository_id: 'r2', source_url: 'https://github.com/o/good' }),
+        await mirrorRow({ repository_id: 'r1', source_url: 'https://github.com/o/bad' }),
+        await mirrorRow({ repository_id: 'r2', source_url: 'https://github.com/o/good' }),
       ],
     });
-    const env = { DB: createFakeDb(tables), REPO: { getByName: () => mirrorStub() } } as unknown as Env;
+    const env = { DB: createFakeDb(tables), MIRROR_ENCRYPTION_KEY_SECRET: keyBinding, REPO: { getByName: () => mirrorStub() } } as unknown as Env;
     const stub = withFetchStub((url) => {
       if (url.includes('/info/refs') && url.includes('/o/bad')) return new Response('nope', { status: 500 });
       if (url.includes('/info/refs')) {
@@ -802,6 +823,7 @@ describe('MirrorSyncTask retry', () => {
     } as unknown as D1Queryable;
     const env = {
       DB: broken,
+      MIRROR_ENCRYPTION_KEY_SECRET: keyBinding,
       REPO: {
         getByName: () => {
           throw new Error('must not be called');

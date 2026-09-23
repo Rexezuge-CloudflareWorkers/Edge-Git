@@ -10,6 +10,16 @@ const TAG = 'c'.repeat(40);
 const DIV = 'd'.repeat(40);
 const DIV2 = 'e'.repeat(40);
 
+// Deterministic 256-bit AES-GCM test key (32 zero bytes, base64) plus the
+// precomputed envelope for 'https://github.com/o/r' under it (decryption is
+// deterministic, so seeds stay synchronous object literals).
+const TEST_KEY = btoa('0'.repeat(32));
+const URL_ENVELOPE = {
+  encrypted: 'kynAJLI1VjLhA4oRdSW/XRwDxJVpUovlShBx9aBhvVCd7FhqcZ4=',
+  iv: 'S+y4g1WsAFvjk/QE',
+};
+const keyBinding = { get: async () => TEST_KEY };
+
 function advertisement(): Uint8Array {
   return PktLine.mergeLines([
     PktLine.encode('# service=git-upload-pack\n'),
@@ -151,7 +161,8 @@ describe('runImportJob', () => {
         {
           id: 'j1',
           repository_id: 'r1',
-          source_url: 'https://github.com/o/r',
+          encrypted_source_url: URL_ENVELOPE.encrypted,
+          source_url_iv: URL_ENVELOPE.iv,
           status: 'pending',
           error: null,
           refs_json: null,
@@ -164,7 +175,7 @@ describe('runImportJob', () => {
     });
     const importPack = vi.fn(async () => ({ importedRefs: ['refs/heads/main'] }));
     const stub = { listRefs: async () => ({ refs: [], symbolicHead: null }), importPack };
-    const env = { DB: db, REPO: { getByName: () => stub } } as unknown as Env;
+    const env = { DB: db, REPO: { getByName: () => stub }, IMPORT_ENCRYPTION_KEY_SECRET: keyBinding } as unknown as Env;
     // Hermetic failure: the remote 404s, so the job records failed without
     // throwing (the cron sweeper retries later).
     const realFetch = globalThis.fetch;
@@ -184,7 +195,8 @@ describe('runImportJob', () => {
         {
           id: 'j3',
           repository_id: 'r1',
-          source_url: 'https://github.com/o/r',
+          encrypted_source_url: URL_ENVELOPE.encrypted,
+          source_url_iv: URL_ENVELOPE.iv,
           status: 'pending',
           error: null,
           refs_json: null,
@@ -197,7 +209,7 @@ describe('runImportJob', () => {
     });
     const importPack = vi.fn(async () => ({ importedRefs: ['refs/heads/main', 'refs/heads/feature', 'refs/tags/v1'] }));
     const stub = { listRefs: async () => ({ refs: [], symbolicHead: null }), importPack };
-    const env = { DB: db, REPO: { getByName: () => stub } } as unknown as Env;
+    const env = { DB: db, REPO: { getByName: () => stub }, IMPORT_ENCRYPTION_KEY_SECRET: keyBinding } as unknown as Env;
     const realFetch = globalThis.fetch;
     globalThis.fetch = (async (url: string) => {
       if (String(url).includes('/info/refs')) {
@@ -224,7 +236,8 @@ describe('runImportJob', () => {
         {
           id: 'j2',
           repository_id: 'r1',
-          source_url: 'https://github.com/o/r',
+          encrypted_source_url: URL_ENVELOPE.encrypted,
+          source_url_iv: URL_ENVELOPE.iv,
           status: 'pending',
           error: null,
           refs_json: null,
@@ -237,7 +250,7 @@ describe('runImportJob', () => {
     });
     const importPack = vi.fn();
     const stub = { listRefs: async () => ({ refs: [{ ref: 'refs/heads/main', oid: OLD }], symbolicHead: 'refs/heads/main' }), importPack };
-    const env = { DB: db, REPO: { getByName: () => stub } } as unknown as Env;
+    const env = { DB: db, REPO: { getByName: () => stub }, IMPORT_ENCRYPTION_KEY_SECRET: keyBinding } as unknown as Env;
     await runImportJob(env, 'alice/full', 'j2');
     expect(db.data.imports[0].status).toBe('failed');
     expect(db.data.imports[0].error).toContain('not empty');
@@ -248,6 +261,7 @@ describe('runImportJob', () => {
     const db = createRunnerDb();
     const env = {
       DB: db,
+      IMPORT_ENCRYPTION_KEY_SECRET: keyBinding,
       REPO: {
         getByName: () => {
           throw new Error('must not be called');
@@ -263,7 +277,8 @@ describe('runImportJob', () => {
         {
           id: 'j-key',
           repository_id: 'r1',
-          source_url: 'https://github.com/o/r',
+          encrypted_source_url: URL_ENVELOPE.encrypted,
+          source_url_iv: URL_ENVELOPE.iv,
           status: 'pending',
           error: null,
           refs_json: null,
@@ -279,6 +294,7 @@ describe('runImportJob', () => {
     const seen: string[] = [];
     const env = {
       DB: db,
+      IMPORT_ENCRYPTION_KEY_SECRET: keyBinding,
       REPO: {
         getByName: (key: string) => {
           seen.push(key);
@@ -313,7 +329,8 @@ describe('runImportJob', () => {
         {
           id: 'j-head',
           repository_id: 'r1',
-          source_url: 'https://github.com/o/r',
+          encrypted_source_url: URL_ENVELOPE.encrypted,
+          source_url_iv: URL_ENVELOPE.iv,
           status: 'pending',
           error: null,
           refs_json: null,
@@ -327,7 +344,7 @@ describe('runImportJob', () => {
     const importPack = vi.fn(async () => ({ importedRefs: ['refs/heads/master'] }));
     const setDefaultBranch = vi.fn(async () => ({ ok: true }));
     const stub = { listRefs: async () => ({ refs: [], symbolicHead: null }), importPack, setDefaultBranch };
-    const env = { DB: db, REPO: { getByName: () => stub } } as unknown as Env;
+    const env = { DB: db, REPO: { getByName: () => stub }, IMPORT_ENCRYPTION_KEY_SECRET: keyBinding } as unknown as Env;
     const ad = PktLine.mergeLines([
       PktLine.encode('# service=git-upload-pack\n'),
       PktLine.encodeFlush(),
@@ -357,7 +374,7 @@ describe('runImportJob', () => {
 
 describe('runMirrorSync', () => {
   function mirrorEnv(db: D1Queryable & { data: RunnerDb }, stub: unknown): Env {
-    return { DB: db, REPO: { getByName: () => stub } } as unknown as Env;
+    return { DB: db, REPO: { getByName: () => stub }, MIRROR_ENCRYPTION_KEY_SECRET: keyBinding } as unknown as Env;
   }
 
   it('fast-forwards heads, creates tags, and skips diverged branches', async () => {
@@ -366,7 +383,8 @@ describe('runMirrorSync', () => {
       mirrors: [
         {
           repository_id: 'r1',
-          source_url: 'https://github.com/o/r',
+          encrypted_source_url: URL_ENVELOPE.encrypted,
+          source_url_iv: URL_ENVELOPE.iv,
           interval_minutes: 60,
           enabled: 1,
           last_run_at: null,
@@ -447,7 +465,8 @@ describe('runMirrorSync', () => {
       mirrors: [
         {
           repository_id: 'gone',
-          source_url: 'https://github.com/o/r',
+          encrypted_source_url: URL_ENVELOPE.encrypted,
+          source_url_iv: URL_ENVELOPE.iv,
           interval_minutes: 60,
           enabled: 1,
           last_run_at: null,
@@ -469,7 +488,8 @@ describe('runMirrorSync', () => {
       mirrors: [
         {
           repository_id: 'r1',
-          source_url: 'https://github.com/o/r',
+          encrypted_source_url: URL_ENVELOPE.encrypted,
+          source_url_iv: URL_ENVELOPE.iv,
           interval_minutes: 60,
           enabled: 0,
           last_run_at: null,
@@ -497,7 +517,8 @@ describe('runMirrorSync', () => {
       mirrors: [
         {
           repository_id: 'r1',
-          source_url: 'https://github.com/o/r',
+          encrypted_source_url: URL_ENVELOPE.encrypted,
+          source_url_iv: URL_ENVELOPE.iv,
           interval_minutes: 60,
           enabled: 1,
           last_run_at: null,
@@ -534,7 +555,8 @@ describe('runMirrorSync', () => {
       mirrors: [
         {
           repository_id: 'r1',
-          source_url: 'https://github.com/o/r',
+          encrypted_source_url: URL_ENVELOPE.encrypted,
+          source_url_iv: URL_ENVELOPE.iv,
           interval_minutes: 60,
           enabled: 1,
           last_run_at: null,
@@ -556,6 +578,7 @@ describe('runMirrorSync', () => {
     const seen: string[] = [];
     const env = {
       DB: db,
+      MIRROR_ENCRYPTION_KEY_SECRET: keyBinding,
       REPO: {
         getByName: (key: string) => {
           seen.push(key);
@@ -591,7 +614,8 @@ describe('runMirrorSync', () => {
       mirrors: [
         {
           repository_id: 'r1',
-          source_url: 'https://github.com/o/r',
+          encrypted_source_url: URL_ENVELOPE.encrypted,
+          source_url_iv: URL_ENVELOPE.iv,
           interval_minutes: 60,
           enabled: 1,
           last_run_at: null,
