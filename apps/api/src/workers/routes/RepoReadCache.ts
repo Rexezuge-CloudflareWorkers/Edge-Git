@@ -71,7 +71,12 @@ function withEtagHeaders(response: Response, etag: string, cacheControl: string)
   return new Response(response.body, { status: response.status, headers });
 }
 
-function jsonWithEtag(c: { json: (data: unknown, status?: number, headers?: Record<string, string>) => Response }, data: unknown, etag: string, cacheControl: string): Response {
+function jsonWithEtag(
+  c: { json: (data: unknown, status?: number, headers?: Record<string, string>) => Response },
+  data: unknown,
+  etag: string,
+  cacheControl: string,
+): Response {
   return c.json(data, 200, { ETag: etag, 'Cache-Control': cacheControl });
 }
 
@@ -83,11 +88,24 @@ async function putCachedRefs(cache: KvCache, fullName: string, snapshot: RefsSna
   await cache.putJson('refs', [cacheKeyForRepo(fullName), 'snapshot'], snapshot, { ttlSeconds: REFS_TTL_SECONDS });
 }
 
-async function getCachedReadModel<T>(cache: KvCache, fullName: string, kind: string, argsKey: string, headOid = 'empty'): Promise<T | null> {
+async function getCachedReadModel<T>(
+  cache: KvCache,
+  fullName: string,
+  kind: string,
+  argsKey: string,
+  headOid = 'empty',
+): Promise<T | null> {
   return cache.getJson<T>('readmodel', [cacheKeyForRepo(fullName), kind, headOid.slice(0, 16), fnv1aHex(argsKey)]);
 }
 
-async function putCachedReadModel(cache: KvCache, fullName: string, kind: string, argsKey: string, headOid: string, value: unknown): Promise<void> {
+async function putCachedReadModel(
+  cache: KvCache,
+  fullName: string,
+  kind: string,
+  argsKey: string,
+  headOid: string,
+  value: unknown,
+): Promise<void> {
   await cache.putJson('readmodel', [cacheKeyForRepo(fullName), kind, headOid.slice(0, 16), fnv1aHex(argsKey)], value, {
     ttlSeconds: READMODEL_TTL_SECONDS,
   });
@@ -135,9 +153,14 @@ async function getCachedPack(cache: KvCache, fullName: string, headOid: string, 
 async function putCachedPack(cache: KvCache, fullName: string, headOid: string, bodyHash: string, bytes: Uint8Array): Promise<void> {
   if (bytes.byteLength > MAX_CACHED_PACK_BYTES) return;
   try {
-    await cache.putJson('readmodel', [cacheKeyForRepo(fullName), 'pack', headOid.slice(0, 16), bodyHash], { b64: bytesToBase64(bytes) }, {
-      ttlSeconds: READMODEL_TTL_SECONDS,
-    });
+    await cache.putJson(
+      'readmodel',
+      [cacheKeyForRepo(fullName), 'pack', headOid.slice(0, 16), bodyHash],
+      { b64: bytesToBase64(bytes) },
+      {
+        ttlSeconds: READMODEL_TTL_SECONDS,
+      },
+    );
   } catch {
     // Best-effort cache population.
   }
