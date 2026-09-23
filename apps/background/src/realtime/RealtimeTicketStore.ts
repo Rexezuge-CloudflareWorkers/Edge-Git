@@ -17,20 +17,49 @@ interface TicketStorage {
 class RealtimeTicketStore {
   constructor(private readonly storage: TicketStorage) {}
 
+  // TTL is clamped to 1..300s (default 30s): prevents immortal tickets from
+  // huge values and immediate-expiry churn from 0/negative inputs.
+  private static normalizeTtl(ttlSeconds: number): number {
+    if (!Number.isSafeInteger(ttlSeconds)) return 30;
+    return Math.min(Math.max(ttlSeconds, 1), 300);
+  }
+
   public async mint(shard: string, channels: string[], viewer: string, ttlSeconds: number): Promise<{ ticket: string; expiresAt: number }> {
-    const expiresAt = TimestampUtil.getCurrentUnixTimestampInSeconds() + ttlSeconds;
+    if (!shard.trim()) throw new Error('shard is required');
+    if (!viewer.trim()) throw new Error('viewer is required');
+    const cleanShard = shard.trim().slice(0, 256);
+    const cleanViewer = viewer.trim().slice(0, 320);
+    const cleanChannels = channels
+      .filter((ch) => typeof ch === 'string' && ch.trim())
+      .map((ch) => ch.trim().slice(0, 256))
+      .slice(0, 50);
+    const ttl = RealtimeTicketStore.normalizeTtl(ttlSeconds);
+    const expiresAt = TimestampUtil.getCurrentUnixTimestampInSeconds() + ttl;
     const ticket = UUIDUtil.getRandomUUIDNoDash();
+    if (!/^[0-9a-f]{32}$/i.test(ticket)) throw new Error('ticket format invalid');
     const existing = ((await this.storage.get<string[]>('ticketIds').catch(() => [] as string[])) ?? []).filter(
       (id) => typeof id === 'string',
     );
-    await this.storage.put(`ticket:${ticket}`, { shard, channels, viewer, expiresAt } satisfies TicketRecord);
-    await this.storage.put('ticketIds', [...existing, ticket].slice(-200));
-    await this.storage.setAlarm?.(Date.now() + ttlSeconds * 1000 + 5000).catch(() => undefined);
+    await this.storage.put(`ticket:${ticket}`, {
+      shard: cleanShard,
+      channels: cleanChannels,
+      viewer: cleanViewer,
+      expiresAt,
+    } satisfies TicketRecord);
+    // Evict oldest ids beyond the 200 cap AND delete their keys so storage
+    // does not leak orphaned `ticket:<id>` rows.
+    const next = [...existing, ticket].slice(-200);
+    const evicted = new Set(existing.filter((id) => !next.includes(id)));
+    await this.storage.put('ticketIds', next);
+    for (const id of evicted) {
+      await this.storage.delete(`ticket:${id}`).catch(() => undefined);
+    }
+    await this.storage.setAlarm?.(Date.now() + ttl * 1000 + 5000).catch(() => undefined);
     return { ticket, expiresAt };
   }
 
   public async redeem(ticket: string): Promise<TicketRecord | undefined> {
-    if (!ticket) return undefined;
+    if (!ticket || !/^[0-9a-f]{32}$/i.test(ticket)) return undefined;
     let record: TicketRecord | undefined;
     try {
       record = await this.storage.get<TicketRecord>(`ticket:${ticket}`);
@@ -38,6 +67,12 @@ class RealtimeTicketStore {
       record = undefined;
     }
     await this.storage.delete(`ticket:${ticket}`).catch(() => undefined);
+    // Single-use + expiry enforced: expired tickets redeem to undefined so a
+    // stolen/expired ticket can never upgrade to a socket.
+    if (!record) return undefined;
+    if (typeof record.expiresAt !== 'number' || record.expiresAt <= TimestampUtil.getCurrentUnixTimestampInSeconds()) {
+      return undefined;
+    }
     return record;
   }
 

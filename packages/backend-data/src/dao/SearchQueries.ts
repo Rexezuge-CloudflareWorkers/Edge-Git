@@ -97,6 +97,15 @@ function buildScopedLikeStatement(search: ScopedLikeSearch): { text: string; sco
   };
 }
 
+// Shared query preamble: tokenize + clamp once so the six search domains
+// stay consistent. Returns null when the query is empty.
+function prepareSearchQuery(query: string, limitOpt?: number): { limit: number; tokens: string[]; ftsQuery: string } | null {
+  const limit = clampSearchLimit(limitOpt);
+  const tokens = tokenizeSearchQuery(query);
+  if (tokens.length === 0) return null;
+  return { limit, tokens, ftsQuery: buildFtsQuery(tokens) };
+}
+
 export {
   SEARCH_DEFAULT_LIMIT,
   SEARCH_MAX_LIMIT,
@@ -110,6 +119,7 @@ export {
   buildLikeOrClause,
   buildScopedLikeStatement,
   likeParamsForTokens,
+  prepareSearchQuery,
   REPO_SEARCH_COLUMNS,
   TITLE_BODY_SEARCH_COLUMNS,
   CODE_SEARCH_COLUMNS,

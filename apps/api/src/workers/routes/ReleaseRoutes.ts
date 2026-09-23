@@ -1,5 +1,6 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
+import { isValidTagName } from '@edge-git/backend-services/release';
 import { presentMany, presentSingle } from './IdentityPresenter';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { getRepoStub } from '../doStubs';
@@ -57,8 +58,10 @@ function registerReleasePublicRoutes(app: ReleaseApp): void {
   app.get('/repos/:owner/:repo/releases/:tag', async (c) => {
     return withPublicRepo(c, async (row) => {
       try {
+        const rawTag = c.req.param('tag');
+        if (!isValidTagName(rawTag)) return jsonError(c, 'Invalid tag name', 400);
         const scope = getScope(c);
-        const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
+        const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, rawTag);
         if (release.isDraft) {
           const viewerEmail = await resolvePublicViewer(c);
           if (!(await viewerCanSeeDrafts(c.env, viewerEmail, row.owner, row.name))) return jsonError(c, 'Not found', 404);
@@ -113,6 +116,9 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
     try {
       const scope = getScope(c);
       const isDraft = body.isDraft === undefined || body.isDraft === true;
+      if (typeof body.tagName === 'string' && !isValidTagName(body.tagName.trim().replace(/\.git$/i, ''))) {
+        return jsonError(c, 'Invalid tag name', 400);
+      }
       if (!isDraft && typeof body.tagName === 'string') {
         const fullName = `${row.owner}/${row.name}`;
         if (!(await tagExists(c.env, fullName, body.tagName.trim().replace(/\.git$/i, '')))) {
@@ -149,9 +155,11 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
+    const rawTag = c.req.param('tag');
+    if (!isValidTagName(rawTag)) return jsonError(c, 'Invalid tag name', 400);
     try {
       const scope = getScope(c);
-      const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
+      const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, rawTag);
       if (release.isDraft && !(await viewerCanSeeDrafts(c.env, email, owner, repoName))) return jsonError(c, 'Not found', 404);
       const assets = await scope.get(Tokens.ReleaseService).listAssets(row.id, release.tagName);
       return c.json({ release: await presentSingle(scope, release), assets: await presentMany(scope, assets) });
@@ -166,6 +174,8 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
+    const rawTag = c.req.param('tag');
+    if (!isValidTagName(rawTag)) return jsonError(c, 'Invalid tag name', 400);
     try {
       await getScope(c).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
@@ -181,14 +191,14 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);
-      const before = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
+      const before = await scope.get(Tokens.ReleaseService).getRelease(row.id, rawTag);
       if (before.isDraft && body.isDraft === false) {
         const fullName = `${row.owner}/${row.name}`;
         if (!(await tagExists(c.env, fullName, before.tagName))) {
           return jsonError(c, 'git tag does not exist yet — push the tag before publishing', 400);
         }
       }
-      const release = await scope.get(Tokens.ReleaseService).updateRelease(row.id, c.req.param('tag'), body);
+      const release = await scope.get(Tokens.ReleaseService).updateRelease(row.id, rawTag, body);
       if (before.isDraft && !release.isDraft) {
         const fullName = `${row.owner}/${row.name}`;
         void recordAndNotify(c.env, {
@@ -214,6 +224,8 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
+    const rawTag = c.req.param('tag');
+    if (!isValidTagName(rawTag)) return jsonError(c, 'Invalid tag name', 400);
     try {
       await getScope(c).get(Tokens.RepoService).requireRole(owner, repoName, email, 'write');
     } catch {
@@ -221,7 +233,7 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
     }
     try {
       const scope = getScope(c);
-      const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, c.req.param('tag'));
+      const release = await scope.get(Tokens.ReleaseService).getRelease(row.id, rawTag);
       try {
         await getRepoStub(c.env, `${row.owner}/${row.name}`).deleteReleaseAssets({ releaseId: release.id });
       } catch {
