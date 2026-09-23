@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { BookMarked, GitFork } from 'lucide-react';
+import { BookMarked } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Repo } from '../../types';
 import { VisibilityBadge } from '../ui/Badge';
@@ -26,7 +26,6 @@ export function RepoHeader({
   issueCount,
   pullCount,
   releaseCount,
-  forkCount,
   showSettings,
   onTabChange,
 }: {
@@ -35,7 +34,6 @@ export function RepoHeader({
   issueCount?: number;
   pullCount?: number;
   releaseCount?: number;
-  forkCount?: number;
   showSettings?: boolean;
   onTabChange: (tab: RepoTab) => void;
 }) {
@@ -67,12 +65,6 @@ export function RepoHeader({
               </Link>
             </h1>
             <VisibilityBadge isPrivate={repo.isPrivate} />
-            {forkCount !== undefined && forkCount > 0 && (
-              <span className="inline-flex items-center gap-1 text-xs text-[var(--color-text-muted)]">
-                <GitFork className="h-3.5 w-3.5" />
-                {forkCount}
-              </span>
-            )}
           </>
         }
       />

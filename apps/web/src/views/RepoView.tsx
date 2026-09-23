@@ -161,7 +161,6 @@ export function RepoView({
         issueCount={issueCount}
         pullCount={pullCount}
         releaseCount={releaseCount}
-        forkCount={repoData.forksCount}
         showSettings={canManage}
         onTabChange={setTab}
       />
@@ -172,7 +171,6 @@ export function RepoView({
             owner={owner}
             repo={repo}
             repoMeta={repoData}
-            canFork={authorized ?? false}
             canWrite={repoData.viewerRole === 'admin' || repoData.viewerRole === 'write'}
             forkOwner={defaultOwner || owner}
             showNotice={showNotice}
