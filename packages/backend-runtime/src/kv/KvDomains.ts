@@ -45,9 +45,9 @@ const KV_DOMAINS: Record<KvDomainName, KvDomainDef> = {
     description: 'Advertised ref snapshots per repo; invalidated on receive-pack. Long-lived (24h) to keep DO rows_read low.',
   },
   readmodel: {
-    ttlSeconds: 600,
+    ttlSeconds: 86_400,
     maxValueBytes: 1_048_576,
-    description: 'Repo read-model snapshots (overview/branches/tags/tree/commits/blob) keyed by head oid; invalidated on push.',
+    description: 'Repo read-model snapshots (overview/branches/tags/tree/commits/blob) keyed by head oid; invalidated on push. Long-lived (24h) to keep DO rows_read low.',
   },
   ratelimit: {
     ttlSeconds: 60,

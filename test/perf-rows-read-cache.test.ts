@@ -45,7 +45,7 @@ function makeFakeKv(): KvNamespaceLike & { store: Map<string, string> } {
 describe('KV liveness', () => {
   it('keeps refs for 24h and adds a readmodel domain', () => {
     expect(KV_DOMAINS.refs.ttlSeconds).toBe(86_400);
-    expect(KV_DOMAINS.readmodel.ttlSeconds).toBe(600);
+    expect(KV_DOMAINS.readmodel.ttlSeconds).toBe(86_400);
     expect(KV_DOMAINS.readmodel.maxValueBytes).toBe(1_048_576);
   });
 });

@@ -6,13 +6,13 @@ import { repoDoKeyForFullName } from '@edge-git/shared/utils';
 // D1/DO stay authoritative; KV is loss-tolerant. All keys use the canonical
 // lowercase DO key so `Foo/Bar` and `foo/bar` share one cache entry, matching
 // `REPO.getByName` sharding. Refs snapshots live 24h (`refs` domain) and are
-// invalidated on push; read-model snapshots live 10min (`readmodel` domain)
+// invalidated on push; read-model snapshots live 24h (`readmodel` domain)
 // keyed by head oid so branch-tip moves naturally miss.
 
 type RefsSnapshot = { refs: Array<{ ref: string; oid: string }>; symbolicHead: string | null };
 
 const REFS_TTL_SECONDS = 86_400;
-const READMODEL_TTL_SECONDS = 600;
+const READMODEL_TTL_SECONDS = 86_400;
 // Tight fetch-loop guard: identical `git fetch` bodies (IDE auto-fetch,
 // broken cron) each burn a full DO pack walk. Only 2 identical fetches per
 // 5min window pass; the 3rd gets 429 + Retry-After instead of more rows.
