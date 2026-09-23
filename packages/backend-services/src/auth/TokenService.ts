@@ -3,7 +3,7 @@ import { RepositoryDAO, TokenRepoGrantDAO, UserAccessTokenDAO } from '@edge-git/
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError, NotFoundError, UnauthorizedError } from '@edge-git/backend-errors';
 import type { TokenScope, TokenRepoGrantMetadata, UserAccessTokenMetadata } from '@edge-git/shared';
-import { TimestampUtil, UUIDUtil, CryptoUtil } from '@edge-git/shared/utils';
+import { TimestampUtil, UUIDUtil, CryptoUtil, mapWithConcurrency } from '@edge-git/shared/utils';
 import { DEFAULT_TOKEN_SCOPES, TOKEN_SCOPES, coversScope, normalizeTokenScopes } from './TokenScopes';
 
 interface TokenServiceEnv {
@@ -99,10 +99,9 @@ class TokenService {
     if (!Array.isArray(grants)) throw new BadRequestError('repoGrants must be an array of {owner, name, scope}');
     const max = ConfigurationManager.transfer.getMaxTokenRepoGrants(this.env);
     if (grants.length > max) throw new BadRequestError(`At most ${max} repository grants per token`);
-    const repoDAO = await this.deps.repositoryDAO();
-    const resolved: RepoGrantInput[] = [];
-    const seen = new Set<string>();
-    for (const entry of grants) {
+    // Validate shapes first (fail fast without D1), then batch repo lookups
+    // concurrently (was sequential N+1).
+    const parsed = grants.map((entry) => {
       const owner = typeof (entry as { owner?: unknown }).owner === 'string' ? (entry as { owner: string }).owner.trim() : '';
       const rawName = typeof (entry as { name?: unknown }).name === 'string' ? (entry as { name: string }).name.trim() : '';
       const name = rawName.toLowerCase().endsWith('.git') ? rawName.slice(0, -4) : rawName;
@@ -111,11 +110,18 @@ class TokenService {
       if (typeof scope !== 'string' || !(TOKEN_SCOPES as readonly string[]).includes(scope)) {
         throw new BadRequestError(`Each repoGrant scope must be one of ${TOKEN_SCOPES.join(', ')}`);
       }
-      const repo = await repoDAO.getByOwnerAndName(owner, name).catch(() => null);
+      return { owner, name, scope: scope as TokenScope };
+    });
+    const repoDAO = await this.deps.repositoryDAO();
+    const repos = await mapWithConcurrency(parsed, 10, (p) => repoDAO.getByOwnerAndName(p.owner, p.name).catch(() => null));
+    const resolved: RepoGrantInput[] = [];
+    const seen = new Set<string>();
+    for (const [i, p] of parsed.entries()) {
+      const repo = repos.at(i);
       if (!repo) throw new NotFoundError('Repository not found');
-      if (seen.has(repo.id)) throw new BadRequestError(`Duplicate grant for ${owner}/${name}`);
+      if (seen.has(repo.id)) throw new BadRequestError(`Duplicate grant for ${p.owner}/${p.name}`);
       seen.add(repo.id);
-      resolved.push({ repositoryId: repo.id, scope: scope as TokenScope });
+      resolved.push({ repositoryId: repo.id, scope: p.scope });
     }
     return resolved;
   }

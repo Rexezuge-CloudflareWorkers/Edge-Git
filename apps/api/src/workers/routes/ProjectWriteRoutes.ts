@@ -24,7 +24,8 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     if (!(await requireWriteRole(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
-    const { malformed, body } = await readJsonBody<{ title: unknown; description?: unknown }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ title: unknown; description?: unknown }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);
@@ -54,7 +55,8 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
     if (!(await requireWriteRole(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
     const number = parseProjectNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Invalid project number', 400);
-    const { malformed, body } = await readJsonBody<{ title?: unknown; description?: unknown; status?: unknown }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ title?: unknown; description?: unknown; status?: unknown }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);
@@ -106,7 +108,8 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
     if (!(await requireWriteRole(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
     const number = parseProjectNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Invalid project number', 400);
-    const { malformed, body } = await readJsonBody<{ title?: unknown }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ title?: unknown }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const column = await getScope(c)
@@ -127,7 +130,8 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
     if (!(await requireWriteRole(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
     const number = parseProjectNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Invalid project number', 400);
-    const { malformed, body } = await readJsonBody<{ title?: unknown }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ title?: unknown }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const column = await getScope(c)
@@ -165,7 +169,7 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
     if (!(await requireWriteRole(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
     const number = parseProjectNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Invalid project number', 400);
-    const { malformed, body } = await readJsonBody<{
+    const { malformed, oversized, body } = await readJsonBody<{
       columnId: unknown;
       kind?: unknown;
       noteTitle?: unknown;
@@ -173,6 +177,7 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
       issueId?: unknown;
       pullRequestId?: unknown;
     }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);
@@ -192,7 +197,8 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
     if (!(await requireWriteRole(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
     const number = parseProjectNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Invalid project number', 400);
-    const { malformed, body } = await readJsonBody<{ toColumnId: unknown; position?: unknown }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ toColumnId: unknown; position?: unknown }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);
@@ -212,7 +218,8 @@ function registerProjectUserWriteRoutes(app: ProjectApp): void {
     if (!(await requireWriteRole(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
     const number = parseProjectNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Invalid project number', 400);
-    const { malformed, body } = await readJsonBody<{ archived?: unknown }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ archived?: unknown }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);

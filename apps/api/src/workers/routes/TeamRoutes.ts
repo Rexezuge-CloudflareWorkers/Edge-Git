@@ -52,7 +52,8 @@ function registerTeamRoutes(app: TeamApp): void {
 
   app.post('/user/orgs/:org/teams', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const { malformed, body } = await readJsonBody<{ slug?: string; name?: string; description?: string | null }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ slug?: string; name?: string; description?: string | null }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (!body.slug) return jsonError(c, 'slug is required', 400);
     try {
@@ -79,7 +80,8 @@ function registerTeamRoutes(app: TeamApp): void {
 
   app.patch('/user/orgs/:org/teams/:team', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const { malformed, body } = await readJsonBody<{ slug?: string; name?: string; description?: string | null }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ slug?: string; name?: string; description?: string | null }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const team = await getScope(c).get(Tokens.TeamService).renameTeam(c.req.param('org'), c.req.param('team'), email, body);
@@ -111,7 +113,8 @@ function registerTeamRoutes(app: TeamApp): void {
 
   app.post('/user/orgs/:org/teams/:team/members', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const { malformed, body } = await readJsonBody<{ username?: string; email?: string; role?: string }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ username?: string; email?: string; role?: string }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const target = body.username ?? body.email;
     if (!target) return jsonError(c, 'username or email is required', 400);
@@ -129,7 +132,8 @@ function registerTeamRoutes(app: TeamApp): void {
 
   app.patch('/user/orgs/:org/teams/:team/members/:member', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const { malformed, body } = await readJsonBody<{ role?: string }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ role?: string }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (body.role !== 'admin' && body.role !== 'member') return jsonError(c, 'Invalid role', 400);
     const member = decodeMemberParam(c.req.param('member'));
@@ -178,7 +182,8 @@ function registerTeamRoutes(app: TeamApp): void {
 
   app.put('/user/orgs/:org/teams/:team/repos/:owner/:repo', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const { malformed, body } = await readJsonBody<{ role?: string }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ role?: string }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const role = body.role ?? 'read';
     if (role !== 'admin' && role !== 'write' && role !== 'read') return jsonError(c, 'Invalid role', 400);

@@ -112,7 +112,8 @@ function registerUserPullMergeRoutes(app: PullApp): void {
         );
       }
     }
-    const { malformed, body } = await readJsonBody<{ message?: string; deleteHead?: boolean; strategy?: string }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ message?: string; deleteHead?: boolean; strategy?: string }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const rawMessage = typeof body.message === 'string' ? body.message.trim() : '';
     const message = rawMessage ? rawMessage.slice(0, 1000) : `Merge pull request #${number}: ${pull.title}`;

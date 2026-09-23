@@ -71,7 +71,10 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
       if (!(await needWrite(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
       const number = parseNumber(c.req.param('number'));
       if (number === null) return jsonError(c, 'Not found', 404);
-      const { malformed, body } = await readJsonBody<{ labelIds?: string[]; assignees?: string[]; milestoneId?: string | null }>(c);
+      const { malformed, oversized, body } = await readJsonBody<{ labelIds?: string[]; assignees?: string[]; milestoneId?: string | null }>(
+        c,
+      );
+      if (oversized) return jsonError(c, 'Payload too large', 413);
       if (malformed) return jsonError(c, 'Invalid JSON body', 400);
       try {
         const scope = getScope(c);
@@ -117,7 +120,8 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
     if (!(await needWrite(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
     const number = parseNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
-    const { malformed, body } = await readJsonBody<{ reviewers?: string[] }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ reviewers?: string[] }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);
@@ -168,7 +172,8 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
     if (!(await needWrite(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
     const number = parseNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
-    const { malformed, body } = await readJsonBody<{ isDraft?: boolean }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ isDraft?: boolean }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.isDraft !== 'boolean') return jsonError(c, 'isDraft must be a boolean', 400);
     try {

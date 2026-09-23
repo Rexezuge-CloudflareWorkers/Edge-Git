@@ -10,7 +10,8 @@ type OrgApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: 
 function registerOrgRoutes(app: OrgApp): void {
   app.post('/user/orgs', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const { malformed, body } = await readJsonBody<{ username?: string }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ username?: string }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (!body.username) return jsonError(c, 'username is required', 400);
     try {
@@ -50,7 +51,8 @@ function registerOrgRoutes(app: OrgApp): void {
   app.patch('/user/orgs/:org', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const orgName = c.req.param('org');
-    const { malformed, body } = await readJsonBody<{ username?: string }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ username?: string }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);
@@ -149,7 +151,8 @@ function registerOrgRoutes(app: OrgApp): void {
 
   app.post('/user/orgs/:org/members', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const { malformed, body } = await readJsonBody<{ username?: string; email?: string; role?: string }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ username?: string; email?: string; role?: string }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const target = body.username ?? body.email;
     if (!target) return jsonError(c, 'username or email is required', 400);
@@ -165,7 +168,8 @@ function registerOrgRoutes(app: OrgApp): void {
 
   app.patch('/user/orgs/:org/members/:member', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const { malformed, body } = await readJsonBody<{ role?: string }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ role?: string }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (body.role !== 'owner' && body.role !== 'member') return jsonError(c, 'Invalid role', 400);
     try {
@@ -217,7 +221,8 @@ function registerOrgRoutes(app: OrgApp): void {
     const owner = c.req.param('owner');
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const member = decodeURIComponent(c.req.param('member'));
-    const { malformed, body } = await readJsonBody<{ role?: string }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ role?: string }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const role = body.role ?? 'read';
     if (role !== 'admin' && role !== 'write' && role !== 'read') return jsonError(c, 'Invalid role', 400);

@@ -132,8 +132,9 @@ async function withVisibleRepo(
 }
 
 // Shared BaseRoute helpers — delegated so both stay consistent. Routes keep
-// importing from here for backwards compatibility; new code may import
-// `BaseRoute` directly.
+// importing from here for backwards compatibility; new code must import
+// `BaseRoute` directly (these delegates are deprecated and will be removed;
+// they exist only to avoid touching 30+ route imports in one sweep).
 function toServiceStatus(error: unknown): 400 | 401 | 403 | 404 | 409 | 413 | 429 | 500 {
   return BaseRoute.toServiceStatus(error);
 }

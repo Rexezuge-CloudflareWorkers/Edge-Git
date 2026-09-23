@@ -28,7 +28,7 @@ function registerRuleRoutes(app: RuleApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
-    const { malformed, body } = await readJsonBody<{
+    const { malformed, oversized, body } = await readJsonBody<{
       pattern?: string;
       requirePr?: boolean;
       requiredApprovals?: number;
@@ -36,6 +36,7 @@ function registerRuleRoutes(app: RuleApp): void {
       blockDeletion?: boolean;
       requireStatusChecks?: unknown;
     }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.pattern !== 'string' || !body.pattern.trim()) return jsonError(c, 'pattern is required', 400);
     try {

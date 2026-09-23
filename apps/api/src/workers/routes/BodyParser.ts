@@ -6,14 +6,13 @@ type JsonContext = {
 
 /**
  * Strict JSON body reader: distinguishes malformed JSON (`malformed: true`)
- * from a valid empty object. Callers must return 400 on malformed instead of
- * collapsing to `{}` and surfacing a misleading `required` error.
+ * from a valid empty object. Callers must check `oversized` first (413) then
+ * `malformed` (400) — see `toBodyErrorStatus` — instead of collapsing to `{}`
+ * and surfacing a misleading `required` error.
  * Non-object JSON (null, array, string, number) is malformed — callers
  * expecting an object must not coerce it to `{}`.
  * Oversized `Content-Length` is reported as `oversized: true` (alongside
- * `malformed: true` so legacy callers still fail closed with 400). Callers
- * with domain size caps (release assets, file writes) must check `oversized`
- * first and return 413 so large-but-valid payloads are not masked as 400.
+ * `malformed: true` so legacy callers still fail closed with 400).
  * The default cap is 1MB; base64 upload routes pass a higher per-route cap
  * derived from their configured max bytes.
  */
@@ -47,5 +46,16 @@ async function readJsonBody<T>(c: JsonContext | Context, opts?: ReadJsonOptions)
   }
 }
 
-export { readJsonBody, MAX_JSON_BYTES };
+/**
+ * Central status mapper for `readJsonBody` results (why: 60+ callers
+ * previously ignored `oversized`, masking 413 as 400). Returns 413 when
+ * oversized, 400 when malformed, null when ok — callers map to `jsonError`.
+ */
+function toBodyErrorStatus(result: Pick<ReadJsonResult<unknown>, 'malformed' | 'oversized'>): 413 | 400 | null {
+  if (result.oversized) return 413;
+  if (result.malformed) return 400;
+  return null;
+}
+
+export { readJsonBody, toBodyErrorStatus, MAX_JSON_BYTES };
 export type { ReadJsonOptions, ReadJsonResult };

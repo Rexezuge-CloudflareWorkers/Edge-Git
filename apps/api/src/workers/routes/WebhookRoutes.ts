@@ -36,7 +36,8 @@ function registerWebhookRoutes(app: WebhookApp): void {
   app.post('/user/repos/:owner/:repo/hooks', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const { owner, repoName } = repoParams(c);
-    const { malformed, body } = await readJsonBody<{ url?: unknown; events?: unknown; secret?: unknown }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ url?: unknown; events?: unknown; secret?: unknown }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.url !== 'string' || !body.url.trim()) return jsonError(c, 'url is required', 400);
     try {
@@ -74,7 +75,8 @@ function registerWebhookRoutes(app: WebhookApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const { owner, repoName } = repoParams(c);
     const id = c.req.param('id');
-    const { malformed, body } = await readJsonBody<{ url?: unknown; events?: unknown; isActive?: unknown }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ url?: unknown; events?: unknown; isActive?: unknown }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);

@@ -61,13 +61,14 @@ function registerUserPullThreadRoutes(app: PullApp): void {
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parsePullNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
-    const { malformed, body } = await readJsonBody<{
+    const { malformed, oversized, body } = await readJsonBody<{
       path?: string;
       line?: number | null;
       side?: string | null;
       commitOid?: string | null;
       body?: string;
     }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);
@@ -107,7 +108,8 @@ function registerUserPullThreadRoutes(app: PullApp): void {
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parsePullNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
-    const { malformed, body } = await readJsonBody<{ body?: string }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ body?: string }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);
@@ -144,7 +146,8 @@ function registerUserPullThreadRoutes(app: PullApp): void {
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parsePullNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
-    const { malformed, body } = await readJsonBody<{ resolved?: boolean }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ resolved?: boolean }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.resolved !== 'boolean') return jsonError(c, 'resolved must be a boolean', 400);
     try {
@@ -187,7 +190,8 @@ function registerUserPullThreadRoutes(app: PullApp): void {
     }
     const number = parsePullNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
-    const { malformed, body } = await readJsonBody<{ reason?: string }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ reason?: string }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);

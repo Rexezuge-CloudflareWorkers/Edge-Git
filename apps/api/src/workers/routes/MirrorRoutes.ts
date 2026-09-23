@@ -42,7 +42,8 @@ function registerMirrorRoutes(app: MirrorApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
-    const { malformed, body } = await readJsonBody<{ sourceUrl?: string; intervalMinutes?: number }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ sourceUrl?: string; intervalMinutes?: number }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.sourceUrl !== 'string' || !body.sourceUrl.trim()) return jsonError(c, 'sourceUrl is required', 400);
     if (typeof body.intervalMinutes !== 'number') return jsonError(c, 'intervalMinutes is required', 400);
@@ -83,7 +84,8 @@ function registerMirrorRoutes(app: MirrorApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
-    const { malformed, body } = await readJsonBody<{ enabled?: boolean }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ enabled?: boolean }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.enabled !== 'boolean') return jsonError(c, 'enabled is required', 400);
     try {

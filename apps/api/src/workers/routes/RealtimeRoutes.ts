@@ -50,7 +50,8 @@ function registerRealtimeUserRoutes(app: RealtimeApp): void {
   app.post('/user/realtime/ticket', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     if (realtimeDisabled(c.env)) return jsonError(c, 'Realtime is disabled', 503);
-    const { malformed, body } = await readJsonBody<{ owner?: unknown; repo?: unknown; channels?: unknown }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ owner?: unknown; repo?: unknown; channels?: unknown }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.owner !== 'string' || typeof body.repo !== 'string') {
       return jsonError(c, 'owner and repo are required', 400);

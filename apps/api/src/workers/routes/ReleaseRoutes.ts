@@ -101,13 +101,14 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
     } catch {
       return jsonError(c, 'Forbidden', 403);
     }
-    const { malformed, body } = await readJsonBody<{
+    const { malformed, oversized, body } = await readJsonBody<{
       tagName?: unknown;
       name?: unknown;
       body?: unknown;
       isDraft?: unknown;
       isPrerelease?: unknown;
     }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);
@@ -170,7 +171,13 @@ function registerReleaseUserRoutes(app: ReleaseApp): void {
     } catch {
       return jsonError(c, 'Forbidden', 403);
     }
-    const { malformed, body } = await readJsonBody<{ name?: unknown; body?: unknown; isDraft?: unknown; isPrerelease?: unknown }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{
+      name?: unknown;
+      body?: unknown;
+      isDraft?: unknown;
+      isPrerelease?: unknown;
+    }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);

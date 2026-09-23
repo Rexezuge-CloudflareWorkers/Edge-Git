@@ -39,7 +39,8 @@ function registerCollabLabelUserRoutes(app: CollabApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     if (!(await needAdmin(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
-    const { malformed, body } = await readJsonBody<{ name?: string; color?: string; description?: string }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ name?: string; color?: string; description?: string }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const created = await getScope(c)

@@ -1,7 +1,7 @@
 import { CollaborationDAO } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
-import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
+import { TimestampUtil, UUIDUtil, mapWithConcurrency } from '@edge-git/shared/utils';
 
 interface CollaborationServiceEnv {
   DB: D1Queryable;
@@ -156,6 +156,16 @@ class CollaborationService {
     const dao = await this.deps.collaborationDAO();
     const [labels, assignees] = await Promise.all([dao.listIssueLabels(issueId), dao.listIssueAssignees(issueId)]);
     return { labels, assignees };
+  }
+
+  /**
+   * Batched meta for issue filter fan-out (why: IssueRoutes filtered up to 50
+   * issues with sequential getIssueMeta; now one bounded concurrent batch).
+   * Per-issue failures degrade to empty meta so filters stay best-effort.
+   */
+  public async getIssueMetas(issueIds: readonly string[]): Promise<Array<{ labels: Array<{ name: string }>; assignees: string[] }>> {
+    if (issueIds.length === 0) return [];
+    return mapWithConcurrency(issueIds, 10, (id) => this.getIssueMeta(id).catch(() => ({ labels: [], assignees: [] })));
   }
 
   public async setPullLabels(pullRequestId: string, repositoryId: string, labelIds: unknown): Promise<void> {

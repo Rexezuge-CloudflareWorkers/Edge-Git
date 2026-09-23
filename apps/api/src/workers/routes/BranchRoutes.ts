@@ -45,7 +45,8 @@ function registerBranchRoutes(app: RepoApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
-    const { malformed, body } = await readJsonBody<{ name?: string; from?: string }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ name?: string; from?: string }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const name = (body.name ?? '').trim();
     if (!name) return jsonError(c, 'name is required', 400);
@@ -108,7 +109,8 @@ function registerBranchRoutes(app: RepoApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
-    const { malformed, body } = await readJsonBody<{ branch?: string }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ branch?: string }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const branch = (body.branch ?? '').trim();
     if (!branch) return jsonError(c, 'branch is required', 400);

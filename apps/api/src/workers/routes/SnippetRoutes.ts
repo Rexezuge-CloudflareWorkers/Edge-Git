@@ -77,7 +77,8 @@ function registerSnippetUserRoutes(app: SnippetApp): void {
 
   app.post('/user/snippets', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const { malformed, body } = await readJsonBody<{ title?: unknown; visibility?: unknown; files?: unknown }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ title?: unknown; visibility?: unknown; files?: unknown }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);
@@ -115,7 +116,8 @@ function registerSnippetUserRoutes(app: SnippetApp): void {
 
   app.patch('/user/snippets/:id', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const { malformed, body } = await readJsonBody<{ title?: unknown; visibility?: unknown; files?: unknown }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ title?: unknown; visibility?: unknown; files?: unknown }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);
