@@ -1,5 +1,8 @@
-import { BaseDAO } from './BaseDAO';
+import { DatabaseError } from '@edge-git/backend-errors';
+import { decryptData, encryptData } from '../crypto/aes-gcm';
 import type { D1Queryable } from '../utils/D1Types';
+import { isMissingSchemaError } from '../utils/D1ErrorClassifier';
+import { EncryptedDAO } from './BaseDAO';
 
 interface RepoWebhookRow {
   id: string;
@@ -10,6 +13,11 @@ interface RepoWebhookRow {
   url: string;
   url_prefix: string;
   secret: string;
+  // AES-GCM envelope (0026): per-feature key `WEBHOOK_ENCRYPTION_KEY_SECRET`.
+  // Dual-written with `secret`; reads prefer the envelope with plaintext
+  // fallback until the backfill/drop migration lands.
+  encrypted_secret?: string | null;
+  secret_iv?: string | null;
   secret_suffix: string;
   is_active: number;
   consecutive_failures: number;
@@ -20,9 +28,29 @@ interface RepoWebhookRow {
   updated_at: number;
 }
 
-class WebhookDAO extends BaseDAO {
-  constructor(database: D1Queryable) {
-    super(database);
+class WebhookDAO extends EncryptedDAO {
+  constructor(database: D1Queryable, masterKey?: string) {
+    // Empty key = legacy plaintext mode (unit fakes without Secrets Store).
+    // Production always wires a key via daoBindings (fail closed there).
+    super(database, masterKey ?? '');
+  }
+
+  private async resolveSecret(row: RepoWebhookRow): Promise<string> {
+    if (row.encrypted_secret && row.secret_iv) {
+      if (!this.masterKey) throw new DatabaseError('Webhook encryption key is not configured for this scope.');
+      try {
+        return await decryptData(row.encrypted_secret, row.secret_iv, this.masterKey);
+      } catch (error) {
+        throw new DatabaseError(`Failed to decrypt webhook secret: ${error instanceof Error ? error.message : 'unknown error'}`);
+      }
+    }
+    return row.secret;
+  }
+
+  private async withDecryptedSecret(rows: RepoWebhookRow[]): Promise<RepoWebhookRow[]> {
+    const out: RepoWebhookRow[] = [];
+    for (const row of rows) out.push({ ...row, secret: await this.resolveSecret(row) });
+    return out;
   }
 
   public async create(input: {
@@ -36,26 +64,55 @@ class WebhookDAO extends BaseDAO {
     creatorEmail: string;
     now: number;
   }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'INSERT INTO repo_webhooks (id, repository_id, url, url_prefix, secret, secret_suffix, is_active, consecutive_failures, last_delivery_at, last_delivery_status, creator_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, 0, NULL, NULL, ?, ?, ?)',
-          )
-          .bind(
-            input.id,
-            input.repositoryId,
-            input.url,
-            input.urlPrefix,
-            input.secret,
-            input.secretSuffix,
-            input.creatorEmail,
-            input.now,
-            input.now,
-          )
-          .run(),
-      'create repo webhook',
-    );
+    const envelope = this.masterKey ? await encryptData(input.secret, this.masterKey) : null;
+    try {
+      await this.withRetry(
+        () =>
+          this.database
+            .prepare(
+              'INSERT INTO repo_webhooks (id, repository_id, url, url_prefix, secret, secret_suffix, is_active, consecutive_failures, last_delivery_at, last_delivery_status, creator_email, created_at, updated_at, encrypted_secret, secret_iv) VALUES (?, ?, ?, ?, ?, ?, 1, 0, NULL, NULL, ?, ?, ?, ?, ?)',
+            )
+            .bind(
+              input.id,
+              input.repositoryId,
+              input.url,
+              input.urlPrefix,
+              input.secret,
+              input.secretSuffix,
+              input.creatorEmail,
+              input.now,
+              input.now,
+              envelope?.encrypted ?? null,
+              envelope?.iv ?? null,
+            )
+            .run(),
+        'create repo webhook',
+      );
+    } catch (error) {
+      // Pre-0026 databases (deploy skew / local dev): fall back to the
+      // legacy column list. Reads tolerate either shape.
+      if (!isMissingSchemaError(error)) throw error;
+      await this.withRetry(
+        () =>
+          this.database
+            .prepare(
+              'INSERT INTO repo_webhooks (id, repository_id, url, url_prefix, secret, secret_suffix, is_active, consecutive_failures, last_delivery_at, last_delivery_status, creator_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, 0, NULL, NULL, ?, ?, ?)',
+            )
+            .bind(
+              input.id,
+              input.repositoryId,
+              input.url,
+              input.urlPrefix,
+              input.secret,
+              input.secretSuffix,
+              input.creatorEmail,
+              input.now,
+              input.now,
+            )
+            .run(),
+        'create repo webhook',
+      );
+    }
     // Events live only in the junction table (0024 dropped the JSON column).
     await this.replaceEvents(input.id, input.events, input.now);
   }
@@ -99,7 +156,7 @@ class WebhookDAO extends BaseDAO {
       .prepare(`SELECT repo_webhooks.*, ${WebhookDAO.FULL_NAME_ALIAS} FROM repo_webhooks WHERE repository_id = ? ORDER BY created_at ASC, id ASC`)
       .bind(repositoryId)
       .all<RepoWebhookRow>();
-    return result.results ?? [];
+    return this.withDecryptedSecret(result.results ?? []);
   }
 
   public async getById(id: string): Promise<RepoWebhookRow | null> {
@@ -107,7 +164,8 @@ class WebhookDAO extends BaseDAO {
       .prepare(`SELECT repo_webhooks.*, ${WebhookDAO.FULL_NAME_ALIAS} FROM repo_webhooks WHERE id = ? LIMIT 1`)
       .bind(id)
       .first<RepoWebhookRow>();
-    return row ?? null;
+    if (!row) return null;
+    return { ...row, secret: await this.resolveSecret(row) };
   }
 
   public async getByIdAndRepo(id: string, repositoryId: string): Promise<RepoWebhookRow | null> {
@@ -115,7 +173,8 @@ class WebhookDAO extends BaseDAO {
       .prepare(`SELECT repo_webhooks.*, ${WebhookDAO.FULL_NAME_ALIAS} FROM repo_webhooks WHERE id = ? AND repository_id = ? LIMIT 1`)
       .bind(id, repositoryId)
       .first<RepoWebhookRow>();
-    return row ?? null;
+    if (!row) return null;
+    return { ...row, secret: await this.resolveSecret(row) };
   }
 
   public async countByRepo(repositoryId: string): Promise<number> {
@@ -156,16 +215,32 @@ class WebhookDAO extends BaseDAO {
   }
 
   public async rotateSecret(id: string, repositoryId: string, secret: string, secretSuffix: string, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'UPDATE repo_webhooks SET secret = ?, secret_suffix = ?, consecutive_failures = 0, updated_at = ? WHERE id = ? AND repository_id = ?',
-          )
-          .bind(secret, secretSuffix, now, id, repositoryId)
-          .run(),
-      'rotate repo webhook secret',
-    );
+    const envelope = this.masterKey ? await encryptData(secret, this.masterKey) : null;
+    try {
+      await this.withRetry(
+        () =>
+          this.database
+            .prepare(
+              'UPDATE repo_webhooks SET secret = ?, secret_suffix = ?, consecutive_failures = 0, updated_at = ?, encrypted_secret = ?, secret_iv = ? WHERE id = ? AND repository_id = ?',
+            )
+            .bind(secret, secretSuffix, now, envelope?.encrypted ?? null, envelope?.iv ?? null, id, repositoryId)
+            .run(),
+        'rotate repo webhook secret',
+      );
+    } catch (error) {
+      // Pre-0026 databases: legacy column list.
+      if (!isMissingSchemaError(error)) throw error;
+      await this.withRetry(
+        () =>
+          this.database
+            .prepare(
+              'UPDATE repo_webhooks SET secret = ?, secret_suffix = ?, consecutive_failures = 0, updated_at = ? WHERE id = ? AND repository_id = ?',
+            )
+            .bind(secret, secretSuffix, now, id, repositoryId)
+            .run(),
+        'rotate repo webhook secret',
+      );
+    }
   }
 
   public async recordDeliveryOutcome(hookId: string, success: boolean, now: number, disableAfterFailures: number): Promise<void> {

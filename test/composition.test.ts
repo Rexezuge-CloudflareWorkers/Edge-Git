@@ -60,6 +60,9 @@ const EXPECTED_TOKENS = [
   'Db',
   'KvCache',
   'Keys',
+  'WebhookKey',
+  'MirrorKey',
+  'ImportKey',
   'AppConfig',
   'UserDAO',
   'RepositoryDAO',
@@ -107,7 +110,9 @@ function makeEnv() {
   return {
     DB: {},
     SITE_URL: 'https://git.example.com/',
-    AES_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') },
+    WEBHOOK_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('webhook-key') },
+    MIRROR_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('mirror-key') },
+    IMPORT_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('import-key') },
   };
 }
 
@@ -251,22 +256,35 @@ describe('createRequestScope', () => {
     }
   });
 
-  it('resolves keys lazily and memoizes the secret fetch', async () => {
+  it('resolves keys lazily and memoizes each secret fetch independently', async () => {
     const env = makeEnv();
     const scope = createRequestScope(env as never);
-    expect(env.AES_ENCRYPTION_KEY_SECRET.get).not.toHaveBeenCalled();
+    expect(env.WEBHOOK_ENCRYPTION_KEY_SECRET.get).not.toHaveBeenCalled();
+    expect(env.MIRROR_ENCRYPTION_KEY_SECRET.get).not.toHaveBeenCalled();
+    expect(env.IMPORT_ENCRYPTION_KEY_SECRET.get).not.toHaveBeenCalled();
+    // Per-feature thunks fetch only their own key.
+    const webhookKey = scope.get(Tokens.WebhookKey);
+    await expect(webhookKey()).resolves.toBe('webhook-key');
+    await expect(webhookKey()).resolves.toBe('webhook-key');
+    expect(env.WEBHOOK_ENCRYPTION_KEY_SECRET.get).toHaveBeenCalledTimes(1);
+    expect(env.MIRROR_ENCRYPTION_KEY_SECRET.get).not.toHaveBeenCalled();
+    expect(env.IMPORT_ENCRYPTION_KEY_SECRET.get).not.toHaveBeenCalled();
+    // Combined thunk resolves all three.
     const keys = scope.get(Tokens.Keys);
     const first = await keys();
-    expect(first).toEqual({ masterKey: 'master-key' });
+    expect(first).toEqual({ webhookKey: 'webhook-key', mirrorKey: 'mirror-key', importKey: 'import-key' });
     await expect(keys()).resolves.toBe(first);
-    expect(env.AES_ENCRYPTION_KEY_SECRET.get).toHaveBeenCalledTimes(1);
+    expect(env.MIRROR_ENCRYPTION_KEY_SECRET.get).toHaveBeenCalledTimes(1);
+    expect(env.IMPORT_ENCRYPTION_KEY_SECRET.get).toHaveBeenCalledTimes(1);
   });
 
-  it('throws a clear error when the AES secret binding is missing', async () => {
-    const { AES_ENCRYPTION_KEY_SECRET: _dropped, ...env } = makeEnv();
+  it('throws a clear error when a per-feature secret binding is missing', async () => {
+    const { WEBHOOK_ENCRYPTION_KEY_SECRET: _dropped, ...env } = makeEnv();
     void _dropped;
     const scope = createRequestScope(env as never);
-    await expect(scope.get(Tokens.Keys)()).rejects.toThrow('AES_ENCRYPTION_KEY_SECRET');
+    await expect(scope.get(Tokens.WebhookKey)()).rejects.toThrow('WEBHOOK_ENCRYPTION_KEY_SECRET');
+    // Other features still resolve.
+    await expect(scope.get(Tokens.MirrorKey)()).resolves.toBe('mirror-key');
   });
 
   it('resolves AppConfig from the request env', () => {

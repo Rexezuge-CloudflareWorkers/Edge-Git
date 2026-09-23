@@ -2,19 +2,28 @@ import type { D1Queryable } from '@edge-git/backend-data/utils';
 
 // Minimal structural env for scope creation. Secrets are resolved lazily and
 // memoized — requests that never touch encrypted state pay no Secrets Store
-// round-trip.
+// round-trip. One master key per feature (webhook/mirror/import) so a single
+// key compromise or rotation only affects one envelope type.
 //
 // NOTE: no `[key: string]: unknown` index signature on purpose — interfaces
 // (e.g. endpoint `*Env`) do not carry an implicit index signature, so a target
 // with one would reject every `createRequestScope(env)` call site. Extra
 // bindings are still assignable structurally; services receive `env as never`.
+interface SecretsStoreSecret {
+  get(): Promise<string>;
+}
+
 interface RequestScopeEnv {
   DB: D1Queryable;
-  AES_ENCRYPTION_KEY_SECRET?: { get(): Promise<string> };
+  WEBHOOK_ENCRYPTION_KEY_SECRET?: SecretsStoreSecret;
+  MIRROR_ENCRYPTION_KEY_SECRET?: SecretsStoreSecret;
+  IMPORT_ENCRYPTION_KEY_SECRET?: SecretsStoreSecret;
 }
 
 interface RequestKeys {
-  masterKey: string;
+  webhookKey: string;
+  mirrorKey: string;
+  importKey: string;
 }
 
 // Single audited unsafe-cast location for service envs. Services declare
