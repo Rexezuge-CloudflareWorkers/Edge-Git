@@ -71,6 +71,19 @@ class CheckRunnerWorker extends DurableObject<Env> {
     return { queued: contexts.length };
   }
 
+  // Drops queued check items for one deleted repository. Filtered by
+  // `repositoryId` (never `deleteAll`) so a recreated same-name repo — which
+  // shares this DO key — keeps its own queue. Called synchronously on repo
+  // delete (best-effort) and again by the background `RepoVacuumTask`.
+  public async purgeRepo(repositoryId: string): Promise<{ removed: number }> {
+    const pending = (await this.ctx.storage.get<PendingItem[]>('pending').catch(() => null)) ?? [];
+    const kept = pending.filter((p) => p.repositoryId !== repositoryId);
+    if (kept.length !== pending.length) {
+      await this.ctx.storage.put('pending', kept).catch(() => undefined);
+    }
+    return { removed: pending.length - kept.length };
+  }
+
   public override async alarm(): Promise<void> {
     const pending = (await this.ctx.storage.get<PendingItem[]>('pending').catch(() => null)) ?? [];
     if (pending.length === 0) return;

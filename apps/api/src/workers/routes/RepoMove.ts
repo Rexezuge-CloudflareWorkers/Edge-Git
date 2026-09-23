@@ -3,6 +3,7 @@ import { repoShardFor } from '@edge-git/shared/realtime';
 import { ensureRepo, getRepoStub } from '../doStubs';
 import { getRealtimeStub } from '../doStubs';
 import { copyRepoGit } from './CrossFork';
+import { enqueueRepoVacuum } from './RepoVacuum';
 
 interface RepoMoveItem {
   id: string;
@@ -94,11 +95,13 @@ async function moveOneRepo(env: Env, actorEmail: string, move: RepoMoveItem): Pr
     await getRepoStub(env, move.oldFull)
       .deleteRepo()
       .catch(() => undefined);
+    await enqueueRepoVacuum(env, move.oldFull, move.id);
     return { empty: copied.empty };
   } catch (error) {
     await getRepoStub(env, move.newFull)
       .deleteRepo()
       .catch(() => undefined);
+    await enqueueRepoVacuum(env, move.newFull, move.id);
     throw error;
   }
 }
@@ -114,6 +117,7 @@ async function moveOneRepoBack(env: Env, move: RepoMoveItem): Promise<boolean> {
     await getRepoStub(env, move.newFull)
       .deleteRepo()
       .catch(() => undefined);
+    await enqueueRepoVacuum(env, move.newFull, move.id);
     return true;
   } catch {
     return false;

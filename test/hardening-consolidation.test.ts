@@ -117,7 +117,9 @@ describe('best-effort paths stay silent-safe but observable', () => {
           webhookDeliveryDAO: ok,
           auditLogDAO: ok,
           teamGrantDAO: ok,
-          checkRunDAO: () => Promise.resolve({} as never),
+          checkRunDAO: ok,
+          numberingDAO: ok,
+          searchDAO: ok,
         } as never,
         'repo-1',
       );
@@ -147,7 +149,9 @@ describe('best-effort paths stay silent-safe but observable', () => {
           webhookDeliveryDAO: ok,
           auditLogDAO: ok,
           teamGrantDAO: ok,
-          checkRunDAO: () => Promise.resolve({} as never),
+          checkRunDAO: ok,
+          numberingDAO: ok,
+          searchDAO: ok,
         } as never,
         'repo-1',
       );

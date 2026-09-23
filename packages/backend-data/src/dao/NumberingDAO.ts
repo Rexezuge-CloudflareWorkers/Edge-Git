@@ -46,6 +46,13 @@ class NumberingDAO extends BaseDAO {
     }
     return row.n;
   }
+
+  public async deleteByRepo(repositoryId: string): Promise<void> {
+    await this.withRetry(
+      () => this.database.prepare('DELETE FROM repo_number_counters WHERE repository_id = ?').bind(repositoryId).run(),
+      'delete repo number counters',
+    );
+  }
 }
 
 export { NumberingDAO };

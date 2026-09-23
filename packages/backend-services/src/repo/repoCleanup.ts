@@ -10,11 +10,13 @@ import type {
   IssueDAO,
   MirrorDAO,
   NotificationDAO,
+  NumberingDAO,
   ProjectDAO,
   PullRequestDAO,
   PullThreadDAO,
   ReleaseDAO,
   RepoCollaboratorDAO,
+  SearchDAO,
   SecuritySettingsDAO,
   StarDAO,
   TeamRepoGrantDAO,
@@ -60,6 +62,8 @@ interface RepoCleanupDeps {
   auditLogDAO: () => Promise<AuditLogDAO>;
   teamGrantDAO: () => Promise<TeamRepoGrantDAO>;
   checkRunDAO: () => Promise<CheckRunDAO>;
+  numberingDAO: () => Promise<NumberingDAO>;
+  searchDAO: () => Promise<SearchDAO>;
 }
 
 async function cleanupRepoSidecars(deps: RepoCleanupDeps, repoId: string): Promise<void> {
@@ -88,6 +92,9 @@ async function cleanupRepoSidecars(deps: RepoCleanupDeps, repoId: string): Promi
     deps.webhookDeliveryDAO,
     deps.auditLogDAO,
     deps.teamGrantDAO,
+    deps.checkRunDAO,
+    deps.numberingDAO,
+    deps.searchDAO,
   ];
   for (const [index, factory] of factories.entries()) {
     try {
@@ -98,16 +105,6 @@ async function cleanupRepoSidecars(deps: RepoCleanupDeps, repoId: string): Promi
       // partial-delete risk — log it while still continuing best-effort.
       if (!isMissingTableError(error)) console.warn(`[WARN] [repoCleanup] sidecar[${index}] deleteByRepo failed: ${String(error)}`);
     }
-  }
-  // Check runs prune by time (no deleteByRepo); best-effort purge via a wide
-  // cutoff so deletes do not leave check history orphaned on new DBs.
-  try {
-    const checkDao = await deps.checkRunDAO();
-    if (typeof (checkDao as unknown as { deleteByRepo?: (id: string) => Promise<unknown> }).deleteByRepo === 'function') {
-      await (checkDao as unknown as { deleteByRepo: (id: string) => Promise<unknown> }).deleteByRepo(repoId);
-    }
-  } catch (error) {
-    if (!isMissingTableError(error)) console.warn(`[WARN] [repoCleanup] checkRun deleteByRepo failed: ${String(error)}`);
   }
 }
 

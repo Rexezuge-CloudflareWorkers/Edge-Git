@@ -21,6 +21,7 @@ import {
 import {
   AuditLogDAO,
   CheckRunDAO,
+  DeletedRepoDoDAO,
   DeployKeyDAO,
   EventDAO,
   ImportDAO,
@@ -85,6 +86,7 @@ function bindDaoBindings(scope: Container, env: RequestScopeEnv): void {
     [Tokens.ImportDAO, () => Promise.resolve(new ImportDAO(env.DB))],
     [Tokens.MirrorDAO, () => Promise.resolve(new MirrorDAO(env.DB))],
     [Tokens.DeployKeyDAO, () => Promise.resolve(new DeployKeyDAO(env.DB))],
+    [Tokens.DeletedRepoDoDAO, () => Promise.resolve(new DeletedRepoDoDAO(env.DB))],
     [Tokens.TokenRepoGrantDAO, () => Promise.resolve(new TokenRepoGrantDAO(env.DB))],
     [Tokens.SecuritySettingsDAO, () => Promise.resolve(new SecuritySettingsDAO(env.DB))],
   ];

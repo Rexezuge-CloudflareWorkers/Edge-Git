@@ -4,6 +4,7 @@ import { AuditLogCleanupTask } from './AuditLogCleanupTask';
 import { CheckPruneTask } from './CheckPruneTask';
 import { CheckStaleTask } from './CheckStaleTask';
 import { ExpiredTokenPruningTask } from './ExpiredTokenPruningTask';
+import { RepoVacuumTask } from './RepoVacuumTask';
 import { SearchBackfillTask } from './SearchBackfillTask';
 import { WebhookDeliveryTask } from './WebhookDeliveryTask';
 import { ImportSweeperTask } from './ImportSweeperTask';
@@ -29,6 +30,7 @@ const CRON_TASK_FACTORIES: readonly TaskDefinition[] = [
   { name: 'WebhookDeliveryTask', phase: 2, make: () => new WebhookDeliveryTask() },
   { name: 'ImportSweeperTask', phase: 2, make: () => new ImportSweeperTask() },
   { name: 'MirrorSyncTask', phase: 2, make: () => new MirrorSyncTask() },
+  { name: 'RepoVacuumTask', phase: 2, make: () => new RepoVacuumTask() },
 ];
 
 // Eager instances preserved for backwards compat (tests index `.run`/instanceof).
@@ -74,4 +76,5 @@ export { SearchBackfillTask } from './SearchBackfillTask';
 export { WebhookDeliveryTask } from './WebhookDeliveryTask';
 export { ImportSweeperTask } from './ImportSweeperTask';
 export { MirrorSyncTask } from './MirrorSyncTask';
+export { RepoVacuumTask } from './RepoVacuumTask';
 export type { ScheduledTask } from './IScheduledTask';

@@ -7,6 +7,7 @@ import type {
   BranchProtectionDAO,
   CheckRunDAO,
   CollaborationDAO,
+  DeletedRepoDoDAO,
   DeployKeyDAO,
   DiscussionDAO,
   EventDAO,
@@ -71,6 +72,7 @@ interface DaoThunks {
   importDAO: () => Promise<ImportDAO>;
   mirrorDAO: () => Promise<MirrorDAO>;
   deployKeyDAO: () => Promise<DeployKeyDAO>;
+  deletedRepoDoDAO: () => Promise<DeletedRepoDoDAO>;
   tokenDAO: () => Promise<UserAccessTokenDAO>;
   checkRunDAO: () => Promise<CheckRunDAO>;
   collaborationDAO: () => Promise<CollaborationDAO>;

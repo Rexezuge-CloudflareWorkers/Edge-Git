@@ -6,3 +6,5 @@ export { BranchProtectionDAO } from './BranchProtectionDAO';
 export type { BranchProtectionRuleRow } from './BranchProtectionDAO';
 export { DeployKeyDAO } from './DeployKeyDAO';
 export { SecuritySettingsDAO } from './SecuritySettingsDAO';
+export { DeletedRepoDoDAO } from './DeletedRepoDoDAO';
+export type { DeletedRepoDoRow } from './DeletedRepoDoDAO';

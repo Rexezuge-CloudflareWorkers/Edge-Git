@@ -3,6 +3,7 @@ import {
   BranchProtectionDAO,
   CheckRunDAO,
   CollaborationDAO,
+  DeletedRepoDoDAO,
   DiscussionDAO,
   EventDAO,
   ImportDAO,
@@ -10,6 +11,7 @@ import {
   MirrorDAO,
   NamespaceDAO,
   NotificationDAO,
+  NumberingDAO,
   OrganizationDAO,
   OrganizationMemberDAO,
   ProjectDAO,
@@ -19,6 +21,7 @@ import {
   DeployKeyDAO,
   RepoCollaboratorDAO,
   RepositoryDAO,
+  SearchDAO,
   SecuritySettingsDAO,
   StarDAO,
   TeamRepoGrantDAO,
@@ -34,7 +37,7 @@ import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
 import { AppConfiguration } from '@edge-git/backend-runtime/config';
 import { isReservedNamespaceName } from '@edge-git/shared/constants';
-import { EmailAddress, RepoFullName, TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
+import { EmailAddress, RepoFullName, TimestampUtil, UUIDUtil, repoDoKeyForFullName } from '@edge-git/shared/utils';
 import { PermissionService } from '../permission/PermissionService';
 import { cleanupRepoSidecars } from './repoCleanup';
 import { RepoVisibilityService } from './RepoVisibilityService';
@@ -67,6 +70,9 @@ interface RepoServiceDeps {
   importDAO?: () => Promise<ImportDAO>;
   mirrorDAO?: () => Promise<MirrorDAO>;
   deployKeyDAO?: () => Promise<DeployKeyDAO>;
+  deletedRepoDoDAO?: () => Promise<DeletedRepoDoDAO>;
+  numberingDAO?: () => Promise<NumberingDAO>;
+  searchDAO?: () => Promise<SearchDAO>;
   tokenGrantDAO?: () => Promise<TokenRepoGrantDAO>;
   securitySettingsDAO?: () => Promise<SecuritySettingsDAO>;
   collaborationDAO?: () => Promise<CollaborationDAO>;
@@ -120,6 +126,9 @@ class RepoService {
       importDAO: () => Promise.resolve(new ImportDAO(env.DB)),
       mirrorDAO: () => Promise.resolve(new MirrorDAO(env.DB)),
       deployKeyDAO: () => Promise.resolve(new DeployKeyDAO(env.DB)),
+      deletedRepoDoDAO: () => Promise.resolve(new DeletedRepoDoDAO(env.DB)),
+      numberingDAO: () => Promise.resolve(new NumberingDAO(env.DB)),
+      searchDAO: () => Promise.resolve(new SearchDAO(env.DB)),
       tokenGrantDAO: () => Promise.resolve(new TokenRepoGrantDAO(env.DB)),
       securitySettingsDAO: () => Promise.resolve(new SecuritySettingsDAO(env.DB)),
       collaborationDAO: () => Promise.resolve(new CollaborationDAO(env.DB)),
@@ -325,6 +334,23 @@ class RepoService {
     await cleanupRepoSidecars(this.deps, repo.id);
     const repositoryDAO = await this.deps.repositoryDAO();
     await repositoryDAO.deleteById(repo.id);
+    // Enqueue a vacuum tombstone so the background `RepoVacuumTask` can
+    // reclaim the REPO + CHECK_RUNNER isolate storage and KV caches once the
+    // name stays free. Best-effort: the synchronous targeted DO purge in the
+    // route already removed the live content; a missed tombstone only leaks
+    // reclaimed-later SQLite pages, never user-visible data.
+    try {
+      const tombstones = await this.deps.deletedRepoDoDAO();
+      const fullName = `${repo.owner}/${repo.name}`;
+      await tombstones.enqueue(
+        repoDoKeyForFullName(fullName),
+        fullName,
+        repo.id,
+        TimestampUtil.getCurrentUnixTimestampInSeconds(),
+      );
+    } catch (error) {
+      console.warn(`[WARN] [repoCleanup] vacuum tombstone enqueue failed: ${String(error)}`);
+    }
     return { id: repo.id };
   }
 }
