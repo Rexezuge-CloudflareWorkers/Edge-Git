@@ -25,7 +25,7 @@ describe('MirrorDAO', () => {
       calls.push({ query, params });
       return { all: [] };
     });
-    await new MirrorDAO(db).listDue(1234, 10);
+    await new MirrorDAO(db, btoa('0'.repeat(32))).listDue(1234, 10);
     expect(calls[0].params).toEqual([1234, 10]);
     expect(calls[0].query).toContain('repo_mirrors WHERE enabled = 1');
   });
@@ -36,7 +36,7 @@ describe('MirrorDAO', () => {
       queries.push(query);
       return {};
     });
-    const dao = new MirrorDAO(db);
+    const dao = new MirrorDAO(db, btoa('0'.repeat(32)));
     await dao.recordRun('r1', true, null, 999, 5);
     expect(queries[0]).toContain('consecutive_failures = 0');
     await dao.recordRun('r1', false, 'boom', 999, 5);
@@ -51,7 +51,7 @@ describe('ImportDAO claimDue race', () => {
       calls.push({ query, params });
       return { all: [] };
     });
-    await new ImportDAO(db).claimDue(5, 300, 9999);
+    await new ImportDAO(db, btoa('0'.repeat(32))).claimDue(5, 300, 9999);
     const claim = calls.find((c) => c.query.includes('UPDATE')) ?? calls[0];
     expect(claim.params).toContain(5);
   });

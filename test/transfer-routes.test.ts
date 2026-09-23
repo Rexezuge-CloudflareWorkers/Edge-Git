@@ -201,17 +201,20 @@ function createTransferFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO repo_imports')) {
+          // Envelope-only shape since 0027 (no plaintext `source_url`):
+          // (id, repoId, status, createdBy, created, updated, enc, iv).
           state.imports.push({
             id: params[0],
             repository_id: params[1],
-            source_url: params[2],
-            status: params[3],
+            encrypted_source_url: params[6],
+            source_url_iv: params[7],
+            status: params[2],
             error: null,
             refs_json: null,
             imported_refs: 0,
-            created_by: params[4],
-            created_at: params[5],
-            updated_at: params[6],
+            created_by: params[3],
+            created_at: params[4],
+            updated_at: params[5],
           });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
@@ -233,25 +236,29 @@ function createTransferFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 0 } });
         }
         if (q.startsWith('INSERT INTO repo_mirrors')) {
+          // Envelope-only shape since 0027 (no plaintext `source_url`):
+          // (repoId, interval, createdBy, created, updated, enc, iv).
           const existing = state.mirrors.find((m) => m.repository_id === params[0]);
           if (existing) {
-            existing.source_url = params[1];
-            existing.interval_minutes = params[2];
+            existing.encrypted_source_url = params[5];
+            existing.source_url_iv = params[6];
+            existing.interval_minutes = params[1];
             existing.enabled = 1;
-            existing.updated_at = params[6];
+            existing.updated_at = params[4];
           } else {
             state.mirrors.push({
               repository_id: params[0],
-              source_url: params[1],
-              interval_minutes: params[2],
+              encrypted_source_url: params[5],
+              source_url_iv: params[6],
+              interval_minutes: params[1],
               enabled: 1,
               last_run_at: null,
               last_status: null,
               last_error: null,
               consecutive_failures: 0,
-              created_by: params[3],
-              created_at: params[4],
-              updated_at: params[5],
+              created_by: params[2],
+              created_at: params[3],
+              updated_at: params[4],
             });
           }
           return Promise.resolve({ success: true, meta: { changes: 1 } });
@@ -328,12 +335,16 @@ function createStub(empty: boolean) {
 
 function createEnv(db: D1Queryable, empty: boolean) {
   const stub = createStub(empty);
+  const testKey = { get: async () => btoa('0'.repeat(32)) };
   return {
     DB: db,
     REPO: { getByName: () => stub, get: () => stub, idFromName: (n: string) => n },
     CRON_TASKS: { get: () => stub, idFromName: (n: string) => n },
     ENVIRONMENT: 'development',
     DEV_AUTH_EMAIL: ALICE,
+    WEBHOOK_ENCRYPTION_KEY_SECRET: testKey,
+    MIRROR_ENCRYPTION_KEY_SECRET: testKey,
+    IMPORT_ENCRYPTION_KEY_SECRET: testKey,
   };
 }
 

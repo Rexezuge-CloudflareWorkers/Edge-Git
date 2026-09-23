@@ -1,7 +1,6 @@
 import { DatabaseError } from '@edge-git/backend-errors';
 import { decryptData, encryptData } from '../crypto/aes-gcm';
 import type { D1Queryable } from '../utils/D1Types';
-import { isMissingSchemaError } from '../utils/D1ErrorClassifier';
 import { EncryptedDAO } from './BaseDAO';
 
 type ImportStatus = 'pending' | 'running' | 'done' | 'failed' | 'cancelled';
@@ -26,12 +25,12 @@ function parseRefsJson(raw: string): Array<{ ref: string; oid: string | null }> 
 interface RepoImportRow {
   id: string;
   repository_id: string;
+  // Decrypted source URL (output only, never a stored column since 0027
+  // dropped the plaintext `source_url` column). Envelope lives in
+  // `encrypted_source_url`/`source_url_iv` under `IMPORT_ENCRYPTION_KEY_SECRET`.
   source_url: string;
-  // AES-GCM envelope (0026): per-feature key `IMPORT_ENCRYPTION_KEY_SECRET`.
-  // Dual-written with `source_url`; reads prefer the envelope with plaintext
-  // fallback until the backfill/drop migration lands.
-  encrypted_source_url?: string | null;
-  source_url_iv?: string | null;
+  encrypted_source_url: string;
+  source_url_iv: string;
   status: ImportStatus;
   error: string | null;
   imported_refs: number;
@@ -41,22 +40,18 @@ interface RepoImportRow {
 }
 
 class ImportDAO extends EncryptedDAO {
-  constructor(database: D1Queryable, masterKey?: string) {
-    // Empty key = legacy plaintext mode (unit fakes without Secrets Store).
-    // Production always wires a key via daoBindings (fail closed there).
-    super(database, masterKey ?? '');
+  constructor(database: D1Queryable, masterKey: string) {
+    super(database, masterKey);
   }
 
   private async resolveSourceUrl(row: RepoImportRow): Promise<string> {
-    if (row.encrypted_source_url && row.source_url_iv) {
-      if (!this.masterKey) throw new DatabaseError('Import encryption key is not configured for this scope.');
-      try {
-        return await decryptData(row.encrypted_source_url, row.source_url_iv, this.masterKey);
-      } catch (error) {
-        throw new DatabaseError(`Failed to decrypt import source URL: ${error instanceof Error ? error.message : 'unknown error'}`);
-      }
+    if (!this.masterKey) throw new DatabaseError('Import encryption key is not configured for this scope.');
+    if (!row.encrypted_source_url || !row.source_url_iv) throw new DatabaseError('Import source URL envelope is missing.');
+    try {
+      return await decryptData(row.encrypted_source_url, row.source_url_iv, this.masterKey);
+    } catch (error) {
+      throw new DatabaseError(`Failed to decrypt import source URL: ${error instanceof Error ? error.message : 'unknown error'}`);
     }
-    return row.source_url;
   }
 
   private async withDecryptedSourceUrl(rows: RepoImportRow[]): Promise<RepoImportRow[]> {
@@ -66,42 +61,17 @@ class ImportDAO extends EncryptedDAO {
   }
 
   public async create(input: { id: string; repositoryId: string; sourceUrl: string; createdBy: string; now: number }): Promise<void> {
-    const envelope = this.masterKey ? await encryptData(input.sourceUrl, this.masterKey) : null;
-    try {
-      await this.withRetry(
-        () =>
-          this.database
-            .prepare(
-              'INSERT INTO repo_imports (id, repository_id, source_url, status, error, imported_refs, created_by, created_at, updated_at, encrypted_source_url, source_url_iv) VALUES (?, ?, ?, ?, NULL, 0, ?, ?, ?, ?, ?)',
-            )
-            .bind(
-              input.id,
-              input.repositoryId,
-              input.sourceUrl,
-              'pending',
-              input.createdBy,
-              input.now,
-              input.now,
-              envelope?.encrypted ?? null,
-              envelope?.iv ?? null,
-            )
-            .run(),
-        'create repo import',
-      );
-    } catch (error) {
-      // Pre-0026 databases (deploy skew / local dev): legacy column list.
-      if (!isMissingSchemaError(error)) throw error;
-      await this.withRetry(
-        () =>
-          this.database
-            .prepare(
-              'INSERT INTO repo_imports (id, repository_id, source_url, status, error, imported_refs, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, NULL, 0, ?, ?, ?)',
-            )
-            .bind(input.id, input.repositoryId, input.sourceUrl, 'pending', input.createdBy, input.now, input.now)
-            .run(),
-        'create repo import',
-      );
-    }
+    const envelope = await encryptData(input.sourceUrl, this.masterKey);
+    await this.withRetry(
+      () =>
+        this.database
+          .prepare(
+            'INSERT INTO repo_imports (id, repository_id, status, error, imported_refs, created_by, created_at, updated_at, encrypted_source_url, source_url_iv) VALUES (?, ?, ?, NULL, 0, ?, ?, ?, ?, ?)',
+          )
+          .bind(input.id, input.repositoryId, 'pending', input.createdBy, input.now, input.now, envelope.encrypted, envelope.iv)
+          .run(),
+      'create repo import',
+    );
   }
 
   public async getById(id: string): Promise<RepoImportRow | null> {

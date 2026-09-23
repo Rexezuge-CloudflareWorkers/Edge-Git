@@ -18,6 +18,12 @@ interface RequestScopeEnv {
   WEBHOOK_ENCRYPTION_KEY_SECRET?: SecretsStoreSecret;
   MIRROR_ENCRYPTION_KEY_SECRET?: SecretsStoreSecret;
   IMPORT_ENCRYPTION_KEY_SECRET?: SecretsStoreSecret;
+  // Raw-key escape hatch for the integration pool / local dev without Secrets
+  // Store. Test-only: never set these vars in production (the template does
+  // not declare them; production always uses the bindings above).
+  WEBHOOK_ENCRYPTION_KEY?: string;
+  MIRROR_ENCRYPTION_KEY?: string;
+  IMPORT_ENCRYPTION_KEY?: string;
 }
 
 interface RequestKeys {

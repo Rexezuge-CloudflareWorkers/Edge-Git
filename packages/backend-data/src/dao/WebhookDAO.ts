@@ -1,7 +1,6 @@
 import { DatabaseError } from '@edge-git/backend-errors';
 import { decryptData, encryptData } from '../crypto/aes-gcm';
 import type { D1Queryable } from '../utils/D1Types';
-import { isMissingSchemaError } from '../utils/D1ErrorClassifier';
 import { EncryptedDAO } from './BaseDAO';
 
 interface RepoWebhookRow {
@@ -12,12 +11,12 @@ interface RepoWebhookRow {
   full_name: string;
   url: string;
   url_prefix: string;
+  // Decrypted HMAC secret (output only, never a stored column since 0027
+  // dropped the plaintext `secret` column). Envelope lives in
+  // `encrypted_secret`/`secret_iv` under `WEBHOOK_ENCRYPTION_KEY_SECRET`.
   secret: string;
-  // AES-GCM envelope (0026): per-feature key `WEBHOOK_ENCRYPTION_KEY_SECRET`.
-  // Dual-written with `secret`; reads prefer the envelope with plaintext
-  // fallback until the backfill/drop migration lands.
-  encrypted_secret?: string | null;
-  secret_iv?: string | null;
+  encrypted_secret: string;
+  secret_iv: string;
   secret_suffix: string;
   is_active: number;
   consecutive_failures: number;
@@ -29,22 +28,18 @@ interface RepoWebhookRow {
 }
 
 class WebhookDAO extends EncryptedDAO {
-  constructor(database: D1Queryable, masterKey?: string) {
-    // Empty key = legacy plaintext mode (unit fakes without Secrets Store).
-    // Production always wires a key via daoBindings (fail closed there).
-    super(database, masterKey ?? '');
+  constructor(database: D1Queryable, masterKey: string) {
+    super(database, masterKey);
   }
 
   private async resolveSecret(row: RepoWebhookRow): Promise<string> {
-    if (row.encrypted_secret && row.secret_iv) {
-      if (!this.masterKey) throw new DatabaseError('Webhook encryption key is not configured for this scope.');
-      try {
-        return await decryptData(row.encrypted_secret, row.secret_iv, this.masterKey);
-      } catch (error) {
-        throw new DatabaseError(`Failed to decrypt webhook secret: ${error instanceof Error ? error.message : 'unknown error'}`);
-      }
+    if (!this.masterKey) throw new DatabaseError('Webhook encryption key is not configured for this scope.');
+    if (!row.encrypted_secret || !row.secret_iv) throw new DatabaseError('Webhook secret envelope is missing.');
+    try {
+      return await decryptData(row.encrypted_secret, row.secret_iv, this.masterKey);
+    } catch (error) {
+      throw new DatabaseError(`Failed to decrypt webhook secret: ${error instanceof Error ? error.message : 'unknown error'}`);
     }
-    return row.secret;
   }
 
   private async withDecryptedSecret(rows: RepoWebhookRow[]): Promise<RepoWebhookRow[]> {
@@ -64,55 +59,28 @@ class WebhookDAO extends EncryptedDAO {
     creatorEmail: string;
     now: number;
   }): Promise<void> {
-    const envelope = this.masterKey ? await encryptData(input.secret, this.masterKey) : null;
-    try {
-      await this.withRetry(
-        () =>
-          this.database
-            .prepare(
-              'INSERT INTO repo_webhooks (id, repository_id, url, url_prefix, secret, secret_suffix, is_active, consecutive_failures, last_delivery_at, last_delivery_status, creator_email, created_at, updated_at, encrypted_secret, secret_iv) VALUES (?, ?, ?, ?, ?, ?, 1, 0, NULL, NULL, ?, ?, ?, ?, ?)',
-            )
-            .bind(
-              input.id,
-              input.repositoryId,
-              input.url,
-              input.urlPrefix,
-              input.secret,
-              input.secretSuffix,
-              input.creatorEmail,
-              input.now,
-              input.now,
-              envelope?.encrypted ?? null,
-              envelope?.iv ?? null,
-            )
-            .run(),
-        'create repo webhook',
-      );
-    } catch (error) {
-      // Pre-0026 databases (deploy skew / local dev): fall back to the
-      // legacy column list. Reads tolerate either shape.
-      if (!isMissingSchemaError(error)) throw error;
-      await this.withRetry(
-        () =>
-          this.database
-            .prepare(
-              'INSERT INTO repo_webhooks (id, repository_id, url, url_prefix, secret, secret_suffix, is_active, consecutive_failures, last_delivery_at, last_delivery_status, creator_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, 0, NULL, NULL, ?, ?, ?)',
-            )
-            .bind(
-              input.id,
-              input.repositoryId,
-              input.url,
-              input.urlPrefix,
-              input.secret,
-              input.secretSuffix,
-              input.creatorEmail,
-              input.now,
-              input.now,
-            )
-            .run(),
-        'create repo webhook',
-      );
-    }
+    const envelope = await encryptData(input.secret, this.masterKey);
+    await this.withRetry(
+      () =>
+        this.database
+          .prepare(
+            'INSERT INTO repo_webhooks (id, repository_id, url, url_prefix, secret_suffix, is_active, consecutive_failures, last_delivery_at, last_delivery_status, creator_email, created_at, updated_at, encrypted_secret, secret_iv) VALUES (?, ?, ?, ?, ?, 1, 0, NULL, NULL, ?, ?, ?, ?, ?)',
+          )
+          .bind(
+            input.id,
+            input.repositoryId,
+            input.url,
+            input.urlPrefix,
+            input.secretSuffix,
+            input.creatorEmail,
+            input.now,
+            input.now,
+            envelope.encrypted,
+            envelope.iv,
+          )
+          .run(),
+      'create repo webhook',
+    );
     // Events live only in the junction table (0024 dropped the JSON column).
     await this.replaceEvents(input.id, input.events, input.now);
   }
@@ -215,32 +183,17 @@ class WebhookDAO extends EncryptedDAO {
   }
 
   public async rotateSecret(id: string, repositoryId: string, secret: string, secretSuffix: string, now: number): Promise<void> {
-    const envelope = this.masterKey ? await encryptData(secret, this.masterKey) : null;
-    try {
-      await this.withRetry(
-        () =>
-          this.database
-            .prepare(
-              'UPDATE repo_webhooks SET secret = ?, secret_suffix = ?, consecutive_failures = 0, updated_at = ?, encrypted_secret = ?, secret_iv = ? WHERE id = ? AND repository_id = ?',
-            )
-            .bind(secret, secretSuffix, now, envelope?.encrypted ?? null, envelope?.iv ?? null, id, repositoryId)
-            .run(),
-        'rotate repo webhook secret',
-      );
-    } catch (error) {
-      // Pre-0026 databases: legacy column list.
-      if (!isMissingSchemaError(error)) throw error;
-      await this.withRetry(
-        () =>
-          this.database
-            .prepare(
-              'UPDATE repo_webhooks SET secret = ?, secret_suffix = ?, consecutive_failures = 0, updated_at = ? WHERE id = ? AND repository_id = ?',
-            )
-            .bind(secret, secretSuffix, now, id, repositoryId)
-            .run(),
-        'rotate repo webhook secret',
-      );
-    }
+    const envelope = await encryptData(secret, this.masterKey);
+    await this.withRetry(
+      () =>
+        this.database
+          .prepare(
+            'UPDATE repo_webhooks SET secret_suffix = ?, consecutive_failures = 0, updated_at = ?, encrypted_secret = ?, secret_iv = ? WHERE id = ? AND repository_id = ?',
+          )
+          .bind(secretSuffix, now, envelope.encrypted, envelope.iv, id, repositoryId)
+          .run(),
+      'rotate repo webhook secret',
+    );
   }
 
   public async recordDeliveryOutcome(hookId: string, success: boolean, now: number, disableAfterFailures: number): Promise<void> {

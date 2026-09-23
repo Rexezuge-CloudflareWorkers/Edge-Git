@@ -42,7 +42,9 @@ class MirrorService {
     deps: MirrorServiceDeps = {},
   ) {
     this.deps = {
-      mirrorDAO: () => Promise.resolve(new MirrorDAO(env.DB)),
+      // Encrypted DAOs require a key: outside the request scope (which wires
+      // per-feature keys via daoBindings) callers must inject the DAO.
+      mirrorDAO: () => Promise.reject<MirrorDAO>(new Error('MirrorService requires an injected mirrorDAO outside request scope.')),
       ...deps,
     };
   }

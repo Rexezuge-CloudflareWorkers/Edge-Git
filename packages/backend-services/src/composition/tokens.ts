@@ -87,6 +87,9 @@ interface RequestScopeEnvShape {
   WEBHOOK_ENCRYPTION_KEY_SECRET?: { get(): Promise<string> };
   MIRROR_ENCRYPTION_KEY_SECRET?: { get(): Promise<string> };
   IMPORT_ENCRYPTION_KEY_SECRET?: { get(): Promise<string> };
+  WEBHOOK_ENCRYPTION_KEY?: string;
+  MIRROR_ENCRYPTION_KEY?: string;
+  IMPORT_ENCRYPTION_KEY?: string;
 }
 
 interface RequestKeysShape {

@@ -104,7 +104,9 @@ class WebhookService {
     deps: WebhookServiceDeps = {},
   ) {
     this.deps = {
-      webhookDAO: () => Promise.resolve(new WebhookDAO(env.DB)),
+      // Encrypted DAOs require a key: outside the request scope (which wires
+      // per-feature keys via daoBindings) callers must inject the DAO.
+      webhookDAO: () => Promise.reject<WebhookDAO>(new Error('WebhookService requires an injected webhookDAO outside request scope.')),
       userDAO: () => Promise.resolve(new UserDAO(env.DB)),
       ...deps,
     };

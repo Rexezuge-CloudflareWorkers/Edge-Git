@@ -12,6 +12,15 @@ const OID_A = 'a'.repeat(40);
 const OID_B = 'b'.repeat(40);
 const OID_C = 'c'.repeat(40);
 
+// Deterministic 256-bit AES-GCM test key (32 zero bytes, base64) plus the
+// precomputed envelope for 'https://github.com/o/r' under it (decryption is
+// deterministic, so seeds stay synchronous object literals).
+const TEST_KEY = btoa('0'.repeat(32));
+const URL_ENVELOPE = {
+  encrypted: 'kynAJLI1VjLhA4oRdSW/XRwDxJVpUovlShBx9aBhvVCd7FhqcZ4=',
+  iv: 'S+y4g1WsAFvjk/QE',
+};
+
 function advertisement(refs: Array<{ ref: string; oid: string }>): Uint8Array {
   return PktLine.mergeLines([
     PktLine.encode('# service=git-upload-pack\n'),
@@ -61,7 +70,8 @@ function seedRunnerState(): RunnerState {
       {
         id: 'job1',
         repository_id: 'r1',
-        source_url: 'https://github.com/o/r',
+        encrypted_source_url: URL_ENVELOPE.encrypted,
+        source_url_iv: URL_ENVELOPE.iv,
         status: 'pending',
         error: null,
         refs_json: null,
@@ -74,7 +84,8 @@ function seedRunnerState(): RunnerState {
     mirrors: [
       {
         repository_id: 'r1',
-        source_url: 'https://github.com/o/r',
+        encrypted_source_url: URL_ENVELOPE.encrypted,
+        source_url_iv: URL_ENVELOPE.iv,
         interval_minutes: 60,
         enabled: 1,
         last_run_at: null,
@@ -183,10 +194,14 @@ function repoStub(refs: Array<{ ref: string; oid: string }>, calls: Record<strin
 }
 
 function runnerEnv(db: D1Queryable, stubs: Record<string, unknown>) {
+  const keyBinding = { get: async () => TEST_KEY };
   return {
     DB: db,
     REPO: { getByName: (name: string) => stubs[name], get: (name: string) => stubs[name], idFromName: (n: string) => n },
     ENVIRONMENT: 'development',
+    WEBHOOK_ENCRYPTION_KEY_SECRET: keyBinding,
+    MIRROR_ENCRYPTION_KEY_SECRET: keyBinding,
+    IMPORT_ENCRYPTION_KEY_SECRET: keyBinding,
   } as unknown as Env;
 }
 
@@ -200,7 +215,13 @@ describe('slice5: runImportJob', () => {
     state.imports = [];
     const env = runnerEnv(runnerDb(state), {});
     await expect(runImportJob(env, 'alice/demo', 'nope')).resolves.toBeUndefined();
-    state.imports.push({ id: 'job2', repository_id: 'r1', source_url: 'https://github.com/o/r', status: 'done' });
+    state.imports.push({
+      id: 'job2',
+      repository_id: 'r1',
+      encrypted_source_url: URL_ENVELOPE.encrypted,
+      source_url_iv: URL_ENVELOPE.iv,
+      status: 'done',
+    });
     await expect(runImportJob(env, 'alice/demo', 'job2')).resolves.toBeUndefined();
     expect(state.failed).toHaveLength(0);
     expect(state.done).toHaveLength(0);
@@ -258,7 +279,13 @@ describe('slice5: runMirrorSync', () => {
     state.mirrors = [];
     const env = runnerEnv(runnerDb(state), {});
     await expect(runMirrorSync(env, 'r1')).resolves.toBeUndefined();
-    state.mirrors.push({ repository_id: 'r1', source_url: 'https://github.com/o/r', interval_minutes: 60, enabled: 0 });
+    state.mirrors.push({
+      repository_id: 'r1',
+      encrypted_source_url: URL_ENVELOPE.encrypted,
+      source_url_iv: URL_ENVELOPE.iv,
+      interval_minutes: 60,
+      enabled: 0,
+    });
     await expect(runMirrorSync(env, 'r1')).resolves.toBeUndefined();
     expect(state.runs).toHaveLength(0);
   });

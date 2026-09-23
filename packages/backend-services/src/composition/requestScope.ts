@@ -18,18 +18,25 @@ function createRequestScope(env: RequestScopeEnv): Container {
   // Single CACHE binding (absent in tests / legacy deploys → fail-soft cache).
   scope.bindValue(Tokens.KvCache, new KvCache((env as { CACHE?: KvNamespaceLike }).CACHE ?? null));
 
-  const webhookKey = memoizeAsync(async () => {
-    if (!env.WEBHOOK_ENCRYPTION_KEY_SECRET) throw new Error('WEBHOOK_ENCRYPTION_KEY_SECRET is not configured for this scope.');
-    return env.WEBHOOK_ENCRYPTION_KEY_SECRET.get();
-  });
-  const mirrorKey = memoizeAsync(async () => {
-    if (!env.MIRROR_ENCRYPTION_KEY_SECRET) throw new Error('MIRROR_ENCRYPTION_KEY_SECRET is not configured for this scope.');
-    return env.MIRROR_ENCRYPTION_KEY_SECRET.get();
-  });
-  const importKey = memoizeAsync(async () => {
-    if (!env.IMPORT_ENCRYPTION_KEY_SECRET) throw new Error('IMPORT_ENCRYPTION_KEY_SECRET is not configured for this scope.');
-    return env.IMPORT_ENCRYPTION_KEY_SECRET.get();
-  });
+  // Per-feature encryption keys: Secrets Store binding first (production),
+  // else a raw `*_ENCRYPTION_KEY` var (integration pool + local dev without a
+  // Secrets Store — test-only, never set these vars in production), else
+  // throw fail-closed. A declared-but-unreadable binding still throws: the
+  // vars fallback never masks a broken production binding.
+  const resolveKey = (
+    binding: { get(): Promise<string> } | undefined,
+    rawVar: string | undefined,
+    bindingName: string,
+    varName: string,
+  ): (() => Promise<string>) =>
+    memoizeAsync(async () => {
+      if (binding) return binding.get();
+      if (rawVar) return rawVar;
+      throw new Error(`${bindingName} is not configured for this scope (set ${varName} for tests).`);
+    });
+  const webhookKey = resolveKey(env.WEBHOOK_ENCRYPTION_KEY_SECRET, env.WEBHOOK_ENCRYPTION_KEY, 'WEBHOOK_ENCRYPTION_KEY_SECRET', 'WEBHOOK_ENCRYPTION_KEY');
+  const mirrorKey = resolveKey(env.MIRROR_ENCRYPTION_KEY_SECRET, env.MIRROR_ENCRYPTION_KEY, 'MIRROR_ENCRYPTION_KEY_SECRET', 'MIRROR_ENCRYPTION_KEY');
+  const importKey = resolveKey(env.IMPORT_ENCRYPTION_KEY_SECRET, env.IMPORT_ENCRYPTION_KEY, 'IMPORT_ENCRYPTION_KEY_SECRET', 'IMPORT_ENCRYPTION_KEY');
   // Per-feature thunks: resolving one key never fetches the other two.
   scope.bindValue(Tokens.WebhookKey, webhookKey);
   scope.bindValue(Tokens.MirrorKey, mirrorKey);

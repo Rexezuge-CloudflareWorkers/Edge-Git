@@ -5,9 +5,9 @@ import { ImportDAO } from '@edge-git/backend-data/dao/ImportDAO';
 import { MirrorDAO } from '@edge-git/backend-data/dao/MirrorDAO';
 import { WebhookDAO } from '@edge-git/backend-data/dao/WebhookDAO';
 
-// Minimal in-memory D1 fake covering only the encrypted-secret SQL shapes:
-// dual-write INSERTs/UPSERTs plus SELECTs returning stored rows verbatim
-// (including the envelope columns).
+// Minimal in-memory D1 fake covering the envelope-only SQL shapes since
+// 0027 (no plaintext `secret`/`source_url` columns): envelope INSERTs/UPSERTs
+// plus SELECTs returning stored rows verbatim.
 function createEncryptedFakeDb() {
   const state = {
     hooks: [] as Array<Record<string, unknown>>,
@@ -54,17 +54,16 @@ function createEncryptedFakeDb() {
       },
       run(): Promise<{ success: boolean; meta?: { changes?: number } }> {
         if (q.startsWith('INSERT INTO repo_webhooks')) {
-          const [id, repository_id, url, url_prefix, secret, secret_suffix, creator_email, created_at, updated_at] =
+          const [id, repository_id, url, url_prefix, secret_suffix, creator_email, created_at, updated_at] =
             params as Array<string | number>;
           state.hooks.push({
             id,
             repository_id,
             url,
             url_prefix,
-            secret,
             secret_suffix,
-            encrypted_secret: (params[9] as string | null | undefined) ?? null,
-            secret_iv: (params[10] as string | null | undefined) ?? null,
+            encrypted_secret: params[8] as string,
+            secret_iv: params[9] as string,
             is_active: 1,
             consecutive_failures: 0,
             last_delivery_at: null,
@@ -75,17 +74,14 @@ function createEncryptedFakeDb() {
           });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
-        if (q.startsWith('UPDATE repo_webhooks SET secret = ?')) {
-          const id = (params.length > 5 ? params[5] : params[3]) as string;
+        if (q.startsWith('UPDATE repo_webhooks SET secret_suffix = ?')) {
+          const [secret_suffix, now, encrypted_secret, secret_iv, id] = params as [string, number, string, string, string];
           const hook = state.hooks.find((h) => h.id === id);
           if (hook) {
-            hook.secret = params[0] as string;
-            hook.secret_suffix = params[1] as string;
-            hook.updated_at = params[2] as number;
-            if (params.length > 5) {
-              hook.encrypted_secret = params[3] as string | null;
-              hook.secret_iv = params[4] as string | null;
-            }
+            hook.secret_suffix = secret_suffix;
+            hook.updated_at = now;
+            hook.encrypted_secret = encrypted_secret;
+            hook.secret_iv = secret_iv;
           }
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
@@ -99,12 +95,11 @@ function createEncryptedFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO repo_mirrors')) {
-          const [repository_id, source_url, interval_minutes, created_by, created_at, updated_at] = params as Array<string | number>;
+          const [repository_id, interval_minutes, created_by, created_at, updated_at] = params as Array<string | number>;
           const row = {
             repository_id,
-            source_url,
-            encrypted_source_url: (params[6] as string | null | undefined) ?? null,
-            source_url_iv: (params[7] as string | null | undefined) ?? null,
+            encrypted_source_url: params[5] as string,
+            source_url_iv: params[6] as string,
             interval_minutes,
             enabled: 1,
             last_run_at: null,
@@ -121,13 +116,12 @@ function createEncryptedFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO repo_imports')) {
-          const [id, repository_id, source_url, status, created_by, created_at, updated_at] = params as Array<string | number>;
+          const [id, repository_id, status, created_by, created_at, updated_at] = params as Array<string | number>;
           state.imports.push({
             id,
             repository_id,
-            source_url,
-            encrypted_source_url: (params[7] as string | null | undefined) ?? null,
-            source_url_iv: (params[8] as string | null | undefined) ?? null,
+            encrypted_source_url: params[6] as string,
+            source_url_iv: params[7] as string,
             status,
             error: null,
             imported_refs: 0,
@@ -159,7 +153,7 @@ function createEncryptedFakeDb() {
 }
 
 describe('per-feature encrypted secrets at rest', () => {
-  it('webhook DAO dual-writes the envelope and decrypts on read', async () => {
+  it('webhook DAO stores only the envelope and decrypts on read', async () => {
     const { db, state } = createEncryptedFakeDb();
     const key = await generateAESGCMKey();
     const dao = new WebhookDAO(db, key);
@@ -175,9 +169,9 @@ describe('per-feature encrypted secrets at rest', () => {
       now: 1_700_000_000,
     });
     const stored = state.hooks[0];
+    expect(stored).not.toHaveProperty('secret');
     expect(stored.encrypted_secret).toBeTruthy();
     expect(stored.encrypted_secret).not.toBe('super-secret-value');
-    expect(stored.secret).toBe('super-secret-value');
     const row = await dao.getByIdAndRepo('hook-1', 'repo-1');
     expect(row?.secret).toBe('super-secret-value');
     await dao.rotateSecret('hook-1', 'repo-1', 'rotated-secret', 'cret', 1_700_000_001);
@@ -197,8 +191,8 @@ describe('per-feature encrypted secrets at rest', () => {
     await expect(imports.latestByRepo('repo-1').then((r) => r?.source_url)).resolves.toBe('https://github.com/o/s.git');
   });
 
-  it('fails closed when the envelope exists but the key is wrong or missing', async () => {
-    const { db } = createEncryptedFakeDb();
+  it('fails closed on a wrong key or a missing envelope', async () => {
+    const { db, state } = createEncryptedFakeDb();
     const dao = new WebhookDAO(db, await generateAESGCMKey());
     await dao.create({
       id: 'hook-1',
@@ -213,19 +207,12 @@ describe('per-feature encrypted secrets at rest', () => {
     });
     const wrongKey = new WebhookDAO(db, await generateAESGCMKey());
     await expect(wrongKey.getByIdAndRepo('hook-1', 'repo-1')).rejects.toThrow();
-    const noKey = new WebhookDAO(db);
-    await expect(noKey.getByIdAndRepo('hook-1', 'repo-1')).rejects.toThrow();
-  });
-
-  it('reads legacy plaintext rows written before 0026', async () => {
-    const { db, state } = createEncryptedFakeDb();
     state.hooks.push({
-      id: 'legacy',
+      id: 'bare',
       repository_id: 'repo-1',
-      url: 'https://hooks.example.com/hook',
-      url_prefix: 'https://hooks.example.com/ho',
-      secret: 'legacy-secret',
-      secret_suffix: 'cret',
+      url: 'https://hooks.example.com/bare',
+      url_prefix: 'https://hooks.example.com/ba',
+      secret_suffix: 'bare',
       encrypted_secret: null,
       secret_iv: null,
       is_active: 1,
@@ -236,23 +223,6 @@ describe('per-feature encrypted secrets at rest', () => {
       created_at: 1,
       updated_at: 1,
     });
-    state.mirrors.push({
-      repository_id: 'repo-1',
-      source_url: 'https://github.com/o/legacy.git',
-      encrypted_source_url: null,
-      source_url_iv: null,
-      interval_minutes: 1440,
-      enabled: 1,
-      last_run_at: null,
-      last_status: null,
-      last_error: null,
-      consecutive_failures: 0,
-      created_by: 'a@x.com',
-      created_at: 1,
-      updated_at: 1,
-    });
-    const key = await generateAESGCMKey();
-    await expect(new WebhookDAO(db, key).getByIdAndRepo('legacy', 'repo-1').then((r) => r?.secret)).resolves.toBe('legacy-secret');
-    await expect(new MirrorDAO(db, key).getByRepo('repo-1').then((r) => r?.source_url)).resolves.toBe('https://github.com/o/legacy.git');
+    await expect(dao.getByIdAndRepo('bare', 'repo-1')).rejects.toThrow('envelope is missing');
   });
 });

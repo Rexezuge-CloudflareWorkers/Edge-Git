@@ -43,7 +43,9 @@ class ImportService {
     deps: ImportServiceDeps = {},
   ) {
     this.deps = {
-      importDAO: () => Promise.resolve(new ImportDAO(env.DB)),
+      // Encrypted DAOs require a key: outside the request scope (which wires
+      // per-feature keys via daoBindings) callers must inject the DAO.
+      importDAO: () => Promise.reject<ImportDAO>(new Error('ImportService requires an injected importDAO outside request scope.')),
       ...deps,
     };
   }

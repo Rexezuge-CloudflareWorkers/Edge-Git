@@ -123,8 +123,10 @@ class RepoService {
       projectDAO: () => Promise.resolve(new ProjectDAO(env.DB)),
       discussionDAO: () => Promise.resolve(new DiscussionDAO(env.DB)),
       wikiDAO: () => Promise.resolve(new WikiDAO(env.DB)),
-      importDAO: () => Promise.resolve(new ImportDAO(env.DB)),
-      mirrorDAO: () => Promise.resolve(new MirrorDAO(env.DB)),
+      importDAO: () =>
+        Promise.reject<ImportDAO>(new Error('RepoService requires an injected importDAO outside request scope.')),
+      mirrorDAO: () =>
+        Promise.reject<MirrorDAO>(new Error('RepoService requires an injected mirrorDAO outside request scope.')),
       deployKeyDAO: () => Promise.resolve(new DeployKeyDAO(env.DB)),
       deletedRepoDoDAO: () => Promise.resolve(new DeletedRepoDoDAO(env.DB)),
       numberingDAO: () => Promise.resolve(new NumberingDAO(env.DB)),
@@ -132,7 +134,8 @@ class RepoService {
       tokenGrantDAO: () => Promise.resolve(new TokenRepoGrantDAO(env.DB)),
       securitySettingsDAO: () => Promise.resolve(new SecuritySettingsDAO(env.DB)),
       collaborationDAO: () => Promise.resolve(new CollaborationDAO(env.DB)),
-      webhookDAO: () => Promise.resolve(new WebhookDAO(env.DB)),
+      webhookDAO: () =>
+        Promise.reject<WebhookDAO>(new Error('RepoService requires an injected webhookDAO outside request scope.')),
       webhookDeliveryDAO: () => Promise.resolve(new WebhookDeliveryDAO(env.DB)),
       auditLogDAO: () => Promise.resolve(new AuditLogDAO(env.DB)),
       teamGrantDAO: () => Promise.resolve(new TeamRepoGrantDAO(env.DB)),
