@@ -15,6 +15,7 @@ import { RepoFullName } from '@edge-git/shared/utils';
 import { copyRepoGit, isPackLimitError } from './CrossFork';
 import { recordAndNotify } from './SocialEmit';
 import { readJsonBody } from './BodyParser';
+import { enqueueRepoVacuum } from './RepoVacuum';
 
 type ForkApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -75,6 +76,7 @@ function registerUserForkRoutes(app: ForkApp): void {
       } catch {
         // best-effort DO purge
       }
+      await enqueueRepoVacuum(c.env, fork.fullName, fork.id);
       if (isPackLimitError(error)) {
         return jsonError(c, error instanceof Error ? error.message : 'Repository too large to fork', 413);
       }

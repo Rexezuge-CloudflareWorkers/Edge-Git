@@ -324,6 +324,13 @@ class SearchDAO extends BaseDAO {
     }
   }
 
+  // Repo-delete alias: FTS rows for issues/pulls/discussions/repos are
+  // trigger-maintained off their base-table deletes, so only the code index
+  // (keyed by repo with no base row) needs an explicit purge here.
+  public async deleteByRepo(repoId: string): Promise<void> {
+    await this.deleteCodeByRepo(repoId);
+  }
+
   public async searchDiscussions(query: string, opts: SearchOptions = {}): Promise<DiscussionRow[]> {
     const limit = clampSearchLimit(opts.limit);
     const tokens = tokenizeSearchQuery(query);

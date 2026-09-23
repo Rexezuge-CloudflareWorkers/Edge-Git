@@ -151,6 +151,14 @@ class RepoWorker extends DurableObject<Env> {
     this.fullNameValue = undefined;
   }
 
+  public async vacuum(): Promise<{ vacuumed: boolean; reason: string }> {
+    // Background full reclaim (see `RepoLifecycle.vacuum`): only fires while
+    // the name binding is absent, so a recreated repo keeps its storage.
+    const result = await this.lifecycle.vacuum();
+    if (result.vacuumed) this.fullNameValue = undefined;
+    return result;
+  }
+
   public async ensureRepoInitialized(): Promise<void> {
     await this.lifecycle.ensureRepoInitialized();
   }

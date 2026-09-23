@@ -154,6 +154,13 @@ class CheckRunDAO extends BaseDAO {
   public async pruneOlderThan(cutoff: number, limit: number): Promise<number> {
     return this.deleteRowsOlderThan('check_runs', 'created_at', cutoff, limit, 'id');
   }
+
+  public async deleteByRepo(repositoryId: string): Promise<void> {
+    await this.withRetry(
+      () => this.database.prepare('DELETE FROM check_runs WHERE repository_id = ?').bind(repositoryId).run(),
+      'delete check runs by repo',
+    );
+  }
 }
 
 export { CheckRunDAO, toMetadata as toCheckRunMetadata };

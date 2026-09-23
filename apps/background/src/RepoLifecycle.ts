@@ -1,4 +1,4 @@
-import { setDofsDeviceSize } from '@edge-git/git-service';
+import { createDofsFs, setDofsDeviceSize } from '@edge-git/git-service';
 import type { DofsFs, GitService, IsoGitFs } from '@edge-git/git-service';
 import { AppConfiguration } from '@edge-git/backend-runtime/config';
 import type { FetchLimits } from './FetchHandler';
@@ -55,6 +55,36 @@ class RepoLifecycle {
     (this.git as unknown as { clearCache?: () => void }).clearCache?.();
     this.initPromise = null;
     this.initialized = false;
+  }
+
+  public async vacuum(): Promise<{ vacuumed: boolean; reason: string }> {
+    // Background full reclaim for deleted repos (via `RepoVacuumTask`). The
+    // synchronous `deleteRepo` above keeps a targeted purge so same-name
+    // recreates work on the warm isolate; this step runs minutes later and
+    // drops everything — including the dofs schema tables and their SQLite
+    // pages — so the dashboard stops reporting storage for the dead DO.
+    // Recreate-safety: a recreated repo re-persists the `fullName` binding
+    // first, so a present binding means the isolate is live again and the
+    // wipe is skipped. The guard read and the wipe have no await between
+    // them, so no interleaving RPC can slip a rename in the middle.
+    const bound = await this.ctx.storage.get<string>('fullName').catch(() => null);
+    if (bound) return { vacuumed: false, reason: 'name-live' };
+    await this.ctx.storage.deleteAll();
+    // `deleteAll` dropped the dofs schema tables while this warm isolate
+    // keeps its `Fs` instance (schema bootstrap runs once in its
+    // constructor). Re-bootstrap via a throwaway `Fs` — its constructor
+    // schedules `blockConcurrencyWhile(ensureSchema)` (`CREATE TABLE IF NOT
+    // EXISTS`), which gates any later recreate behind the fresh schema.
+    // Best-effort for fakes lacking `blockConcurrencyWhile`.
+    try {
+      createDofsFs(this.ctx, this.env);
+    } catch {
+      // storage is already empty; a later recreate re-inits on a fresh isolate.
+    }
+    (this.git as unknown as { clearCache?: () => void }).clearCache?.();
+    this.initPromise = null;
+    this.initialized = false;
+    return { vacuumed: true, reason: 'reclaimed' };
   }
 
   public async ensureRepoInitialized(): Promise<void> {

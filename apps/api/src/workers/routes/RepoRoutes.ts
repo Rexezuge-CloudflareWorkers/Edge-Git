@@ -1,5 +1,5 @@
 import type { Hono } from 'hono';
-import { getRepoStub, ensureRepo } from '../doStubs';
+import { getCheckRunnerStub, getRepoStub, ensureRepo } from '../doStubs';
 import {
   getScope,
   jsonError,
@@ -16,7 +16,7 @@ import { EmailAddress, RepoFullName } from '@edge-git/shared/utils';
 import { readJsonBody } from './BodyParser';
 import { parseOverviewArgs, parseWithLastCommit, sanitizeDepthParam, sanitizePathParam, sanitizeRefParam } from './RepoParamParsers';
 import { ErrorSanitizationUtil } from '@edge-git/shared/utils';
-import { isFresh, serveReadModel } from './RepoReadCache';
+import { isFresh, serveReadModel, invalidateRepoCaches } from './RepoReadCache';
 
 type RepoApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -267,11 +267,24 @@ function registerUserRepoRoutes(app: RepoApp): void {
     try {
       const { id } = await getScope(c).get(Tokens.RepoService).deleteRepo(owner, repoName, email);
       // Purge git objects from the Durable Object (best-effort; D1 is source of truth).
+      // `RepoService.deleteRepo` also enqueued a vacuum tombstone — the
+      // background `RepoVacuumTask` repeats the purges below and finishes
+      // with a full `storage.deleteAll()` once the name stays free.
       const fullName = `${owner}/${repoName}`;
       try {
         await getRepoStub(c.env, fullName).deleteRepo();
       } catch (error) {
         console.error('Failed to purge repo DO', fullName, ErrorSanitizationUtil.sanitizeErrorForLogging(error));
+      }
+      try {
+        await getCheckRunnerStub(c.env, fullName).purgeRepo(id);
+      } catch (error) {
+        console.error('Failed to purge check queue', fullName, ErrorSanitizationUtil.sanitizeErrorForLogging(error));
+      }
+      try {
+        await invalidateRepoCaches(getScope(c).get(Tokens.KvCache), fullName);
+      } catch (error) {
+        console.error('Failed to purge repo caches', fullName, ErrorSanitizationUtil.sanitizeErrorForLogging(error));
       }
       try {
         await getScope(c).get(Tokens.SearchService).clearRepo(id);
