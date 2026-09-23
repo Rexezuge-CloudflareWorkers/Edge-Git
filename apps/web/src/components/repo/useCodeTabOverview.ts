@@ -106,7 +106,7 @@ function useCodeTabOverview(
           if (cancelled) return;
         }
         if (!overview) {
-          const promise = loadOverview(owner, repo, refState || undefined, path || undefined, { ...authOpt, depth: 10 });
+          const promise = loadOverview(owner, repo, refState || undefined, path || undefined, { ...authOpt, depth: 5 });
           st.inflightKey = key;
           st.inflight = promise;
           try {
@@ -143,11 +143,14 @@ function useCodeTabOverview(
         const readmeText = isBinaryReadme ? null : decodeBlobContent(overview.readme ?? null);
         setReadme(readmeText !== null && overview.readme ? { path: overview.readme.path, text: readmeText } : null);
         setLoading(false);
+        // Enrichment re-reads the tree with per-file last-commit data (one log
+        // walk per entry in the DO). Capped at 10 entries and delayed so fast
+        // navigation never fans out into dozens of DO rows per page view.
         const shouldEnrich =
-          overview.tree.length <= 30 && (typeof document === 'undefined' || !document.hidden);
+          overview.tree.length <= 10 && (typeof document === 'undefined' || !document.hidden);
         const enrichKey = `${key}/${treeRef ?? ''}/${dir ?? ''}`;
         if (shouldEnrich && st.enrichedKey !== enrichKey) {
-          await new Promise((resolve) => setTimeout(resolve, 350));
+          await new Promise((resolve) => setTimeout(resolve, 1000));
           if (cancelled) return;
           if (typeof document !== 'undefined' && document.hidden) return;
           const sharedEnrich = st.enrichInflightKey === enrichKey ? st.enrichInflight : null;

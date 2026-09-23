@@ -10,8 +10,11 @@ import {
   cacheControlFor,
   checkFetchLoop,
   etagForReadModel,
+  getCachedPack,
+  hashFetchBody,
   invalidateRepoCaches,
   isFresh,
+  putCachedPack,
   putCachedRefs,
   serveReadModel,
 } from '@/workers/routes/RepoReadCache';
@@ -20,6 +23,7 @@ import {
 // `cloudflare:workers`); stub the barrel like `repo-lifecycle.test.ts`.
 vi.mock('@edge-git/git-service', () => ({ setDofsDeviceSize: vi.fn() }));
 import { RepoLifecycle } from '@edge-git/background/RepoLifecycle';
+import { maybeCompactPacks } from '@edge-git/background/PackCompactor';
 
 function makeFakeKv(): KvNamespaceLike & { store: Map<string, string> } {
   const store = new Map<string, string>();
@@ -157,11 +161,121 @@ describe('RepoReadCache', () => {
   it('429s repeated identical fetches', async () => {
     const cache = new KvCache(makeFakeKv());
     const body = new Uint8Array([1, 2, 3]);
-    for (let i = 0; i < 5; i += 1) {
+    for (let i = 0; i < 2; i += 1) {
       const out = await checkFetchLoop(cache, 'a/b', 'ip:1', body);
       expect(out.allowed).toBe(true);
     }
     const blocked = await checkFetchLoop(cache, 'a/b', 'ip:1', body);
     expect(blocked.allowed).toBe(false);
+  });
+
+  it('hashes the full body so same-prefix fetches do not collide', async () => {
+    const cache = new KvCache(makeFakeKv());
+    const a = new Uint8Array(600).fill(7);
+    const b = new Uint8Array(600).fill(7);
+    b[599] = 8;
+    for (let i = 0; i < 2; i += 1) {
+      expect((await checkFetchLoop(cache, 'a/b', 'ip:1', a)).allowed).toBe(true);
+    }
+    // Distinct suffix => distinct bucket, still allowed.
+    expect((await checkFetchLoop(cache, 'a/b', 'ip:1', b)).allowed).toBe(true);
+  });
+
+  it('caches small fetch responses and purges them on push', async () => {
+    const cache = new KvCache(makeFakeKv());
+    const head = 'd'.repeat(40);
+    const body = new Uint8Array([9, 9, 9]);
+    const hash = hashFetchBody(body);
+    expect(await getCachedPack(cache, 'a/b', head, hash)).toBeNull();
+    await putCachedPack(cache, 'a/b', head, hash, new Uint8Array([1, 2, 3]));
+    expect(await getCachedPack(cache, 'a/b', head, hash)).toEqual(new Uint8Array([1, 2, 3]));
+    // Oversized responses bypass the cache.
+    await putCachedPack(cache, 'a/b', head, hash, new Uint8Array(800_000));
+    expect(await getCachedPack(cache, 'a/b', head, hash)).toEqual(new Uint8Array([1, 2, 3]));
+    await invalidateRepoCaches(cache, 'a/b');
+    expect(await getCachedPack(cache, 'a/b', head, hash)).toBeNull();
+  });
+});
+
+describe('PackCompactor', () => {
+  const oid = 'e'.repeat(40);
+
+  function fakeFs(packs: string[]) {
+    const unlinked: string[] = [];
+    const written: string[] = [];
+    return {
+      fs: {
+        promises: {
+          readdir: async () => [...packs],
+          writeFile: async (p: string) => {
+            written.push(p);
+          },
+          unlink: async (p: string) => {
+            unlinked.push(p);
+          },
+        },
+      } as never,
+      unlinked,
+      written,
+    };
+  }
+
+  it('skips compaction under the threshold without listing refs', async () => {
+    const { fs } = fakeFs(['a.pack', 'b.pack']);
+    const listRefs = vi.fn(async () => ({ refs: [], symbolicHead: null }));
+    const out = await maybeCompactPacks({
+      isoGitFs: fs,
+      git: { listRefs, clearCache: vi.fn() } as never,
+      maxObjects: 100,
+      maxPackBytes: 1024,
+      fullName: 'a/b',
+    });
+    expect(out).toEqual({ compacted: false, deleted: 0 });
+    expect(listRefs).not.toHaveBeenCalled();
+  });
+
+  it('never throws when storage is unavailable', async () => {
+    const out = await maybeCompactPacks({
+      isoGitFs: { promises: { readdir: async () => Promise.reject(new Error('ENOENT')) } } as never,
+      git: {} as never,
+      maxObjects: 100,
+      maxPackBytes: 1024,
+      fullName: 'a/b',
+    });
+    expect(out).toEqual({ compacted: false, deleted: 0 });
+  });
+
+  it('compacts fragmented packs and deletes predecessors', async () => {
+    const packs = Array.from({ length: 21 }, (_, i) => `pack-${i}.pack`);
+    const { fs, unlinked, written } = fakeFs(packs);
+    const git = {
+      listRefs: async () => ({ refs: [{ ref: 'refs/heads/main', oid }], symbolicHead: 'refs/heads/main' }),
+      collectObjectsForPack: async () => ({ oids: [oid], shallow: [] }),
+      packObjects: async () => new Uint8Array([1, 2, 3]),
+      indexPack: vi.fn(async () => undefined),
+      hasObject: async () => true,
+      clearCache: vi.fn(),
+    } as never;
+    const out = await maybeCompactPacks({ isoGitFs: fs, git, maxObjects: 100, maxPackBytes: 1024, fullName: 'a/b' });
+    expect(out.compacted).toBe(true);
+    expect(out.deleted).toBe(21);
+    expect(written).toHaveLength(1);
+    expect(unlinked.filter((p) => p.endsWith('.pack'))).toHaveLength(21);
+  });
+
+  it('keeps old packs when verification fails', async () => {
+    const packs = Array.from({ length: 21 }, (_, i) => `pack-${i}.pack`);
+    const { fs, unlinked } = fakeFs(packs);
+    const git = {
+      listRefs: async () => ({ refs: [{ ref: 'refs/heads/main', oid }], symbolicHead: 'refs/heads/main' }),
+      collectObjectsForPack: async () => ({ oids: [oid], shallow: [] }),
+      packObjects: async () => new Uint8Array([1, 2, 3]),
+      indexPack: vi.fn(async () => undefined),
+      hasObject: async () => false,
+      clearCache: vi.fn(),
+    } as never;
+    const out = await maybeCompactPacks({ isoGitFs: fs, git, maxObjects: 100, maxPackBytes: 1024, fullName: 'a/b' });
+    expect(out).toEqual({ compacted: false, deleted: 0 });
+    expect(unlinked.filter((p) => p.includes('pack-'))).toHaveLength(0);
   });
 });

@@ -11,6 +11,7 @@ import {
 import type { ProtectedRefRule } from '@edge-git/git-protocol';
 import { UUIDUtil } from '@edge-git/shared/utils';
 import { createLogger } from '@edge-git/backend-runtime/logger';
+import { maybeCompactPacks } from './PackCompactor';
 
 const logger = createLogger('PushHandler');
 
@@ -180,6 +181,20 @@ class PushHandler {
       // Best-effort: refs are already applied; a dangling HEAD only affects
       // default-branch resolution, never data.
     }
+
+    // Best-effort pack consolidation: each push adds one pack file and reads
+    // fan out across packs, so bound fragmentation without delaying the push
+    // response on failure (never throws; keeps old packs when it aborts).
+    // Object budget comes from the repo pack limit when available so a huge
+    // repo aborts compaction instead of burning rows on a full walk.
+    const maxObjects = (limits as { maxObjects?: number }).maxObjects ?? 10_000;
+    await maybeCompactPacks({
+      isoGitFs,
+      git,
+      maxObjects,
+      maxPackBytes: limits.maxPackBytes,
+      fullName: getFullName(),
+    }).catch(() => ({ compacted: false, deleted: 0 }));
 
     return buildReportStatus(results, true);
   }

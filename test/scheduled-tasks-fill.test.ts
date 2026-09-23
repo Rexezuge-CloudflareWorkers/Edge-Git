@@ -541,8 +541,8 @@ describe('SearchBackfill scheduling', () => {
 
   it('search backfill tunables default with env overrides', () => {
     expect(new AppConfiguration({}).getSearchBackfillIntervalSeconds()).toBe(14400);
-    expect(new AppConfiguration({}).getSearchBackfillReposPerTick()).toBe(8);
-    expect(new AppConfiguration({}).getSearchBackfillFilesPerRepo()).toBe(50);
+    expect(new AppConfiguration({}).getSearchBackfillReposPerTick()).toBe(4);
+    expect(new AppConfiguration({}).getSearchBackfillFilesPerRepo()).toBe(25);
     expect(new AppConfiguration({ SEARCH_BACKFILL_INTERVAL_SECONDS: '3600' }).getSearchBackfillIntervalSeconds()).toBe(3600);
     expect(new AppConfiguration({ SEARCH_BACKFILL_REPOS_PER_TICK: '3' }).getSearchBackfillReposPerTick()).toBe(3);
   });

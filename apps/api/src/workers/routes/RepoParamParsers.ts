@@ -21,7 +21,9 @@ function sanitizeDepthParam(raw: string | null | undefined): number | undefined 
   const text = raw.trim().slice(0, 16);
   if (text === '') return undefined;
   const n = Number(text);
-  if (!Number.isSafeInteger(n) || n < 1 || n > 500) return undefined;
+  // Capped at 50: deeper log walks cost one tree-diff per commit in the DO
+  // (each burns DO SQLite rows). Callers needing more history paginate.
+  if (!Number.isSafeInteger(n) || n < 1 || n > 50) return undefined;
   return n;
 }
 

@@ -50,7 +50,9 @@ class BlameReader {
     if (currentLines.length > MAX_BLAME_LINES) return { oid: resolved, lines: [], truncated: true };
     let history: Array<{ oid: string; commit: { author: { name: string; email: string } } }>;
     try {
-      history = await git.log({ fs: this.fs, gitdir: this.gitdir, ref, filepath, cache: this.getCache() });
+      // Bounded to MAX_BLAME_COMMITS: unbounded file-history walks read every
+      // commit + tree-diff in the repo and dominate DO rows on large repos.
+      history = await git.log({ fs: this.fs, gitdir: this.gitdir, ref, filepath, depth: MAX_BLAME_COMMITS, cache: this.getCache() });
     } catch {
       return null;
     }
