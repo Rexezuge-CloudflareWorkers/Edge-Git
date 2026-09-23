@@ -202,22 +202,37 @@ class TokenService {
   public async listTokens(userEmail: string): Promise<UserAccessTokenMetadata[]> {
     const dao = await this.deps.tokenDAO();
     const tokens = await dao.getByUserEmail(userEmail.toLowerCase());
+    if (tokens.length === 0) return [];
     const grantDAO = await this.deps.tokenGrantDAO();
     const repoDAO = await this.deps.repositoryDAO();
-    const enriched: UserAccessTokenMetadata[] = [];
-    for (const token of tokens) {
-      // Fail closed for display: propagate grant-read failures instead of
-      // showing a scoped token with `repoGrants: []` (looks unrestricted).
-      // Callers map thrown errors to masked 500s.
-      const grants = await grantDAO.listByToken(token.tokenId);
+    // Perf: concurrent grant + repo fan-out (was sequential N+1: up to
+    // 5 tokens x 50 grants = 250 D1 round-trips). Fail-closed on grants.
+    const grantsByToken = await Promise.all(tokens.map((t) => grantDAO.listByToken(t.tokenId)));
+    const allRepoIds = [...new Set(grantsByToken.flat().map((g) => g.repository_id))];
+    const repoById = new Map<string, { owner: string; name: string }>();
+    await Promise.all(
+      allRepoIds.map(async (id) => {
+        const repo = await repoDAO.getById(id).catch(() => null);
+        if (repo) repoById.set(id, { owner: repo.owner, name: repo.name });
+      }),
+    );
+    return tokens.map((token, i) => {
       const detailed: TokenRepoGrantMetadata[] = [];
+      const grants = grantsByToken.at(i) ?? [];
       for (const grant of grants) {
-        const meta = await this.grantMetadata(repoDAO, grant);
-        if (meta) detailed.push(meta);
+        const repo = repoById.get(grant.repository_id);
+        if (!repo) continue;
+        detailed.push({
+          tokenId: grant.token_id,
+          repositoryId: grant.repository_id,
+          owner: repo.owner,
+          name: repo.name,
+          fullName: `${repo.owner}/${repo.name}`,
+          scope: grant.scope,
+        });
       }
-      enriched.push({ ...token, repoGrants: detailed });
-    }
-    return enriched;
+      return { ...token, repoGrants: detailed };
+    });
   }
 
   private async grantMetadata(

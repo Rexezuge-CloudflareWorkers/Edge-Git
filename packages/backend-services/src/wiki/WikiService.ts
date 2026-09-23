@@ -4,7 +4,7 @@ import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import type { WikiPageMetadata, WikiRevisionMetadata } from '@edge-git/shared';
-import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
+import { TimestampUtil, UUIDUtil, SLUG_RE } from '@edge-git/shared/utils';
 
 interface WikiServiceEnv {
   DB: D1Queryable;
@@ -16,7 +16,6 @@ interface WikiServiceDeps {
   wikiDAO?: () => Promise<WikiDAO>;
 }
 
-const SLUG_CHARS_RE = /^[a-z0-9-]+$/;
 const MAX_SLUG = 100;
 const MAX_TITLE = 200;
 
@@ -37,8 +36,9 @@ function toMetadata(row: WikiPageRow): WikiPageMetadata {
 function normalizeSlug(raw: unknown): string {
   if (typeof raw !== 'string' || !raw.trim()) throw new BadRequestError('slug is required');
   const slug = raw.trim().toLowerCase();
-  // Linear-time slug check (no nested quantifiers): charset + hyphen rules.
-  if (slug.length > MAX_SLUG || !SLUG_CHARS_RE.test(slug) || slug.startsWith('-') || slug.endsWith('-') || slug.includes('--'))
+  // Canonical charset from @edge-git/shared SLUG_RE plus wiki hyphen rules.
+  // Linear-time check (no nested quantifiers): charset + hyphen rules.
+  if (slug.length > MAX_SLUG || !SLUG_RE.test(slug) || slug.startsWith('-') || slug.endsWith('-') || slug.includes('--'))
     throw new BadRequestError('slug must be 1-100 lowercase alphanumerics and hyphens');
   return slug;
 }
@@ -63,7 +63,7 @@ class WikiService {
     };
   }
 
-  public static normalizeSlug(raw: string): string {
+  public static slugify(raw: string): string {
     // Linear-time slugify without regex (sonar-safe): map runs of
     // non-alphanumerics to a single hyphen, then trim edge hyphens.
     const lower = raw.trim().toLowerCase();
@@ -81,6 +81,13 @@ class WikiService {
     }
     if (out.endsWith('-')) out = out.slice(0, -1);
     return out.slice(0, MAX_SLUG);
+  }
+
+  /*
+   * @deprecated Use slugify; kept for compat until callers migrate.
+   */
+  public static normalizeSlug(raw: string): string {
+    return this.slugify(raw);
   }
 
   public async createPage(

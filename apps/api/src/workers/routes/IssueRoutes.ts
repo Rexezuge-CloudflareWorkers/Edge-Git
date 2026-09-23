@@ -2,15 +2,53 @@ import type { Hono } from 'hono';
 import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo, getScope } from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
 import { Tokens } from '@edge-git/backend-services/composition';
-import { RepoFullName } from '@edge-git/shared/utils';
+import { RepoFullName, mapWithConcurrency } from '@edge-git/shared/utils';
 import { parsePositiveInt } from '@edge-git/shared/validation';
 import { readJsonBody } from './BodyParser';
 import { presentMany, presentSingle } from './IdentityPresenter';
 
 type IssueApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
+const MAX_ISSUE_TITLE = 200;
+const MAX_ISSUE_BODY = 10_000;
+const MAX_FILTER_CHARS = 100;
+const ISSUE_STATUSES = new Set(['open', 'closed']);
+
 function parseIssueNumber(raw: string | undefined): number | null {
   return parsePositiveInt(raw ?? null);
+}
+
+function sanitizeFilter(raw: string | undefined): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim().slice(0, MAX_FILTER_CHARS);
+  if (!trimmed) return null;
+  // Reject control chars via code points (not regex); why: filters reach SQL LIKE.
+  for (const ch of trimmed) {
+    const code = ch.codePointAt(0) ?? 0;
+    if (code === 0x7f || code <= 0x1f) return null;
+  }
+  return trimmed;
+}
+
+async function filterIssuesByMeta(
+  scope: ReturnType<typeof getScope>,
+  issues: Array<{ id: string; milestone_id?: string | null }>,
+  filters: { label: string | null; assignee: string | null; milestone: string | null },
+): Promise<typeof issues> {
+  const collab = scope.get(Tokens.CollaborationService);
+  // Concurrent meta fan-out capped at 10 (was sequential N+1 up to 50).
+  // Per-issue failures degrade to empty meta; outer failures fall back to
+  // unfiltered (filters are best-effort on public reads).
+  const metas = await mapWithConcurrency(issues, 10, (issue) => collab.getIssueMeta(issue.id).catch(() => ({ labels: [], assignees: [] })));
+  const labelLower = filters.label?.toLowerCase() ?? null;
+  const assigneeLower = filters.assignee?.toLowerCase() ?? null;
+  return issues.filter((issue, i) => {
+    if (filters.milestone && (issue as { milestone_id?: string | null }).milestone_id !== filters.milestone) return false;
+    const meta = metas[i] as { labels: Array<{ name: string }>; assignees: string[] };
+    if (labelLower && meta.labels.every((l) => l.name.toLowerCase() !== labelLower)) return false;
+    if (assigneeLower && meta.assignees.every((a) => a.toLowerCase() !== assigneeLower)) return false;
+    return true;
+  });
 }
 
 function registerIssueRoutes(app: IssueApp): void {
@@ -18,20 +56,13 @@ function registerIssueRoutes(app: IssueApp): void {
     return withPublicRepo(c, async (row) => {
       const scope = getScope(c);
       const issues = await scope.get(Tokens.IssueService).listByRepo(row.id, 50);
-      const label = c.req.query('label');
-      const assignee = c.req.query('assignee')?.toLowerCase();
-      const milestone = c.req.query('milestone');
+      const label = sanitizeFilter(c.req.query('label'));
+      const assigneeRaw = sanitizeFilter(c.req.query('assignee'));
+      const assignee = assigneeRaw?.toLowerCase() ?? null;
+      const milestone = sanitizeFilter(c.req.query('milestone'));
       if (!label && !assignee && !milestone) return c.json({ issues: await presentMany(scope, issues) });
       try {
-        const collab = scope.get(Tokens.CollaborationService);
-        const filtered: typeof issues = [];
-        for (const issue of issues) {
-          if (milestone && (issue as { milestone_id?: string | null }).milestone_id !== milestone) continue;
-          const meta = await collab.getIssueMeta(issue.id).catch(() => ({ labels: [], assignees: [] }));
-          if (label && (meta.labels as Array<{ name: string }>).every((l) => l.name.toLowerCase() !== label.toLowerCase())) continue;
-          if (assignee && (meta.assignees as string[]).every((a) => a.toLowerCase() !== assignee)) continue;
-          filtered.push(issue);
-        }
+        const filtered = await filterIssuesByMeta(scope, issues, { label, assignee, milestone });
         return c.json({ issues: await presentMany(scope, filtered) });
       } catch {
         return c.json({ issues: await presentMany(scope, issues) });
@@ -76,20 +107,13 @@ function registerUserIssueRoutes(app: IssueApp): void {
     if (!row) return jsonError(c, 'Not found', 404);
     const scope = getScope(c);
     const issues = await scope.get(Tokens.IssueService).listByRepo(row.id, 50);
-    const label = c.req.query('label');
-    const assignee = c.req.query('assignee')?.toLowerCase();
-    const milestone = c.req.query('milestone');
+    const label = sanitizeFilter(c.req.query('label'));
+    const assigneeRaw = sanitizeFilter(c.req.query('assignee'));
+    const assignee = assigneeRaw?.toLowerCase() ?? null;
+    const milestone = sanitizeFilter(c.req.query('milestone'));
     if (!label && !assignee && !milestone) return c.json({ issues: await presentMany(scope, issues) });
     try {
-      const collab = scope.get(Tokens.CollaborationService);
-      const filtered: typeof issues = [];
-      for (const issue of issues) {
-        if (milestone && (issue as { milestone_id?: string | null }).milestone_id !== milestone) continue;
-        const meta = await collab.getIssueMeta(issue.id).catch(() => ({ labels: [], assignees: [] }));
-        if (label && (meta.labels as Array<{ name: string }>).every((l) => l.name.toLowerCase() !== label.toLowerCase())) continue;
-        if (assignee && (meta.assignees as string[]).every((a) => a.toLowerCase() !== assignee)) continue;
-        filtered.push(issue);
-      }
+      const filtered = await filterIssuesByMeta(scope, issues, { label, assignee, milestone });
       return c.json({ issues: await presentMany(scope, filtered) });
     } catch {
       return c.json({ issues });
@@ -102,13 +126,18 @@ function registerUserIssueRoutes(app: IssueApp): void {
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
-    const { malformed, body } = await readJsonBody<{ title?: string; body?: string }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ title?: string; body?: string }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
-    if (!body.title) return jsonError(c, 'title is required', 400);
+    const title = typeof body.title === 'string' ? body.title.trim() : '';
+    if (!title) return jsonError(c, 'title is required', 400);
+    if (title.length > MAX_ISSUE_TITLE) return jsonError(c, `title must be at most ${MAX_ISSUE_TITLE} characters`, 400);
+    if (typeof body.body === 'string' && body.body.length > MAX_ISSUE_BODY)
+      return jsonError(c, `body must be at most ${MAX_ISSUE_BODY} characters`, 400);
     const scope = getScope(c);
     const created = await scope.get(Tokens.IssueService).createIssue({
       repositoryId: row.id,
-      title: body.title,
+      title,
       body: body.body ?? null,
       creatorEmail: email,
     });
@@ -117,10 +146,10 @@ function registerUserIssueRoutes(app: IssueApp): void {
       fullName: `${owner}/${repoName}`,
       actorEmail: email,
       type: 'issue_opened',
-      title: `Issue #${created.number} ${body.title}`,
+      title: `Issue #${created.number} ${title}`,
       subjectType: 'issue',
       subjectNumber: created.number,
-      mentionText: `${body.title}\n${body.body ?? ''}`,
+      mentionText: `${title}\n${body.body ?? ''}`,
     });
     return c.json(await presentSingle(scope, created), 201);
   });
@@ -156,11 +185,14 @@ function registerUserIssueRoutes(app: IssueApp): void {
     }
     const number = parseIssueNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
-    const { malformed, body } = await readJsonBody<{ status?: string }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ status?: string }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
+    const status = typeof body.status === 'string' ? body.status.trim().toLowerCase() : '';
+    if (!ISSUE_STATUSES.has(status)) return jsonError(c, 'status must be open or closed', 400);
     try {
       const scope = getScope(c);
-      const issue = await scope.get(Tokens.IssueService).updateStatus({ repositoryId: row.id, number, status: body.status ?? '' });
+      const issue = await scope.get(Tokens.IssueService).updateStatus({ repositoryId: row.id, number, status });
       await recordAndNotify(c.env, {
         repositoryId: row.id,
         fullName: `${owner}/${repoName}`,
@@ -202,9 +234,11 @@ function registerUserIssueRoutes(app: IssueApp): void {
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parseIssueNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
-    const { malformed, body } = await readJsonBody<{ body?: string }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ body?: string }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.body !== 'string' || !body.body.trim()) return jsonError(c, 'body is required', 400);
+    if (body.body.length > MAX_ISSUE_BODY) return jsonError(c, `body must be at most ${MAX_ISSUE_BODY} characters`, 400);
     try {
       const scope = getScope(c);
       const issue = await scope.get(Tokens.IssueService).getByNumber(row.id, number);
@@ -232,4 +266,5 @@ function registerUserIssueRoutes(app: IssueApp): void {
   });
 }
 
-export { registerIssueRoutes, registerUserIssueRoutes };
+export { registerIssueRoutes, registerUserIssueRoutes, sanitizeFilter, filterIssuesByMeta, parseIssueNumber };
+export { MAX_ISSUE_TITLE, MAX_ISSUE_BODY, MAX_FILTER_CHARS, ISSUE_STATUSES };

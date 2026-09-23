@@ -1,5 +1,6 @@
 import { RELEASE_ASYNC, newQuickJSAsyncWASMModule, newVariant } from 'quickjs-emscripten';
 import type { QuickJSAsyncWASMModule } from 'quickjs-emscripten';
+import { memoizeAsync } from '@edge-git/backend-runtime/di';
 
 // Singleton QuickJS async module shared by all sandbox runs in this isolate.
 // Runtimes and contexts stay per-execution (fresh globals per run); only the
@@ -12,15 +13,10 @@ import type { QuickJSAsyncWASMModule } from 'quickjs-emscripten';
 // import as a WebAssembly.Module; node/vitest/vite-based runners cannot load
 // it, so failure falls through to the default loader (which reads the file
 // from the package directory under node).
-function memoizeModule(loader: () => Promise<QuickJSAsyncWASMModule>): () => Promise<QuickJSAsyncWASMModule> {
-  let pending: Promise<QuickJSAsyncWASMModule> | undefined;
-  return () => {
-    if (pending === undefined) pending = loader();
-    return pending;
-  };
-}
+// Canonical memoizer lives in backend-runtime so retry/rejection semantics
+// stay consistent (why not a local copy: local memoize swallowed rejections).
 
-const getQuickJSModule = memoizeModule(async () => {
+const getQuickJSModule = memoizeAsync(async (): Promise<QuickJSAsyncWASMModule> => {
   try {
     const imported = await import(/* @vite-ignore */ './quickjsWasm');
     if (imported?.default) {

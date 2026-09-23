@@ -126,9 +126,9 @@ class WebhookService {
   public async listHooks(repositoryId: string): Promise<RepoWebhookMetadata[]> {
     const dao = await this.deps.webhookDAO();
     const rows = await dao.listByRepo(repositoryId);
-    const out: RepoWebhookMetadata[] = [];
-    for (const row of rows) out.push(await this.toPublicResolved(row));
-    return out;
+    // Perf: concurrent enrichment (was sequential N+1: 10 hooks -> 20 queries).
+    // Fail-closed display is preserved: toPublicResolved throws propagate.
+    return Promise.all(rows.map((row) => this.toPublicResolved(row)));
   }
 
   public async getHook(hookId: string, repositoryId: string): Promise<RepoWebhookMetadata> {
@@ -162,7 +162,13 @@ class WebhookService {
     const secret = normalizeSecret(input.secret);
     const dao = await this.deps.webhookDAO();
     const max = ConfigurationManager.webhooks.getMaxPerRepo(this.env);
-    const count = await dao.countByRepo(input.repositoryId).catch(() => 0);
+    // Fail-closed: count failures must not bypass MAX_HOOKS_PER_REPO.
+    let count: number;
+    try {
+      count = await dao.countByRepo(input.repositoryId);
+    } catch {
+      throw new BadRequestError('Webhook service temporarily unavailable');
+    }
     if (count >= max) throw new BadRequestError(`Maximum ${max} webhooks per repository`);
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const id = UUIDUtil.getRandomUUID();

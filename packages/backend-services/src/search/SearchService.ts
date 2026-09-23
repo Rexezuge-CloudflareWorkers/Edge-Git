@@ -2,7 +2,7 @@ import { IssueDAO, RepositoryDAO, SearchDAO } from '@edge-git/backend-data/dao';
 import type { CodeHit, DiscussionRow, IssueRow, PullRequestRow, RepositoryRow, SnippetRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError } from '@edge-git/backend-errors';
-import { EmailAddress, TimestampUtil } from '@edge-git/shared/utils';
+import { EmailAddress, TimestampUtil, mapWithConcurrency } from '@edge-git/shared/utils';
 import { PermissionService } from '../permission/PermissionService';
 
 interface SearchServiceEnv {
@@ -74,11 +74,13 @@ class SearchService {
     return content.length > MAX_INDEX_BYTES ? content.slice(0, MAX_INDEX_BYTES) : content;
   }
 
-  private permissionServiceSync(): PermissionService {
-    // Fast path for visibility checks when deps use default construction.
-    // Injected `permissionService` thunk is preferred; this fallback only
-    // exists for legacy direct `new SearchService(env)` call sites.
-    return new PermissionService(this.env);
+  private async resolvePermission(): Promise<PermissionService> {
+    try {
+      return await this.deps.permissionService();
+    } catch {
+      // Legacy direct construction fallback; prefer injected thunk via Tokens.
+      return new PermissionService(this.env);
+    }
   }
 
   private static normalizeViewer(viewerEmail: string | null): string | null {
@@ -90,20 +92,63 @@ class SearchService {
     }
   }
 
+  /**
+   * Template for visibility-filtered search (why: 5 search* methods duplicated
+   * sanitize -> over-fetch -> getRole loop; sequential N+1 dominated latency).
+   * Resolves roles concurrently (cap 10) and preserves candidate order.
+   */
+  private async filterVisibleRepos(rows: RepositoryRow[], viewer: string | null, limit: number): Promise<RepositoryRow[]> {
+    if (rows.length === 0) return [];
+    const permission = await this.resolvePermission();
+    const checked = await mapWithConcurrency(rows, 10, async (row) => ({
+      row,
+      role: await permission.getRole(viewer, row).catch(() => null),
+    }));
+    const visible: RepositoryRow[] = [];
+    for (const { row, role } of checked) {
+      if (role) visible.push(row);
+      if (visible.length >= limit) break;
+    }
+    return visible;
+  }
+
   public async searchRepos(query: string, viewerEmail: string | null, limit = 20): Promise<RepositoryRow[]> {
     const q = SearchService.sanitizeQuery(query);
     const viewer = SearchService.normalizeViewer(viewerEmail);
     const dao = await this.deps.searchDAO();
     // Over-fetch candidates, then filter private rows via PermissionService.
     const candidates = await dao.searchRepos(q, { limit: Math.min(limit * 3, MAX_LIMIT) });
-    const permission = await this.deps.permissionService().catch(() => this.permissionServiceSync());
-    const visible: RepositoryRow[] = [];
-    for (const row of candidates) {
-      const role = await permission.getRole(viewer, row).catch(() => null);
-      if (role) visible.push(row);
-      if (visible.length >= limit) break;
+    return this.filterVisibleRepos(candidates, viewer, SearchService.clampLimit(limit));
+  }
+
+  private async loadReposByIds(ids: readonly string[]): Promise<Map<string, RepositoryRow>> {
+    const repoById = new Map<string, RepositoryRow>();
+    if (ids.length === 0) return repoById;
+    const repositoryDAO = await this.deps.repositoryDAO().catch(() => null);
+    if (!repositoryDAO) return repoById;
+    // Paired results avoid indexed existence checks (lint) and keep order.
+    const paired = await mapWithConcurrency(ids, 10, async (id) => ({
+      id,
+      repo: await repositoryDAO.getById(id).catch(() => null),
+    }));
+    for (const { id, repo } of paired) {
+      if (repo) repoById.set(id, repo);
     }
-    return visible;
+    return repoById;
+  }
+
+  private async checkVisibility<T>(
+    items: readonly T[],
+    viewer: string | null,
+    resolveRepo: (item: T) => RepositoryRow | null,
+  ): Promise<Array<{ item: T; visible: boolean }>> {
+    const permission = await this.resolvePermission();
+    return mapWithConcurrency(items, 10, async (item) => {
+      const repo = resolveRepo(item);
+      if (!repo) return { item, visible: false };
+      const role = await permission.getRole(viewer, repo).catch(() => null);
+      return { item, visible: role !== null };
+    });
   }
 
   public async searchIssues(
@@ -116,19 +161,15 @@ class SearchService {
     const limit = SearchService.clampLimit(opts.limit ?? 20);
     const dao = await this.deps.searchDAO();
     const candidates = await dao.searchIssues(q, { limit: Math.min(limit * 3, MAX_LIMIT), repoId: opts.repoId });
-    const permission = await this.deps.permissionService().catch(() => this.permissionServiceSync());
-    const repositoryDAO = await this.deps.repositoryDAO().catch(() => null);
-    const repoCache = new Map<string, RepositoryRow | null>();
+    if (candidates.length === 0) return [];
+    // Batch repo loads concurrently (was sequential N+1), then concurrent roles.
+    const repoIds = [...new Set(candidates.map((c) => c.repository_id))];
+    const repoById = await this.loadReposByIds(repoIds);
+    if (repoById.size === 0) return [];
+    const checked = await this.checkVisibility(candidates, viewer, (issue) => repoById.get(issue.repository_id) ?? null);
     const visible: IssueRow[] = [];
-    for (const issue of candidates) {
-      let repo: RepositoryRow | null | undefined = repoCache.get(issue.repository_id);
-      if (repo === undefined) {
-        repo = repositoryDAO ? await repositoryDAO.getById(issue.repository_id).catch(() => null) : null;
-        repoCache.set(issue.repository_id, repo ?? null);
-      }
-      if (!repo) continue;
-      const role = await permission.getRole(viewer, repo).catch(() => null);
-      if (role) visible.push(issue);
+    for (const { item, visible: isVisible } of checked) {
+      if (isVisible) visible.push(item);
       if (visible.length >= limit) break;
     }
     return visible;
@@ -144,19 +185,14 @@ class SearchService {
     const limit = SearchService.clampLimit(opts.limit ?? 20);
     const dao = await this.deps.searchDAO();
     const candidates = await dao.searchPulls(q, { limit: Math.min(limit * 3, MAX_LIMIT), repoId: opts.repoId });
-    const permission = await this.deps.permissionService().catch(() => this.permissionServiceSync());
-    const repositoryDAO = await this.deps.repositoryDAO().catch(() => null);
-    const repoCache = new Map<string, RepositoryRow | null>();
+    if (candidates.length === 0) return [];
+    const repoIds = [...new Set(candidates.map((c) => c.repository_id))];
+    const repoById = await this.loadReposByIds(repoIds);
+    if (repoById.size === 0) return [];
+    const checked = await this.checkVisibility(candidates, viewer, (pull) => repoById.get(pull.repository_id) ?? null);
     const visible: PullRequestRow[] = [];
-    for (const pull of candidates) {
-      let repo: RepositoryRow | null | undefined = repoCache.get(pull.repository_id);
-      if (repo === undefined) {
-        repo = repositoryDAO ? await repositoryDAO.getById(pull.repository_id).catch(() => null) : null;
-        repoCache.set(pull.repository_id, repo ?? null);
-      }
-      if (!repo) continue;
-      const role = await permission.getRole(viewer, repo).catch(() => null);
-      if (role) visible.push(pull);
+    for (const { item, visible: isVisible } of checked) {
+      if (isVisible) visible.push(item);
       if (visible.length >= limit) break;
     }
     return visible;
@@ -172,21 +208,16 @@ class SearchService {
     const limit = SearchService.clampLimit(opts.limit ?? 20);
     const dao = await this.deps.searchDAO();
     const candidates = await dao.searchCode(q, { limit: Math.min(limit * 3, MAX_LIMIT), repoId: opts.repoId });
-    const permission = await this.deps.permissionService().catch(() => this.permissionServiceSync());
-    const repositoryDAO = await this.deps.repositoryDAO().catch(() => null);
-    const repoCache = new Map<string, RepositoryRow | null>();
+    if (candidates.length === 0) return [];
+    const repoIds = [...new Set(candidates.map((c) => c.repo_id))];
+    const repoById = await this.loadReposByIds(repoIds);
+    if (repoById.size === 0) return [];
     const firstToken = q.split(' ', 1)[0].toLowerCase();
+    const checked = await this.checkVisibility(candidates, viewer, (hit) => repoById.get(hit.repo_id) ?? null);
     const visible: Array<CodeHit & { snippet: string }> = [];
-    for (const hit of candidates) {
-      let repo: RepositoryRow | null | undefined = repoCache.get(hit.repo_id);
-      if (repo === undefined) {
-        repo = repositoryDAO ? await repositoryDAO.getById(hit.repo_id).catch(() => null) : null;
-        repoCache.set(hit.repo_id, repo ?? null);
-      }
-      if (!repo) continue;
-      const role = await permission.getRole(viewer, repo).catch(() => null);
-      if (!role) continue;
-      visible.push({ ...hit, snippet: SearchService.buildSnippet(hit.content, firstToken) });
+    for (const { item, visible: isVisible } of checked) {
+      if (!isVisible) continue;
+      visible.push({ ...item, snippet: SearchService.buildSnippet(item.content, firstToken) });
       if (visible.length >= limit) break;
     }
     return visible;
@@ -260,19 +291,14 @@ class SearchService {
     const limit = SearchService.clampLimit(opts.limit ?? 20);
     const dao = await this.deps.searchDAO();
     const candidates = await dao.searchDiscussions(q, { limit: Math.min(limit * 3, MAX_LIMIT), repoId: opts.repoId });
-    const permission = await this.deps.permissionService().catch(() => this.permissionServiceSync());
-    const repositoryDAO = await this.deps.repositoryDAO().catch(() => null);
-    const repoCache = new Map<string, RepositoryRow | null>();
+    if (candidates.length === 0) return [];
+    const repoIds = [...new Set(candidates.map((c) => c.repository_id))];
+    const repoById = await this.loadReposByIds(repoIds);
+    if (repoById.size === 0) return [];
+    const checked = await this.checkVisibility(candidates, viewer, (d) => repoById.get(d.repository_id) ?? null);
     const visible: DiscussionRow[] = [];
-    for (const discussion of candidates) {
-      let repo: RepositoryRow | null | undefined = repoCache.get(discussion.repository_id);
-      if (repo === undefined) {
-        repo = repositoryDAO ? await repositoryDAO.getById(discussion.repository_id).catch(() => null) : null;
-        repoCache.set(discussion.repository_id, repo ?? null);
-      }
-      if (!repo) continue;
-      const role = await permission.getRole(viewer, repo).catch(() => null);
-      if (role) visible.push(discussion);
+    for (const { item, visible: isVisible } of checked) {
+      if (isVisible) visible.push(item);
       if (visible.length >= limit) break;
     }
     return visible;

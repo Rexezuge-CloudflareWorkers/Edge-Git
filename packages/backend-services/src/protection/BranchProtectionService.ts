@@ -4,7 +4,7 @@ import { BadRequestError } from '@edge-git/backend-errors';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import type { BranchProtectionRuleMetadata } from '@edge-git/shared';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
-import { PullRequestService } from '../pull/PullRequestService';
+import { isBlockedByReviews } from '../pull/PullReviewGate';
 import {
   countApprovals as countApprovalsPolicy,
   matchRule as matchRulePolicy,
@@ -70,6 +70,8 @@ class BranchProtectionService {
    * Count distinct approvers from latest-per-author reviews, excluding the
    * PR creator (self-approval never counts). `commented` reviews are neutral.
    * Dismissed reviews never count.
+   * @deprecated Import countApprovals from BranchProtectionPolicy directly;
+   * kept for test compat.
    */
   public static countApprovals(
     reviews: Array<{ author_email: string; state: string; dismissed?: number | null }>,
@@ -80,7 +82,7 @@ class BranchProtectionService {
 
   /**
    * Merge gate for a protected base branch: `changes_requested` vetoes
-   * (shared with `PullRequestService.isBlockedByReviews`), then the approval
+   * (shared with PullReviewGate.isBlockedByReviews), then the approval
    * quorum applies, then the CODEOWNERS quorum (when owners resolve for the
    * changed paths: at least one non-creator owner approval is required).
    * Returns a human-readable reason when blocked.
@@ -91,7 +93,7 @@ class BranchProtectionService {
     creatorEmail: string;
     codeowners?: { owners: string[] };
   }): { blocked: boolean; reason: string | null } {
-    if (PullRequestService.isBlockedByReviews(input.reviews)) {
+    if (isBlockedByReviews(input.reviews)) {
       return { blocked: true, reason: 'pull request has unresolved change requests' };
     }
     const required = input.rule?.requiredApprovals ?? 0;

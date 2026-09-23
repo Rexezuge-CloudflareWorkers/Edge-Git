@@ -1,4 +1,5 @@
 import type { GitService } from '@edge-git/git-service';
+import { mapWithConcurrency } from '@edge-git/shared/utils';
 
 // README candidates at the repo root, mirroring the web CodeTab list so the
 // overview response can inline the same file the UI would fetch separately.
@@ -7,28 +8,15 @@ const README_NAMES = new Set(['README.md', 'README.markdown', 'README.mdown', 'R
 // Upper bound for inlining README bytes into the overview payload. Larger or
 // binary READMEs stay null so the aggregate call never becomes a blob pipe;
 // the UI can still load them on demand via getBlob.
-const MAX_OVERVIEW_README_BYTES = 512 * 1024;
+// BREAKING: reduced 512KB -> 64KB: overview is a hot code-page RPC, base64
+// inflates +33%, and large READMEs dominated DO payloads.
+const MAX_OVERVIEW_README_BYTES = 64 * 1024;
 
 // Upper bound for unbounded Promise.all fan-out (tag peel, tree last-commit).
 // Malicious refs with thousands of tags/entries would otherwise spawn
 // thousands of parallel git reads in the DO.
 const MAX_FANOUT = 100;
 const FANOUT_CONCURRENCY = 10;
-
-async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const out = Array.from({ length: items.length }, () => undefined as R);
-  let next = 0;
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (next < items.length) {
-      const i = next;
-      next += 1;
-      const item = items[i];
-      if (item !== undefined) out[i] = await fn(item);
-    }
-  });
-  await Promise.all(workers);
-  return out;
-}
 
 // Read-model queries served over DO RPC (branches/tree/blob/commits).
 // Lifecycle (ensure initialized, cache refresh) stays with RepoWorker via
@@ -52,8 +40,7 @@ class ReadModelService {
   }
 
   public async getBranches(): Promise<{ branches: string[]; currentBranch: string | null }> {
-    const branches = await this.git.listBranches();
-    const currentBranch = await this.git.currentBranch();
+    const [branches, currentBranch] = await Promise.all([this.git.listBranches(), this.git.currentBranch()]);
     return { branches, currentBranch: currentBranch ?? null };
   }
 
@@ -101,15 +88,18 @@ class ReadModelService {
   // Recursive file listing for the code search indexer. Breadth-first walk
   // capped by maxFiles (+ a dir-visit cap) so giant repos cannot blow the
   // DO wall-clock. Returns repo-relative paths with blob oids.
+  // Uses an index pointer instead of shift() so the walk stays O(n).
   public async listAllFiles(args: { ref?: string; maxFiles?: number }): Promise<Array<{ path: string; oid: string }>> {
     const maxFiles = Math.min(Math.max(args.maxFiles ?? 200, 1), 500);
     const resolvedRef = await this.git.resolveRef(args.ref);
     if (!resolvedRef) return [];
     const files: Array<{ path: string; oid: string }> = [];
     const queue: string[] = [''];
+    let head = 0;
     let dirsVisited = 0;
-    while (queue.length > 0 && files.length < maxFiles && dirsVisited < 200) {
-      const dir = queue.shift();
+    while (head < queue.length && files.length < maxFiles && dirsVisited < 200) {
+      const dir = queue.at(head);
+      head += 1;
       if (dir === undefined) break;
       dirsVisited += 1;
       const entries = await this.readTreeEntries(resolvedRef, dir);

@@ -38,11 +38,17 @@ class PullRequestService {
    * A pull request is merge-blocked when any reviewer's latest review requests
    * changes. Delegates to the pure `PullReviewGate` helper (see
    * `./PullReviewGate.ts`) so the rule is unit testable without D1.
+   * @deprecated Import isBlockedByReviews from PullReviewGate directly;
+   * kept for route/test compat.
    */
   public static isBlockedByReviews(reviews: ReviewGateInput[]): boolean {
     return isBlockedByReviews(reviews);
   }
 
+  /**
+   * @deprecated Import isValidBranchName from @edge-git/shared/utils directly;
+   * kept for route/test compat.
+   */
   public static isValidBranchName(branch: string): boolean {
     return isValidBranchName(branch);
   }
@@ -162,7 +168,7 @@ class PullRequestService {
     // changes_requested blocks merge: any latest blocking review vetoes.
     const dao = await this.deps.pullRequestDAO();
     const reviews = await dao.listReviews(pr.id);
-    if (PullRequestService.isBlockedByReviews(reviews)) throw new BadRequestError('pull request has unresolved change requests');
+    if (isBlockedByReviews(reviews)) throw new BadRequestError('pull request has unresolved change requests');
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     await dao.markMerged(pr.id, input.mergedBy, input.commitOid ?? null, now);
     const updated = await dao.getByNumber(input.repositoryId, input.number);
