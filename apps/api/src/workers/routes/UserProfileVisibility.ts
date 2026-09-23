@@ -1,4 +1,5 @@
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
+import { BaseRoute } from '../../endpoints/IBaseRoute';
 
 /**
  * Pure profile-visibility helpers for public user/org pages.
@@ -12,18 +13,11 @@ import type { RepositoryRow } from '@edge-git/backend-data/dao';
 const PROFILE_REPO_SCAN_CAP = 200;
 
 function parseLimit(url: string): number {
-  try {
-    const raw = new URL(url).searchParams.get('limit');
-    // Invalid values fall back to a safe default (20), never to the max:
-    // `?limit=abc` must not silently become a 100-row over-fetch.
-    // Numeric out-of-range values clamp (0→1, 500→100); non-numeric →20.
-    if (raw === null || raw.trim() === '') return 20;
-    const n = Number(raw.trim());
-    if (!Number.isFinite(n)) return 20;
-    return Math.min(100, Math.max(1, Math.floor(n)));
-  } catch {
-    return 20;
-  }
+  // Profile lists default to 20 (not 100): invalid values fall back to the
+  // safe default, never to the max — `?limit=abc` must not silently become
+  // a 100-row over-fetch. Numeric out-of-range values clamp (0→1, 500→100).
+  // Single source of truth lives in `BaseRoute.parseLimit` (Strategy).
+  return BaseRoute.parseLimit(url, 20, 100);
 }
 
 async function filterVisibleRepos(

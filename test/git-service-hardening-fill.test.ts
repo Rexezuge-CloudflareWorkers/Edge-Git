@@ -5,12 +5,14 @@ import * as git from 'isomorphic-git';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 // NOTE: relative imports bypass packages/git-service/src/index.ts, which
 // re-exports the `dofs` runtime (unparsable in the node unit pool).
-import { GitService, PackLimitError } from '../packages/git-service/src/GitService';
+import { GitService } from '../packages/git-service/src/GitService';
+import { PackLimitError } from '../packages/git-service/src/PackLimits';
 import { IsoGitFs } from '../packages/git-service/src/IsoGitFs';
 import { HistoryService } from '../packages/git-service/src/HistoryService';
 import { PackCollector } from '../packages/git-service/src/PackCollector';
 import { ObjectReader } from '../packages/git-service/src/ObjectReader';
-import { MergeService, isValidBranchName } from '../packages/git-service/src/MergeService';
+import { MergeService } from '../packages/git-service/src/MergeService';
+import { isValidBranchName } from '../packages/git-service/src/RefValidation';
 import { splitFilePath } from '../packages/git-service/src/WriteService';
 
 const AUTHOR = { name: 'tester', email: 'tester@example.com' };

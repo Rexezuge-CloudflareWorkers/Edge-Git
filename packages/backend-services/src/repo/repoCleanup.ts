@@ -27,8 +27,14 @@ import type {
 
 // Best-effort sidecar cleanup for `RepoService.deleteRepo`, split out of
 // `RepoService.ts` to stay under the god-file guard. Each step tolerates
-// legacy DBs missing the table. Issues are hard-required (v1 tables); the
-// rest degrade silently.
+// legacy DBs missing the table (matched by `isMissingTableError`). Issues
+// are hard-required (v1 tables); the rest degrade silently by design so a
+// legacy DB never blocks repo deletion — but unexpected failures are logged
+// so partial deletes stay debuggable (Observer pattern: caller owns retry).
+function isMissingTableError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /no such table|does not exist|not found|prepare is not a function/i.test(message);
+}
 interface RepoCleanupDeps {
   issueDAO: () => Promise<IssueDAO>;
   pullRequestDAO: () => Promise<PullRequestDAO>;
@@ -83,12 +89,14 @@ async function cleanupRepoSidecars(deps: RepoCleanupDeps, repoId: string): Promi
     deps.auditLogDAO,
     deps.teamGrantDAO,
   ];
-  for (const factory of factories) {
+  for (const [index, factory] of factories.entries()) {
     try {
       const dao = await factory();
       await dao.deleteByRepo(repoId);
-    } catch {
-      // ignore — legacy DBs without the table
+    } catch (error) {
+      // Legacy DBs without the table are expected; anything else is a real
+      // partial-delete risk — log it while still continuing best-effort.
+      if (!isMissingTableError(error)) console.warn(`[WARN] [repoCleanup] sidecar[${index}] deleteByRepo failed: ${String(error)}`);
     }
   }
   // Check runs prune by time (no deleteByRepo); best-effort purge via a wide
@@ -98,8 +106,8 @@ async function cleanupRepoSidecars(deps: RepoCleanupDeps, repoId: string): Promi
     if (typeof (checkDao as unknown as { deleteByRepo?: (id: string) => Promise<unknown> }).deleteByRepo === 'function') {
       await (checkDao as unknown as { deleteByRepo: (id: string) => Promise<unknown> }).deleteByRepo(repoId);
     }
-  } catch {
-    // ignore — legacy DBs without the table
+  } catch (error) {
+    if (!isMissingTableError(error)) console.warn(`[WARN] [repoCleanup] checkRun deleteByRepo failed: ${String(error)}`);
   }
 }
 

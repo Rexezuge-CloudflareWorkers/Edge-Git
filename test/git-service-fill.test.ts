@@ -12,7 +12,8 @@ import ts from 'typescript';
 import { IsoGitFs } from '../packages/git-service/src/IsoGitFs';
 import { normalizePath } from '../packages/git-service/src/ErrorNormalizer';
 import { RefService } from '../packages/git-service/src/RefService';
-import { GitService, PackLimitError } from '../packages/git-service/src/GitService';
+import { GitService } from '../packages/git-service/src/GitService';
+import { PackLimitError } from '../packages/git-service/src/PackLimits';
 import { TreeReader } from '../packages/git-service/src/TreeReader';
 
 const ZERO_OID = '0'.repeat(40);

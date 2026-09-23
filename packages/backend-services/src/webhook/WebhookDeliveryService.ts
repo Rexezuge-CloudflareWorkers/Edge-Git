@@ -113,10 +113,15 @@ class WebhookDeliveryService {
   // Best-effort fan-out: enqueue one pending delivery per active hook
   // subscribed to the event. Never throws — delivery must not fail the
   // user-visible mutation (mirrors SocialEmit's recordAndNotify contract).
+  // DAO outages degrade to `{enqueued: 0}` but are logged so zero-fan-out
+  // from an outage is distinguishable from zero-subscriber quiet.
   public async enqueueForEvent(input: EnqueueEventInput): Promise<{ enqueued: number }> {
     try {
       const webhookDAO = await this.deps.webhookDAO();
-      const hooks = await webhookDAO.listByRepo(input.repositoryId).catch(() => [] as RepoWebhookRow[]);
+      const hooks = await webhookDAO.listByRepo(input.repositoryId).catch((error: unknown) => {
+        console.warn(`[WARN] [WebhookDeliveryService] listByRepo failed: ${String(error)}`);
+        return [] as RepoWebhookRow[];
+      });
       const matching: RepoWebhookRow[] = [];
       for (const hook of hooks) {
         if (hook.is_active !== 1) continue;
@@ -166,12 +171,14 @@ class WebhookDeliveryService {
             now,
           });
           enqueued += 1;
-        } catch {
+        } catch (error) {
           // Per-hook best-effort; one bad row must not block the rest.
+          console.warn(`[WARN] [WebhookDeliveryService] enqueue failed for hook ${hook.id}: ${String(error)}`);
         }
       }
       return { enqueued };
-    } catch {
+    } catch (error) {
+      console.warn(`[WARN] [WebhookDeliveryService] enqueueForEvent failed: ${String(error)}`);
       return { enqueued: 0 };
     }
   }
@@ -236,15 +243,24 @@ class WebhookDeliveryService {
     const now = input?.now ?? TimestampUtil.getCurrentUnixTimestampInSeconds();
     const limit = Math.min(Math.max(input?.limit ?? 50, 1), 200);
     const deliveryDAO = await this.deps.deliveryDAO();
-    const due = await deliveryDAO.listDue(now, limit).catch(() => [] as WebhookDeliveryRow[]);
+    const due = await deliveryDAO.listDue(now, limit).catch((error: unknown) => {
+      console.warn(`[WARN] [WebhookDeliveryService] listDue failed: ${String(error)}`);
+      return [] as WebhookDeliveryRow[];
+    });
     let processed = 0;
     let succeeded = 0;
     let failed = 0;
     for (const row of due) {
-      const claimed = await deliveryDAO.claim(row.id, now).catch(() => false);
+      const claimed = await deliveryDAO.claim(row.id, now).catch((error: unknown) => {
+        console.warn(`[WARN] [WebhookDeliveryService] claim failed for ${row.id}: ${String(error)}`);
+        return false;
+      });
       if (!claimed) continue;
       processed += 1;
-      const ok = await this.attemptRow(row.id, now).catch(() => false);
+      const ok = await this.attemptRow(row.id, now).catch((error: unknown) => {
+        console.warn(`[WARN] [WebhookDeliveryService] attemptRow failed for ${row.id}: ${String(error)}`);
+        return false;
+      });
       if (ok) succeeded += 1;
       else failed += 1;
     }

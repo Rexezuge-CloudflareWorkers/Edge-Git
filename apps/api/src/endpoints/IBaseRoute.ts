@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import { ServiceError, DatabaseError, DefaultInternalServerError } from '@edge-git/backend-errors';
 import { getBackendStrings } from '@edge-git/shared/i18n';
-import { ErrorSanitizationUtil } from '@edge-git/shared/utils';
+import { ErrorSanitizationUtil, canonicalizeLanguageTag } from '@edge-git/shared/utils';
 import { createRequestScope } from '@edge-git/backend-services/composition';
 import { getRequestScope, asScopedContext } from '@edge-git/backend-runtime/di';
 import { toServiceStatus as toMappedStatus } from '@edge-git/backend-services/errors';
@@ -60,12 +60,15 @@ abstract class BaseRoute {
 
   /**
    * Clamped `?limit=` parser. Returns `def` when missing/unparsable, clamped
-   * to `[1, max]` otherwise.
+   * to `[1, max]` otherwise. Trims whitespace so `?limit= 20 ` and
+   * `?limit=` both fall back to `def` instead of producing 0/1 via
+   * `Number("   ")`.
    */
   public static parseLimit(url: string, def = 100, max = 100): number {
     try {
       const raw = new URL(url).searchParams.get('limit');
-      const n = raw ? Number(raw) : def;
+      if (raw === null || raw.trim() === '') return def;
+      const n = Number(raw.trim());
       if (!Number.isFinite(n)) return def;
       return Math.min(max, Math.max(1, Math.floor(n)));
     } catch {
@@ -172,7 +175,11 @@ abstract class BaseRoute {
       const header = c.req.header('Accept-Language');
       if (!header) return 'en';
       const first = header.split(',', 1)[0]?.split(';', 1)[0]?.trim();
-      return first && first.length > 0 ? first : 'en';
+      if (!first) return 'en';
+      // Canonicalize (`en_us` → `en-US`) so backend string lookup and logs
+      // see one tag shape; unknown tags still fall back to `en` downstream
+      // via `normalizeBackendLocale`.
+      return canonicalizeLanguageTag(first);
     } catch {
       return 'en';
     }

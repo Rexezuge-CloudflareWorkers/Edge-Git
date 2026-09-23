@@ -9,7 +9,9 @@ import { MergeService } from './MergeService';
 import { WriteService } from './WriteService';
 import type { CommitFileInput } from './WriteService';
 
-export { PackLimitError } from './PackCollector';
+// NOTE: `PackLimitError` canonical home is `./PackLimits` (re-exported via
+// the package barrel and `./PackCollector` for compat). Import from there —
+// never re-export it here, so the chain stays single-hop.
 
 type PromiseFsClient = ReturnType<IsoGitFs['getPromiseFsClient']>;
 
