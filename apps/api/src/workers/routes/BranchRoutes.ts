@@ -4,6 +4,7 @@ import { jsonError, requireVisibleRepo, toErrorBody, toSafeErrorMessage, toServi
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { readJsonBody } from './BodyParser';
+import { invalidateRepoCaches } from './RepoReadCache';
 
 type RepoApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -54,6 +55,13 @@ function registerBranchRoutes(app: RepoApp): void {
       const fullName = `${owner}/${repoName}`;
       const result = (await getRepoStub(c.env, fullName).createBranch({ name, fromRef: body.from || undefined })) as BranchResult;
       const { body: out, status } = toBranchResponse(result, 201);
+      if (result.ok) {
+        try {
+          await invalidateRepoCaches(getScope(c).get(Tokens.KvCache), fullName);
+        } catch {
+          // Best-effort.
+        }
+      }
       return c.json(out, status);
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to create branch'), toServiceStatus(error));
@@ -83,6 +91,13 @@ function registerBranchRoutes(app: RepoApp): void {
       const fullName = `${owner}/${repoName}`;
       const result = (await getRepoStub(c.env, fullName).deleteBranchRef(branch)) as BranchResult;
       const { body: out, status } = toBranchResponse(result, 200);
+      if (result.ok) {
+        try {
+          await invalidateRepoCaches(getScope(c).get(Tokens.KvCache), fullName);
+        } catch {
+          // Best-effort.
+        }
+      }
       return c.json(out, status);
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to delete branch'), toServiceStatus(error));
@@ -108,6 +123,13 @@ function registerBranchRoutes(app: RepoApp): void {
       const fullName = `${owner}/${repoName}`;
       const result = (await getRepoStub(c.env, fullName).setDefaultBranch(branch)) as BranchResult;
       const { body: out, status } = toBranchResponse(result, 200);
+      if (result.ok) {
+        try {
+          await invalidateRepoCaches(getScope(c).get(Tokens.KvCache), fullName);
+        } catch {
+          // Best-effort.
+        }
+      }
       return c.json(out, status);
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to update default branch'), toServiceStatus(error));

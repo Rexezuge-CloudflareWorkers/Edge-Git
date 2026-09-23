@@ -11,7 +11,7 @@ const KV_MAX_KEY_LENGTH = 512;
 const KV_MIN_TTL_SECONDS = 60;
 const KV_PLATFORM_MAX_VALUE_BYTES = 26_214_400;
 
-type KvDomainName = 'jwks' | 'oauth2' | 'code' | 'searchCursor' | 'refs' | 'ratelimit';
+type KvDomainName = 'jwks' | 'oauth2' | 'code' | 'searchCursor' | 'refs' | 'readmodel' | 'ratelimit';
 
 interface KvDomainDef {
   ttlSeconds?: number;
@@ -40,9 +40,14 @@ const KV_DOMAINS: Record<KvDomainName, KvDomainDef> = {
     description: 'Search backfill cron progress markers per repo.',
   },
   refs: {
-    ttlSeconds: 3600,
+    ttlSeconds: 86_400,
     maxValueBytes: 1_048_576,
-    description: 'Advertised ref snapshots per repo; invalidated on receive-pack.',
+    description: 'Advertised ref snapshots per repo; invalidated on receive-pack. Long-lived (24h) to keep DO rows_read low.',
+  },
+  readmodel: {
+    ttlSeconds: 600,
+    maxValueBytes: 1_048_576,
+    description: 'Repo read-model snapshots (overview/branches/tags/tree/commits/blob) keyed by head oid; invalidated on push.',
   },
   ratelimit: {
     ttlSeconds: 60,

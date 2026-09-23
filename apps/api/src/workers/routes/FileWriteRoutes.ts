@@ -8,6 +8,7 @@ import { branchNameSchema, decodeBase64Strict, sanitizeCommitMessage } from '@ed
 import { scanBytes } from '@edge-git/backend-services/security';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { readJsonBody } from './BodyParser';
+import { invalidateRepoCaches } from './RepoReadCache';
 
 type RepoApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -217,6 +218,12 @@ function registerFileWriteRoutes(app: RepoApp): void {
             () => undefined,
           ),
         );
+        try {
+          const cache = getScope(c).get(Tokens.KvCache);
+          waitUntilOf(c)?.(invalidateRepoCaches(cache, `${owner}/${repoName}`).catch(() => undefined));
+        } catch {
+          // Cache invalidation is best-effort.
+        }
       }
       if (secretWarning > 0)
         c.header('X-EdgeGit-Secret-Warning', `${secretWarning} possible secret(s) detected; rotate any exposed credentials`);
@@ -263,6 +270,12 @@ function registerFileWriteRoutes(app: RepoApp): void {
           await getScope(c).get(Tokens.SearchService).removeFile(gate.repo.id, filePath);
         } catch {
           // Index failures must never fail the file delete.
+        }
+        try {
+          const cache = getScope(c).get(Tokens.KvCache);
+          waitUntilOf(c)?.(invalidateRepoCaches(cache, `${owner}/${repoName}`).catch(() => undefined));
+        } catch {
+          // Cache invalidation is best-effort.
         }
       }
       return c.json(out, status);

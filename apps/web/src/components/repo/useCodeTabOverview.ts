@@ -143,8 +143,13 @@ function useCodeTabOverview(
         const readmeText = isBinaryReadme ? null : decodeBlobContent(overview.readme ?? null);
         setReadme(readmeText !== null && overview.readme ? { path: overview.readme.path, text: readmeText } : null);
         setLoading(false);
+        const shouldEnrich =
+          overview.tree.length <= 30 && (typeof document === 'undefined' || !document.hidden);
         const enrichKey = `${key}/${treeRef ?? ''}/${dir ?? ''}`;
-        if (st.enrichedKey !== enrichKey) {
+        if (shouldEnrich && st.enrichedKey !== enrichKey) {
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          if (cancelled) return;
+          if (typeof document !== 'undefined' && document.hidden) return;
           const sharedEnrich = st.enrichInflightKey === enrichKey ? st.enrichInflight : null;
           let enriched: TreeEntry[] | null = null;
           if (sharedEnrich) {

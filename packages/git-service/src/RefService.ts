@@ -13,6 +13,26 @@ const logger = {
 
 type PromiseFsClient = ReturnType<IsoGitFs['getPromiseFsClient']>;
 
+// Bound parallel ref resolution so tag/branch bombs cannot fan out into
+// unbounded git I/O. Matches `ReadModelService` fan-out discipline.
+const MAX_REF_RESOLVE_CONCURRENCY = 10;
+const OID_RE = /^[0-9a-f]{40}$/i;
+
+async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out = Array.from({ length: items.length }, () => undefined as R);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const index = next;
+      next += 1;
+      const item = items[index];
+      if (item !== undefined) out[index] = await fn(item);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
 export class RefService {
   private readonly fs: PromiseFsClient;
   private readonly gitdir: string;
@@ -68,17 +88,13 @@ export class RefService {
         fs: this.fs,
         gitdir: this.gitdir,
       });
-      const branches = await Promise.all(
-        branchRefs.map(async (branch) => {
-          const oid = await git.resolveRef({
-            fs: this.fs,
-            gitdir: this.gitdir,
-            ref: `refs/heads/${branch}`,
-          });
-          return { ref: `refs/heads/${branch}`, oid };
-        }),
-      );
-      return branches;
+      const packed = await this.loadPackedRefsMap();
+      const branches = await mapWithConcurrency(branchRefs, MAX_REF_RESOLVE_CONCURRENCY, async (branch) => {
+        const ref = `refs/heads/${branch}`;
+        const oid = await this.resolveLooseOrPacked(ref, packed);
+        return { ref, oid };
+      });
+      return branches.filter((b) => OID_RE.test(b.oid));
     } catch {
       return [];
     }
@@ -198,20 +214,48 @@ export class RefService {
         fs: this.fs,
         gitdir: this.gitdir,
       });
-      const tags = await Promise.all(
-        tagRefs.map(async (tag) => {
-          const oid = await git.resolveRef({
-            fs: this.fs,
-            gitdir: this.gitdir,
-            ref: `refs/tags/${tag}`,
-          });
-          return { ref: `refs/tags/${tag}`, oid };
-        }),
-      );
-      return tags;
+      const packed = await this.loadPackedRefsMap();
+      const tags = await mapWithConcurrency(tagRefs, MAX_REF_RESOLVE_CONCURRENCY, async (tag) => {
+        const ref = `refs/tags/${tag}`;
+        const oid = await this.resolveLooseOrPacked(ref, packed);
+        return { ref, oid };
+      });
+      return tags.filter((t) => OID_RE.test(t.oid));
     } catch {
       return [];
     }
+  }
+
+  // Single-read packed-refs snapshot per listing. Previously each
+  // `resolveRef` re-read `packed-refs` + the loose file (2-3 SQLite rows per
+  // ref); now one shared `packed-refs` read plus one loose read per ref.
+  private async loadPackedRefsMap(): Promise<Map<string, string>> {
+    const map = new Map<string, string>();
+    try {
+      const raw = (await this.fs.promises.readFile(`${this.gitdir}/packed-refs`, { encoding: 'utf8' })) as string;
+      for (const line of raw.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('^')) continue;
+        const [oid, ref] = trimmed.split(' ', 2);
+        if (oid && ref && OID_RE.test(oid) && ref.startsWith('refs/')) map.set(ref, oid.toLowerCase());
+      }
+    } catch {
+      // No packed-refs (fresh repo with only loose refs).
+    }
+    return map;
+  }
+
+  private async resolveLooseOrPacked(ref: string, packed: Map<string, string>): Promise<string> {
+    try {
+      const raw = (await this.fs.promises.readFile(`${this.gitdir}/${ref}`, { encoding: 'utf8' })) as string;
+      const oid = raw.trim().split('\n', 1)[0]?.trim() ?? '';
+      if (OID_RE.test(oid)) return oid.toLowerCase();
+    } catch {
+      // Missing loose ref — fall through to packed map.
+    }
+    const fromPacked = packed.get(ref);
+    if (fromPacked) return fromPacked;
+    return git.resolveRef({ fs: this.fs, gitdir: this.gitdir, ref });
   }
 
   async resolveRef(ref = 'HEAD') {

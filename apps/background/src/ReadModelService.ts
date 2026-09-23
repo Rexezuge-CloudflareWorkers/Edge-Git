@@ -70,7 +70,11 @@ class ReadModelService {
   }
 
   public async getTree(args: { ref?: string; path?: string; withLastCommit?: boolean }): Promise<unknown> {
-    const { ref, path, withLastCommit = true } = args;
+    // Default is cheap (no per-file `getLog`): the code page uses the
+    // aggregate `getOverview` fast tree, and explicit `withLastCommit=true`
+    // is reserved for on-demand enrichment. Previously the default was true,
+    // turning every `/tree` without a flag into up to 100 log walks.
+    const { ref, path, withLastCommit = false } = args;
     const resolvedRef = await this.git.resolveRef(ref);
     if (!resolvedRef) {
       return [];

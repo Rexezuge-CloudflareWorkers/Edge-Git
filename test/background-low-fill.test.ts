@@ -594,9 +594,20 @@ describe('background-low-fill ReadModelService', () => {
       getLog: vi.fn(async () => [commit]),
     });
     const svc = new ReadModelService(git as never);
-    const tree = (await svc.getTree({ ref: 'main' })) as Array<Record<string, unknown>>;
+    const tree = (await svc.getTree({ ref: 'main', withLastCommit: true })) as Array<Record<string, unknown>>;
     expect(tree[0]).toMatchObject({ path: 'a.txt', lastCommit: commit });
     expect(git.getLog).toHaveBeenCalledWith({ ref: 'main', depth: 1, filepath: 'a.txt' });
+  });
+
+  it('getTree defaults to cheap fast tree without lastCommit', async () => {
+    const git = makeReadGit({
+      getTree: vi.fn(async () => [{ path: 'a.txt', type: 'blob', oid: OID_A }]),
+      getLog: vi.fn(async () => [{ oid: OID_A }]),
+    });
+    const svc = new ReadModelService(git as never);
+    const tree = (await svc.getTree({ ref: 'main' })) as Array<Record<string, unknown>>;
+    expect(tree).toEqual([{ path: 'a.txt', type: 'blob', oid: OID_A, lastCommit: null }]);
+    expect(git.getLog).not.toHaveBeenCalled();
   });
 
   it('listAllFiles walks trees breadth-first and caps maxFiles', async () => {

@@ -152,7 +152,11 @@ export class IsoGitFs {
   statCore(path: string, detectSymlink: boolean): Promise<StatsLike> {
     let isSymlink = false;
     const normalizedPath = normalizePath(path);
-    if (detectSymlink) {
+    // Fast path: content-addressed objects are never symlinks. Skips one
+    // `readlink` SQLite row per `lstat` during pack walks and log traversals,
+    // which dominate `rows_read` on fetch-heavy workloads.
+    const isObjectPath = normalizedPath.startsWith('/repo/objects/');
+    if (detectSymlink && !isObjectPath) {
       try {
         this.dofs.readlink(normalizedPath);
         isSymlink = true;
