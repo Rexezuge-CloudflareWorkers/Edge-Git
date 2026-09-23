@@ -553,6 +553,50 @@ describe('gap fill: social star/watch flows', () => {
     const mine = (await (await callGap(env, '/user/stars')).json()) as { repos?: unknown[]; stars?: unknown[] };
     expect(mine).toBeDefined();
   });
+
+  it('embeds social counts and viewer flags in repo payloads', async () => {
+    const state = seedState();
+    state.stars.push({ repo_id: 'r-demo', user_email: BOB, created_at: 1 });
+    const env = gapEnv(gapDb(state));
+    // Public payload carries counts; DEV_AUTH_EMAIL (alice) resolves as the
+    // viewer, so flags reflect alice (not the bob star above).
+    const pub = (await (await callGap(env, '/repos/alice/demo')).json()) as {
+      forksCount: number;
+      starsCount: number;
+      watchersCount: number;
+      viewerStarred: boolean;
+      viewerWatching: boolean;
+      starred: boolean;
+      watching: boolean;
+    };
+    expect(pub).toMatchObject({
+      forksCount: 0,
+      starsCount: 1,
+      watchersCount: 0,
+      viewerStarred: false,
+      viewerWatching: false,
+      starred: false,
+      watching: false,
+    });
+    const authed = (await (await callGap(env, '/user/repos/alice/demo')).json()) as {
+      viewerCanManage: boolean;
+      starsCount: number;
+      viewerStarred: boolean;
+    };
+    expect(authed).toMatchObject({ viewerCanManage: true, starsCount: 1, viewerStarred: false });
+    // After alice stars, both payloads reflect the viewer's flag and count.
+    expect((await callGap(env, '/user/repos/alice/demo/star', { method: 'PUT' })).status).toBe(200);
+    const pubAfter = (await (await callGap(env, '/repos/alice/demo')).json()) as {
+      starsCount: number;
+      viewerStarred: boolean;
+    };
+    expect(pubAfter).toMatchObject({ starsCount: 2, viewerStarred: true });
+    const authedAfter = (await (await callGap(env, '/user/repos/alice/demo')).json()) as {
+      starsCount: number;
+      viewerStarred: boolean;
+    };
+    expect(authedAfter).toMatchObject({ starsCount: 2, viewerStarred: true });
+  });
 });
 
 describe('gap fill: user profiles (UserRoutes)', () => {
