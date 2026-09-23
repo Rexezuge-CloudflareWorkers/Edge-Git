@@ -2,6 +2,7 @@ import type { Hono } from 'hono';
 import { Tokens } from '@edge-git/backend-services/composition';
 import { WEBHOOK_EVENTS } from '@edge-git/backend-services/webhook';
 import { RepoFullName } from '@edge-git/shared/utils';
+import { tokenIdSchema } from '@edge-git/shared/validation';
 import { jsonError, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 import { presentMany, presentSingle } from './IdentityPresenter';
@@ -10,6 +11,16 @@ type WebhookApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddre
 
 function repoParams(c: { req: { param(name: string): string } }): { owner: string; repoName: string } {
   return { owner: c.req.param('owner'), repoName: RepoFullName.normalizeRepo(c.req.param('repo')) };
+}
+
+// Edge UUID gate (fail fast before D1): hook/delivery ids are UUIDs minted
+// by WebhookService. Rejects path-injection probes with 400 instead of a
+// scoped D1 lookup.
+const INVALID_HOOK_ID = 'Not found';
+const INVALID_DELIVERY_ID = 'Not found';
+
+function invalidHookId(id: string): boolean {
+  return !tokenIdSchema.safeParse(id).success;
 }
 
 // Repo webhooks — list/get/deliveries need `read+`, all mutations need
@@ -61,6 +72,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const { owner, repoName } = repoParams(c);
     const id = c.req.param('id');
+    if (invalidHookId(id)) return jsonError(c, INVALID_HOOK_ID, 404);
     try {
       const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'read');
@@ -75,6 +87,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const { owner, repoName } = repoParams(c);
     const id = c.req.param('id');
+    if (invalidHookId(id)) return jsonError(c, INVALID_HOOK_ID, 404);
     const { malformed, oversized, body } = await readJsonBody<{ url?: unknown; events?: unknown; isActive?: unknown }>(c);
     if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
@@ -96,6 +109,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const { owner, repoName } = repoParams(c);
     const id = c.req.param('id');
+    if (invalidHookId(id)) return jsonError(c, INVALID_HOOK_ID, 404);
     try {
       const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
@@ -110,6 +124,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const { owner, repoName } = repoParams(c);
     const id = c.req.param('id');
+    if (invalidHookId(id)) return jsonError(c, INVALID_HOOK_ID, 404);
     try {
       const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
@@ -124,6 +139,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const { owner, repoName } = repoParams(c);
     const id = c.req.param('id');
+    if (invalidHookId(id)) return jsonError(c, INVALID_HOOK_ID, 404);
     try {
       const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');
@@ -146,6 +162,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const { owner, repoName } = repoParams(c);
     const id = c.req.param('id');
+    if (invalidHookId(id)) return jsonError(c, INVALID_HOOK_ID, 404);
     try {
       const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'read');
@@ -163,6 +180,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const { owner, repoName } = repoParams(c);
     const deliveryId = c.req.param('deliveryId');
+    if (invalidHookId(deliveryId)) return jsonError(c, INVALID_DELIVERY_ID, 404);
     try {
       const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');

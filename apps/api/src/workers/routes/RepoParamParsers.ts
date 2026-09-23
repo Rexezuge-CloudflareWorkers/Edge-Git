@@ -3,17 +3,46 @@
  * commits/overview granules). Extracted from `RepoRoutes` (god-file guard):
  * validation at the edge so malformed callers fail fast without burning DO
  * I/O. No Hono/D1 imports — unit-testable in isolation.
+ *
+ * Why strict: `ref` flows into git ref resolution and `path` into DO
+ * filesystem reads. Traversal (`..`), absolute paths, backslashes, and
+ * control chars must never reach the DO — return `undefined` so callers fall
+ * back to the default ref/root instead of a traversal.
  */
+function hasControlChars(value: string): boolean {
+  for (const ch of value) {
+    const code = ch.codePointAt(0) ?? 0;
+    if (code === 0x7f || code <= 0x1f) return true;
+  }
+  return false;
+}
+
 function sanitizeRefParam(raw: string | null | undefined): string | undefined {
   if (raw == null) return undefined;
   const trimmed = raw.trim().slice(0, 256);
-  return trimmed || undefined;
+  if (!trimmed) return undefined;
+  // Reject git-dangerous refs: traversal, empty segments, control chars,
+  // trailing lock/dot/slash, `@{` reflog syntax, and whitespace.
+  if (trimmed.includes('..') || trimmed.includes('//') || trimmed.includes('\0')) return undefined;
+  if (hasControlChars(trimmed) || /[\s~^:?*[\]@{\\]/.test(trimmed)) return undefined;
+  if (trimmed.endsWith('.') || trimmed.endsWith('/') || trimmed.endsWith('.lock')) return undefined;
+  if (trimmed.startsWith('/') || trimmed.startsWith('.')) return undefined;
+  if (trimmed.split('/').some((seg) => seg.length === 0 || seg === '.' || seg === '..' || seg === '@')) return undefined;
+  return trimmed;
 }
 
 function sanitizePathParam(raw: string | null | undefined): string | undefined {
   if (raw == null) return undefined;
   const trimmed = raw.trim().slice(0, 512);
-  return trimmed || undefined;
+  if (!trimmed) return undefined;
+  // Reject filesystem traversal: absolute paths, `..` segments, backslashes,
+  // null bytes, and control chars. Normalized paths are always relative.
+  if (trimmed.includes('\0') || trimmed.includes('\\') || hasControlChars(trimmed)) return undefined;
+  if (trimmed.startsWith('/')) return undefined;
+  const segments = trimmed.split('/').filter((s) => s.length > 0);
+  if (segments.some((s) => s === '.' || s === '..')) return undefined;
+  if (trimmed.includes('//')) return undefined;
+  return trimmed;
 }
 
 function sanitizeDepthParam(raw: string | null | undefined): number | undefined {

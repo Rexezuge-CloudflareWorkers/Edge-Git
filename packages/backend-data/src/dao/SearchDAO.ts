@@ -13,12 +13,10 @@ import {
   SNIPPET_SEARCH_COLUMNS,
   TITLE_BODY_SEARCH_COLUMNS,
   UPSERT_CODE_FILE_SQL,
-  buildFtsQuery,
   buildLikeOrClause,
   buildScopedLikeStatement,
-  clampSearchLimit,
   likeParamsForTokens,
-  tokenizeSearchQuery,
+  prepareSearchQuery,
 } from './SearchQueries';
 
 interface SearchOptions {
@@ -77,24 +75,24 @@ class SearchDAO extends BaseDAO {
   }
 
   private async runScopedFts<T>(sql: string, params: unknown[]): Promise<T[]> {
-    const result = await this.database.prepare(sql).bind(...params).all<T>();
+    const result = await this.database
+      .prepare(sql)
+      .bind(...params)
+      .all<T>();
     return SearchDAO.rowsOrEmpty(result);
   }
 
   private async runScopedLike<T>(sql: string, scopeValue: string | undefined, patterns: unknown[], limit: number): Promise<T[]> {
     const result = await (
-      scopeValue
-        ? this.database.prepare(sql).bind(scopeValue, ...patterns, limit)
-        : this.database.prepare(sql).bind(...patterns, limit)
+      scopeValue ? this.database.prepare(sql).bind(scopeValue, ...patterns, limit) : this.database.prepare(sql).bind(...patterns, limit)
     ).all<T>();
     return SearchDAO.rowsOrEmpty(result);
   }
 
   public async searchRepos(query: string, opts: SearchOptions = {}): Promise<RepositoryRow[]> {
-    const limit = clampSearchLimit(opts.limit);
-    const tokens = tokenizeSearchQuery(query);
-    if (tokens.length === 0) return [];
-    const ftsQuery = buildFtsQuery(tokens);
+    const prepared = prepareSearchQuery(query, opts.limit);
+    if (!prepared) return [];
+    const { limit, tokens, ftsQuery } = prepared;
     try {
       const result = await this.database
         .prepare(`SELECT r.* FROM repo_fts f JOIN repositories r ON r.id = f.repo_id WHERE repo_fts MATCH ? ORDER BY rank LIMIT ?`)
@@ -119,10 +117,9 @@ class SearchDAO extends BaseDAO {
   }
 
   public async searchIssues(query: string, opts: SearchOptions = {}): Promise<IssueRow[]> {
-    const limit = clampSearchLimit(opts.limit);
-    const tokens = tokenizeSearchQuery(query);
-    if (tokens.length === 0) return [];
-    const ftsQuery = buildFtsQuery(tokens);
+    const prepared = prepareSearchQuery(query, opts.limit);
+    if (!prepared) return [];
+    const { limit, tokens, ftsQuery } = prepared;
     try {
       const base = opts.repoId
         ? `SELECT i.* FROM issue_fts f JOIN issues i ON i.id = f.issue_id WHERE issue_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
@@ -150,10 +147,9 @@ class SearchDAO extends BaseDAO {
   }
 
   public async searchPulls(query: string, opts: SearchOptions = {}): Promise<PullRequestRow[]> {
-    const limit = clampSearchLimit(opts.limit);
-    const tokens = tokenizeSearchQuery(query);
-    if (tokens.length === 0) return [];
-    const ftsQuery = buildFtsQuery(tokens);
+    const prepared = prepareSearchQuery(query, opts.limit);
+    if (!prepared) return [];
+    const { limit, tokens, ftsQuery } = prepared;
     try {
       const base = opts.repoId
         ? `SELECT p.* FROM pull_fts f JOIN pull_requests p ON p.id = f.pull_id WHERE pull_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
@@ -181,10 +177,9 @@ class SearchDAO extends BaseDAO {
   }
 
   public async searchCode(query: string, opts: SearchOptions = {}): Promise<CodeHit[]> {
-    const limit = clampSearchLimit(opts.limit);
-    const tokens = tokenizeSearchQuery(query);
-    if (tokens.length === 0) return [];
-    const ftsQuery = buildFtsQuery(tokens);
+    const prepared = prepareSearchQuery(query, opts.limit);
+    if (!prepared) return [];
+    const { limit, tokens, ftsQuery } = prepared;
     try {
       const base = opts.repoId
         ? `SELECT c.* FROM code_fts f JOIN code_index c ON c.repo_id = f.repo_id AND c.path = f.path WHERE code_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
@@ -332,10 +327,9 @@ class SearchDAO extends BaseDAO {
   }
 
   public async searchDiscussions(query: string, opts: SearchOptions = {}): Promise<DiscussionRow[]> {
-    const limit = clampSearchLimit(opts.limit);
-    const tokens = tokenizeSearchQuery(query);
-    if (tokens.length === 0) return [];
-    const ftsQuery = buildFtsQuery(tokens);
+    const prepared = prepareSearchQuery(query, opts.limit);
+    if (!prepared) return [];
+    const { limit, tokens, ftsQuery } = prepared;
     try {
       const base = opts.repoId
         ? `SELECT d.* FROM discussion_fts f JOIN discussions d ON d.id = f.discussion_id WHERE discussion_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
@@ -363,10 +357,9 @@ class SearchDAO extends BaseDAO {
   }
 
   public async searchSnippets(query: string, opts: { limit?: number } = {}): Promise<SnippetRow[]> {
-    const limit = clampSearchLimit(opts.limit);
-    const tokens = tokenizeSearchQuery(query);
-    if (tokens.length === 0) return [];
-    const ftsQuery = buildFtsQuery(tokens);
+    const prepared = prepareSearchQuery(query, opts.limit);
+    if (!prepared) return [];
+    const { limit, tokens, ftsQuery } = prepared;
     try {
       const result = await this.database
         .prepare(
