@@ -45,7 +45,10 @@ class ReadModelService {
     if (!latestCommit) {
       return [];
     }
-    return this.git.getLog(args);
+    // Default 20, cap 50: unbounded log walks read the full history (one
+    // commit + tree-diff per entry) and dominate DO rows on large repos.
+    const depth = Math.min(Math.max(args.depth ?? 20, 1), 50);
+    return this.git.getLog({ ...args, depth });
   }
 
   public async getBranches(): Promise<{ branches: string[]; currentBranch: string | null }> {
@@ -196,7 +199,9 @@ class ReadModelService {
   }> {
     const ref = args.ref || undefined;
     const dir = args.path || '';
-    const depth = Math.min(Math.max(args.depth ?? 10, 1), 50);
+    // Default 5, cap 20: each log entry costs a commit read + tree walk in
+    // the DO (SQLite rows). Deeper history paginates via explicit depth.
+    const depth = Math.min(Math.max(args.depth ?? 5, 1), 20);
     const branches = await this.git.listBranches();
     const currentBranch = (await this.git.currentBranch()) ?? null;
     const tags = args.includeTags === false ? [] : await this.getTags();

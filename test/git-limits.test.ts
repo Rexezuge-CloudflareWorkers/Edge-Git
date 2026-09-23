@@ -37,8 +37,8 @@ describe('git limit configuration', () => {
 
   it('falls back to defaults for missing limit env', () => {
     const env = {};
-    expect(ConfigurationManager.repo.getMaxFetchWants(env)).toBe(64);
-    expect(ConfigurationManager.repo.getMaxFetchHaves(env)).toBe(512);
+    expect(ConfigurationManager.repo.getMaxFetchWants(env)).toBe(16);
+    expect(ConfigurationManager.repo.getMaxFetchHaves(env)).toBe(100);
     expect(ConfigurationManager.repo.getMaxPushCommands(env)).toBe(100);
     expect(ConfigurationManager.repo.getMaxPackBytes(env)).toBe(52_428_800);
     expect(ConfigurationManager.repo.getMaxFetchBodyBytes(env)).toBe(1_048_576);
@@ -46,7 +46,7 @@ describe('git limit configuration', () => {
 
   it('falls back to defaults for invalid limit env', () => {
     const env = { MAX_FETCH_WANTS: 'nope', MAX_PACK_BYTES: '-5' };
-    expect(ConfigurationManager.repo.getMaxFetchWants(env)).toBe(64);
+    expect(ConfigurationManager.repo.getMaxFetchWants(env)).toBe(16);
     expect(ConfigurationManager.repo.getMaxPackBytes(env)).toBe(52_428_800);
   });
 });

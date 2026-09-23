@@ -18,8 +18,8 @@ describe('slice5: ConfigurationManager facade parity', () => {
     expect(ConfigurationManager.repo.getDoDeviceBytes(env)).toBe(5 * 1024 * 1024 * 1024);
     expect(ConfigurationManager.repo.getMaxPackObjects(env)).toBe(10_000);
     expect(ConfigurationManager.repo.getCacheTtlSeconds(env)).toBe(3600);
-    expect(ConfigurationManager.repo.getMaxFetchWants(env)).toBe(64);
-    expect(ConfigurationManager.repo.getMaxFetchHaves(env)).toBe(512);
+    expect(ConfigurationManager.repo.getMaxFetchWants(env)).toBe(16);
+    expect(ConfigurationManager.repo.getMaxFetchHaves(env)).toBe(100);
     expect(ConfigurationManager.repo.getMaxPushCommands(env)).toBe(100);
     expect(ConfigurationManager.repo.getMaxPackBytes(env)).toBe(52_428_800);
     expect(ConfigurationManager.repo.getMaxFetchBodyBytes(env)).toBe(1_048_576);
@@ -30,8 +30,8 @@ describe('slice5: ConfigurationManager facade parity', () => {
     expect(ConfigurationManager.processing.getTaskRunRetentionDays(env)).toBe(30);
     expect(ConfigurationManager.processing.getAuditLogRetentionDays(env)).toBe(90);
     expect(ConfigurationManager.processing.getSearchBackfillIntervalSeconds(env)).toBe(14_400);
-    expect(ConfigurationManager.processing.getSearchBackfillReposPerTick(env)).toBe(8);
-    expect(ConfigurationManager.processing.getSearchBackfillFilesPerRepo(env)).toBe(50);
+    expect(ConfigurationManager.processing.getSearchBackfillReposPerTick(env)).toBe(4);
+    expect(ConfigurationManager.processing.getSearchBackfillFilesPerRepo(env)).toBe(25);
     expect(ConfigurationManager.webhooks.getMaxPerRepo(env)).toBe(10);
     expect(ConfigurationManager.webhooks.getDeliveryRetentionDays(env)).toBe(30);
     expect(ConfigurationManager.webhooks.getMaxAttempts(env)).toBe(5);

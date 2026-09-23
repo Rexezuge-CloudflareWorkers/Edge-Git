@@ -22,8 +22,12 @@ import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import {
   checkFetchLoop,
   etagForRefs,
+  getCachedPack,
   getCachedRefs,
+  hashFetchBody,
+  headOidFromRefs,
   invalidateRepoCaches,
+  putCachedPack,
   putCachedRefs,
   withEtagHeaders,
 } from './RepoReadCache';
@@ -95,7 +99,7 @@ function registerGitRoutes(app: GitApp): void {
     if (body.byteLength > maxFetchBodyBytes) {
       return c.text(`ERR fetch request too large: ${body.byteLength} > ${maxFetchBodyBytes} bytes`, 413);
     }
-    // Fetch-loop guard: identical bodies from the same caller inside 60s are
+    // Fetch-loop guard: identical bodies from the same caller inside 5min are
     // cheap 429s instead of repeated pack walks (each burns thousands of DO
     // rows). Fail-open on KV errors so caching can never break fetches.
     try {
@@ -107,6 +111,42 @@ function registerGitRoutes(app: GitApp): void {
       }
     } catch {
       // Fail open — fetch proceeds to the DO on cache errors.
+    }
+    // Small-response pack cache: identical polls between pushes skip the DO
+    // pack walk entirely. Keyed by (headOid, bodyHash); pushes purge the
+    // `readmodel` prefix so a new head always misses. `listRefs` warms the
+    // 24h refs snapshot as a side effect (one cheap DO call on first miss).
+    try {
+      const cache = getScope(c).get(Tokens.KvCache);
+      let snapshot = await getCachedRefs(cache, fullName).catch(() => null);
+      if (!snapshot) {
+        try {
+          snapshot = await stub.listRefs();
+          await putCachedRefs(cache, fullName, snapshot);
+        } catch {
+          snapshot = null;
+        }
+      }
+      const headOid = snapshot ? headOidFromRefs(snapshot) : null;
+      if (headOid) {
+        const bodyHash = hashFetchBody(body);
+        const cached = await getCachedPack(cache, fullName, headOid, bodyHash);
+        if (cached) {
+          return new Response(cached as unknown as BodyInit, {
+            status: 200,
+            headers: { 'Content-Type': 'application/x-git-upload-pack-result', 'Cache-Control': 'no-cache' },
+          });
+        }
+        const res = await stub.fetch(new Request('https://do/git-upload-pack', { method: 'POST', body: body as unknown as BodyInit }));
+        const bytes = new Uint8Array(await res.arrayBuffer());
+        if (res.ok) await putCachedPack(cache, fullName, headOid, bodyHash, bytes).catch(() => undefined);
+        return new Response(bytes, {
+          status: res.status,
+          headers: { 'Content-Type': 'application/x-git-upload-pack-result', 'Cache-Control': 'no-cache' },
+        });
+      }
+    } catch {
+      // Fail open — fall through to a direct DO fetch below.
     }
     const res = await stub.fetch(new Request('https://do/git-upload-pack', { method: 'POST', body: body as unknown as BodyInit }));
     return new Response(res.body, {

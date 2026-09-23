@@ -82,6 +82,10 @@ export class PackCollector {
     };
     const filter = opts.filter?.trim() ?? '';
     const parsedFilter = parseBlobFilter(filter);
+    // Fast path: without a blob filter every blob is packed, so the second
+    // content read below (size check only) is pure overhead — one extra DO
+    // file read per blob. Skip it entirely when no filter applies.
+    const hasBlobFilter = parsedFilter.filterBlobs || parsedFilter.blobLimit !== undefined;
 
     const shouldSkipBlob = (size: number): boolean => shouldSkipBlobByFilter(size, parsedFilter);
 
@@ -148,19 +152,21 @@ export class PackCollector {
       }
 
       if (objType === 'blob') {
-        try {
-          const obj = await git.readObject({
-            fs: this.fs,
-            gitdir: this.gitdir,
-            oid,
-            format: 'content',
-            cache: this.cache,
-          });
-          const content = obj.object;
-          const size = typeof content === 'string' ? content.length : (content as Uint8Array).length;
-          if (shouldSkipBlob(size) && !wantSet.has(oid)) continue;
-        } catch {
-          // If content read fails, fall through and include the oid.
+        if (hasBlobFilter && !wantSet.has(oid)) {
+          try {
+            const obj = await git.readObject({
+              fs: this.fs,
+              gitdir: this.gitdir,
+              oid,
+              format: 'content',
+              cache: this.cache,
+            });
+            const content = obj.object;
+            const size = typeof content === 'string' ? content.length : (content as Uint8Array).length;
+            if (shouldSkipBlob(size)) continue;
+          } catch {
+            // If content read fails, fall through and include the oid.
+          }
         }
         objectsToSend.add(oid);
         assertObjectBudget();

@@ -13,8 +13,15 @@ type RefsSnapshot = { refs: Array<{ ref: string; oid: string }>; symbolicHead: s
 
 const REFS_TTL_SECONDS = 86_400;
 const READMODEL_TTL_SECONDS = 600;
-const FETCH_LOOP_WINDOW_SECONDS = 60;
-const FETCH_LOOP_MAX_REPEATS = 5;
+// Tight fetch-loop guard: identical `git fetch` bodies (IDE auto-fetch,
+// broken cron) each burn a full DO pack walk. Only 2 identical fetches per
+// 5min window pass; the 3rd gets 429 + Retry-After instead of more rows.
+const FETCH_LOOP_WINDOW_SECONDS = 300;
+const FETCH_LOOP_MAX_REPEATS = 2;
+// Upper bound for KV-cached fetch responses (raw bytes). `readmodel` caps at
+// 1MiB; base64 inflates ~33%, so only small/negotiation responses are cached.
+// Full clones bypass the cache and always hit the DO.
+const MAX_CACHED_PACK_BYTES = 700_000;
 
 function cacheKeyForRepo(fullName: string): string {
   return repoDoKeyForFullName(fullName);
@@ -89,23 +96,77 @@ async function putCachedReadModel(cache: KvCache, fullName: string, kind: string
 async function invalidateRepoCaches(cache: KvCache, fullName: string): Promise<void> {
   const key = cacheKeyForRepo(fullName);
   await cache.del('refs', [key, 'snapshot']);
+  // Purges read-model snapshots and cached fetch responses (both live in the
+  // `readmodel` domain under this repo prefix) so post-push reads refetch.
   await cache.purgePrefix('readmodel', [key]);
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const chunk = 8192;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCodePoint(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+function base64ToBytes(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const out = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) out[i] = (binary.codePointAt(i) ?? 0) & 0xff;
+  return out;
+}
+
+// Small fetch-response cache for identical `git fetch` polls between pushes.
+// Keyed by (headOid, bodyHash): pushes invalidate via `invalidateRepoCaches`
+// (refs snapshot miss => new head => miss), so stale packs are impossible.
+// Only responses under MAX_CACHED_PACK_BYTES are stored; full clones bypass.
+// Fail-soft like the rest of this module: misses recompute from the DO.
+async function getCachedPack(cache: KvCache, fullName: string, headOid: string, bodyHash: string): Promise<Uint8Array | null> {
+  try {
+    const entry = await cache.getJson<{ b64: string }>('readmodel', [cacheKeyForRepo(fullName), 'pack', headOid.slice(0, 16), bodyHash]);
+    if (!entry?.b64) return null;
+    return base64ToBytes(entry.b64);
+  } catch {
+    return null;
+  }
+}
+
+async function putCachedPack(cache: KvCache, fullName: string, headOid: string, bodyHash: string, bytes: Uint8Array): Promise<void> {
+  if (bytes.byteLength > MAX_CACHED_PACK_BYTES) return;
+  try {
+    await cache.putJson('readmodel', [cacheKeyForRepo(fullName), 'pack', headOid.slice(0, 16), bodyHash], { b64: bytesToBase64(bytes) }, {
+      ttlSeconds: READMODEL_TTL_SECONDS,
+    });
+  } catch {
+    // Best-effort cache population.
+  }
+}
+
+// Streaming FNV-1a over the full request body. Previously only the first
+// 512 bytes were hashed, so distinct fetches with a shared prefix collided
+// into one bucket (false 429s) while distinct suffixes evaded the guard.
+// Iterating bytes directly avoids building a 1MB string for hashing.
+function hashFetchBody(body: Uint8Array): string {
+  let hash = 0x81_1c_9d_c5;
+  for (const byte of body) {
+    hash ^= byte;
+    hash = Math.imul(hash, 0x01_00_01_93);
+  }
+  return `${body.byteLength}:${(hash >>> 0).toString(16).padStart(8, '0')}`;
 }
 
 // Tight `git fetch` loops (IDE auto-fetch, broken cron) send identical bodies
 // every few seconds and each burns thousands of DO rows. Deduplicate by body
-// hash + caller identity in the `ratelimit` domain; the 6th identical fetch
-// inside 60s gets 429 + Retry-After instead of another pack walk.
+// hash + caller identity in the `ratelimit` domain; the 3rd identical fetch
+// inside 5min gets 429 + Retry-After instead of another pack walk.
 async function checkFetchLoop(
   cache: KvCache,
   fullName: string,
   identity: string,
   body: Uint8Array,
 ): Promise<{ allowed: true } | { allowed: false; retryAfter: number }> {
-  let sample = `${body.byteLength}:`;
-  const end = Math.min(body.length, 512);
-  for (let i = 0; i < end; i += 1) sample += String.fromCodePoint(body[i] ?? 0);
-  const hash = fnv1aHex(`${body.byteLength}:${fnv1aHex(sample)}`);
+  const hash = hashFetchBody(body);
   const key = [cacheKeyForRepo(fullName), identity, hash];
   const now = Date.now();
   const seen = await cache.getJson<{ count: number; startedAt: number }>('ratelimit', key);
@@ -217,6 +278,7 @@ export {
   READMODEL_TTL_SECONDS,
   FETCH_LOOP_WINDOW_SECONDS,
   FETCH_LOOP_MAX_REPEATS,
+  MAX_CACHED_PACK_BYTES,
   cacheKeyForRepo,
   headOidFromRefs,
   etagForRefs,
@@ -232,6 +294,9 @@ export {
   putCachedReadModel,
   invalidateRepoCaches,
   checkFetchLoop,
+  hashFetchBody,
+  getCachedPack,
+  putCachedPack,
   serveReadModel,
   serveImmutableReadModel,
 };

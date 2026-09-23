@@ -1,5 +1,6 @@
 import { PackLimitError } from '@edge-git/git-service';
 import { ZERO_OID } from '@edge-git/shared/constants';
+import { maybeCompactPacks } from './PackCompactor';
 import type { RepoRpcDeps } from './RepoRpcDeps';
 
 // Mutation slice of the `RepoWorker` RPC surface: branch/file/ref writes plus
@@ -129,6 +130,20 @@ class RepoMutationRpc {
         if (result.ok) importedRefs.push(pending[i].ref);
       }
       this.deps.git.clearCache();
+    }
+    // Best-effort pack consolidation (same fragmentation bound as pushes).
+    // Never throws; keeps old packs when it aborts.
+    try {
+      const rpcLimits = this.deps.getLimits?.() ?? { maxObjects: 10_000, maxPackBytes: 52_428_800 };
+      await maybeCompactPacks({
+        isoGitFs: this.deps.isoGitFs,
+        git: this.deps.git,
+        maxObjects: rpcLimits.maxObjects,
+        maxPackBytes: rpcLimits.maxPackBytes,
+        fullName: undefined,
+      });
+    } catch {
+      // Best-effort only.
     }
     return { importedRefs };
   }

@@ -17,7 +17,7 @@ interface RateLimitDef {
  * backstop. Edit this table — not the worker — to tune limits.
  */
 const RATE_LIMIT_DEFS: readonly RateLimitDef[] = [
-  { path: '/:owner/:repo/git-upload-pack', windowMs: 60_000, max: 300, keyPrefix: 'git-fetch' },
+  { path: '/:owner/:repo/git-upload-pack', windowMs: 60_000, max: 60, keyPrefix: 'git-fetch' },
   { path: '/:owner/:repo/git-receive-pack', windowMs: 60_000, max: 60, keyPrefix: 'git-push' },
   { path: '/:owner/:repo/info/refs', windowMs: 60_000, max: 120, keyPrefix: 'git-refs' },
   { path: '/user/tokens*', windowMs: 60_000, max: 30, keyPrefix: 'tokens' },

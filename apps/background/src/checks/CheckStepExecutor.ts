@@ -25,7 +25,7 @@ interface PendingItemShape {
   actorEmail: string;
 }
 
-const MAX_SCAN_FILES = 50;
+const MAX_SCAN_FILES = 10;
 const MAX_SCAN_BYTES = 20_000;
 const CODEOWNERS_CANDIDATES = ['CODEOWNERS', '.github/CODEOWNERS', 'docs/CODEOWNERS'];
 
@@ -34,7 +34,7 @@ const CODEOWNERS_CANDIDATES = ['CODEOWNERS', '.github/CODEOWNERS', 'docs/CODEOWN
 // thin queue/routing facade under the god-file guard.
 async function preloadTextFiles(repoStub: RepoStubShape, headSha: string): Promise<Record<string, string>> {
   const files: Record<string, string> = {};
-  const listed = await repoStub.listAllFiles({ ref: headSha, maxFiles: 500 }).catch(() => []);
+  const listed = await repoStub.listAllFiles({ ref: headSha, maxFiles: 100 }).catch(() => []);
   for (const file of listed.slice(0, MAX_SCAN_FILES)) {
     if (Object.keys(files).length >= MAX_SCAN_FILES) break;
     const blob = await repoStub.getBlob({ ref: headSha, filepath: file.path }).catch(() => null);
@@ -76,7 +76,7 @@ async function runBuiltInStep(env: Env, repoStub: RepoStubShape, headSha: string
     case 'required-files': {
       const required = parseRequiredGlobs(arg);
       const patterns = required.length > 0 ? required : ['README.md'];
-      const files = await repoStub.listAllFiles({ ref: headSha, maxFiles: 500 }).catch(() => []);
+      const files = await repoStub.listAllFiles({ ref: headSha, maxFiles: 100 }).catch(() => []);
       return runRequiredFilesStep(
         files.map((f) => f.path),
         patterns,
