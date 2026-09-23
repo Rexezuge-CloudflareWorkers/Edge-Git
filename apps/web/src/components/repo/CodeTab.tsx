@@ -31,7 +31,7 @@ export function CodeTab({
   showNotice: (type: 'success' | 'error', text: string) => void;
   authorized?: boolean | null;
 }) {
-  const social = useSocialState({ owner, repo, authorized, showNotice });
+  const social = useSocialState({ owner, repo, authorized, showNotice, initial: repoMeta });
   const { t } = useTranslation();
   const [params, setParams] = useSearchParams();
   const [branches, setBranches] = useState<string[]>([]);

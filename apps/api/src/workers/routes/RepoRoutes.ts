@@ -20,16 +20,68 @@ import { isFresh, serveReadModel, invalidateRepoCaches } from './RepoReadCache';
 
 type RepoApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
+// Shared social read for the repo payload: counts always resolve (0 on
+// error), viewer flags resolve best-effort and default to false for
+// anonymous visitors. Keeps `GET /repos/:owner/:repo` and
+// `GET /user/repos/:owner/:repo` consistent with the dedicated
+// star/watch read-models so the web client can seed its buttons from the
+// repo payload instead of issuing separate star/watch round-trips.
+async function getRepoSocial(
+  scope: ReturnType<typeof getScope>,
+  repoId: string,
+  viewerEmail: string | null,
+): Promise<{ starsCount: number; watchersCount: number; viewerStarred: boolean; viewerWatching: boolean }> {
+  const [starsCount, watchersCount, viewerStarred, viewerWatching] = await Promise.all([
+    scope
+      .get(Tokens.StarService)
+      .countByRepo(repoId)
+      .catch(() => 0),
+    scope
+      .get(Tokens.WatchService)
+      .countByRepo(repoId)
+      .catch(() => 0),
+    viewerEmail
+      ? scope
+          .get(Tokens.StarService)
+          .isStarred(repoId, viewerEmail)
+          .catch(() => false)
+      : Promise.resolve(false),
+    viewerEmail
+      ? scope
+          .get(Tokens.WatchService)
+          .isWatching(repoId, viewerEmail)
+          .catch(() => false)
+      : Promise.resolve(false),
+  ]);
+  return { starsCount, watchersCount, viewerStarred, viewerWatching };
+}
+
 // Public read-model API — anonymous OK for public repos (private → 404
 // unless the caller presents Access identity or a PAT for the owner).
 function registerRepoRoutes(app: RepoApp): void {
   app.get('/repos/:owner/:repo', async (c) => {
-    return withPublicRepo(c, async (row) => {
-      const forksCount = await getScope(c)
-        .get(Tokens.ForkService)
-        .countForks(row.id)
-        .catch(() => 0);
-      return c.json({ ...(toRepoJson(row) as Record<string, unknown>), forksCount });
+    return withPublicRepo(c, async (row, _fullName, viewerEmail) => {
+      const scope = getScope(c);
+      const [role, forksCount, social] = await Promise.all([
+        scope
+          .get(Tokens.PermissionService)
+          .getRole(viewerEmail, row)
+          .catch(() => null),
+        scope
+          .get(Tokens.ForkService)
+          .countForks(row.id)
+          .catch(() => 0),
+        getRepoSocial(scope, row.id, viewerEmail),
+      ]);
+      return c.json({
+        ...(toRepoJson(row, role) as Record<string, unknown>),
+        viewerCanManage: role === 'admin',
+        viewerRole: role,
+        forksCount,
+        ...social,
+        starred: social.viewerStarred,
+        watching: social.viewerWatching,
+      });
     });
   });
 
@@ -224,19 +276,25 @@ function registerUserRepoRoutes(app: RepoApp): void {
     const scope = getScope(c);
     const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoFullName.normalizeRepo(c.req.param('repo')), email, scope);
     if (!row) return jsonError(c, 'Not found', 404);
-    const role = await scope
-      .get(Tokens.PermissionService)
-      .getRole(email, row)
-      .catch(() => null);
-    const forksCount = await scope
-      .get(Tokens.ForkService)
-      .countForks(row.id)
-      .catch(() => 0);
+    const [role, forksCount, social] = await Promise.all([
+      scope
+        .get(Tokens.PermissionService)
+        .getRole(email, row)
+        .catch(() => null),
+      scope
+        .get(Tokens.ForkService)
+        .countForks(row.id)
+        .catch(() => 0),
+      getRepoSocial(scope, row.id, email),
+    ]);
     return c.json({
       ...(toRepoJson(row, role) as Record<string, unknown>),
       viewerCanManage: role === 'admin',
       viewerRole: role,
       forksCount,
+      ...social,
+      starred: social.viewerStarred,
+      watching: social.viewerWatching,
     });
   });
 

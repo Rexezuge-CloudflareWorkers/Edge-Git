@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Eye, Star } from 'lucide-react';
 import { getStarState, getWatchState, starRepo, unstarRepo, unwatchRepo, watchRepo } from '../../services/socialService';
+import type { Repo } from '../../types';
 import { useRealtimeSubscription } from '../../realtime/useRealtime';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/Button';
@@ -9,33 +10,66 @@ import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export type SocialNotice = (type: 'success' | 'error', text: string) => void;
 
+type SocialSeed = Pick<Repo, 'starsCount' | 'watchersCount' | 'viewerStarred' | 'viewerWatching' | 'starred' | 'watching'>;
+
 export function useSocialState({
   owner,
   repo,
   authorized,
   showNotice,
+  initial,
 }: {
   owner: string;
   repo: string;
   authorized: boolean | null | undefined;
   showNotice: SocialNotice;
+  // Repo payload seed: the enriched `GET /repos|/user/repos/:owner/:repo`
+  // already carries counts + viewer flags, so the buttons render without
+  // separate star/watch round-trips. Absent on older backends — falls back
+  // to fetching below.
+  initial?: SocialSeed | null;
 }) {
   const { t } = useTranslation();
-  const [starsCount, setStarsCount] = useState(0);
-  const [starred, setStarred] = useState(false);
-  const [watchersCount, setWatchersCount] = useState(0);
-  const [watching, setWatching] = useState(false);
+  const [starsCount, setStarsCount] = useState(initial?.starsCount ?? 0);
+  const [starred, setStarred] = useState(initial?.viewerStarred ?? initial?.starred ?? false);
+  const [watchersCount, setWatchersCount] = useState(initial?.watchersCount ?? 0);
+  const [watching, setWatching] = useState(initial?.viewerWatching ?? initial?.watching ?? false);
   const [busy, setBusy] = useState<'star' | 'watch' | null>(null);
 
   // `true` only for signed-in viewers: `null` (resolving) and `false` share
   // the public path so null->false never refetches, while null/false->true
   // refetches via the authed per-repo status (`GET /user/.../star|watch`)
   // so viewerStarred/viewerWatching resolve with Access auth instead of the
-  // best-effort public read-model.
+  // best-effort public read-model. When the repo payload already carries the
+  // social read-model (enriched `GET /repos|/user/repos/:owner/:repo`), the
+  // seed below applies instead and no fetch runs at all.
   const useAuthed = authorized === true;
   const authOpt = useAuthed ? { isAuthed: true as const } : { isAuthed: false as const };
+  const seedStars = initial?.starsCount;
+  const seedWatchers = initial?.watchersCount;
+  const seedStarred = initial?.viewerStarred ?? initial?.starred;
+  const seedWatching = initial?.viewerWatching ?? initial?.watching;
+  const hasSeed = seedStars !== undefined || seedWatchers !== undefined;
+
+  // Seed from the repo payload during render (previous-value pattern): the
+  // public→authed repo upgrade applies without a fetch and without sync
+  // setState in an effect. Toggles/realtime keep working — they setState
+  // from event callbacks, and the next seed only applies when the payload
+  // itself changes.
+  const seedKey = hasSeed
+    ? `${owner}/${repo}/${seedStars ?? 0}/${seedWatchers ?? 0}/${seedStarred ?? false}/${seedWatching ?? false}`
+    : null;
+  const [appliedSeedKey, setAppliedSeedKey] = useState<string | null>(null);
+  if (seedKey !== appliedSeedKey) {
+    setAppliedSeedKey(seedKey);
+    setStarsCount(seedStars ?? 0);
+    setStarred(seedStarred ?? false);
+    setWatchersCount(seedWatchers ?? 0);
+    setWatching(seedWatching ?? false);
+  }
 
   useEffect(() => {
+    if (hasSeed) return;
     let cancelled = false;
     const run = async () => {
       try {
@@ -55,7 +89,7 @@ export function useSocialState({
     return () => {
       cancelled = true;
     };
-  }, [owner, repo, useAuthed]);
+  }, [owner, repo, useAuthed, hasSeed]);
 
   const refreshCounts = useCallback(async () => {
     try {

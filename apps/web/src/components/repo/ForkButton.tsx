@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { GitFork } from 'lucide-react';
@@ -28,29 +28,33 @@ export function ForkButton({
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [forkOwner, setForkOwner] = useState(defaultOwner);
-  const [owners, setOwners] = useState<string[]>([defaultOwner]);
   const [forkName, setForkName] = useState(repo);
   const [saving, setSaving] = useState(false);
+  // Org owners load lazily on first modal open (not on page load) so the
+  // owner/repo page skips `GET /user/orgs` until the viewer forks. The cache
+  // is keyed by `defaultOwner`, so a late-arriving username invalidates it
+  // via derivation — no sync effect needed.
+  const [orgCache, setOrgCache] = useState<{ owner: string; orgs: string[] } | null>(null);
+  const owners =
+    orgCache !== null && orgCache.owner === defaultOwner
+      ? [defaultOwner, ...orgCache.orgs.filter((u) => u.toLowerCase() !== defaultOwner.toLowerCase())]
+      : [defaultOwner];
 
-  useEffect(() => {
+  // `defaultOwner` starts empty until `/user/me` resolves: adopt it while the
+  // selection is still unresolved (render-phase previous-value pattern).
+  if (forkOwner === '' && defaultOwner !== '') setForkOwner(defaultOwner);
+
+  const loadOwners = async () => {
     if (authorized !== true) return;
-    let cancelled = false;
-    const run = async () => {
-      try {
-        const orgs = await listMyOrgs();
-        if (cancelled) return;
-        const next = [defaultOwner, ...orgs.map((o) => o.username).filter((u) => u.toLowerCase() !== defaultOwner.toLowerCase())];
-        setOwners(next);
-        setForkOwner((prev) => prev || defaultOwner);
-      } catch {
-        if (!cancelled) setOwners([defaultOwner]);
-      }
-    };
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [defaultOwner, authorized]);
+    if (orgCache !== null && orgCache.owner === defaultOwner) return;
+    const ownerAtCall = defaultOwner;
+    try {
+      const orgs = await listMyOrgs();
+      setOrgCache({ owner: ownerAtCall, orgs: orgs.map((o) => o.username) });
+    } catch {
+      setOrgCache({ owner: ownerAtCall, orgs: [] });
+    }
+  };
 
   const openModal = () => {
     if (authorized !== true) {
@@ -60,6 +64,7 @@ export function ForkButton({
     setForkOwner((prev) => (owners.includes(prev) ? prev : defaultOwner));
     setForkName(repo);
     setOpen(true);
+    void loadOwners();
   };
 
   const submit = async (e: React.FormEvent) => {

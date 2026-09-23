@@ -21,6 +21,15 @@ export interface Repo {
   updatedAt: number;
   viewerCanManage?: boolean;
   viewerRole?: 'admin' | 'write' | 'read' | null;
+  // Social read-model (present on repo payloads so the code tab can seed
+  // star/watch buttons without separate round-trips; absent on older
+  // backends or list payloads that predate the enrichment).
+  starsCount?: number;
+  watchersCount?: number;
+  viewerStarred?: boolean;
+  viewerWatching?: boolean;
+  starred?: boolean;
+  watching?: boolean;
 }
 
 export type ProfileType = 'user' | 'org';

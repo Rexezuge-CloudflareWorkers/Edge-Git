@@ -39,12 +39,21 @@ describe('social lifecycle on real D1', () => {
   it('stars and unstars idempotently with public counts', async () => {
     const before = await body<{ count: number; viewerStarred: boolean }>(await api(`/repos/${OWNER}/${REPO}/stars`));
     expect(before.count).toBe(0);
+    // Repo payloads embed the same social read-model (no separate calls needed).
+    const beforeRepo = await body<{ starsCount: number; viewerStarred: boolean }>(await api(`/repos/${OWNER}/${REPO}`));
+    expect(beforeRepo).toMatchObject({ starsCount: 0, viewerStarred: false });
     const starred = await body<{ starred: boolean; starsCount: number }>(await api(`/user/repos/${OWNER}/${REPO}/star`, { method: 'PUT' }));
     expect(starred).toMatchObject({ starred: true, starsCount: 1 });
     // Second star is a no-op (INSERT OR IGNORE).
     await api(`/user/repos/${OWNER}/${REPO}/star`, { method: 'PUT' });
     const pub = await body<{ count: number; viewerStarred: boolean }>(await api(`/repos/${OWNER}/${REPO}/stars`));
     expect(pub.count).toBe(1);
+    const pubRepo = await body<{ starsCount: number; viewerStarred: boolean }>(await api(`/repos/${OWNER}/${REPO}`));
+    expect(pubRepo).toMatchObject({ starsCount: 1, viewerStarred: true });
+    const authedRepo = await body<{ starsCount: number; viewerStarred: boolean; viewerCanManage: boolean }>(
+      await api(`/user/repos/${OWNER}/${REPO}`),
+    );
+    expect(authedRepo).toMatchObject({ starsCount: 1, viewerStarred: true, viewerCanManage: true });
     const mine = await body<{ repos: Array<{ name: string }> }>(await api('/user/stars'));
     expect(mine.repos.map((r) => r.name)).toContain(REPO);
     const unstarred = await body<{ starred: boolean; starsCount: number }>(

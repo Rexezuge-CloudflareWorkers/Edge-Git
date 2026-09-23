@@ -98,7 +98,10 @@ async function resolvePublicViewer(c: RequestContext): Promise<string | null> {
   }
 }
 
-async function withPublicRepo(c: RequestContext, fn: (row: RepositoryRow, fullName: string) => Promise<Response>): Promise<Response> {
+async function withPublicRepo(
+  c: RequestContext,
+  fn: (row: RepositoryRow, fullName: string, viewerEmail: string | null) => Promise<Response>,
+): Promise<Response> {
   const owner = c.req.param('owner');
   const repoParam = c.req.param('repo');
   if (!owner || !repoParam) return c.json({ Exception: { Type: 'NotFound', Message: 'Repository not found.' } }, 404);
@@ -106,7 +109,7 @@ async function withPublicRepo(c: RequestContext, fn: (row: RepositoryRow, fullNa
   const viewerEmail = await resolvePublicViewer(c);
   const row = await requireVisibleRepo(c.env, owner, repoName, viewerEmail, getScope(asScopedContext(c)));
   if (!row) return c.json({ Exception: { Type: 'NotFound', Message: 'Repository not found.' } }, 404);
-  return fn(row, `${owner}/${repoName}`);
+  return fn(row, `${owner}/${repoName}`, viewerEmail);
 }
 
 /**
