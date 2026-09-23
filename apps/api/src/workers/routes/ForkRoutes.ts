@@ -50,12 +50,13 @@ function registerUserForkRoutes(app: ForkApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
-    const { malformed, body } = await readJsonBody<{
+    const { malformed, oversized, body } = await readJsonBody<{
       owner?: string;
       name?: string;
       description?: string | null;
       isPrivate?: boolean;
     }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const scope = getScope(c);
     let fork: { id: string; owner: string; name: string; fullName: string; isPrivate: boolean };

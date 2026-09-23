@@ -208,7 +208,8 @@ function registerUserProfileRoutes(app: UserApp): void {
 function registerUserSettingsRoutes(app: UserApp): void {
   app.patch('/user/me/username', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const { malformed, body } = await readJsonBody<{ username?: string }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ username?: string }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (!body.username || typeof body.username !== 'string') return jsonError(c, 'username is required', 400);
     try {

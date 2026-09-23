@@ -27,12 +27,13 @@ function registerTokenRoutes(app: TokenApp): void {
 
   app.post('/user/tokens', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const { malformed, body } = await readJsonBody<{
+    const { malformed, oversized, body } = await readJsonBody<{
       name?: string;
       expiresInDays?: number;
       scopes?: unknown;
       repoGrants?: unknown;
     }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (!body.name) return jsonError(c, 'name is required', 400);
     try {

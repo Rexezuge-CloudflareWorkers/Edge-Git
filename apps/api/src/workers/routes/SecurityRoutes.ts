@@ -29,7 +29,8 @@ function registerSecurityRoutes(app: SecurityApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
-    const { malformed, body } = await readJsonBody<{ secretScanMode?: unknown }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ secretScanMode?: unknown }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (body.secretScanMode === undefined) return jsonError(c, 'secretScanMode is required', 400);
     try {

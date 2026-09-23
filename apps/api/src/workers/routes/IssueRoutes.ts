@@ -2,7 +2,7 @@ import type { Hono } from 'hono';
 import { jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo, getScope } from './PublicViewerResolver';
 import { recordAndNotify } from './SocialEmit';
 import { Tokens } from '@edge-git/backend-services/composition';
-import { RepoFullName, mapWithConcurrency } from '@edge-git/shared/utils';
+import { RepoFullName } from '@edge-git/shared/utils';
 import { parsePositiveInt } from '@edge-git/shared/validation';
 import { readJsonBody } from './BodyParser';
 import { presentMany, presentSingle } from './IdentityPresenter';
@@ -36,15 +36,15 @@ async function filterIssuesByMeta(
   filters: { label: string | null; assignee: string | null; milestone: string | null },
 ): Promise<typeof issues> {
   const collab = scope.get(Tokens.CollaborationService);
-  // Concurrent meta fan-out capped at 10 (was sequential N+1 up to 50).
+  // Single batched DAO round-trip (was N+1 getIssueMeta up to 50).
   // Per-issue failures degrade to empty meta; outer failures fall back to
   // unfiltered (filters are best-effort on public reads).
-  const metas = await mapWithConcurrency(issues, 10, (issue) => collab.getIssueMeta(issue.id).catch(() => ({ labels: [], assignees: [] })));
+  const metas = await collab.getIssueMetas(issues.map((i) => i.id));
   const labelLower = filters.label?.toLowerCase() ?? null;
   const assigneeLower = filters.assignee?.toLowerCase() ?? null;
   return issues.filter((issue, i) => {
     if (filters.milestone && (issue as { milestone_id?: string | null }).milestone_id !== filters.milestone) return false;
-    const meta = metas[i] as { labels: Array<{ name: string }>; assignees: string[] };
+    const meta = metas.at(i) ?? { labels: [], assignees: [] };
     if (labelLower && meta.labels.every((l) => l.name.toLowerCase() !== labelLower)) return false;
     if (assigneeLower && meta.assignees.every((a) => a.toLowerCase() !== assigneeLower)) return false;
     return true;

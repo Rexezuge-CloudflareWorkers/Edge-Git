@@ -23,7 +23,7 @@ function registerUserPullWriteRoutes(app: PullApp): void {
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
-    const { malformed, body } = await readJsonBody<{
+    const { malformed, oversized, body } = await readJsonBody<{
       title?: string;
       body?: string;
       baseBranch?: string;
@@ -32,6 +32,7 @@ function registerUserPullWriteRoutes(app: PullApp): void {
       headRepo?: string;
       isDraft?: boolean;
     }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (!body.title?.trim()) return jsonError(c, 'title is required', 400);
     if (!body.baseBranch?.trim() || !body.headBranch?.trim()) return jsonError(c, 'baseBranch and headBranch are required', 400);
@@ -143,7 +144,8 @@ function registerUserPullWriteRoutes(app: PullApp): void {
     }
     const number = parsePullNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
-    const { malformed, body } = await readJsonBody<{ status?: string }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ status?: string }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);
@@ -172,7 +174,8 @@ function registerUserPullWriteRoutes(app: PullApp): void {
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parsePullNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
-    const { malformed, body } = await readJsonBody<{ body?: string }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ body?: string }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.body !== 'string' || !body.body.trim()) return jsonError(c, 'body is required', 400);
     try {
@@ -209,7 +212,8 @@ function registerUserPullWriteRoutes(app: PullApp): void {
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parsePullNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
-    const { malformed, body } = await readJsonBody<{ state?: string; body?: string; commitOid?: string }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ state?: string; body?: string; commitOid?: string }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.state !== 'string') return jsonError(c, 'state is required', 400);
     try {

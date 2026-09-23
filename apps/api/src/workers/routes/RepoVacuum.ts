@@ -9,12 +9,7 @@ async function enqueueRepoVacuum(env: Env, fullName: string, repoId: string): Pr
   try {
     const scope = createRequestScope(env);
     const dao = await scope.get(Tokens.DeletedRepoDoDAO)();
-    await dao.enqueue(
-      repoDoKeyForFullName(fullName),
-      fullName,
-      repoId,
-      TimestampUtil.getCurrentUnixTimestampInSeconds(),
-    );
+    await dao.enqueue(repoDoKeyForFullName(fullName), fullName, repoId, TimestampUtil.getCurrentUnixTimestampInSeconds());
   } catch {
     // Best-effort tombstone — the synchronous targeted DO purge already ran.
   }

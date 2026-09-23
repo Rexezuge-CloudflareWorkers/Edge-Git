@@ -30,7 +30,8 @@ function registerDeployKeyRoutes(app: DeployKeyApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
-    const { malformed, body } = await readJsonBody<{ name?: string; permission?: unknown; expiresInDays?: number }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ name?: string; permission?: unknown; expiresInDays?: number }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.name !== 'string' || !body.name.trim()) return jsonError(c, 'name is required', 400);
     try {

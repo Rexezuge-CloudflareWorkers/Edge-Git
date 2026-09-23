@@ -67,7 +67,8 @@ function registerWikiUserRoutes(app: WikiApp): void {
     } catch {
       return jsonError(c, 'Forbidden', 403);
     }
-    const { malformed, body } = await readJsonBody<{ slug: unknown; title: unknown; body?: unknown }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ slug: unknown; title: unknown; body?: unknown }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);
@@ -125,7 +126,8 @@ function registerWikiUserRoutes(app: WikiApp): void {
     } catch {
       return jsonError(c, 'Forbidden', 403);
     }
-    const { malformed, body } = await readJsonBody<{ title?: unknown; body?: unknown; expectedRevision?: unknown }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ title?: unknown; body?: unknown; expectedRevision?: unknown }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);

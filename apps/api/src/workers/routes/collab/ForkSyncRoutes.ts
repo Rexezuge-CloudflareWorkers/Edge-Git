@@ -58,12 +58,13 @@ function registerCollabForkSyncRoutes(app: CollabApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     if (!(await needWrite(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
-    const { malformed, body } = await readJsonBody<{
+    const { malformed, oversized, body } = await readJsonBody<{
       upstreamOwner?: string;
       upstreamRepo?: string;
       upstreamBranch?: string;
       branch?: string;
     }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const upstreamOwner = body.upstreamOwner?.trim() || '';
     const upstreamRepo = body.upstreamRepo ? RepoFullName.normalizeRepo(body.upstreamRepo) : '';

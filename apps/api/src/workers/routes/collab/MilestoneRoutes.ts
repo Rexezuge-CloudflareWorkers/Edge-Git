@@ -39,7 +39,8 @@ function registerCollabMilestoneUserRoutes(app: CollabApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     if (!(await needWrite(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
-    const { malformed, body } = await readJsonBody<{ title?: string; description?: string; dueOn?: number }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ title?: string; description?: string; dueOn?: number }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (!body.title?.trim()) return jsonError(c, 'title is required', 400);
     try {
@@ -59,7 +60,8 @@ function registerCollabMilestoneUserRoutes(app: CollabApp): void {
     const row = await requireVisibleRepo(c.env, owner, repoName, email);
     if (!row) return jsonError(c, 'Not found', 404);
     if (!(await needWrite(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
-    const { malformed, body } = await readJsonBody<{ status?: string }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ status?: string }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       await getScope(c).get(Tokens.CollaborationService).updateMilestone(row.id, c.req.param('id'), body);

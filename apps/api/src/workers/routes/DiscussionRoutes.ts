@@ -86,7 +86,8 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const row = await requireVisibleRepo(c.env, c.req.param('owner'), RepoFullName.normalizeRepo(c.req.param('repo')), email);
     if (!row) return jsonError(c, 'Not found', 404);
-    const { malformed, body } = await readJsonBody<{ title: unknown; body?: unknown; categorySlug?: unknown }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ title: unknown; body?: unknown; categorySlug?: unknown }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);
@@ -131,7 +132,13 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parseNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Invalid discussion number', 400);
-    const { malformed, body } = await readJsonBody<{ title?: unknown; body?: unknown; categorySlug?: unknown; status?: unknown }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{
+      title?: unknown;
+      body?: unknown;
+      categorySlug?: unknown;
+      status?: unknown;
+    }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);
@@ -201,7 +208,8 @@ function registerDiscussionUserRoutes(app: DiscussionApp): void {
     if (!row) return jsonError(c, 'Not found', 404);
     const number = parseNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Invalid discussion number', 400);
-    const { malformed, body } = await readJsonBody<{ body?: unknown }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ body?: unknown }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);

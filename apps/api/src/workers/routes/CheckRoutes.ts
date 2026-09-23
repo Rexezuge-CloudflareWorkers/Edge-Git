@@ -98,13 +98,14 @@ function registerCheckUserRoutes(app: CheckApp): void {
     } catch {
       return jsonError(c, 'Forbidden', 403);
     }
-    const { malformed, body } = await readJsonBody<{
+    const { malformed, oversized, body } = await readJsonBody<{
       headSha?: unknown;
       context?: unknown;
       detailsUrl?: unknown;
       outputTitle?: unknown;
       outputSummary?: unknown;
     }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     try {
       const scope = getScope(c);
@@ -162,13 +163,14 @@ function registerCheckUserRoutes(app: CheckApp): void {
     } catch {
       return jsonError(c, 'Forbidden', 403);
     }
-    const { malformed, body } = await readJsonBody<{
+    const { malformed, oversized, body } = await readJsonBody<{
       status?: unknown;
       conclusion?: unknown;
       detailsUrl?: unknown;
       outputTitle?: unknown;
       outputSummary?: unknown;
     }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (typeof body.status !== 'string') return jsonError(c, 'status is required', 400);
     try {

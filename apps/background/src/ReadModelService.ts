@@ -192,9 +192,12 @@ class ReadModelService {
     // Default 5, cap 20: each log entry costs a commit read + tree walk in
     // the DO (SQLite rows). Deeper history paginates via explicit depth.
     const depth = Math.min(Math.max(args.depth ?? 5, 1), 20);
-    const branches = await this.git.listBranches();
-    const currentBranch = (await this.git.currentBranch()) ?? null;
-    const tags = args.includeTags === false ? [] : await this.getTags();
+    // Parallelize independent reads (was 3 sequential round-trips).
+    const [branches, currentBranch, tags] = await Promise.all([
+      this.git.listBranches(),
+      this.git.currentBranch().then((b) => b ?? null),
+      args.includeTags === false ? Promise.resolve([]) : this.getTags(),
+    ]);
     // Default reads follow HEAD, but a fresh repo's HEAD can dangle (init
     // defaults to `main` while the first push landed on another branch, e.g.
     // `master`). An explicit `ref` keeps exact semantics (no fallback).

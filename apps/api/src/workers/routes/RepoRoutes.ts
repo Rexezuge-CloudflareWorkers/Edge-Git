@@ -219,12 +219,13 @@ function registerUserRepoRoutes(app: RepoApp): void {
 
   app.post('/user/repos', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
-    const { malformed, body } = await readJsonBody<{
+    const { malformed, oversized, body } = await readJsonBody<{
       owner?: string;
       name?: string;
       description?: string | null;
       isPrivate?: boolean;
     }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const scope = getScope(c);
     let owner = (body.owner ?? '').trim();
@@ -302,7 +303,8 @@ function registerUserRepoRoutes(app: RepoApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
-    const { malformed, body } = await readJsonBody<{ description?: string | null; isPrivate?: boolean }>(c);
+    const { malformed, oversized, body } = await readJsonBody<{ description?: string | null; isPrivate?: boolean }>(c);
+    if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     const patch: { description?: string | null; isPrivate?: boolean } = {};
     if ('description' in body) patch.description = body.description ?? null;
