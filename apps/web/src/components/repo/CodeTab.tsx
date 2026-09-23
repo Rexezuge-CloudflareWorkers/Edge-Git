@@ -18,7 +18,6 @@ export function CodeTab({
   owner,
   repo,
   repoMeta,
-  canFork,
   canWrite,
   forkOwner,
   showNotice,
@@ -27,7 +26,6 @@ export function CodeTab({
   owner: string;
   repo: string;
   repoMeta: Repo;
-  canFork: boolean;
   canWrite: boolean;
   forkOwner: string;
   showNotice: (type: 'success' | 'error', text: string) => void;
@@ -308,8 +306,9 @@ export function CodeTab({
         loading={loading}
         editable={editable}
         canWrite={canWrite}
-        canFork={canFork}
+        forksCount={repoMeta.forksCount ?? 0}
         forkOwner={forkOwner}
+        authorized={authorized}
         social={social}
         showNotice={showNotice}
         navigateBrowser={navigateBrowser}

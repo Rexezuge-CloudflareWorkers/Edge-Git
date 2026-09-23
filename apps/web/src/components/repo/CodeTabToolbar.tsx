@@ -24,8 +24,9 @@ interface CodeTabToolbarProps {
   loading: boolean;
   editable: boolean;
   canWrite: boolean;
-  canFork: boolean;
+  forksCount: number;
   forkOwner: string;
+  authorized?: boolean | null;
   social: ReturnType<typeof useSocialState>;
   showNotice: (type: 'success' | 'error', text: string) => void;
   navigateBrowser: (patch: { ref?: string; path?: string; blob?: string | null }) => void;
@@ -56,8 +57,9 @@ export function CodeTabToolbar(props: CodeTabToolbarProps) {
     loading,
     editable,
     canWrite,
-    canFork,
+    forksCount,
     forkOwner,
+    authorized,
     social,
     showNotice,
     navigateBrowser,
@@ -160,7 +162,14 @@ export function CodeTabToolbar(props: CodeTabToolbarProps) {
           disabled={social.busy !== null}
           onToggle={() => void social.toggleWatch()}
         />
-        {canFork && <ForkButton owner={owner} repo={repo} defaultOwner={forkOwner} showNotice={showNotice} />}
+        <ForkButton
+          owner={owner}
+          repo={repo}
+          defaultOwner={forkOwner}
+          forksCount={forksCount}
+          authorized={authorized}
+          showNotice={showNotice}
+        />
         <StarButton
           starred={social.starred}
           starsCount={social.starsCount}

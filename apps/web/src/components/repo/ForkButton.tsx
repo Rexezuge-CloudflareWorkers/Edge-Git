@@ -13,11 +13,15 @@ export function ForkButton({
   owner,
   repo,
   defaultOwner,
+  forksCount,
+  authorized,
   showNotice,
 }: {
   owner: string;
   repo: string;
   defaultOwner: string;
+  forksCount?: number;
+  authorized?: boolean | null;
   showNotice: (type: 'success' | 'error', text: string) => void;
 }) {
   const { t } = useTranslation();
@@ -29,6 +33,7 @@ export function ForkButton({
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    if (authorized !== true) return;
     let cancelled = false;
     const run = async () => {
       try {
@@ -45,9 +50,13 @@ export function ForkButton({
     return () => {
       cancelled = true;
     };
-  }, [defaultOwner]);
+  }, [defaultOwner, authorized]);
 
   const openModal = () => {
+    if (authorized !== true) {
+      showNotice('error', t('social.signInToStar', 'Sign In To Star Or Watch Repositories.'));
+      return;
+    }
     setForkOwner((prev) => (owners.includes(prev) ? prev : defaultOwner));
     setForkName(repo);
     setOpen(true);
@@ -73,6 +82,7 @@ export function ForkButton({
       <Button variant="secondary" size="sm" onClick={openModal}>
         <GitFork className="h-3.5 w-3.5" />
         {t('forks.fork', 'Fork')}
+        <span className="text-xs text-[var(--color-text-muted)]">{forksCount ?? 0}</span>
       </Button>
       {open && (
         <ModalShell onClose={() => setOpen(false)} widthClass="w-full max-w-md mx-4" ariaLabel={t('forks.fork', 'Fork')}>

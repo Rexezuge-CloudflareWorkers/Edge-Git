@@ -45,8 +45,9 @@ describe('CodeTabToolbar', () => {
           loading={false}
           editable={false}
           canWrite={false}
-          canFork={false}
+          forksCount={4}
           forkOwner="alice"
+          authorized={false}
           social={socialStub}
           showNotice={() => undefined}
           navigateBrowser={() => undefined}
@@ -62,6 +63,8 @@ describe('CodeTabToolbar', () => {
     );
     expect(screen.getByLabelText('Branch')).toBeDefined();
     expect(screen.getByText('main')).toBeDefined();
+    expect(screen.getByText('Fork')).toBeDefined();
+    expect(screen.getByText('4')).toBeDefined();
   });
 });
 
