@@ -514,12 +514,24 @@ describe('gap fill: social star/watch flows', () => {
     };
     expect(starred.starred).toBe(true);
     expect(starred.starsCount).toBe(1);
+    const authedStar = (await (await callGap(env, '/user/repos/alice/demo/star')).json()) as {
+      starred: boolean;
+      viewerStarred: boolean;
+      starsCount: number;
+    };
+    expect(authedStar).toMatchObject({ starred: true, viewerStarred: true, starsCount: 1 });
     const watched = (await (await callGap(env, '/user/repos/alice/demo/watch', { method: 'PUT' })).json()) as {
       watched?: boolean;
       watching?: boolean;
       watchersCount: number;
     };
     expect(watched.watchersCount).toBe(1);
+    const authedWatch = (await (await callGap(env, '/user/repos/alice/demo/watch')).json()) as {
+      watching: boolean;
+      viewerWatching: boolean;
+      watchersCount: number;
+    };
+    expect(authedWatch).toMatchObject({ watching: true, viewerWatching: true, watchersCount: 1 });
     const unstarred = (await (await callGap(env, '/user/repos/alice/demo/star', { method: 'DELETE' })).json()) as {
       starred: boolean;
       starsCount: number;

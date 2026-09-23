@@ -1,5 +1,5 @@
 import type { Repo, RepoEvent } from '../types';
-import { apiDelete, apiGet, apiPut } from '../lib/api';
+import { apiAuthedFirst, apiDelete, apiGet, apiPut } from '../lib/api';
 
 function authedBase(owner: string, repo: string): string {
   return `/user/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
@@ -13,20 +13,28 @@ export interface StarState {
   count: number;
   starsCount: number;
   viewerStarred: boolean;
+  starred?: boolean;
+  watchersCount?: number;
 }
 
 export interface WatchState {
   count: number;
   watchersCount: number;
   viewerWatching: boolean;
+  watching?: boolean;
+  starsCount?: number;
 }
 
-export async function getStarState(owner: string, repo: string): Promise<StarState> {
-  return apiGet<StarState>(`${publicBase(owner, repo)}/stars`);
+export interface SocialReadOpts {
+  isAuthed?: boolean | null;
 }
 
-export async function getWatchState(owner: string, repo: string): Promise<WatchState> {
-  return apiGet<WatchState>(`${publicBase(owner, repo)}/watches`);
+export async function getStarState(owner: string, repo: string, opts?: SocialReadOpts): Promise<StarState> {
+  return apiAuthedFirst<StarState>(`${authedBase(owner, repo)}/star`, `${publicBase(owner, repo)}/stars`, opts?.isAuthed);
+}
+
+export async function getWatchState(owner: string, repo: string, opts?: SocialReadOpts): Promise<WatchState> {
+  return apiAuthedFirst<WatchState>(`${authedBase(owner, repo)}/watch`, `${publicBase(owner, repo)}/watches`, opts?.isAuthed);
 }
 
 export async function starRepo(owner: string, repo: string): Promise<StarState & { starred: boolean }> {

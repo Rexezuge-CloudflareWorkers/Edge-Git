@@ -133,6 +133,8 @@ describe('fail-closed sweep under D1 outage', () => {
       '/user/repos/alice/demo/compare?base=main&head=feat',
       '/user/repos/alice/demo/tags',
       '/user/repos/alice/demo/forks',
+      '/user/repos/alice/demo/star',
+      '/user/repos/alice/demo/watch',
       '/user/repos/alice/demo/overview',
       '/user/repos/alice/demo/security',
       '/user/orgs/acme/teams',

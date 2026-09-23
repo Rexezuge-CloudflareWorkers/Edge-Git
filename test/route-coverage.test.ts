@@ -250,6 +250,8 @@ describe('route coverage sweep', () => {
       '/user/repos/alice/demo/pulls/1/diff',
       '/user/repos/alice/demo/pulls/1/preview',
       '/user/repos/alice/demo/pulls/1/threads',
+      '/user/repos/alice/demo/star',
+      '/user/repos/alice/demo/watch',
       '/user/repos/alice/demo/releases/v1/assets/a1/download',
       '/repos/alice/demo/releases/v1/assets/a1/download',
     ]) {

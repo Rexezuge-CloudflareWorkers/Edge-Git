@@ -9,6 +9,13 @@ type SocialApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddres
 
 async function getCounts(env: Env, repoId: string): Promise<{ starsCount: number; watchersCount: number }> {
   const scope = createRequestScope(env);
+  return getCountsWithScope(scope, repoId);
+}
+
+async function getCountsWithScope(
+  scope: ReturnType<typeof createRequestScope>,
+  repoId: string,
+): Promise<{ starsCount: number; watchersCount: number }> {
   const [starsCount, watchersCount] = await Promise.all([
     scope
       .get(Tokens.StarService)
@@ -85,6 +92,52 @@ function registerSocialRoutes(app: SocialApp): void {
 
 // Protected star/watch toggles + personal lists behind /user/* Access auth.
 function registerUserSocialRoutes(app: SocialApp): void {
+  app.get('/user/repos/:owner/:repo/star', async (c) => {
+    const email = c.get('AuthenticatedUserEmailAddress');
+    const owner = c.req.param('owner');
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
+    const scope = getScope(c);
+    const row = await requireVisibleRepo(c.env, owner, repoName, email, scope);
+    if (!row) return jsonError(c, 'Not found', 404);
+    const [starred, counts] = await Promise.all([
+      scope
+        .get(Tokens.StarService)
+        .isStarred(row.id, email)
+        .catch(() => false),
+      getCountsWithScope(scope, row.id),
+    ]);
+    return c.json({
+      starred,
+      viewerStarred: starred,
+      count: counts.starsCount,
+      starsCount: counts.starsCount,
+      watchersCount: counts.watchersCount,
+    });
+  });
+
+  app.get('/user/repos/:owner/:repo/watch', async (c) => {
+    const email = c.get('AuthenticatedUserEmailAddress');
+    const owner = c.req.param('owner');
+    const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
+    const scope = getScope(c);
+    const row = await requireVisibleRepo(c.env, owner, repoName, email, scope);
+    if (!row) return jsonError(c, 'Not found', 404);
+    const [watching, counts] = await Promise.all([
+      scope
+        .get(Tokens.WatchService)
+        .isWatching(row.id, email)
+        .catch(() => false),
+      getCountsWithScope(scope, row.id),
+    ]);
+    return c.json({
+      watching,
+      viewerWatching: watching,
+      count: counts.watchersCount,
+      watchersCount: counts.watchersCount,
+      starsCount: counts.starsCount,
+    });
+  });
+
   app.put('/user/repos/:owner/:repo/star', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');

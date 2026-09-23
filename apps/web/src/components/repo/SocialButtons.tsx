@@ -29,20 +29,22 @@ export function useSocialState({
 
   // `true` only for signed-in viewers: `null` (resolving) and `false` share
   // the public path so null->false never refetches, while null/false->true
-  // refetches to resolve viewerStarred/viewerWatching (public endpoints
-  // resolve the viewer best-effort via Access/PAT).
+  // refetches via the authed per-repo status (`GET /user/.../star|watch`)
+  // so viewerStarred/viewerWatching resolve with Access auth instead of the
+  // best-effort public read-model.
   const useAuthed = authorized === true;
+  const authOpt = useAuthed ? { isAuthed: true as const } : { isAuthed: false as const };
 
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
       try {
-        const [stars, watches] = await Promise.all([getStarState(owner, repo), getWatchState(owner, repo)]);
+        const [stars, watches] = await Promise.all([getStarState(owner, repo, authOpt), getWatchState(owner, repo, authOpt)]);
         if (cancelled) return;
         setStarsCount(stars.starsCount ?? stars.count ?? 0);
-        setStarred(stars.viewerStarred);
+        setStarred(stars.viewerStarred ?? stars.starred ?? false);
         setWatchersCount(watches.watchersCount ?? watches.count ?? 0);
-        setWatching(watches.viewerWatching);
+        setWatching(watches.viewerWatching ?? watches.watching ?? false);
       } catch {
         // counts stay zero on public-load failure; buttons remain usable.
         // A private-repo 404 while anonymous retries after auth upgrade via
@@ -57,15 +59,15 @@ export function useSocialState({
 
   const refreshCounts = useCallback(async () => {
     try {
-      const [stars, watches] = await Promise.all([getStarState(owner, repo), getWatchState(owner, repo)]);
+      const [stars, watches] = await Promise.all([getStarState(owner, repo, authOpt), getWatchState(owner, repo, authOpt)]);
       setStarsCount(stars.starsCount ?? stars.count ?? 0);
-      setStarred(stars.viewerStarred);
+      setStarred(stars.viewerStarred ?? stars.starred ?? false);
       setWatchersCount(watches.watchersCount ?? watches.count ?? 0);
-      setWatching(watches.viewerWatching);
+      setWatching(watches.viewerWatching ?? watches.watching ?? false);
     } catch {
       // best-effort
     }
-  }, [owner, repo]);
+  }, [owner, repo, useAuthed]);
 
   // Live star/watch counts for signed-in viewers.
   useRealtimeSubscription({
