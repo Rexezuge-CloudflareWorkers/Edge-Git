@@ -24,11 +24,16 @@ describe('useSocialState auth upgrade', () => {
   it('refetches viewerStarred/viewerWatching on null->true upgrade', async () => {
     const anonStars = { count: 1, starsCount: 1, viewerStarred: false };
     const anonWatches = { count: 2, watchersCount: 2, viewerWatching: false };
-    const authedStars = { count: 1, starsCount: 1, viewerStarred: true };
-    const authedWatches = { count: 3, watchersCount: 3, viewerWatching: true };
+    const authedStars = { count: 1, starsCount: 1, viewerStarred: true, starred: true, watchersCount: 2 };
+    const authedWatches = { count: 3, watchersCount: 3, viewerWatching: true, watching: true, starsCount: 1 };
 
     let phase: 'anon' | 'authed' = 'anon';
     const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/user/repos/')) {
+        if (url.endsWith('/star')) return jsonResponse(authedStars);
+        if (url.endsWith('/watch')) return jsonResponse(authedWatches);
+        throw new Error(`unexpected authed fetch ${url}`);
+      }
       if (url.includes('/stars')) return jsonResponse(phase === 'anon' ? anonStars : authedStars);
       if (url.includes('/watches')) return jsonResponse(phase === 'anon' ? anonWatches : authedWatches);
       throw new Error(`unexpected fetch ${url}`);
@@ -54,6 +59,8 @@ describe('useSocialState auth upgrade', () => {
     expect(result.current.watching).toBe(true);
     expect(result.current.watchersCount).toBe(3);
     expect(fetchMock.mock.calls.length).toBeGreaterThan(callsAfterAnon);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/user/repos/alice/demo/star'))).toBe(true);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/user/repos/alice/demo/watch'))).toBe(true);
   });
 
   it('does not refetch on null->false (both anonymous)', async () => {

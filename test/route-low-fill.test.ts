@@ -1528,9 +1528,21 @@ describe('SocialRoutes low fill', () => {
     expect(starred.status).toBe(200);
     expect(state.stars).toHaveLength(1);
     expect((await callWorker(env, '/repos/alice/demo/stars')).status).toBe(200);
+    const authedStar = (await (await callWorker(env, '/user/repos/alice/demo/star')).json()) as {
+      starred: boolean;
+      viewerStarred: boolean;
+      starsCount: number;
+      count: number;
+    };
+    expect(authedStar).toMatchObject({ starred: true, viewerStarred: true, starsCount: 1, count: 1 });
     const unstarred = await callWorker(env, '/user/repos/alice/demo/star', { method: 'DELETE' });
     expect(unstarred.status).toBe(200);
     expect(state.stars).toHaveLength(0);
+    const authedUnstarred = (await (await callWorker(env, '/user/repos/alice/demo/star')).json()) as {
+      starred: boolean;
+      viewerStarred: boolean;
+    };
+    expect(authedUnstarred).toMatchObject({ starred: false, viewerStarred: false });
   });
 
   it('watches and unwatches repos', async () => {
@@ -1539,6 +1551,13 @@ describe('SocialRoutes low fill', () => {
     expect((await callWorker(env, '/user/repos/alice/demo/watch', putJson({}))).status).toBe(200);
     expect(state.watches).toHaveLength(1);
     expect((await callWorker(env, '/repos/alice/demo/watches')).status).toBe(200);
+    const authedWatch = (await (await callWorker(env, '/user/repos/alice/demo/watch')).json()) as {
+      watching: boolean;
+      viewerWatching: boolean;
+      watchersCount: number;
+      count: number;
+    };
+    expect(authedWatch).toMatchObject({ watching: true, viewerWatching: true, watchersCount: 1, count: 1 });
     expect((await callWorker(env, '/user/repos/alice/demo/watch', { method: 'DELETE' })).status).toBe(200);
     expect(state.watches).toHaveLength(0);
   });
