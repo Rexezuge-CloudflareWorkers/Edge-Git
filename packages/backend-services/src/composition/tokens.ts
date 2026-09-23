@@ -84,11 +84,15 @@ import type { RealtimeService } from '../realtime/RealtimeService';
 // service type without an explicit generic at call sites.
 interface RequestScopeEnvShape {
   DB: D1Queryable;
-  AES_ENCRYPTION_KEY_SECRET?: { get(): Promise<string> };
+  WEBHOOK_ENCRYPTION_KEY_SECRET?: { get(): Promise<string> };
+  MIRROR_ENCRYPTION_KEY_SECRET?: { get(): Promise<string> };
+  IMPORT_ENCRYPTION_KEY_SECRET?: { get(): Promise<string> };
 }
 
 interface RequestKeysShape {
-  masterKey: string;
+  webhookKey: string;
+  mirrorKey: string;
+  importKey: string;
 }
 
 const Tokens = {
@@ -96,6 +100,9 @@ const Tokens = {
   Db: Symbol('Db') as Token<D1Queryable>,
   KvCache: Symbol('KvCache') as Token<KvCache>,
   Keys: Symbol('Keys') as Token<() => Promise<RequestKeysShape>>,
+  WebhookKey: Symbol('WebhookKey') as Token<() => Promise<string>>,
+  MirrorKey: Symbol('MirrorKey') as Token<() => Promise<string>>,
+  ImportKey: Symbol('ImportKey') as Token<() => Promise<string>>,
   AppConfig: Symbol('AppConfig') as Token<AppConfiguration>,
   UserDAO: Symbol('UserDAO') as Token<() => Promise<UserDAO>>,
   RepositoryDAO: Symbol('RepositoryDAO') as Token<() => Promise<RepositoryDAO>>,

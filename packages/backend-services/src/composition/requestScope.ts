@@ -18,11 +18,27 @@ function createRequestScope(env: RequestScopeEnv): Container {
   // Single CACHE binding (absent in tests / legacy deploys → fail-soft cache).
   scope.bindValue(Tokens.KvCache, new KvCache((env as { CACHE?: KvNamespaceLike }).CACHE ?? null));
 
-  const masterKey = memoizeAsync(() => {
-    if (!env.AES_ENCRYPTION_KEY_SECRET) throw new Error('AES_ENCRYPTION_KEY_SECRET is not configured for this scope.');
-    return env.AES_ENCRYPTION_KEY_SECRET.get();
+  const webhookKey = memoizeAsync(async () => {
+    if (!env.WEBHOOK_ENCRYPTION_KEY_SECRET) throw new Error('WEBHOOK_ENCRYPTION_KEY_SECRET is not configured for this scope.');
+    return env.WEBHOOK_ENCRYPTION_KEY_SECRET.get();
   });
-  const keys = memoizeAsync(async (): Promise<RequestKeys> => ({ masterKey: await masterKey() }));
+  const mirrorKey = memoizeAsync(async () => {
+    if (!env.MIRROR_ENCRYPTION_KEY_SECRET) throw new Error('MIRROR_ENCRYPTION_KEY_SECRET is not configured for this scope.');
+    return env.MIRROR_ENCRYPTION_KEY_SECRET.get();
+  });
+  const importKey = memoizeAsync(async () => {
+    if (!env.IMPORT_ENCRYPTION_KEY_SECRET) throw new Error('IMPORT_ENCRYPTION_KEY_SECRET is not configured for this scope.');
+    return env.IMPORT_ENCRYPTION_KEY_SECRET.get();
+  });
+  // Per-feature thunks: resolving one key never fetches the other two.
+  scope.bindValue(Tokens.WebhookKey, webhookKey);
+  scope.bindValue(Tokens.MirrorKey, mirrorKey);
+  scope.bindValue(Tokens.ImportKey, importKey);
+  const keys = memoizeAsync(async (): Promise<RequestKeys> => ({
+    webhookKey: await webhookKey(),
+    mirrorKey: await mirrorKey(),
+    importKey: await importKey(),
+  }));
   scope.bindValue(Tokens.Keys, keys);
 
   bindDaoBindings(scope, env);

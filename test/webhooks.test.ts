@@ -150,6 +150,8 @@ function createWebhookFakeDb() {
             url_prefix,
             secret,
             secret_suffix,
+            encrypted_secret: (params[9] as string | null | undefined) ?? null,
+            secret_iv: (params[10] as string | null | undefined) ?? null,
             is_active: 1,
             consecutive_failures: 0,
             last_delivery_at: null,
@@ -187,13 +189,20 @@ function createWebhookFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE repo_webhooks SET secret = ?')) {
-          const [secret, suffix, now, id] = params as [string, string, number, string];
+          // Rotate shape is 7 params with the 0026 envelope
+          // (secret, suffix, now, encrypted, iv, id, repoId); legacy is 5
+          // (secret, suffix, now, id, repoId).
+          const id = params.length > 5 ? (params[5] as string) : (params[3] as string);
           const hook = state.hooks.find((h) => h.id === id);
           if (hook) {
-            hook.secret = secret;
-            hook.secret_suffix = suffix;
+            hook.secret = params[0] as string;
+            hook.secret_suffix = params[1] as string;
             hook.consecutive_failures = 0;
-            hook.updated_at = now;
+            hook.updated_at = params[2] as number;
+            if (params.length > 5) {
+              hook.encrypted_secret = params[3] as string | null;
+              hook.secret_iv = params[4] as string | null;
+            }
           }
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }

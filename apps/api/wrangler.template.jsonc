@@ -69,6 +69,23 @@
       "id": "00000000000000000000000000000000",
     },
   ],
+  "secrets_store_secrets": [
+    {
+      "binding": "WEBHOOK_ENCRYPTION_KEY_SECRET",
+      "store_id": "00000000000000000000000000000000",
+      "secret_name": "edge-git-webhook-encryption-key",
+    },
+    {
+      "binding": "MIRROR_ENCRYPTION_KEY_SECRET",
+      "store_id": "00000000000000000000000000000000",
+      "secret_name": "edge-git-mirror-encryption-key",
+    },
+    {
+      "binding": "IMPORT_ENCRYPTION_KEY_SECRET",
+      "store_id": "00000000000000000000000000000000",
+      "secret_name": "edge-git-import-encryption-key",
+    },
+  ],
   "triggers": {
     "crons": ["*/10 * * * *", "7 */4 * * *"],
   },

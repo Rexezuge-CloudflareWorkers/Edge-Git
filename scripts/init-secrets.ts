@@ -57,7 +57,13 @@ async function main() {
     for (const secret of config.secrets_store_secrets) {
       if (!checkSecret(secret.store_id, secret.secret_name)) {
         let secretValue: string;
-        if (secret.secret_name === 'edge-git-aes-encryption-key' || secret.secret_name === 'edge-git-action-encryption-key') {
+        if (
+          secret.secret_name === 'edge-git-webhook-encryption-key' ||
+          secret.secret_name === 'edge-git-mirror-encryption-key' ||
+          secret.secret_name === 'edge-git-import-encryption-key' ||
+          secret.secret_name === 'edge-git-aes-encryption-key' ||
+          secret.secret_name === 'edge-git-action-encryption-key'
+        ) {
           secretValue = await generateAESGCMKey();
           console.log(`Generated AES encryption key`);
         } else if (secret.secret_name === 'edge-git-action-signing-secret') {
