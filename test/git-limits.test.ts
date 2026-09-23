@@ -8,7 +8,8 @@ import { AppConfiguration } from '@edge-git/backend-runtime/config/AppConfigurat
 import { buildFetchErrorResponse, parseFetchRequest, validateFetchRequestCounts, validateReceivePackCounts } from '@edge-git/git-protocol';
 // NOTE: relative import bypasses packages/git-service/src/index.ts, which
 // re-exports the `dofs` runtime (unparsable in the node test env).
-import { GitService, PackLimitError } from '../packages/git-service/src/GitService';
+import { GitService } from '../packages/git-service/src/GitService';
+import { PackLimitError } from '../packages/git-service/src/PackLimits';
 
 const OID = 'a'.repeat(40);
 

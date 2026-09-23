@@ -1,7 +1,7 @@
 import * as git from 'isomorphic-git';
 import type { IsoGitFs } from './IsoGitFs';
 import { GitCache } from './GitCache';
-import { isValidBranchName as sharedIsValidBranchName } from '@edge-git/shared/utils';
+import { isValidBranchName } from '@edge-git/shared/utils';
 
 const logger = {
   warn: (...args: unknown[]): void => console.warn('[WARN] [MergeService]', ...args),
@@ -29,11 +29,19 @@ interface MergePreview {
   canFastForward: boolean;
 }
 
-// Canonical validator lives in `@edge-git/shared/utils` (Layer 0) so
-// `backend-services` can share it without importing `git-service`.
-// Re-exported here for backward compatibility (`RefService`, `WriteService`).
-export { isValidBranchName } from '@edge-git/shared/utils';
+// Canonical branch-name validator lives in `@edge-git/shared/utils` (Layer 0)
+// and is re-exported via `./RefValidation` so `backend-services` can share it
+// without importing `git-service`. Import from `@edge-git/shared/utils` or
+// `./RefValidation` — never from this module.
 
+/**
+ * Merge orchestration over isomorphic-git (Template Method pattern).
+ *
+ * `squashMerge` / `rebaseMerge` / `mergeBranches` share one preamble
+ * (`resolveMergeBase`) that validates the base branch + head oid, resolves
+ * the base ref, and computes the merge-base outcome. Each variant then
+ * executes only its own commit strategy.
+ */
 export class MergeService {
   private readonly fs: PromiseFsClient;
   private readonly gitdir: string;
@@ -119,7 +127,7 @@ export class MergeService {
   }
 
   public async deleteBranch(branch: string): Promise<void> {
-    if (!sharedIsValidBranchName(branch)) throw new Error(`invalid branch name: ${branch}`);
+    if (!isValidBranchName(branch)) throw new Error(`invalid branch name: ${branch}`);
     await git.deleteBranch({ fs: this.fs, gitdir: this.gitdir, ref: branch });
   }
 
@@ -128,19 +136,34 @@ export class MergeService {
   }
 
   /**
+   * Shared merge preamble (Template Method step): validate inputs, resolve
+   * the base ref, and classify the already-merged cases. Returns the base
+   * ref/oid plus merge-base so variants only implement their strategy.
+   */
+  private async resolveMergeBase(
+    baseBranch: string,
+    headOid: string,
+  ): Promise<{ baseRef: string; baseOid: string; mergeBase: string | null } | { alreadyMerged: string }> {
+    if (!isValidBranchName(baseBranch)) throw new Error(`invalid base branch: ${baseBranch}`);
+    if (!/^[0-9a-f]{40}$/.test(headOid)) throw new Error('invalid head oid');
+    const baseRef = `refs/heads/${baseBranch}`;
+    const baseOid = await this.resolveRef(baseRef);
+    if (!baseOid) throw new Error(`base branch not found: ${baseBranch}`);
+    if (baseOid === headOid) return { alreadyMerged: baseOid };
+    const mergeBase = await this.findMergeBase([baseOid, headOid]);
+    if (mergeBase === headOid) return { alreadyMerged: baseOid };
+    return { baseRef, baseOid, mergeBase };
+  }
+
+  /**
    * Squash merge: single new commit on the base branch with the head tree.
    * Always succeeds when both oids exist (no 3-way content merge), which is
    * why GitHub offers it alongside merge commits.
    */
   public async squashMerge(input: { baseBranch: string; headOid: string; author: MergeAuthor; message?: string }): Promise<MergeOutcome> {
-    if (!sharedIsValidBranchName(input.baseBranch)) throw new Error(`invalid base branch: ${input.baseBranch}`);
-    if (!/^[0-9a-f]{40}$/.test(input.headOid)) throw new Error('invalid head oid');
-    const baseRef = `refs/heads/${input.baseBranch}`;
-    const baseOid = await this.resolveRef(baseRef);
-    if (!baseOid) throw new Error(`base branch not found: ${input.baseBranch}`);
-    if (baseOid === input.headOid) return { type: 'already-merged', commitOid: baseOid };
-    const mergeBase = await this.findMergeBase([baseOid, input.headOid]);
-    if (mergeBase === input.headOid) return { type: 'already-merged', commitOid: baseOid };
+    const preamble = await this.resolveMergeBase(input.baseBranch, input.headOid);
+    if ('alreadyMerged' in preamble) return { type: 'already-merged', commitOid: preamble.alreadyMerged };
+    const { baseRef, baseOid } = preamble;
     let headTree: string;
     let headMessage: string;
     try {
@@ -170,14 +193,9 @@ export class MergeService {
    * rather than risking an incorrect tree replay.
    */
   public async rebaseMerge(input: { baseBranch: string; headOid: string; author: MergeAuthor }): Promise<MergeOutcome> {
-    if (!sharedIsValidBranchName(input.baseBranch)) throw new Error(`invalid base branch: ${input.baseBranch}`);
-    if (!/^[0-9a-f]{40}$/.test(input.headOid)) throw new Error('invalid head oid');
-    const baseRef = `refs/heads/${input.baseBranch}`;
-    const baseOid = await this.resolveRef(baseRef);
-    if (!baseOid) throw new Error(`base branch not found: ${input.baseBranch}`);
-    if (baseOid === input.headOid) return { type: 'already-merged', commitOid: baseOid };
-    const mergeBase = await this.findMergeBase([baseOid, input.headOid]);
-    if (mergeBase === input.headOid) return { type: 'already-merged', commitOid: baseOid };
+    const preamble = await this.resolveMergeBase(input.baseBranch, input.headOid);
+    if ('alreadyMerged' in preamble) return { type: 'already-merged', commitOid: preamble.alreadyMerged };
+    const { baseRef, baseOid, mergeBase } = preamble;
     if (mergeBase === baseOid) {
       await git.writeRef({ fs: this.fs, gitdir: this.gitdir, ref: baseRef, value: input.headOid, force: true });
       this.clearCache();
@@ -222,15 +240,9 @@ export class MergeService {
   }
 
   public async mergeBranches(input: { baseBranch: string; headOid: string; author: MergeAuthor; message?: string }): Promise<MergeOutcome> {
-    if (!sharedIsValidBranchName(input.baseBranch)) throw new Error(`invalid base branch: ${input.baseBranch}`);
-    if (!/^[0-9a-f]{40}$/.test(input.headOid)) throw new Error('invalid head oid');
-    const baseRef = `refs/heads/${input.baseBranch}`;
-    const baseOid = await this.resolveRef(baseRef);
-    if (!baseOid) throw new Error(`base branch not found: ${input.baseBranch}`);
-    if (baseOid === input.headOid) return { type: 'already-merged', commitOid: baseOid };
-
-    const mergeBase = await this.findMergeBase([baseOid, input.headOid]);
-    if (mergeBase === input.headOid) return { type: 'already-merged', commitOid: baseOid };
+    const preamble = await this.resolveMergeBase(input.baseBranch, input.headOid);
+    if ('alreadyMerged' in preamble) return { type: 'already-merged', commitOid: preamble.alreadyMerged };
+    const { baseRef, baseOid, mergeBase } = preamble;
     if (mergeBase === baseOid) {
       // Fast-forward: head is strictly ahead.
       await git.writeRef({ fs: this.fs, gitdir: this.gitdir, ref: baseRef, value: input.headOid, force: true });

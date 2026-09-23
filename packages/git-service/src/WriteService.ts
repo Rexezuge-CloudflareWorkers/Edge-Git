@@ -1,6 +1,6 @@
 import * as git from 'isomorphic-git';
 import type { IsoGitFs } from './IsoGitFs';
-import { isValidBranchName } from './MergeService';
+import { isValidBranchName } from './RefValidation';
 
 const logger = {
   warn: (...args: unknown[]): void => console.warn('[WARN] [WriteService]', ...args),

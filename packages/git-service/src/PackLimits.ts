@@ -2,8 +2,9 @@
  * Pure pack-budget predicates (Otter pure-helper pattern).
  *
  * Extracted from `PackCollector.collectObjectsForPack` so limit checks are
- * unit testable without isomorphic-git. `PackLimitError` lives here;
- * `PackCollector` re-exports it for backward compatibility.
+ * unit testable without isomorphic-git. `PackLimitError` canonical home is
+ * this module; `PackCollector` keeps a single compat re-export and the
+ * package barrel re-exports from here directly.
  */
 class PackLimitError extends Error {
   constructor(message: string) {

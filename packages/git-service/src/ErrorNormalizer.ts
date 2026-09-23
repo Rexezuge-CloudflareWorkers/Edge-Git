@@ -34,6 +34,16 @@ export class ErrorWithCode extends Error {
 const KNOWN_CODES = new Set(['ENOENT', 'ENOTDIR', 'EISDIR', 'EEXIST', 'EPERM', 'EACCES', 'EINVAL', 'EBUSY', 'ENOSPC', 'ENOTEMPTY']);
 
 export class ErrorNormalizer {
+  /**
+   * Normalize any thrown value to an `ErrorWithCode`.
+   *
+   * Strategy: preserve FS-set codes, extract known codes from messages,
+   * else default to `ENOENT` (existence-hiding: unknown git-object reads
+   * surface as not-found so private/missing objects never oracle via
+   * distinct codes; callers map to null/false). `ENOSPC`/quota callers must
+   * check the preserved-code path first — only truly codeless errors fall
+   * through to the default.
+   */
   ensureErrCode(error: Error): ErrorWithCode {
     // Preserve codes already set by the underlying FS (dofs / isomorphic-git).
     const existing = (error as { code?: unknown }).code;
