@@ -14,6 +14,7 @@ type IsoGitFsClient = ReturnType<IsoGitFs['getPromiseFsClient']>;
  */
 class RepoLifecycle {
   private initPromise: Promise<void> | null = null;
+  private initialized = false;
 
   constructor(
     private readonly ctx: DurableObjectState,
@@ -53,11 +54,17 @@ class RepoLifecycle {
     // within the cache TTL. Optional-chained for fakes lacking the method.
     (this.git as unknown as { clearCache?: () => void }).clearCache?.();
     this.initPromise = null;
+    this.initialized = false;
   }
 
   public async ensureRepoInitialized(): Promise<void> {
+    // Warm-isolate fast path: a previous `prepare()` already verified `/repo`
+    // exists in this isolate lifetime. Skips one `stat` (1-2 SQLite rows)
+    // per RPC, which dominates `rows_read` on read-heavy workloads.
+    if (this.initialized) return;
     try {
       await this.isoGitFs.promises.stat('/repo/HEAD');
+      this.initialized = true;
       return;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -83,6 +90,7 @@ class RepoLifecycle {
       current = holder.gate;
     }
     await current;
+    this.initialized = true;
   }
 
   public async prepare(): Promise<void> {

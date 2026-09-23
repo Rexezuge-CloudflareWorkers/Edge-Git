@@ -178,12 +178,12 @@ export function CodeTab({
         const readmeText = isBinaryReadme ? null : decodeBlobContent(overview.readme ?? null);
         setReadme(readmeText !== null && overview.readme ? { path: overview.readme.path, text: readmeText } : null);
         setLoading(false);
-        // Lazy enrichment: re-fetch with last-commit and merge by path+oid.
-        // Fire-and-forget relative to loading state so slow histories never
-        // block the file list or README. Claimed per key so the auth-upgrade
-        // run shares (or skips) instead of doubling the call.
+        // Gated enrichment (rows_read): skip when hidden or >30 entries, debounce 350ms.
+        const shouldEnrich = overview.tree.length <= 30 && (typeof document === 'undefined' || !document.hidden);
         const enrichKey = `${key}/${treeRef ?? ''}/${dir ?? ''}`;
-        if (st.enrichedKey !== enrichKey) {
+        if (shouldEnrich && st.enrichedKey !== enrichKey) {
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          if (cancelled || (typeof document !== 'undefined' && document.hidden)) return;
           const sharedEnrich = st.enrichInflightKey === enrichKey ? st.enrichInflight : null;
           let enriched: TreeEntry[] | null = null;
           if (sharedEnrich) {

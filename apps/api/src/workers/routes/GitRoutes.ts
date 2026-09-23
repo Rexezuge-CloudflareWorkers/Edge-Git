@@ -1,6 +1,7 @@
 import { getScope } from './PublicViewerResolver';
 import type { Hono } from 'hono';
 import { gitAuthForRepo } from '@/middleware';
+import { clientIp } from '@/middleware/rateLimit';
 import { getRepoStub } from '../doStubs';
 import { RepoFullName } from '@edge-git/shared/utils';
 import {
@@ -18,6 +19,14 @@ import { scanBytes } from '@edge-git/backend-services/security';
 import { recordAndNotify } from './SocialEmit';
 import { triggerRequiredChecks } from './TriggerChecks';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
+import {
+  checkFetchLoop,
+  etagForRefs,
+  getCachedRefs,
+  invalidateRepoCaches,
+  putCachedRefs,
+  withEtagHeaders,
+} from './RepoReadCache';
 
 type GitApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -46,8 +55,21 @@ function registerGitRoutes(app: GitApp): void {
       return advertiseUploadPack();
     }
     const fullName = `${owner}/${repoName}`;
+    const cache = getScope(c).get(Tokens.KvCache);
+    const cached = await getCachedRefs(cache, fullName);
+    if (cached) {
+      const res = await advertiseReceivePack(() => Promise.resolve(cached));
+      const etag = etagForRefs(cached);
+      if (etag) return withEtagHeaders(res, etag, 'private, max-age=30, must-revalidate');
+      return res;
+    }
     const stub = getRepoStub(c.env, fullName);
-    return advertiseReceivePack(() => stub.listRefs());
+    const snapshot = await stub.listRefs();
+    await putCachedRefs(cache, fullName, snapshot);
+    const res = await advertiseReceivePack(() => Promise.resolve(snapshot));
+    const etag = etagForRefs(snapshot);
+    if (etag) return withEtagHeaders(res, etag, 'private, max-age=30, must-revalidate');
+    return res;
   });
 
   app.post('/:owner/:repo/git-upload-pack', async (c) => {
@@ -72,6 +94,19 @@ function registerGitRoutes(app: GitApp): void {
     const body = new Uint8Array(await c.req.arrayBuffer());
     if (body.byteLength > maxFetchBodyBytes) {
       return c.text(`ERR fetch request too large: ${body.byteLength} > ${maxFetchBodyBytes} bytes`, 413);
+    }
+    // Fetch-loop guard: identical bodies from the same caller inside 60s are
+    // cheap 429s instead of repeated pack walks (each burns thousands of DO
+    // rows). Fail-open on KV errors so caching can never break fetches.
+    try {
+      const cache = getScope(c).get(Tokens.KvCache);
+      const identity = auth.userEmail ?? `ip:${clientIp(c)}`;
+      const guard = await checkFetchLoop(cache, fullName, identity, body);
+      if (!guard.allowed) {
+        return c.text('Rate limit exceeded; try again later.', 429, { 'Retry-After': String(guard.retryAfter) });
+      }
+    } catch {
+      // Fail open — fetch proceeds to the DO on cache errors.
     }
     const res = await stub.fetch(new Request('https://do/git-upload-pack', { method: 'POST', body: body as unknown as BodyInit }));
     return new Response(res.body, {
@@ -155,6 +190,15 @@ function registerGitRoutes(app: GitApp): void {
       return c.text('invalid push request', 400);
     }
     const res = await stub.receivePack(body, protections);
+    // Refs changed: drop cached snapshots so later reads see the new tips.
+    // Best-effort via `waitUntil` — never blocks the push response, and KV
+    // misses simply recompute from the DO.
+    try {
+      const cache = getScope(c).get(Tokens.KvCache);
+      c.executionCtx.waitUntil(invalidateRepoCaches(cache, fullName).catch(() => undefined));
+    } catch {
+      // No execution context in tests — invalidation is best-effort.
+    }
     if (res.ok && auth.userEmail) {
       try {
         const { commands } = parseReceivePackRequest(body);

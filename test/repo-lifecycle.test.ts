@@ -64,6 +64,14 @@ describe('RepoLifecycle.ensureRepoInitialized', () => {
     await lifecycle.ensureRepoInitialized();
     expect(git.initRepo).not.toHaveBeenCalled();
 
+    // Warm fast path: a second prepare on the same isolate skips the stat.
+    await lifecycle.ensureRepoInitialized();
+    expect(isoGitFs.promises.stat).toHaveBeenCalledTimes(1);
+    expect(git.initRepo).not.toHaveBeenCalled();
+  });
+
+  it('inits on a fresh isolate when HEAD is missing', async () => {
+    const { lifecycle, git, isoGitFs } = createLifecycle();
     isoGitFs.promises.stat.mockRejectedValueOnce(new Error('ENOENT'));
     await lifecycle.ensureRepoInitialized();
     expect(git.initRepo).toHaveBeenCalledTimes(1);

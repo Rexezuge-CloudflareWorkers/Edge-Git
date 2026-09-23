@@ -16,6 +16,7 @@ import { EmailAddress, RepoFullName } from '@edge-git/shared/utils';
 import { readJsonBody } from './BodyParser';
 import { parseOverviewArgs, parseWithLastCommit, sanitizeDepthParam, sanitizePathParam, sanitizeRefParam } from './RepoParamParsers';
 import { ErrorSanitizationUtil } from '@edge-git/shared/utils';
+import { isFresh, serveReadModel } from './RepoReadCache';
 
 type RepoApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -33,47 +34,68 @@ function registerRepoRoutes(app: RepoApp): void {
   });
 
   app.get('/repos/:owner/:repo/branches', async (c) => {
-    return withPublicRepo(c, async (_row, fullName) => c.json(await getRepoStub(c.env, fullName).getBranches()));
+    return withPublicRepo(c, async (_row, fullName) => {
+      const cache = getScope(c).get(Tokens.KvCache);
+      const stub = getRepoStub(c.env, fullName);
+      return serveReadModel(c, cache, fullName, 'branches', {}, () => stub.getBranches(), {
+        fetchRefs: () => stub.listRefs(),
+      });
+    });
   });
 
   app.get('/repos/:owner/:repo/tags', async (c) => {
-    return withPublicRepo(c, async (_row, fullName) => c.json(await getRepoStub(c.env, fullName).getTags()));
+    return withPublicRepo(c, async (_row, fullName) => {
+      const cache = getScope(c).get(Tokens.KvCache);
+      const stub = getRepoStub(c.env, fullName);
+      return serveReadModel(c, cache, fullName, 'tags', {}, () => stub.getTags(), {
+        fetchRefs: () => stub.listRefs(),
+      });
+    });
   });
 
   app.get('/repos/:owner/:repo/tree', async (c) => {
     return withPublicRepo(c, async (_row, fullName) => {
       const url = new URL(c.req.url);
-      return c.json(
-        await getRepoStub(c.env, fullName).getTree({
-          ref: sanitizeRefParam(url.searchParams.get('ref')),
-          path: sanitizePathParam(url.searchParams.get('path')),
-          withLastCommit: parseWithLastCommit(url.searchParams.get('withLastCommit')),
-        }),
-      );
+      const args = {
+        ref: sanitizeRefParam(url.searchParams.get('ref')),
+        path: sanitizePathParam(url.searchParams.get('path')),
+        withLastCommit: parseWithLastCommit(url.searchParams.get('withLastCommit')) ?? false,
+      };
+      const cache = getScope(c).get(Tokens.KvCache);
+      const stub = getRepoStub(c.env, fullName);
+      return serveReadModel(c, cache, fullName, 'tree', args, () => stub.getTree(args), {
+        fetchRefs: () => stub.listRefs(),
+      });
     });
   });
 
   app.get('/repos/:owner/:repo/blob', async (c) => {
     return withPublicRepo(c, async (_row, fullName) => {
       const url = new URL(c.req.url);
-      return c.json(
-        await getRepoStub(c.env, fullName).getBlob({
-          ref: sanitizeRefParam(url.searchParams.get('ref')),
-          filepath: sanitizePathParam(url.searchParams.get('path')) ?? '',
-        }),
-      );
+      const args = {
+        ref: sanitizeRefParam(url.searchParams.get('ref')),
+        filepath: sanitizePathParam(url.searchParams.get('path')) ?? '',
+      };
+      const cache = getScope(c).get(Tokens.KvCache);
+      const stub = getRepoStub(c.env, fullName);
+      return serveReadModel(c, cache, fullName, 'blob', args, () => stub.getBlob(args), {
+        fetchRefs: () => stub.listRefs(),
+      });
     });
   });
 
   app.get('/repos/:owner/:repo/commits', async (c) => {
     return withPublicRepo(c, async (_row, fullName) => {
       const url = new URL(c.req.url);
-      return c.json(
-        await getRepoStub(c.env, fullName).getCommits({
-          ref: sanitizeRefParam(url.searchParams.get('ref')),
-          depth: sanitizeDepthParam(url.searchParams.get('depth')),
-        }),
-      );
+      const args = {
+        ref: sanitizeRefParam(url.searchParams.get('ref')),
+        depth: sanitizeDepthParam(url.searchParams.get('depth')),
+      };
+      const cache = getScope(c).get(Tokens.KvCache);
+      const stub = getRepoStub(c.env, fullName);
+      return serveReadModel(c, cache, fullName, 'commits', args, () => stub.getCommits(args), {
+        fetchRefs: () => stub.listRefs(),
+      });
     });
   });
 
@@ -82,7 +104,13 @@ function registerRepoRoutes(app: RepoApp): void {
   app.get('/repos/:owner/:repo/overview', async (c) => {
     return withPublicRepo(c, async (_row, fullName) => {
       const url = new URL(c.req.url);
-      return c.json(await getRepoStub(c.env, fullName).getOverview(parseOverviewArgs(url.searchParams)));
+      const args = parseOverviewArgs(url.searchParams);
+      const cache = getScope(c).get(Tokens.KvCache);
+      const stub = getRepoStub(c.env, fullName);
+      return serveReadModel(c, cache, fullName, 'overview', args, () => stub.getOverview(args), {
+        fetchRefs: () => stub.listRefs(),
+        extractHeadOid: (result) => (result as { resolvedRef?: string } | null)?.resolvedRef ?? null,
+      });
     });
   });
 
@@ -90,9 +118,12 @@ function registerRepoRoutes(app: RepoApp): void {
     const oid = c.req.param('oid');
     if (!/^[0-9a-f]{40}$/i.test(oid)) return jsonError(c, 'Invalid commit oid', 400);
     return withPublicRepo(c, async (_row, fullName) => {
+      // Immutable by oid: 304 without DO I/O when the browser already holds it.
+      const etag = `W/"commit-diff-${oid.slice(0, 16).toLowerCase()}"`;
+      if (isFresh(c.req.raw, etag)) return new Response(null, { status: 304, headers: { ETag: etag } });
       const diff = (await getRepoStub(c.env, fullName).getCommitDiff(oid)) as { commit: unknown } | null;
       if (!diff || !diff.commit) return jsonError(c, 'Not found', 404);
-      return c.json(diff);
+      return c.json(diff, 200, { ETag: etag, 'Cache-Control': 'private, max-age=86400, immutable' });
     });
   });
 

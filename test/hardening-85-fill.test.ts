@@ -197,8 +197,23 @@ describe('ReadModelService fan-out caps', () => {
     const svc = new ReadModelService(git as never);
     const outTags = await svc.getTags();
     expect(outTags.length).toBe(100);
-    const outTree = await svc.getTree({ ref: 'HEAD', path: '' });
+    const outTree = await svc.getTree({ ref: 'HEAD', path: '', withLastCommit: true });
     expect((outTree as unknown[]).length).toBe(100);
+  });
+
+  it('returns the fast tree uncapped by default', async () => {
+    const tree = Array.from({ length: 250 }, (_, i) => ({ path: `f${i}.txt`, type: 'blob', oid: `b${i}` }));
+    const getLog = vi.fn(async () => [{ oid: 'c1' }]);
+    const git = {
+      resolveRef: async () => 'abc',
+      getTree: async () => tree,
+      getLog,
+    };
+    const svc = new ReadModelService(git as never);
+    const outTree = (await svc.getTree({ ref: 'HEAD', path: '' })) as Array<Record<string, unknown>>;
+    expect(outTree).toHaveLength(250);
+    expect(outTree[0]).toMatchObject({ lastCommit: null });
+    expect(getLog).not.toHaveBeenCalled();
   });
 });
 
