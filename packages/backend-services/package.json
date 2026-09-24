@@ -65,7 +65,9 @@
     "./ports": "./src/ports/index.ts",
     "./ports/*": "./src/ports/*.ts",
     "./policy": "./src/policy/index.ts",
-    "./policy/*": "./src/policy/*.ts"
+    "./policy/*": "./src/policy/*.ts",
+    "./errors": "./src/errors/index.ts",
+    "./errors/*": "./src/errors/*.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

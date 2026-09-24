@@ -284,10 +284,10 @@ class SearchService {
   }
 
   // Remove index rows for paths no longer at HEAD. Only call after a
-  // successful HEAD listing (see SearchDAO.deleteCodePathsNotIn).
+  // successful HEAD listing (see `SearchDAO.pruneStaleCodePaths`).
   public async purgeStalePaths(repoId: string, keepPaths: string[]): Promise<number> {
     const dao = await this.deps.searchDAO();
-    return dao.deleteCodePathsNotIn(repoId, keepPaths);
+    return dao.pruneStaleCodePaths(repoId, keepPaths);
   }
 
   public async searchDiscussions(

@@ -28,3 +28,5 @@ export * from './transfer/index';
 export * from './deploykey/index';
 export * from './security/index';
 export * from './events/index';
+export * from './policy/index';
+export * from './errors/index';

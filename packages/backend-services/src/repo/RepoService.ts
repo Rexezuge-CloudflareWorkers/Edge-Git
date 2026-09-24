@@ -1,4 +1,4 @@
-import {
+import type {
   AuditLogDAO,
   BranchProtectionDAO,
   CheckRunDAO,
@@ -31,17 +31,20 @@ import {
   WebhookDAO,
   WebhookDeliveryDAO,
   WikiDAO,
+  RepositoryRow,
+  RepoRole,
 } from '@edge-git/backend-data/dao';
-import type { RepositoryRow, RepoRole } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
-import { AppConfiguration } from '@edge-git/backend-runtime/config';
+import type { AppConfiguration } from '@edge-git/backend-runtime/config';
 import { isReservedNamespaceName } from '@edge-git/shared/constants';
-import { EmailAddress, RepoFullName, TimestampUtil, UUIDUtil, repoDoKeyForFullName } from '@edge-git/shared/utils';
-import { PermissionService } from '../permission/PermissionService';
+import { EmailAddress, RepoFullName, TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
+import type { PermissionService } from '../permission/PermissionService';
 import { cleanupRepoSidecars } from './repoCleanup';
 import { RepoVisibilityService } from './RepoVisibilityService';
 import { checkRepoQuota, classifyCreatePath, throwIfForbidden, validateRepoPatch } from './RepoCreatePolicy';
+import { createDefaultRepoServiceDeps } from './RepoServiceDefaults';
+import { enqueueVacuumTombstone, resolveCallerUsernameLowercased, resolveCreationContext } from './RepoCreateContext';
 
 interface RepoServiceEnv {
   DB: D1Queryable;
@@ -93,57 +96,9 @@ class RepoService {
     private readonly env: RepoServiceEnv,
     deps: RepoServiceDeps = {},
   ) {
-    const permissionService =
-      deps.permissionService ??
-      ((): Promise<PermissionService> =>
-        Promise.resolve(
-          new PermissionService(this.env, {
-            organizationDAO: deps.organizationDAO ?? (() => Promise.resolve(new OrganizationDAO(env.DB))),
-            organizationMemberDAO: deps.organizationMemberDAO ?? (() => Promise.resolve(new OrganizationMemberDAO(env.DB))),
-            repoCollaboratorDAO: deps.repoCollaboratorDAO ?? (() => Promise.resolve(new RepoCollaboratorDAO(env.DB))),
-            namespaceDAO: deps.namespaceDAO ?? (() => Promise.resolve(new NamespaceDAO(env.DB))),
-          }),
-        ));
-    this.deps = {
-      repositoryDAO: () => Promise.resolve(new RepositoryDAO(env.DB)),
-      issueDAO: () => Promise.resolve(new IssueDAO(env.DB)),
-      pullRequestDAO: () => Promise.resolve(new PullRequestDAO(env.DB)),
-      pullThreadDAO: () => Promise.resolve(new PullThreadDAO(env.DB)),
-      branchProtectionDAO: () => Promise.resolve(new BranchProtectionDAO(env.DB)),
-      userDAO: () => Promise.resolve(new UserDAO(env.DB)),
-      organizationDAO: () => Promise.resolve(new OrganizationDAO(env.DB)),
-      organizationMemberDAO: () => Promise.resolve(new OrganizationMemberDAO(env.DB)),
-      repoCollaboratorDAO: () => Promise.resolve(new RepoCollaboratorDAO(env.DB)),
-      namespaceDAO: () => Promise.resolve(new NamespaceDAO(env.DB)),
-      starDAO: () => Promise.resolve(new StarDAO(env.DB)),
-      watchDAO: () => Promise.resolve(new WatchDAO(env.DB)),
-      eventDAO: () => Promise.resolve(new EventDAO(env.DB)),
-      notificationDAO: () => Promise.resolve(new NotificationDAO(env.DB)),
-      releaseDAO: () => Promise.resolve(new ReleaseDAO(env.DB)),
-      projectDAO: () => Promise.resolve(new ProjectDAO(env.DB)),
-      discussionDAO: () => Promise.resolve(new DiscussionDAO(env.DB)),
-      wikiDAO: () => Promise.resolve(new WikiDAO(env.DB)),
-      importDAO: () =>
-        Promise.reject<ImportDAO>(new Error('RepoService requires an injected importDAO outside request scope.')),
-      mirrorDAO: () =>
-        Promise.reject<MirrorDAO>(new Error('RepoService requires an injected mirrorDAO outside request scope.')),
-      deployKeyDAO: () => Promise.resolve(new DeployKeyDAO(env.DB)),
-      deletedRepoDoDAO: () => Promise.resolve(new DeletedRepoDoDAO(env.DB)),
-      numberingDAO: () => Promise.resolve(new NumberingDAO(env.DB)),
-      searchDAO: () => Promise.resolve(new SearchDAO(env.DB)),
-      tokenGrantDAO: () => Promise.resolve(new TokenRepoGrantDAO(env.DB)),
-      securitySettingsDAO: () => Promise.resolve(new SecuritySettingsDAO(env.DB)),
-      collaborationDAO: () => Promise.resolve(new CollaborationDAO(env.DB)),
-      webhookDAO: () =>
-        Promise.reject<WebhookDAO>(new Error('RepoService requires an injected webhookDAO outside request scope.')),
-      webhookDeliveryDAO: () => Promise.resolve(new WebhookDeliveryDAO(env.DB)),
-      auditLogDAO: () => Promise.resolve(new AuditLogDAO(env.DB)),
-      teamGrantDAO: () => Promise.resolve(new TeamRepoGrantDAO(env.DB)),
-      checkRunDAO: () => Promise.resolve(new CheckRunDAO(env.DB)),
-      permissionService,
-      config: AppConfiguration.fromEnv(env),
-      ...deps,
-    };
+    // Defaults live in `RepoServiceDefaults` (Factory): the constructor stays
+    // a thin composition root so this file remains under the god-file guard.
+    this.deps = createDefaultRepoServiceDeps(env, deps);
     this.visibility = new RepoVisibilityService({
       repositoryDAO: this.deps.repositoryDAO,
       organizationDAO: this.deps.organizationDAO,
@@ -164,25 +119,17 @@ class RepoService {
     }
   }
 
-  private async permission(): Promise<PermissionService> {
-    return this.deps.permissionService();
-  }
-
   public async getRole(viewerEmail: string | null, repo: RepositoryRow | null): Promise<RepoRole | null> {
     return this.visibility.getRole(viewerEmail, repo);
   }
 
-  private async resolveCallerUsernameCi(userEmail: string): Promise<string | null> {
-    const normalized = EmailAddress.normalize(userEmail);
-    try {
-      const userDao = await this.deps.userDAO();
-      const user = await userDao.getByEmail(normalized);
-      if (user?.username) return user.username.toLowerCase();
-    } catch {
-      // ignore — fall back to email prefix below
-    }
-    const prefix = normalized.split('@', 1)[0]?.toLowerCase() ?? '';
-    return prefix || null;
+  /**
+   * Lowercased caller username for self-vs-org precedence.
+   * Why lowercased: `owner_ci` comparisons are case-insensitive; D1 stores
+   * the canonical case, but routing must not depend on it.
+   */
+  private async resolveCallerUsernameLowercased(userEmail: string): Promise<string | null> {
+    return resolveCallerUsernameLowercased(this.deps.userDAO, userEmail);
   }
 
   public async createRepo(
@@ -201,42 +148,27 @@ class RepoService {
       throw new BadRequestError('Repository already exists');
     }
     const owned = await dao.listByOwnerEmail(userEmail, 1000).catch(() => []);
+    // Why fail-open here: quota is a soft limit; a transient D1 outage must
+    // not block creation with 500 when the pure `checkRepoQuota` below still
+    // enforces the cap on the rows we did read. Auth/visibility stays fail-closed.
     checkRepoQuota(owned.length, this.deps.config.getMaxReposPerUser());
 
     const ownerCi = normalizedOwner.toLowerCase();
-    const callerCi = await this.resolveCallerUsernameCi(userEmail);
+    const callerCi = await this.resolveCallerUsernameLowercased(userEmail);
     const callerEmail = EmailAddress.normalize(userEmail);
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const id = UUIDUtil.getRandomUUID();
 
     // Resolve the org/namespace lookups up front; the precedence decision
     // itself is the pure `classifyCreatePath` policy below.
-    let org: { id: string; username: string } | null = null;
-    try {
-      const orgDao = await this.deps.organizationDAO();
-      org = await orgDao.getByUsernameCi(ownerCi);
-    } catch {
-      org = null;
-    }
-    let isOrgMember = false;
-    if (org) {
-      try {
-        const memberDao = await this.deps.organizationMemberDAO();
-        isOrgMember = (await memberDao.get(org.id, callerEmail)) !== null;
-      } catch {
-        isOrgMember = false;
-      }
-    }
-    let namespaceOwnerEmail: string | null = null;
-    if (!org && (!callerCi || ownerCi !== callerCi)) {
-      try {
-        const nsDao = await this.deps.namespaceDAO();
-        const ns = await nsDao.get(ownerCi);
-        namespaceOwnerEmail = ns?.user_email?.toLowerCase() ?? null;
-      } catch {
-        namespaceOwnerEmail = null;
-      }
-    }
+    const { org, isOrgMember, namespaceOwnerEmail } = await resolveCreationContext(
+      {
+        organizationDAO: this.deps.organizationDAO,
+        organizationMemberDAO: this.deps.organizationMemberDAO,
+        namespaceDAO: this.deps.namespaceDAO,
+      },
+      { ownerCi, callerCi, callerEmail },
+    );
 
     const path = classifyCreatePath({ ownerCi, callerCi, org, isOrgMember, namespaceOwnerEmail, callerEmail });
     throwIfForbidden(path);
@@ -294,7 +226,7 @@ class RepoService {
   }
 
   public async listVisibleForUser(userEmail: string, limit = 100): Promise<RepositoryRow[]> {
-    return this.visibility.listVisibleForUser(userEmail, (email) => this.resolveCallerUsernameCi(email), limit);
+    return this.visibility.listVisibleForUser(userEmail, (email) => this.resolveCallerUsernameLowercased(email), limit);
   }
 
   public async requireRole(
@@ -337,23 +269,7 @@ class RepoService {
     await cleanupRepoSidecars(this.deps, repo.id);
     const repositoryDAO = await this.deps.repositoryDAO();
     await repositoryDAO.deleteById(repo.id);
-    // Enqueue a vacuum tombstone so the background `RepoVacuumTask` can
-    // reclaim the REPO + CHECK_RUNNER isolate storage and KV caches once the
-    // name stays free. Best-effort: the synchronous targeted DO purge in the
-    // route already removed the live content; a missed tombstone only leaks
-    // reclaimed-later SQLite pages, never user-visible data.
-    try {
-      const tombstones = await this.deps.deletedRepoDoDAO();
-      const fullName = `${repo.owner}/${repo.name}`;
-      await tombstones.enqueue(
-        repoDoKeyForFullName(fullName),
-        fullName,
-        repo.id,
-        TimestampUtil.getCurrentUnixTimestampInSeconds(),
-      );
-    } catch (error) {
-      console.warn(`[WARN] [repoCleanup] vacuum tombstone enqueue failed: ${String(error)}`);
-    }
+    await enqueueVacuumTombstone(this.deps, repo);
     return { id: repo.id };
   }
 }
