@@ -347,6 +347,36 @@ class AppConfiguration {
   public getRealtimeMaxConnPerInboxShard(): number {
     return this.realtime.getMaxConnPerInboxShard();
   }
+
+  /**
+   * Fail-fast misconfiguration report (why: `EnvParser` silent fallback hid
+   * typos like `MAX_PACK_OBJECTS=banana`). Returns human-readable warnings
+   * for explicitly-set but malformed numeric vars; empty means clean.
+   * Call at worker startup or in tests — never per-request (allocation-free
+   * hot path stays untouched).
+   */
+  public validate(): string[] {
+    const warnings: string[] = [];
+    const numericKeys = [
+      'MAX_REPOS_PER_USER',
+      'MAX_TOKENS_PER_USER',
+      'MAX_TOKEN_EXPIRY_DAYS',
+      'MAX_PACK_OBJECTS',
+      'GIT_CACHE_TTL_SECONDS',
+      'MAX_FETCH_WANTS',
+      'MAX_FETCH_HAVES',
+      'MAX_PUSH_COMMANDS',
+      'MAX_PACK_BYTES',
+      'MAX_FETCH_BODY_BYTES',
+      'DO_DEVICE_BYTES',
+    ];
+    for (const key of numericKeys) {
+      if (!EnvParser.isValidPositiveInt(this.env, key)) {
+        warnings.push(`Invalid configuration: ${key} must be a positive integer`);
+      }
+    }
+    return warnings;
+  }
 }
 
 export { AppConfiguration };

@@ -107,4 +107,4 @@ function splitFullName(fullName: string): { owner: string; name: string } {
   return { owner, name: rest.join('/') };
 }
 
-export { RepoVacuumTask, VACUUM_GRACE_SECONDS, VACUUM_CLAIM_LIMIT, VACUUM_MAX_ATTEMPTS };
+export { RepoVacuumTask, VACUUM_GRACE_SECONDS };

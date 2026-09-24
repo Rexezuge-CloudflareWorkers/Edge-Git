@@ -11,14 +11,18 @@ function isLogLevel(level: string): level is LogLevel {
   return (['debug', 'info', 'warn', 'error'] as const).includes(level as LogLevel);
 }
 
-function resolveLogLevel(): LogLevel {
+function resolveLogLevel(env?: unknown): LogLevel {
+  // Workers have no `process.env`: prefer an injected env object (config
+  // separation) and fall back to Node `process.env` only for local tooling.
+  const fromInjected =
+    env !== null && typeof env === 'object' ? (env as Record<string, string | undefined>)['LOG_LEVEL'] : undefined;
   const fromEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.LOG_LEVEL;
-  const level = fromEnv ?? 'info';
+  const level = fromInjected ?? fromEnv ?? 'info';
   return isLogLevel(level) ? level : 'info';
 }
 
-export function createLogger(namespace?: string, fullRepoName?: string) {
-  const currentLevel = resolveLogLevel();
+export function createLogger(namespace?: string, fullRepoName?: string, env?: unknown) {
+  const currentLevel = resolveLogLevel(env);
   const minLevel = LOG_LEVELS[currentLevel];
 
   const argsStr = [fullRepoName, namespace]

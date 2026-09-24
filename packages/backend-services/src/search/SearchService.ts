@@ -151,28 +151,51 @@ class SearchService {
     });
   }
 
+  /**
+   * Strategy for repo-scoped visibility search (why: searchIssues/Pulls/Code/
+   * Discussions duplicated over-fetch → batch repo load → concurrent
+   * visibility → truncate). Callers supply only the DAO fetch and the repo-id
+   * extractor; ordering and truncation stay in one place.
+   */
+  private async runVisibilitySearch<T, R = T>(
+    query: string,
+    viewerEmail: string | null,
+    opts: { limit?: number; repoId?: string },
+    fetchCandidates: (q: string, fetchLimit: number, repoId?: string) => Promise<readonly T[]>,
+    resolveRepoId: (item: T) => string,
+    mapResult?: (item: T) => R,
+  ): Promise<R[]> {
+    const q = SearchService.sanitizeQuery(query);
+    const viewer = SearchService.normalizeViewer(viewerEmail);
+    const limit = SearchService.clampLimit(opts.limit ?? 20);
+    const candidates = await fetchCandidates(q, Math.min(limit * 3, MAX_LIMIT), opts.repoId);
+    if (candidates.length === 0) return [];
+    const repoIds = [...new Set(candidates.map(resolveRepoId))];
+    const repoById = await this.loadReposByIds(repoIds);
+    if (repoById.size === 0) return [];
+    const checked = await this.checkVisibility(candidates, viewer, (item) => repoById.get(resolveRepoId(item)) ?? null);
+    const visible: R[] = [];
+    for (const { item, visible: isVisible } of checked) {
+      if (!isVisible) continue;
+      visible.push(mapResult ? mapResult(item) : (item as unknown as R));
+      if (visible.length >= limit) break;
+    }
+    return visible;
+  }
+
   public async searchIssues(
     query: string,
     viewerEmail: string | null,
     opts: { limit?: number; repoId?: string } = {},
   ): Promise<IssueRow[]> {
-    const q = SearchService.sanitizeQuery(query);
-    const viewer = SearchService.normalizeViewer(viewerEmail);
-    const limit = SearchService.clampLimit(opts.limit ?? 20);
     const dao = await this.deps.searchDAO();
-    const candidates = await dao.searchIssues(q, { limit: Math.min(limit * 3, MAX_LIMIT), repoId: opts.repoId });
-    if (candidates.length === 0) return [];
-    // Batch repo loads concurrently (was sequential N+1), then concurrent roles.
-    const repoIds = [...new Set(candidates.map((c) => c.repository_id))];
-    const repoById = await this.loadReposByIds(repoIds);
-    if (repoById.size === 0) return [];
-    const checked = await this.checkVisibility(candidates, viewer, (issue) => repoById.get(issue.repository_id) ?? null);
-    const visible: IssueRow[] = [];
-    for (const { item, visible: isVisible } of checked) {
-      if (isVisible) visible.push(item);
-      if (visible.length >= limit) break;
-    }
-    return visible;
+    return this.runVisibilitySearch<IssueRow>(
+      query,
+      viewerEmail,
+      opts,
+      (q, fetchLimit, repoId) => dao.searchIssues(q, { limit: fetchLimit, repoId }),
+      (issue) => issue.repository_id,
+    );
   }
 
   public async searchPulls(
@@ -180,22 +203,14 @@ class SearchService {
     viewerEmail: string | null,
     opts: { limit?: number; repoId?: string } = {},
   ): Promise<PullRequestRow[]> {
-    const q = SearchService.sanitizeQuery(query);
-    const viewer = SearchService.normalizeViewer(viewerEmail);
-    const limit = SearchService.clampLimit(opts.limit ?? 20);
     const dao = await this.deps.searchDAO();
-    const candidates = await dao.searchPulls(q, { limit: Math.min(limit * 3, MAX_LIMIT), repoId: opts.repoId });
-    if (candidates.length === 0) return [];
-    const repoIds = [...new Set(candidates.map((c) => c.repository_id))];
-    const repoById = await this.loadReposByIds(repoIds);
-    if (repoById.size === 0) return [];
-    const checked = await this.checkVisibility(candidates, viewer, (pull) => repoById.get(pull.repository_id) ?? null);
-    const visible: PullRequestRow[] = [];
-    for (const { item, visible: isVisible } of checked) {
-      if (isVisible) visible.push(item);
-      if (visible.length >= limit) break;
-    }
-    return visible;
+    return this.runVisibilitySearch<PullRequestRow>(
+      query,
+      viewerEmail,
+      opts,
+      (q, fetchLimit, repoId) => dao.searchPulls(q, { limit: fetchLimit, repoId }),
+      (pull) => pull.repository_id,
+    );
   }
 
   public async searchCode(
@@ -203,24 +218,18 @@ class SearchService {
     viewerEmail: string | null,
     opts: { limit?: number; repoId?: string } = {},
   ): Promise<Array<CodeHit & { snippet: string }>> {
-    const q = SearchService.sanitizeQuery(query);
-    const viewer = SearchService.normalizeViewer(viewerEmail);
-    const limit = SearchService.clampLimit(opts.limit ?? 20);
     const dao = await this.deps.searchDAO();
-    const candidates = await dao.searchCode(q, { limit: Math.min(limit * 3, MAX_LIMIT), repoId: opts.repoId });
-    if (candidates.length === 0) return [];
-    const repoIds = [...new Set(candidates.map((c) => c.repo_id))];
-    const repoById = await this.loadReposByIds(repoIds);
-    if (repoById.size === 0) return [];
-    const firstToken = q.split(' ', 1)[0].toLowerCase();
-    const checked = await this.checkVisibility(candidates, viewer, (hit) => repoById.get(hit.repo_id) ?? null);
-    const visible: Array<CodeHit & { snippet: string }> = [];
-    for (const { item, visible: isVisible } of checked) {
-      if (!isVisible) continue;
-      visible.push({ ...item, snippet: SearchService.buildSnippet(item.content, firstToken) });
-      if (visible.length >= limit) break;
-    }
-    return visible;
+    // Snippet token is derived from the sanitized query so mapping stays pure.
+    const q = SearchService.sanitizeQuery(query);
+    const firstToken = q.split(' ', 1)[0]?.toLowerCase() ?? '';
+    return this.runVisibilitySearch<CodeHit, CodeHit & { snippet: string }>(
+      query,
+      viewerEmail,
+      opts,
+      (sanitized, fetchLimit, repoId) => dao.searchCode(sanitized, { limit: fetchLimit, repoId }),
+      (hit) => hit.repo_id,
+      (hit) => ({ ...hit, snippet: SearchService.buildSnippet(hit.content, firstToken) }),
+    );
   }
 
   private static buildSnippet(content: string, token: string): string {
@@ -286,22 +295,14 @@ class SearchService {
     viewerEmail: string | null,
     opts: { limit?: number; repoId?: string } = {},
   ): Promise<DiscussionRow[]> {
-    const q = SearchService.sanitizeQuery(query);
-    const viewer = SearchService.normalizeViewer(viewerEmail);
-    const limit = SearchService.clampLimit(opts.limit ?? 20);
     const dao = await this.deps.searchDAO();
-    const candidates = await dao.searchDiscussions(q, { limit: Math.min(limit * 3, MAX_LIMIT), repoId: opts.repoId });
-    if (candidates.length === 0) return [];
-    const repoIds = [...new Set(candidates.map((c) => c.repository_id))];
-    const repoById = await this.loadReposByIds(repoIds);
-    if (repoById.size === 0) return [];
-    const checked = await this.checkVisibility(candidates, viewer, (d) => repoById.get(d.repository_id) ?? null);
-    const visible: DiscussionRow[] = [];
-    for (const { item, visible: isVisible } of checked) {
-      if (isVisible) visible.push(item);
-      if (visible.length >= limit) break;
-    }
-    return visible;
+    return this.runVisibilitySearch<DiscussionRow>(
+      query,
+      viewerEmail,
+      opts,
+      (q, fetchLimit, repoId) => dao.searchDiscussions(q, { limit: fetchLimit, repoId }),
+      (d) => d.repository_id,
+    );
   }
 
   public async searchSnippets(query: string, opts: { limit?: number } = {}): Promise<SnippetRow[]> {

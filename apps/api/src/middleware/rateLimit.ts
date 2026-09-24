@@ -55,16 +55,29 @@ function cleanup(now: number): void {
 /**
  * Minimal in-memory token-bucket guard for abuse-prone mutating endpoints.
  * Per-isolate only (Workers have no shared memory); the cron sweeper and DO
- * single-flight remain the cross-isolate backstop. Never throws — failures
- * fail open so limiting can never 500 a legitimate request. IP grouping is
- * fail-closed: without a trusted CF-Connecting-IP all callers share the
- * `unknown` bucket instead of getting per-spoofed-header isolation.
+ * single-flight remain the cross-isolate backstop. Never throws at request
+ * time — failures fail open so limiting can never 500 a legitimate request.
+ * IP grouping is fail-closed: without a trusted CF-Connecting-IP all callers
+ * share the `unknown` bucket instead of getting per-spoofed-header isolation.
+ *
+ * Breaking: misconfigured `opts` (non-positive windowMs/max, empty keyPrefix)
+ * now throw at registration time instead of silently installing an unlimited
+ * or immediately-tripping bucket. All shipped `RATE_LIMIT_DEFS` are valid.
  */
 function rateLimit(opts: {
   windowMs: number;
   max: number;
   keyPrefix: string;
 }): (c: RateLimitContext, next: Next) => Promise<Response | void> {
+  if (!Number.isSafeInteger(opts.windowMs) || opts.windowMs <= 0) {
+    throw new Error(`Invalid rateLimit windowMs: ${String(opts.windowMs)} (must be a positive integer)`);
+  }
+  if (!Number.isSafeInteger(opts.max) || opts.max <= 0) {
+    throw new Error(`Invalid rateLimit max: ${String(opts.max)} (must be a positive integer)`);
+  }
+  if (!opts.keyPrefix || opts.keyPrefix.trim().length === 0) {
+    throw new Error('Invalid rateLimit keyPrefix: must be a non-empty string');
+  }
   return async (c: RateLimitContext, next: Next): Promise<Response | void> => {
     try {
       const now = Date.now();

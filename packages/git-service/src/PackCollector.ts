@@ -4,12 +4,8 @@ import { GitCache } from './GitCache';
 import { PackLimitError, checkObjectBudget, maxVisitedFor } from './PackLimits';
 import { parseBlobFilter, shouldSkipBlob as shouldSkipBlobByFilter } from './PackFilter';
 import { PackDepthResolver } from './PackDepthResolver';
-
-const logger = {
-  warn: (...args: unknown[]): void => console.warn('[WARN] [GitService]', ...args),
-  info: (...args: unknown[]): void => console.info('[INFO] [GitService]', ...args),
-  error: (...args: unknown[]): void => console.error('[ERROR] [GitService]', ...args),
-};
+import { consoleGitLogger } from './GitLogger';
+import type { GitLogger } from './GitLogger';
 
 export { PackLimitError } from './PackLimits';
 
@@ -18,6 +14,7 @@ type PromiseFsClient = ReturnType<IsoGitFs['getPromiseFsClient']>;
 export class PackCollector {
   private readonly fs: PromiseFsClient;
   private readonly gitdir: string;
+  private readonly logger: GitLogger;
   private readonly cacheHolder = new GitCache();
   private readonly depths: PackDepthResolver;
 
@@ -25,9 +22,10 @@ export class PackCollector {
     return this.cacheHolder.getCache();
   }
 
-  constructor(fs: PromiseFsClient, gitdir: string) {
+  constructor(fs: PromiseFsClient, gitdir: string, logger: GitLogger = consoleGitLogger) {
     this.fs = fs;
     this.gitdir = gitdir;
+    this.logger = logger;
     this.depths = new PackDepthResolver(fs, gitdir, () => this.cacheHolder.getCache());
   }
 
@@ -147,7 +145,7 @@ export class PackCollector {
         });
         objType = read.type;
       } catch (error) {
-        logger.error(`(collect-objects) Failed to read object ${oid}: ${String(error)}`);
+        this.logger.error(`(collect-objects) Failed to read object ${oid}: ${String(error)}`);
         continue;
       }
 
@@ -207,7 +205,7 @@ export class PackCollector {
         }
         await this.enqueueRelatedObjectsWithDepth(objType, oid, queue, depth);
       } catch (error) {
-        logger.error(`(collect-objects) Failed to expand object ${oid}: ${String(error)}`);
+        this.logger.error(`(collect-objects) Failed to expand object ${oid}: ${String(error)}`);
       }
     }
 

@@ -1,12 +1,9 @@
 import * as git from 'isomorphic-git';
 import type { IsoGitFs } from './IsoGitFs';
 import { GitCache } from './GitCache';
+import { mergeGitLogger } from './GitLogger';
+import type { GitLogger } from './GitLogger';
 import { isValidBranchName } from '@edge-git/shared/utils';
-
-const logger = {
-  warn: (...args: unknown[]): void => console.warn('[WARN] [MergeService]', ...args),
-  error: (...args: unknown[]): void => console.error('[ERROR] [MergeService]', ...args),
-};
 
 type PromiseFsClient = ReturnType<IsoGitFs['getPromiseFsClient']>;
 
@@ -46,16 +43,18 @@ export class MergeService {
   private readonly fs: PromiseFsClient;
   private readonly gitdir: string;
   private readonly dir: string;
+  private readonly logger: GitLogger;
   private readonly cacheHolder = new GitCache();
 
   private get cache(): object {
     return this.cacheHolder.getCache();
   }
 
-  constructor(fs: PromiseFsClient, gitdir: string, dir = '/tmp-merge-wd') {
+  constructor(fs: PromiseFsClient, gitdir: string, dir = '/tmp-merge-wd', logger: GitLogger = mergeGitLogger) {
     this.fs = fs;
     this.gitdir = gitdir;
     this.dir = dir;
+    this.logger = logger;
   }
 
   public clearCache(): void {
@@ -91,7 +90,7 @@ export class MergeService {
       const bases = await git.findMergeBase({ fs: this.fs, gitdir: this.gitdir, oids, cache: this.cache });
       return bases[0] ?? null;
     } catch (error) {
-      logger.warn(`(find-merge-base) failed for ${oids.join(',')}: ${String(error)}`);
+      this.logger.warn(`(find-merge-base) failed for ${oids.join(',')}: ${String(error)}`);
       return null;
     }
   }
@@ -234,7 +233,7 @@ export class MergeService {
       this.clearCache();
       return { type: 'fast-forward', commitOid: oid };
     } catch (error) {
-      logger.error(`(rebase) failed ${baseRef} <- ${input.headOid}: ${String(error)}`);
+      this.logger.error(`(rebase) failed ${baseRef} <- ${input.headOid}: ${String(error)}`);
       throw error;
     }
   }
@@ -293,7 +292,7 @@ export class MergeService {
       ) {
         return { type: 'conflict', conflicts: [], reason: 'criss-cross merges are not supported' };
       }
-      logger.error(`(merge) failed ${baseRef} <- ${input.headOid}: ${String(error)}`);
+      this.logger.error(`(merge) failed ${baseRef} <- ${input.headOid}: ${String(error)}`);
       throw error;
     } finally {
       await this.removeWorkdir(workdir);

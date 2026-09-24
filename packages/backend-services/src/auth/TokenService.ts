@@ -189,18 +189,21 @@ class TokenService {
       }
     } catch (error) {
       if (error instanceof BadRequestError) throw error;
-      // Count lookup failure must not fail the mint itself.
+      // Count lookup failure must not fail the mint itself (mint succeeds;
+      // the outage is intentionally not propagated so a transient read
+      // failure cannot block issuance).
     }
     if (resolvedGrants.length > 0) {
       const grantDAO = await this.deps.tokenGrantDAO();
       try {
         await grantDAO.setGrants(tokenId, resolvedGrants, now);
-      } catch {
+      } catch (error) {
         // Fail closed: a scoped token whose grants cannot persist must not
         // silently become unrestricted. Best-effort rollback then throw so
         // the caller sees 500 (masked) instead of a full-access token.
+        // `cause` preserves the D1 outage stack (why: bare `new Error` lost it).
         await dao.delete(tokenId, normalized).catch(() => undefined);
-        throw new Error('Failed to persist repository grants for token');
+        throw new Error('Failed to persist repository grants for token', { cause: error });
       }
     }
     return { tokenId, token, name: trimmedName, expiresAt, scopes: effectiveScopes, prefix };

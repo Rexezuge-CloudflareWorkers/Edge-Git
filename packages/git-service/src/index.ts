@@ -34,6 +34,8 @@ export { PackLimitError, checkObjectBudget, maxVisitedFor } from './PackLimits';
 export { parseBlobFilter, shouldSkipBlob } from './PackFilter';
 export type { ParsedBlobFilter } from './PackFilter';
 export { HistoryService } from './HistoryService';
+export { consoleGitLogger, mergeGitLogger, nullGitLogger } from './GitLogger';
+export type { GitLogger } from './GitLogger';
 export { TreeReader } from './TreeReader';
 export { TreeDiffer } from './TreeDiffer';
 export type { FileStateChange, TextFile } from './TreeDiffer';
