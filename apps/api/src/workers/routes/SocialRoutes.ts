@@ -4,6 +4,7 @@ import { Tokens, createRequestScope } from '@edge-git/backend-services/compositi
 import { RepoFullName } from '@edge-git/shared/utils';
 import { emitWebhookEvent, publishLiveUpdate } from './SocialEmit';
 import { usernameFor, usernameMap } from './IdentityPresenter';
+import { parseLimitParam } from './RouteInput';
 
 type SocialApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -76,7 +77,7 @@ function registerSocialRoutes(app: SocialApp): void {
   app.get('/repos/:owner/:repo/activity', async (c) => {
     return withPublicRepo(c, async (row) => {
       const url = new URL(c.req.url);
-      const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 30, 1), 100);
+      const limit = parseLimitParam(url.searchParams.get('limit'), 30, 100);
       const cursor = url.searchParams.get('cursor') ?? undefined;
       const scope = getScope(c);
       const { events, nextCursor } = await scope.get(Tokens.ActivityService).listByRepo(row.id, limit, cursor);

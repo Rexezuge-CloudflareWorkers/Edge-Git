@@ -1,11 +1,11 @@
 import type { Command } from './ReceiveParser';
 import type { ProtectedRefRule } from './types';
-import { ZERO_OID as SHARED_ZERO_OID } from '@edge-git/shared/constants';
+import { isZeroGitOid } from '@edge-git/shared/utils';
 
 export { ZERO_OID } from '@edge-git/shared/constants';
 
-function isZeroOid(oid: string): boolean {
-  return oid === SHARED_ZERO_OID;
+function isZeroOid(oid: unknown): boolean {
+  return isZeroGitOid(oid);
 }
 
 // `refs/heads/<branch>` → `<branch>`; anything else (tags, notes) → null.

@@ -1,6 +1,14 @@
 import type { RepoEventType } from '@edge-git/backend-data/dao';
 import type { WebhookEventName } from '@edge-git/shared';
-import { CryptoUtil } from '@edge-git/shared/utils';
+import {
+  CryptoUtil,
+  MAX_SHARED_URL_LENGTH,
+  stripHostTrailingDot,
+  isEncodedNumericHost,
+  isBlockedIpv6Host,
+  isLoopbackHost,
+  isLocalhostName,
+} from '@edge-git/shared/utils';
 
 const WEBHOOK_EVENTS: readonly WebhookEventName[] = [
   'push',
@@ -23,50 +31,17 @@ const WEBHOOK_EVENTS: readonly WebhookEventName[] = [
   'ping',
 ];
 
-const MAX_URL_LENGTH = 2048;
+const MAX_URL_LENGTH = MAX_SHARED_URL_LENGTH;
 const URL_PREFIX_LENGTH = 30;
 const SECRET_SUFFIX_LENGTH = 4;
 const IPV4_HOST_PATTERN = /^(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/;
 
-function stripBrackets(host: string): string {
-  const h = host.trim();
-  if (h.startsWith('[') && h.endsWith(']')) return h.slice(1, -1);
-  return h;
-}
-
 function stripTrailingDot(host: string): string {
-  const unbracketed = stripBrackets(host);
-  let end = unbracketed.length;
-  while (end > 0 && unbracketed.charAt(end - 1) === '.') end -= 1;
-  return unbracketed.slice(0, end);
+  return stripHostTrailingDot(host);
 }
 
 function isNumericOrEncodedHost(host: string): boolean {
-  const h = host.toLowerCase();
-  if (/^0x[\da-f]+$/i.test(h)) return true;
-  if (/^\d+$/.test(h)) return true;
-  if (/^0[0-7]+(?:\.0[0-7]+)+$/.test(h)) return true;
-  if (/^0x[\da-f.]+$/i.test(h)) return true;
-  if (/^[\d.]+$/.test(h) && !IPV4_HOST_PATTERN.test(h)) return true;
-  return false;
-}
-
-function isBlockedIpv6Host(host: string): boolean {
-  const h = host.toLowerCase();
-  if (['::', '::1', '0.0.0.0'].includes(h)) return true;
-  // Block all IPv4-mapped IPv6 (::ffff:/96): the embedded address may be
-  // normalized to hex (e.g. ::ffff:7f00:1), so match the prefix broadly.
-  if (h.startsWith('::ffff:')) return true;
-  // IPv4-mapped: ::ffff:a.b.c.d — blocked above via the ::ffff: prefix.
-  if (/^::ffff:\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/i.test(h)) {
-    return true;
-  }
-  // ULA fc00::/7, link-local fe80::/10, multicast ff00::/8.
-  if (h.startsWith('fc') || h.startsWith('fd')) return true;
-  if (/^fe[89ab]/i.test(h)) return true;
-  if (h.startsWith('ff')) return true;
-  if (h.startsWith('fe80:')) return true;
-  return false;
+  return isEncodedNumericHost(host);
 }
 
 function normalizeEvents(input: unknown): WebhookEventName[] {
@@ -169,13 +144,12 @@ function validateWebhookUrl(raw: string): void {
   const rawHost = parsed.hostname.toLowerCase();
   const host = stripTrailingDot(rawHost);
   if (host === '' || host.includes('%') || host.includes('_')) throw new Error('url must target a valid hostname');
-  if (host === 'localhost' || host === 'localhost.localdomain' || host.endsWith('.localhost')) {
+  if (isLocalhostName(host)) {
     throw new Error('url must not target localhost');
   }
   if (isBlockedIpv6Host(host)) throw new Error('url must not target a private or reserved address');
   if (isNumericOrEncodedHost(host)) throw new Error('url must not target a private or reserved address');
-  const loopbackHosts = ['::1', '0.0.0.0'];
-  if (loopbackHosts.includes(host) || host.startsWith('::ffff:127.')) throw new Error('url must not target a loopback address');
+  if (isLoopbackHost(host)) throw new Error('url must not target a loopback address');
   const ipv4 = IPV4_HOST_PATTERN.exec(host);
   if (ipv4) {
     const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];

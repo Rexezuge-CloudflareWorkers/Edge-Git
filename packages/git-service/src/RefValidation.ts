@@ -1,4 +1,5 @@
 import { ZERO_OID as SHARED_ZERO_OID } from '@edge-git/shared/constants';
+import { isZeroGitOid } from '@edge-git/shared/utils';
 
 export { ZERO_OID } from '@edge-git/shared/constants';
 export { isValidBranchName } from '@edge-git/shared/utils';
@@ -10,7 +11,7 @@ function isCommitOid(value: unknown): value is string {
 }
 
 function isZeroOid(value: unknown): boolean {
-  return value === SHARED_ZERO_OID;
+  return isZeroGitOid(value);
 }
 
 function branchRefFor(name: string): string {

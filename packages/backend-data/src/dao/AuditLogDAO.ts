@@ -200,4 +200,3 @@ class AuditLogDAO extends BaseDAO {
 }
 
 export { AuditLogDAO };
-export type { AuditLogFilters as AuditQueryFilters };

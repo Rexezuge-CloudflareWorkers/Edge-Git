@@ -3,19 +3,13 @@ import { Tokens } from '@edge-git/backend-services/composition';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { jsonError, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
+import { decodeRouteParam as decodeMemberParam } from './RouteInput';
 
 type TeamApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
-// Pure Strategy helper: Hono already decodes params, but a literal `%` in the
-// route still reaches `decodeURIComponent` here. Guard the URIError so a
-// malformed member becomes 400 instead of an uncaught 500.
-function decodeMemberParam(raw: string): string | null {
-  try {
-    return decodeURIComponent(raw);
-  } catch {
-    return null;
-  }
-}
+// `decodeMemberParam` is the shared fail-closed decoder in `RouteInput`
+// (Hono already decodes params, but a literal `%` still reaches
+// `decodeURIComponent` here — malformed input becomes 400, never a 500).
 
 // Pure normalization: trim whitespace; lowercase emails so `Foo@Bar.com `
 // resolves to the same user. Usernames keep case (resolved case-insensitively
@@ -216,4 +210,6 @@ function registerTeamRoutes(app: TeamApp): void {
   });
 }
 
-export { registerTeamRoutes, decodeMemberParam, normalizeMemberTarget };
+export { registerTeamRoutes,  normalizeMemberTarget };
+
+export {decodeRouteParam as decodeMemberParam} from './RouteInput';

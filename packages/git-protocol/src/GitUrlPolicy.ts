@@ -1,41 +1,26 @@
 import { BadRequestError } from '@edge-git/backend-errors';
+import {
+  MAX_SHARED_URL_LENGTH,
+  stripHostTrailingDot,
+  isEncodedNumericHost as sharedIsEncodedNumericHost,
+  isBlockedIpv6Host as sharedIsBlockedIpv6Host,
+  isLocalhostName,
+  isLoopbackHost,
+} from '@edge-git/shared/utils';
 
-const MAX_URL_LENGTH = 2048;
+const MAX_URL_LENGTH = MAX_SHARED_URL_LENGTH;
 const MAX_REDIRECTS = 3;
-const LOOPBACK_HOSTS = new Set(['::1', '0.0.0.0', '::']);
-
-function stripBrackets(host: string): string {
-  const h = host.trim();
-  if (h.startsWith('[') && h.endsWith(']')) return h.slice(1, -1);
-  return h;
-}
 
 function stripTrailingDot(host: string): string {
-  const unbracketed = stripBrackets(host);
-  let end = unbracketed.length;
-  while (end > 0 && unbracketed.charAt(end - 1) === '.') end -= 1;
-  return unbracketed.slice(0, end);
+  return stripHostTrailingDot(host);
 }
 
 function isEncodedNumericHost(host: string): boolean {
-  const h = host.toLowerCase();
-  if (/^0x[\da-f]+$/i.test(h)) return true;
-  if (/^\d+$/.test(h)) return true;
-  if (/^0[0-7]+(?:\.0[0-7]+)+$/.test(h)) return true;
-  if (/^0x[\da-f.]+$/i.test(h)) return true;
-  if (/^[\d.]+$/.test(h) && !/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return true;
-  return false;
+  return sharedIsEncodedNumericHost(host);
 }
 
 function isBlockedIpv6Host(host: string): boolean {
-  const h = host.toLowerCase();
-  if (h === '::') return true;
-  if (h.startsWith('::ffff:')) return true;
-  if (/^::ffff:\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/i.test(h)) return true;
-  if (h.startsWith('fc') || h.startsWith('fd')) return true;
-  if (/^fe[89ab]/i.test(h)) return true;
-  if (h.startsWith('ff')) return true;
-  return false;
+  return sharedIsBlockedIpv6Host(host);
 }
 
 /**
@@ -62,12 +47,12 @@ function normalizePublicGitUrl(raw: string): string {
   const rawHost = parsed.hostname.toLowerCase();
   const host = stripTrailingDot(rawHost);
   if (host === '' || host.includes('%') || host.includes('_')) throw new BadRequestError('sourceUrl must target a valid hostname');
-  if (host === 'localhost' || host === 'localhost.localdomain' || host.endsWith('.localhost')) {
+  if (isLocalhostName(host)) {
     throw new BadRequestError('sourceUrl must not target localhost');
   }
   if (isBlockedIpv6Host(host)) throw new BadRequestError('sourceUrl must not target a private or reserved address');
   if (isEncodedNumericHost(host)) throw new BadRequestError('sourceUrl must not target a private or reserved address');
-  if (LOOPBACK_HOSTS.has(host) || host.startsWith('::ffff:127.')) {
+  if (isLoopbackHost(host)) {
     throw new BadRequestError('sourceUrl must not target a loopback address');
   }
   const octets = host.split('.');
