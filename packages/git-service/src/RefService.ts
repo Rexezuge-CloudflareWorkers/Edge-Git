@@ -4,15 +4,13 @@ import type { RefUpdateResult } from '@edge-git/git-protocol';
 import { branchRefFor, classifyRefCommand, isValidBranchName } from './RefValidation';
 import { parseSymbolicHead } from './RefParsers';
 import { RefUpdatePlanner } from './RefUpdatePlanner';
+import { consoleGitLogger } from './GitLogger';
+import type { GitLogger } from './GitLogger';
 import { mapWithConcurrency } from '@edge-git/shared/utils';
 
-// Structured logger keeps DO logs greppable; console is the only sink
-// available in git-service (Layer 2 cannot depend on request-scoped DI).
-const logger = {
-  warn: (...args: unknown[]): void => console.warn('[WARN] [GitService]', ...args),
-  info: (...args: unknown[]): void => console.info('[INFO] [GitService]', ...args),
-  error: (...args: unknown[]): void => console.error('[ERROR] [GitService]', ...args),
-};
+// Injectable logger (Adapter): defaults to the console sink so existing DO
+// call sites keep working; tests inject `nullGitLogger` to silence output.
+const defaultLogger: GitLogger = consoleGitLogger;
 
 type PromiseFsClient = ReturnType<IsoGitFs['getPromiseFsClient']>;
 
@@ -24,10 +22,12 @@ const OID_RE = /^[0-9a-f]{40}$/i;
 export class RefService {
   private readonly fs: PromiseFsClient;
   private readonly gitdir: string;
+  private readonly logger: GitLogger;
 
-  constructor(fs: PromiseFsClient, gitdir: string) {
+  constructor(fs: PromiseFsClient, gitdir: string, logger: GitLogger = defaultLogger) {
     this.fs = fs;
     this.gitdir = gitdir;
+    this.logger = logger;
   }
 
   async initRepo() {
@@ -49,7 +49,7 @@ export class RefService {
       });
       symbolicHead = parseSymbolicHead(headContent);
     } catch {
-      logger.warn('(read-head-file) No HEAD found in repository.');
+      this.logger.warn('(read-head-file) No HEAD found in repository.');
     }
 
     try {
@@ -60,7 +60,7 @@ export class RefService {
       });
       refs.push({ ref: 'HEAD', oid: headOid });
     } catch {
-      logger.warn('(resolve-head-ref) No HEAD ref found in repository.');
+      this.logger.warn('(resolve-head-ref) No HEAD ref found in repository.');
     }
 
     const [branches, tags] = await Promise.all([this.listBranchesWithOid(), this.listTags()]);
@@ -96,7 +96,7 @@ export class RefService {
       });
       return branchRefs;
     } catch (error) {
-      logger.warn('(list-branches) Failed to list branches: ', error);
+      this.logger.warn('(list-branches) Failed to list branches: ', error);
       return [];
     }
   }
@@ -110,7 +110,7 @@ export class RefService {
       });
       return branch ?? null;
     } catch (error) {
-      logger.warn('(current-branch) Failed to get current branch: ', error);
+      this.logger.warn('(current-branch) Failed to get current branch: ', error);
       return null;
     }
   }
@@ -140,7 +140,7 @@ export class RefService {
     try {
       await git.branch({ fs: this.fs, gitdir: this.gitdir, ref: name, object: startOid, checkout: false });
     } catch (error) {
-      logger.warn(`(create-branch) Failed to create branch ${name}: ${String(error)}`);
+      this.logger.warn(`(create-branch) Failed to create branch ${name}: ${String(error)}`);
       return { ok: false, error: 'failed to create branch', status: 400 };
     }
     return { ok: true, ref, oid: startOid.toLowerCase() };
@@ -163,7 +163,7 @@ export class RefService {
     try {
       await git.deleteRef({ fs: this.fs, gitdir: this.gitdir, ref });
     } catch (error) {
-      logger.warn(`(delete-branch) Failed to delete branch ${name}: ${String(error)}`);
+      this.logger.warn(`(delete-branch) Failed to delete branch ${name}: ${String(error)}`);
       return { ok: false, error: 'failed to delete branch', status: 400 };
     }
     return { ok: true, ref };
@@ -181,7 +181,7 @@ export class RefService {
     try {
       await git.writeRef({ fs: this.fs, gitdir: this.gitdir, ref: 'HEAD', value: branchRefFor(name), force: true, symbolic: true });
     } catch (error) {
-      logger.warn(`(set-default-branch) Failed to point HEAD at ${name}: ${String(error)}`);
+      this.logger.warn(`(set-default-branch) Failed to point HEAD at ${name}: ${String(error)}`);
       return { ok: false, error: 'failed to update default branch', status: 400 };
     }
     return { ok: true, defaultBranch: name };
@@ -255,7 +255,7 @@ export class RefService {
       });
       return oid;
     } catch (error) {
-      logger.warn(`(resolve-ref) Failed to resolve ref ${ref}: ${String(error)}`);
+      this.logger.warn(`(resolve-ref) Failed to resolve ref ${ref}: ${String(error)}`);
       return null;
     }
   }

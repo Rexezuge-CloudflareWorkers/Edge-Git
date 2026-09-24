@@ -1,7 +1,7 @@
 import { BaseDAO } from './BaseDAO';
 import type { D1Queryable } from '../utils/D1Types';
 import { isMissingSchemaError } from '../utils/D1ErrorClassifier';
-import { DatabaseError } from '@edge-git/backend-errors';
+import { rowsOrEmpty, searchScopedWithTokens, throwUnlessMissingSchema } from './SearchFallback';
 import type { IssueRow } from './IssueDAO';
 import type { PullRequestRow } from './PullRequestDAO';
 import type { RepositoryRow } from './RepositoryDAO';
@@ -14,7 +14,6 @@ import {
   TITLE_BODY_SEARCH_COLUMNS,
   UPSERT_CODE_FILE_SQL,
   buildLikeOrClause,
-  buildScopedLikeStatement,
   likeParamsForTokens,
   prepareSearchQuery,
 } from './SearchQueries';
@@ -62,31 +61,10 @@ class SearchDAO extends BaseDAO {
     super(database);
   }
 
-  // Template Method helpers shared by the six search domains below: run the
-  // FTS statement, fall back to LIKE, degrade to `[]` on missing schema.
-  private static rowsOrEmpty<T>(result: { results?: T[] } | null | undefined): T[] {
-    return result?.results ?? [];
-  }
-
-  private static throwUnlessMissingSchema(error: unknown, resource: string): void {
-    if (!isMissingSchemaError(error)) {
-      throw new DatabaseError(`Failed to search ${resource}: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-
-  private async runScopedFts<T>(sql: string, params: unknown[]): Promise<T[]> {
-    const result = await this.database
-      .prepare(sql)
-      .bind(...params)
-      .all<T>();
-    return SearchDAO.rowsOrEmpty(result);
-  }
-
-  private async runScopedLike<T>(sql: string, scopeValue: string | undefined, patterns: unknown[], limit: number): Promise<T[]> {
-    const result = await (
-      scopeValue ? this.database.prepare(sql).bind(scopeValue, ...patterns, limit) : this.database.prepare(sql).bind(...patterns, limit)
-    ).all<T>();
-    return SearchDAO.rowsOrEmpty(result);
+  // Scoped FTS-first search lives in `./SearchFallback.ts` (Template Method);
+  // domain methods below supply only SQL/params + LIKE specs.
+  private scoped<T>(args: Parameters<typeof searchScopedWithTokens>[1]): Promise<T[]> {
+    return searchScopedWithTokens<T>(this.database, args);
   }
 
   public async searchRepos(query: string, opts: SearchOptions = {}): Promise<RepositoryRow[]> {
@@ -98,7 +76,7 @@ class SearchDAO extends BaseDAO {
         .prepare(`SELECT r.* FROM repo_fts f JOIN repositories r ON r.id = f.repo_id WHERE repo_fts MATCH ? ORDER BY rank LIMIT ?`)
         .bind(ftsQuery, limit)
         .all<RepositoryRow>();
-      return SearchDAO.rowsOrEmpty(result);
+      return rowsOrEmpty(result);
     } catch {
       // FTS5 unavailable — LIKE fallback over name/description/full name.
       const likes = buildLikeOrClause(REPO_SEARCH_COLUMNS, tokens.length);
@@ -108,9 +86,9 @@ class SearchDAO extends BaseDAO {
           .prepare(`SELECT * FROM repositories WHERE ${likes} ORDER BY updated_at DESC LIMIT ?`)
           .bind(...params)
           .all<RepositoryRow>();
-        return SearchDAO.rowsOrEmpty(result);
+        return rowsOrEmpty(result);
       } catch (error) {
-        SearchDAO.throwUnlessMissingSchema(error, 'repositories');
+        throwUnlessMissingSchema(error, 'repositories');
         return [];
       }
     }
@@ -120,90 +98,72 @@ class SearchDAO extends BaseDAO {
     const prepared = prepareSearchQuery(query, opts.limit);
     if (!prepared) return [];
     const { limit, tokens, ftsQuery } = prepared;
-    try {
-      const base = opts.repoId
-        ? `SELECT i.* FROM issue_fts f JOIN issues i ON i.id = f.issue_id WHERE issue_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
-        : `SELECT i.* FROM issue_fts f JOIN issues i ON i.id = f.issue_id WHERE issue_fts MATCH ? ORDER BY rank LIMIT ?`;
-      const result = await this.runScopedFts<IssueRow>(base, opts.repoId ? [ftsQuery, opts.repoId, limit] : [ftsQuery, limit]);
-      return result;
-    } catch {
-      const like = buildScopedLikeStatement({
+    const base = opts.repoId
+      ? `SELECT i.* FROM issue_fts f JOIN issues i ON i.id = f.issue_id WHERE issue_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
+      : `SELECT i.* FROM issue_fts f JOIN issues i ON i.id = f.issue_id WHERE issue_fts MATCH ? ORDER BY rank LIMIT ?`;
+    return this.scoped<IssueRow>({
+      resource: 'issues',
+      ftsSql: base,
+      ftsParams: opts.repoId ? [ftsQuery, opts.repoId, limit] : [ftsQuery, limit],
+      likeSpec: {
         table: 'issues',
         scopeColumn: 'repository_id',
         scopeValue: opts.repoId,
         columns: TITLE_BODY_SEARCH_COLUMNS,
-        tokenCount: tokens.length,
         scopedOrderBy: 'number DESC',
         unscopedOrderBy: 'updated_at DESC',
-      });
-      const patterns = likeParamsForTokens(tokens, TITLE_BODY_SEARCH_COLUMNS.length);
-      try {
-        return await this.runScopedLike<IssueRow>(like.text, like.scoped ? opts.repoId : undefined, patterns, limit);
-      } catch (error) {
-        SearchDAO.throwUnlessMissingSchema(error, 'issues');
-        return [];
-      }
-    }
+      },
+      tokens,
+      limit,
+    });
   }
 
   public async searchPulls(query: string, opts: SearchOptions = {}): Promise<PullRequestRow[]> {
     const prepared = prepareSearchQuery(query, opts.limit);
     if (!prepared) return [];
     const { limit, tokens, ftsQuery } = prepared;
-    try {
-      const base = opts.repoId
-        ? `SELECT p.* FROM pull_fts f JOIN pull_requests p ON p.id = f.pull_id WHERE pull_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
-        : `SELECT p.* FROM pull_fts f JOIN pull_requests p ON p.id = f.pull_id WHERE pull_fts MATCH ? ORDER BY rank LIMIT ?`;
-      const result = await this.runScopedFts<PullRequestRow>(base, opts.repoId ? [ftsQuery, opts.repoId, limit] : [ftsQuery, limit]);
-      return result;
-    } catch {
-      const like = buildScopedLikeStatement({
+    const base = opts.repoId
+      ? `SELECT p.* FROM pull_fts f JOIN pull_requests p ON p.id = f.pull_id WHERE pull_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
+      : `SELECT p.* FROM pull_fts f JOIN pull_requests p ON p.id = f.pull_id WHERE pull_fts MATCH ? ORDER BY rank LIMIT ?`;
+    return this.scoped<PullRequestRow>({
+      resource: 'pulls',
+      ftsSql: base,
+      ftsParams: opts.repoId ? [ftsQuery, opts.repoId, limit] : [ftsQuery, limit],
+      likeSpec: {
         table: 'pull_requests',
         scopeColumn: 'repository_id',
         scopeValue: opts.repoId,
         columns: TITLE_BODY_SEARCH_COLUMNS,
-        tokenCount: tokens.length,
         scopedOrderBy: 'number DESC',
         unscopedOrderBy: 'updated_at DESC',
-      });
-      const patterns = likeParamsForTokens(tokens, TITLE_BODY_SEARCH_COLUMNS.length);
-      try {
-        return await this.runScopedLike<PullRequestRow>(like.text, like.scoped ? opts.repoId : undefined, patterns, limit);
-      } catch (error) {
-        SearchDAO.throwUnlessMissingSchema(error, 'pulls');
-        return [];
-      }
-    }
+      },
+      tokens,
+      limit,
+    });
   }
 
   public async searchCode(query: string, opts: SearchOptions = {}): Promise<CodeHit[]> {
     const prepared = prepareSearchQuery(query, opts.limit);
     if (!prepared) return [];
     const { limit, tokens, ftsQuery } = prepared;
-    try {
-      const base = opts.repoId
-        ? `SELECT c.* FROM code_fts f JOIN code_index c ON c.repo_id = f.repo_id AND c.path = f.path WHERE code_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
-        : `SELECT c.* FROM code_fts f JOIN code_index c ON c.repo_id = f.repo_id AND c.path = f.path WHERE code_fts MATCH ? ORDER BY rank LIMIT ?`;
-      const result = await this.runScopedFts<CodeHit>(base, opts.repoId ? [ftsQuery, opts.repoId, limit] : [ftsQuery, limit]);
-      return result;
-    } catch {
-      const like = buildScopedLikeStatement({
+    const base = opts.repoId
+      ? `SELECT c.* FROM code_fts f JOIN code_index c ON c.repo_id = f.repo_id AND c.path = f.path WHERE code_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
+      : `SELECT c.* FROM code_fts f JOIN code_index c ON c.repo_id = f.repo_id AND c.path = f.path WHERE code_fts MATCH ? ORDER BY rank LIMIT ?`;
+    return this.scoped<CodeHit>({
+      resource: 'code',
+      ftsSql: base,
+      ftsParams: opts.repoId ? [ftsQuery, opts.repoId, limit] : [ftsQuery, limit],
+      likeSpec: {
         table: 'code_index',
         scopeColumn: 'repo_id',
         scopeValue: opts.repoId,
         columns: CODE_SEARCH_COLUMNS,
-        tokenCount: tokens.length,
         scopedOrderBy: 'path ASC',
         unscopedOrderBy: 'updated_at DESC',
-      });
-      const patterns = likeParamsForTokens(tokens, CODE_SEARCH_COLUMNS.length);
-      try {
-        return await this.runScopedLike<CodeHit>(like.text, like.scoped ? opts.repoId : undefined, patterns, limit);
-      } catch (error) {
-        SearchDAO.throwUnlessMissingSchema(error, 'code');
-        return [];
-      }
-    }
+      },
+      tokens,
+      limit,
+    });
   }
 
   public async upsertCodeFile(input: CodeFileInput): Promise<number> {
@@ -258,9 +218,9 @@ class SearchDAO extends BaseDAO {
   public async getOidsByRepo(repoId: string): Promise<CodeOidEntry[]> {
     try {
       const result = await this.database.prepare('SELECT path, oid FROM code_index WHERE repo_id = ?').bind(repoId).all<CodeOidEntry>();
-      return SearchDAO.rowsOrEmpty(result);
+      return rowsOrEmpty(result);
     } catch (error) {
-      SearchDAO.throwUnlessMissingSchema(error, 'indexed oids');
+      throwUnlessMissingSchema(error, 'indexed oids');
       // Fakes/DBs without code search tables.
       return [];
     }
@@ -330,30 +290,24 @@ class SearchDAO extends BaseDAO {
     const prepared = prepareSearchQuery(query, opts.limit);
     if (!prepared) return [];
     const { limit, tokens, ftsQuery } = prepared;
-    try {
-      const base = opts.repoId
-        ? `SELECT d.* FROM discussion_fts f JOIN discussions d ON d.id = f.discussion_id WHERE discussion_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
-        : `SELECT d.* FROM discussion_fts f JOIN discussions d ON d.id = f.discussion_id WHERE discussion_fts MATCH ? ORDER BY rank LIMIT ?`;
-      const result = await this.runScopedFts<DiscussionRow>(base, opts.repoId ? [ftsQuery, opts.repoId, limit] : [ftsQuery, limit]);
-      return result;
-    } catch {
-      const like = buildScopedLikeStatement({
+    const base = opts.repoId
+      ? `SELECT d.* FROM discussion_fts f JOIN discussions d ON d.id = f.discussion_id WHERE discussion_fts MATCH ? AND f.repo_id = ? ORDER BY rank LIMIT ?`
+      : `SELECT d.* FROM discussion_fts f JOIN discussions d ON d.id = f.discussion_id WHERE discussion_fts MATCH ? ORDER BY rank LIMIT ?`;
+    return this.scoped<DiscussionRow>({
+      resource: 'discussions',
+      ftsSql: base,
+      ftsParams: opts.repoId ? [ftsQuery, opts.repoId, limit] : [ftsQuery, limit],
+      likeSpec: {
         table: 'discussions',
         scopeColumn: 'repository_id',
         scopeValue: opts.repoId,
         columns: TITLE_BODY_SEARCH_COLUMNS,
-        tokenCount: tokens.length,
         scopedOrderBy: 'number DESC',
         unscopedOrderBy: 'updated_at DESC',
-      });
-      const patterns = likeParamsForTokens(tokens, TITLE_BODY_SEARCH_COLUMNS.length);
-      try {
-        return await this.runScopedLike<DiscussionRow>(like.text, like.scoped ? opts.repoId : undefined, patterns, limit);
-      } catch (error) {
-        SearchDAO.throwUnlessMissingSchema(error, 'discussions');
-        return [];
-      }
-    }
+      },
+      tokens,
+      limit,
+    });
   }
 
   public async searchSnippets(query: string, opts: { limit?: number } = {}): Promise<SnippetRow[]> {
@@ -367,7 +321,7 @@ class SearchDAO extends BaseDAO {
         )
         .bind(ftsQuery, limit)
         .all<SnippetRow>();
-      return SearchDAO.rowsOrEmpty(result);
+      return rowsOrEmpty(result);
     } catch {
       const likes = buildLikeOrClause(SNIPPET_SEARCH_COLUMNS, tokens.length);
       const params: unknown[] = likeParamsForTokens(tokens, SNIPPET_SEARCH_COLUMNS.length);
@@ -377,9 +331,9 @@ class SearchDAO extends BaseDAO {
           .prepare(`SELECT * FROM snippets WHERE visibility = 'public' AND ${likes} ORDER BY updated_at DESC LIMIT ?`)
           .bind(...params)
           .all<SnippetRow>();
-        return SearchDAO.rowsOrEmpty(result);
+        return rowsOrEmpty(result);
       } catch (error) {
-        SearchDAO.throwUnlessMissingSchema(error, 'snippets');
+        throwUnlessMissingSchema(error, 'snippets');
         return [];
       }
     }

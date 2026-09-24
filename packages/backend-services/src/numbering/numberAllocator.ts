@@ -1,4 +1,5 @@
 import type { NumberedEntity, NumberingDAO } from '@edge-git/backend-data/dao';
+import { isMissingSchemaError } from '@edge-git/backend-data/utils';
 
 /**
  * Allocate a per-repo number via the atomic `repo_number_counters` table,
@@ -24,13 +25,19 @@ async function allocateNumberWithFallback(
     const dao = await numberingDAO();
     return await dao.allocateNumber(repositoryId, entity);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
     // Legacy DBs (missing table) and unit fakes (`DB: {}` without
     // `prepare`) fall back to the legacy MAX+1 reader. Anything else
     // (unknown entity, genuine D1 outage) is rethrown fail-closed:
     // production `D1Queryable` always has `prepare`, so a missing
     // `prepare` unambiguously signals a test fake, never prod.
-    if (/no such table|repo_number_counters|prepare is not a function/i.test(message)) {
+    // Why `isMissingSchemaError` + prepare-probe instead of a message regex:
+    // the old `/no such table|...|prepare is not a function/` regex missed
+    // `no such column` deploy skew and over-matched outage text containing
+    // "counters". Central classifier keeps failure semantics in one place.
+    if (isMissingSchemaError(error)) {
+      return legacyNextNumber();
+    }
+    if (error instanceof TypeError && /prepare is not a function/i.test(error.message)) {
       return legacyNextNumber();
     }
     throw error;

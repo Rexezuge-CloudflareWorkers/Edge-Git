@@ -146,7 +146,6 @@ function isInterruptMessage(message: string): boolean {
 }
 
 export {
-  CUSTOM_CONCLUSIONS,
   disposeBag,
   disposeQuietly,
   formatLoggedArgs,
@@ -161,7 +160,6 @@ export {
   setStringProp,
   sliceText,
   stripTrailingDots,
-  stringifyUnknown,
   toSandboxResult,
 };
 export type { HandleBag };

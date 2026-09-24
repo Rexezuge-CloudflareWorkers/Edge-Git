@@ -11,6 +11,7 @@ import {
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { isMissingSchemaError } from '@edge-git/backend-data/utils';
 import { DatabaseError } from '@edge-git/backend-errors';
+import { maxTeamGrantRole } from './TeamGrantPolicy';
 import type { RepoRole } from '@edge-git/backend-data/dao';
 
 type RepoPermission = RepoRole;
@@ -123,7 +124,7 @@ class PermissionService {
           if (maybeOrg && (repo.org_id === maybeOrg.id || repo.owner_type === 'org')) orgId = maybeOrg.id;
         } catch (error) {
           if (!this.isTolerableSchemaError(error))
-            throw new DatabaseError(`Failed to resolve organization: ${error instanceof Error ? error.message : String(error)}`);
+            throw new DatabaseError(`Failed to resolve organization: ${error instanceof Error ? error.message : String(error)}`, false, { cause: error });
           // ignore — legacy DB without organizations table
         }
       }
@@ -131,7 +132,7 @@ class PermissionService {
       if (!this.isTolerableSchemaError(error))
         throw error instanceof DatabaseError
           ? error
-          : new DatabaseError(`Failed to resolve permission: ${error instanceof Error ? error.message : String(error)}`);
+          : new DatabaseError(`Failed to resolve permission: ${error instanceof Error ? error.message : String(error)}`, false, { cause: error });
       orgId = null;
     }
 
@@ -142,7 +143,7 @@ class PermissionService {
         if (membership?.role === 'owner') return 'admin';
       } catch (error) {
         if (!this.isTolerableSchemaError(error))
-          throw new DatabaseError(`Failed to check org membership: ${error instanceof Error ? error.message : String(error)}`);
+          throw new DatabaseError(`Failed to check org membership: ${error instanceof Error ? error.message : String(error)}`, false, { cause: error });
         // missing table → fall through to collaborator/public checks
       }
       let best: RepoPermission | null = null;
@@ -152,7 +153,7 @@ class PermissionService {
         if (grant) best = grant.role;
       } catch (error) {
         if (!this.isTolerableSchemaError(error))
-          throw new DatabaseError(`Failed to check collaborator grant: ${error instanceof Error ? error.message : String(error)}`);
+          throw new DatabaseError(`Failed to check collaborator grant: ${error instanceof Error ? error.message : String(error)}`, false, { cause: error });
       }
       // Team-derived grants (org repos only): max of direct + team grants.
       // Missing team tables (legacy DBs/fakes) fall through silently.
@@ -163,7 +164,7 @@ class PermissionService {
         if (!this.isTolerableSchemaError(error))
           throw error instanceof DatabaseError
             ? error
-            : new DatabaseError(`Failed to check team grants: ${error instanceof Error ? error.message : String(error)}`);
+            : new DatabaseError(`Failed to check team grants: ${error instanceof Error ? error.message : String(error)}`, false, { cause: error });
       }
       if (best) return best;
       return isPrivate ? null : 'read';
@@ -178,7 +179,7 @@ class PermissionService {
       if (grant) return grant.role;
     } catch (error) {
       if (!this.isTolerableSchemaError(error))
-        throw new DatabaseError(`Failed to check collaborator grant: ${error instanceof Error ? error.message : String(error)}`);
+        throw new DatabaseError(`Failed to check collaborator grant: ${error instanceof Error ? error.message : String(error)}`, false, { cause: error });
     }
     return isPrivate ? null : 'read';
   }
@@ -199,7 +200,7 @@ class PermissionService {
       grants = await grantDAO.listByRepo(repoId);
     } catch (error) {
       if (!this.isTolerableSchemaError(error))
-        throw new DatabaseError(`Failed to list team grants: ${error instanceof Error ? error.message : String(error)}`);
+        throw new DatabaseError(`Failed to list team grants: ${error instanceof Error ? error.message : String(error)}`, false, { cause: error });
       return null;
     }
     if (grants.length === 0) return null;
@@ -211,7 +212,7 @@ class PermissionService {
         return await op;
       } catch (error) {
         if (!this.isTolerableSchemaError(error))
-          throw new DatabaseError(`Failed to resolve team role: ${error instanceof Error ? error.message : String(error)}`);
+          throw new DatabaseError(`Failed to resolve team role: ${error instanceof Error ? error.message : String(error)}`, false, { cause: error });
         return null;
       }
     };
@@ -223,18 +224,12 @@ class PermissionService {
     // Positional membership: `memberships[i]` answers `uniqueTeamIds[i]`.
     // (Do not rely on the row's `team_id` field — fakes/legacy rows may omit it.)
     const memberTeamIds = new Set(uniqueTeamIds.filter((_, i) => memberships[i] !== null));
-    let best: RepoPermission | null = null;
-    for (const grant of grants) {
-      const team = teamById.get(grant.team_id);
-      if (!team || team.org_id !== orgId) continue;
-      if (!memberTeamIds.has(grant.team_id)) continue;
-      const role = grant.role;
-      if (!best || ROLE_RANK[role] > ROLE_RANK[best]) {
-        best = role;
-        if (best === 'admin') break;
-      }
-    }
-    return best;
+    // Pure policy (why: max-role reduction is unit-testable without D1).
+    return maxTeamGrantRole(
+      grants,
+      (teamId) => memberTeamIds.has(teamId),
+      (teamId) => teamById.get(teamId)?.org_id === orgId,
+    );
   }
 }
 
