@@ -19,3 +19,5 @@ export { WebhookDeliveryService } from './WebhookDeliveryService';
 export type { WebhookDeliveryServiceDeps, WebhookDeliveryServiceEnv, EnqueueEventInput } from './WebhookDeliveryService';
 export { WEBHOOK_BACKOFF_SCHEDULE_SECONDS, backoffSecondsForAttempt, isRetryableHttpStatus } from './WebhookRetryPolicy';
 export { resolveSenderUsername, toPublicDelivery } from './WebhookDeliveryMapping';
+export { defaultPostJson, STORED_ERROR_CHAR_LIMIT, ERROR_PREVIEW_LIMIT } from './WebhookHttpClient';
+export type { WebhookPostInit, WebhookPostOutcome, WebhookPostJson } from './WebhookHttpClient';

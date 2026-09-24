@@ -37,7 +37,10 @@ function mapServiceError(error: unknown, locale?: string | null): MappedError {
 
 function toServiceStatus(error: unknown): 400 | 401 | 403 | 404 | 409 | 413 | 429 | 500 {
   const mapped = mapServiceError(error);
-  if ([400, 401, 403, 404, 409, 413, 429].includes(mapped.status)) return mapped.status as 400 | 401 | 403 | 404 | 409 | 413 | 429;
+  // Registry over branching: known wire statuses pass through, everything
+  // else (including 5xx typed errors) collapses to 500 for the JSON API.
+  const KNOWN_STATUSES = new Set([400, 401, 403, 404, 409, 413, 429]);
+  if (KNOWN_STATUSES.has(mapped.status)) return mapped.status as 400 | 401 | 403 | 404 | 409 | 413 | 429;
   return 500;
 }
 

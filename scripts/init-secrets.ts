@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-import { execSync } from 'child_process';
+import { execFileSync, spawnSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parse } from 'jsonc-parser';
@@ -13,14 +13,14 @@ interface WranglerConfig {
   }>;
 }
 
-function exec(command: string): string {
+function execFile(command: string, args: readonly string[], input?: string): string {
   try {
-    return execSync(command, { encoding: 'utf8', stdio: 'pipe' });
+    return execFileSync(command, [...args], { encoding: 'utf8', stdio: 'pipe', input });
   } catch (error: unknown) {
     if (error instanceof Error) {
-      throw new Error(`Command failed: ${command}\n${error.message}`);
+      throw new Error(`Command failed: ${command} ${args.join(' ')}\n${error.message}`);
     }
-    throw new Error(`Command failed: ${command}\nUnknown error.`);
+    throw new Error(`Command failed: ${command} ${args.join(' ')}\nUnknown error.`);
   }
 }
 
@@ -32,7 +32,8 @@ function parseWranglerConfig(): WranglerConfig {
 
 function checkSecret(storeId: string, secretName: string): boolean {
   try {
-    const output = exec(`pnpm exec wrangler secrets-store secret list ${storeId} --remote`);
+    // Argv array (no shell): `storeId` never interpolates into `sh -c`.
+    const output = execFile('pnpm', ['exec', 'wrangler', 'secrets-store', 'secret', 'list', storeId, '--remote']);
     return output.includes(secretName);
   } catch {
     return false;
@@ -47,7 +48,24 @@ async function generateAESGCMKey(): Promise<string> {
 
 function createSecret(storeId: string, secretName: string, secretValue: string): void {
   console.log(`Creating secret: ${secretName}`);
-  exec(`echo "${secretValue}" | pnpm exec wrangler secrets-store secret create ${storeId} --name ${secretName} --scopes workers --remote`);
+  // Why `spawnSync` with piped stdin: the previous
+  // `echo "${secretValue}" | wrangler ... ${secretName}` broke on `"`, `$`,
+  // backticks, and newlines and leaked the value via `ps`. Argv + stdin pipe
+  // keeps both the value and the names out of any shell.
+  const child = spawnSync(
+    'pnpm',
+    ['exec', 'wrangler', 'secrets-store', 'secret', 'create', storeId, '--name', secretName, '--scopes', 'workers', '--remote'],
+    {
+      input: secretValue,
+      encoding: 'utf8',
+      stdio: 'pipe',
+    },
+  );
+  if (child.status !== 0) {
+    throw new Error(
+      `Command failed: wrangler secrets-store secret create ${storeId} --name ${secretName}\n${child.stderr || child.error?.message || 'Unknown error.'}`,
+    );
+  }
 }
 
 async function main() {

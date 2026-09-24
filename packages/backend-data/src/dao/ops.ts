@@ -8,7 +8,17 @@ export { MirrorDAO } from './MirrorDAO';
 export { ReleaseDAO } from './ReleaseDAO';
 export type { ReleaseRow, ReleaseAssetRow } from './ReleaseDAO';
 export { SearchDAO } from './SearchDAO';
-export type { CodeHit, SearchOptions } from './SearchDAO';
+export { SearchCodeIndexDAO } from './SearchCodeIndexDAO';
+export type {
+  CodeHit,
+  CodeOidEntry,
+  CodeFileInput,
+  SearchOptions,
+  CodeIndexRow,
+  CodeOidPair,
+  CodeIndexUpsert,
+  SearchResource,
+} from './SearchDAO';
 export {
   SEARCH_DEFAULT_LIMIT,
   SEARCH_MAX_LIMIT,

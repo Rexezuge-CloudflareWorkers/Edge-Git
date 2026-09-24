@@ -53,7 +53,7 @@ class RepoVisibilityService {
     return { repo, role };
   }
 
-  public async listVisibleForUser(userEmail: string, resolveCallerUsernameCi: CallerResolver, limit = 100): Promise<RepositoryRow[]> {
+  public async listVisibleForUser(userEmail: string, resolveCallerUsername: CallerResolver, limit = 100): Promise<RepositoryRow[]> {
     const dao = await this.deps.repositoryDAO();
     const normalizedEmail = EmailAddress.normalize(userEmail);
     const seen = new Map<string, RepositoryRow>();
@@ -64,9 +64,9 @@ class RepoVisibilityService {
     };
     pushAll(await dao.listByOwnerEmail(normalizedEmail, limit).catch(() => []));
     try {
-      const usernameCi = await resolveCallerUsernameCi(normalizedEmail);
-      if (usernameCi) {
-        pushAll(await dao.listByOwner(usernameCi, limit).catch(() => []));
+      const usernameLowercased = await resolveCallerUsername(normalizedEmail);
+      if (usernameLowercased) {
+        pushAll(await dao.listByOwner(usernameLowercased, limit).catch(() => []));
       }
     } catch {
       // ignore — username index is best-effort

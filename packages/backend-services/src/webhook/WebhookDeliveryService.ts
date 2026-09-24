@@ -1,5 +1,5 @@
-import { WebhookDAO, WebhookDeliveryDAO } from '@edge-git/backend-data/dao';
-import type { RepoWebhookRow, WebhookDeliveryRow } from '@edge-git/backend-data/dao';
+import { WebhookDeliveryDAO } from '@edge-git/backend-data/dao';
+import type { RepoWebhookRow, WebhookDAO, WebhookDeliveryRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { NotFoundError } from '@edge-git/backend-errors';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
@@ -8,6 +8,8 @@ import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 import { buildWebhookPayload, normalizeEvents, signDelivery, validateWebhookUrl } from './WebhookEvents';
 import { backoffSecondsForAttempt, isRetryableHttpStatus } from './WebhookRetryPolicy';
 import { resolveSenderUsername, toPublicDelivery } from './WebhookDeliveryMapping';
+import { defaultPostJson, STORED_ERROR_CHAR_LIMIT } from './WebhookHttpClient';
+import type { WebhookPostJson } from './WebhookHttpClient';
 
 interface WebhookDeliveryServiceEnv {
   DB: D1Queryable;
@@ -20,10 +22,7 @@ interface WebhookDeliveryServiceEnv {
 interface WebhookDeliveryServiceDeps {
   webhookDAO?: () => Promise<WebhookDAO>;
   deliveryDAO?: () => Promise<WebhookDeliveryDAO>;
-  postJson?: (
-    url: string,
-    init: { headers: Record<string, string>; body: string; timeoutMs: number },
-  ) => Promise<{ httpStatus: number | null; error: string | null }>;
+  postJson?: WebhookPostJson;
 }
 
 interface EnqueueEventInput {
@@ -41,51 +40,9 @@ interface EnqueueEventInput {
 }
 
 // Retry policy lives in `./WebhookRetryPolicy.ts` (pure, unit testable).
-
-// Truncation budget for stored delivery error previews (SSRF rejections,
-// HTTP statuses, network failures). One named constant instead of the
-// previous `slice(0, 500)` literals scattered across this module.
-const ERROR_PREVIEW_LIMIT = 500;
-
-async function defaultPostJson(
-  url: string,
-  init: { headers: Record<string, string>; body: string; timeoutMs: number },
-): Promise<{ httpStatus: number | null; error: string | null }> {
-  try {
-    // Re-validate on delivery: the stored hook URL may have been valid at
-    // creation but rebound via DNS since. Literal-IP/private hosts are
-    // rejected here; DNS-resolved private IPs remain documented best-effort
-    // (no resolver in Workers — use allowlist/egress proxy for strict).
-    validateWebhookUrl(url);
-  } catch (error) {
-    return { httpStatus: null, error: error instanceof Error ? error.message.slice(0, ERROR_PREVIEW_LIMIT) : 'Invalid webhook URL.' };
-  }
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...init.headers },
-      body: init.body,
-      redirect: 'manual',
-      signal: AbortSignal.timeout(init.timeoutMs),
-    });
-    // Secrets ride in `X-EdgeGit-Signature-256`: http: deliveries send the
-    // HMAC cleartext. Allowed for local dev, but warn so operators notice.
-    try {
-      if (new URL(url).protocol === 'http:') console.warn('Webhook delivery over cleartext http — prefer https');
-    } catch {
-      // URL already validated above; warning must never fail delivery.
-    }
-    await response.arrayBuffer().catch(() => undefined);
-    if (response.ok) return { httpStatus: response.status, error: null };
-    return { httpStatus: response.status, error: `Webhook returned HTTP ${response.status}` };
-  } catch (error) {
-    return { httpStatus: null, error: error instanceof Error ? error.message.slice(0, ERROR_PREVIEW_LIMIT) : 'Delivery failed.' };
-  }
-}
-
-function toPublic(row: WebhookDeliveryRow): WebhookDeliveryMetadata {
-  return toPublicDelivery(row);
-}
+// Transport lives in `./WebhookHttpClient.ts` (Adapter): `defaultPostJson`
+// re-validates the stored URL (DNS-rebind guard) and truncates stored errors
+// to `STORED_ERROR_CHAR_LIMIT` so D1 rows stay small.
 
 class WebhookDeliveryService {
   private readonly deps: Required<WebhookDeliveryServiceDeps>;
@@ -97,17 +54,27 @@ class WebhookDeliveryService {
     this.deps = {
       // Encrypted DAOs require a key: outside the request scope (which wires
       // per-feature keys via daoBindings) callers must inject the DAO.
-      webhookDAO: () => Promise.reject<WebhookDAO>(new Error('WebhookDeliveryService requires an injected webhookDAO outside request scope.')),
+      webhookDAO: () =>
+        Promise.reject<WebhookDAO>(new Error('WebhookDeliveryService requires an injected webhookDAO outside request scope.')),
       deliveryDAO: () => Promise.resolve(new WebhookDeliveryDAO(env.DB)),
       postJson: defaultPostJson,
       ...deps,
     };
   }
 
+  /**
+   * Back-compat proxies: prefer importing `backoffSecondsForAttempt` /
+   * `isRetryableHttpStatus` from `./WebhookRetryPolicy` directly. Kept so
+   * existing route/test imports keep working; will be removed next major.
+   * @deprecated Use `WebhookRetryPolicy` directly.
+   */
   public static backoffSecondsForAttempt(attempt: number): number {
     return backoffSecondsForAttempt(attempt);
   }
 
+  /**
+   * @deprecated Use `isRetryableHttpStatus` from `./WebhookRetryPolicy` directly.
+   */
   public static isRetryableHttpStatus(status: number | null): boolean {
     return isRetryableHttpStatus(status);
   }
@@ -196,7 +163,7 @@ class WebhookDeliveryService {
     if (!hook) throw new NotFoundError('Webhook not found.');
     const deliveryDAO = await this.deps.deliveryDAO();
     const { deliveries, nextCursor } = await deliveryDAO.listByHook(hookId, Math.min(Math.max(limit, 1), 50), cursor);
-    return { deliveries: deliveries.map(toPublic), nextCursor };
+    return { deliveries: deliveries.map(toPublicDelivery), nextCursor };
   }
 
   public async redeliver(deliveryId: string, repositoryId: string): Promise<WebhookDeliveryMetadata> {
@@ -210,7 +177,7 @@ class WebhookDeliveryService {
     await deliveryDAO.resetForRedelivery(deliveryId, now);
     const updated = await deliveryDAO.getById(deliveryId);
     if (!updated) throw new NotFoundError('Delivery not found.');
-    return toPublic(updated);
+    return toPublicDelivery(updated);
   }
 
   // Attempt one delivery end-to-end (used by the /test route for inline
@@ -236,7 +203,7 @@ class WebhookDeliveryService {
     await this.attemptRow(id, now);
     const settled = await deliveryDAO.getById(id);
     if (!settled) throw new NotFoundError('Delivery not found.');
-    return toPublic(settled);
+    return toPublicDelivery(settled);
   }
 
   // Cron sweeper entry: claim due rows (optimistic per-row claim so overlapping
@@ -276,7 +243,10 @@ class WebhookDeliveryService {
 
   // POST one claimed row and settle it (success / retry / terminal failure +
   // hook consecutive-failure accounting with auto-disable). Returns true on
-  // HTTP success.
+  // HTTP success. Why truncate: stored `last_error` is read on every list;
+  // the signature covers the stored (possibly truncated-at-enqueue) payload
+  // bytes, never the pre-truncation body — truncation happens once at
+  // `enqueueForEvent` under the DO size guard, not here.
   private async attemptRow(deliveryId: string, now: number): Promise<boolean> {
     const deliveryDAO = await this.deps.deliveryDAO();
     const webhookDAO = await this.deps.webhookDAO();
@@ -328,7 +298,7 @@ class WebhookDeliveryService {
         status: terminal ? 'failed' : 'pending',
         nextRetryAt: terminal ? now : now + backoffSecondsForAttempt(attempts),
         httpStatus: outcome.httpStatus,
-        error: outcome.error?.slice(0, ERROR_PREVIEW_LIMIT) ?? null,
+        error: outcome.error?.slice(0, STORED_ERROR_CHAR_LIMIT) ?? null,
         now,
       })
       .catch(() => undefined);

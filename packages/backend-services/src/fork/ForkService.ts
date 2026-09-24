@@ -76,7 +76,7 @@ class ForkService {
     });
   }
 
-  private permission(): Promise<PermissionService> {
+  private getPermissionService(): Promise<PermissionService> {
     return this.deps.permissionService();
   }
 
@@ -92,7 +92,7 @@ class ForkService {
     return normalized.split('@', 1)[0] ?? normalized;
   }
 
-  private async resolveCallerUsernameCi(userEmail: string): Promise<string | null> {
+  private async resolveCallerUsernameLowercased(userEmail: string): Promise<string | null> {
     const normalized = EmailAddress.normalize(userEmail);
     try {
       const userDao = await this.deps.userDAO();
@@ -113,8 +113,8 @@ class ForkService {
    */
   private async assertForkDestinationAllowed(forkerEmail: string, normalizedOwner: string): Promise<void> {
     const ownerCi = normalizedOwner.toLowerCase();
-    const callerCi = await this.resolveCallerUsernameCi(forkerEmail);
-    if (callerCi && ownerCi === callerCi) return;
+    const callerLowercased = await this.resolveCallerUsernameLowercased(forkerEmail);
+    if (callerLowercased && ownerCi === callerLowercased) return;
 
     const callerEmail = EmailAddress.normalize(forkerEmail);
     let org: { id: string; username: string } | null = null;
@@ -155,7 +155,7 @@ class ForkService {
     const dao = await this.deps.repositoryDAO();
     const source = await dao.getByOwnerAndName(sourceOwner, sourceName);
     if (!source) throw new NotFoundError('Repository not found');
-    const permission = await this.permission();
+    const permission = await this.getPermissionService();
     const role = await permission.getRole(forkerEmail, source);
     if (!role) throw new NotFoundError('Repository not found');
 

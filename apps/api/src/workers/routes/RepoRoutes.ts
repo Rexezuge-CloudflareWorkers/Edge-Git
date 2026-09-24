@@ -1,19 +1,12 @@
 import type { Hono } from 'hono';
 import { getCheckRunnerStub, getRepoStub, ensureRepo } from '../doStubs';
-import {
-  getScope,
-  jsonError,
-  requireVisibleRepo,
-  toRepoJson,
-  toSafeErrorMessage,
-  toServiceStatus,
-  withPublicRepo,
-} from './PublicViewerResolver';
+import { getScope, jsonError, requireVisibleRepo, toSafeErrorMessage, toServiceStatus, withPublicRepo } from './PublicViewerResolver';
+import { toRepoDetailJson } from './RepoDetailPresenter';
 import { recordAndNotify } from './SocialEmit';
 import { getRepoSocial } from './RepoSocialHelper';
 import { Tokens } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
-import { EmailAddress, RepoFullName } from '@edge-git/shared/utils';
+import { EmailAddress, RepoFullName, mapWithConcurrency } from '@edge-git/shared/utils';
 import { readJsonBody } from './BodyParser';
 import { parseOverviewArgs, parseWithLastCommit, sanitizeDepthParam, sanitizePathParam, sanitizeRefParam } from './RepoParamParsers';
 import { ErrorSanitizationUtil } from '@edge-git/shared/utils';
@@ -25,6 +18,8 @@ export { getRepoSocial } from './RepoSocialHelper';
 
 // Public read-model API — anonymous OK for public repos (private → 404
 // unless the caller presents Access identity or a PAT for the owner).
+// Detail assembly lives in `RepoDetailPresenter` (Presenter pattern) so the
+// `viewerCanManage/viewerRole/starred/watching` shape stays single-sourced.
 function registerRepoRoutes(app: RepoApp): void {
   app.get('/repos/:owner/:repo', async (c) => {
     return withPublicRepo(c, async (row, _fullName, viewerEmail) => {
@@ -40,15 +35,7 @@ function registerRepoRoutes(app: RepoApp): void {
           .catch(() => 0),
         getRepoSocial(scope, row.id, viewerEmail),
       ]);
-      return c.json({
-        ...(toRepoJson(row, role) as Record<string, unknown>),
-        viewerCanManage: role === 'admin',
-        viewerRole: role,
-        forksCount,
-        ...social,
-        starred: social.viewerStarred,
-        watching: social.viewerWatching,
-      });
+      return c.json(toRepoDetailJson(row, role, { forksCount, social }));
     });
   });
 
@@ -176,11 +163,12 @@ function registerUserRepoRoutes(app: RepoApp): void {
     const scope = getScope(c);
     const rows = await scope.get(Tokens.RepoService).listVisibleForUser(email, 100);
     const permission = scope.get(Tokens.PermissionService);
-    const repos = [];
-    for (const row of rows) {
+    // Batched (was sequential `await` in a for-loop: 100 repos × 1 role RPC).
+    // Preserves order; a failed role lookup degrades to null (public-only).
+    const repos = await mapWithConcurrency(rows, 10, async (row) => {
       const role = await permission.getRole(email, row).catch(() => null);
-      repos.push({ ...(toRepoJson(row, role) as Record<string, unknown>), viewerCanManage: role === 'admin', viewerRole: role });
-    }
+      return toRepoDetailJson(row, role);
+    });
     return c.json({ repos });
   });
 
@@ -228,14 +216,9 @@ function registerUserRepoRoutes(app: RepoApp): void {
       });
       return c.json({ id, owner: canonicalOwner, name: normalized, fullName }, 201);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create repo';
-      const status =
-        message.includes('already exists') || message.includes('Invalid') || message.includes('Maximum') || message.includes('reserved')
-          ? 400
-          : message.includes('members') || message.includes('owner')
-            ? 403
-            : 500;
-      return jsonError(c, toSafeErrorMessage(error, 'Failed to create repo'), status as 400);
+      // Typed mapping via `toServiceStatus` (was fragile `message.includes`
+      // string matching that misclassified wrapped/renamed errors).
+      return jsonError(c, toSafeErrorMessage(error, 'Failed to create repo'), toServiceStatus(error));
     }
   });
 
@@ -255,15 +238,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
         .catch(() => 0),
       getRepoSocial(scope, row.id, email),
     ]);
-    return c.json({
-      ...(toRepoJson(row, role) as Record<string, unknown>),
-      viewerCanManage: role === 'admin',
-      viewerRole: role,
-      forksCount,
-      ...social,
-      starred: social.viewerStarred,
-      watching: social.viewerWatching,
-    });
+    return c.json(toRepoDetailJson(row, role, { forksCount, social }));
   });
 
   app.patch('/user/repos/:owner/:repo', async (c) => {
@@ -281,7 +256,7 @@ function registerUserRepoRoutes(app: RepoApp): void {
     }
     try {
       const updated = await getScope(c).get(Tokens.RepoService).updateRepo(owner, repoName, email, patch);
-      return c.json({ ...(toRepoJson(updated) as Record<string, unknown>), viewerCanManage: true });
+      return c.json(toRepoDetailJson(updated, 'admin'));
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed to update repo'), toServiceStatus(error));
     }

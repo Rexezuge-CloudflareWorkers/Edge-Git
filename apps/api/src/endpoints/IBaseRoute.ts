@@ -94,34 +94,24 @@ abstract class BaseRoute {
    * Status → AWS `Exception.Type` mapping for direct validation returns.
    * Call sites that previously wrote `c.json({ error: msg }, status)` must
    * use `jsonError` so the wire shape stays `{Exception:{Type,Message}}`.
+   *
+   * Why a registry over `switch`: the mapping is data, not branching logic —
+   * a `Record` keeps the 8-entry table scannable and unit-testable as data
+   * (see `ERROR_TYPE_REGISTRY`), and unknown codes fall through to
+   * `InternalServerError` without a `default:` branch.
    */
+  private static readonly ERROR_TYPE_REGISTRY: Readonly<Record<number, string>> = {
+    400: 'BadRequest',
+    401: 'Unauthorized',
+    403: 'Forbidden',
+    404: 'NotFound',
+    409: 'Conflict',
+    413: 'PayloadTooLarge',
+    429: 'RateLimited',
+  };
+
   public static toErrorType(status: number): string {
-    switch (status) {
-      case 400: {
-        return 'BadRequest';
-      }
-      case 401: {
-        return 'Unauthorized';
-      }
-      case 403: {
-        return 'Forbidden';
-      }
-      case 404: {
-        return 'NotFound';
-      }
-      case 409: {
-        return 'Conflict';
-      }
-      case 413: {
-        return 'PayloadTooLarge';
-      }
-      case 429: {
-        return 'RateLimited';
-      }
-      default: {
-        return 'InternalServerError';
-      }
-    }
+    return this.ERROR_TYPE_REGISTRY[status] ?? 'InternalServerError';
   }
 
   public static toErrorBody(status: number, message: string): { Exception: { Type: string; Message: string } } {
