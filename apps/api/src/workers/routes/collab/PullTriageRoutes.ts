@@ -7,6 +7,7 @@ import { suggestCodeownerHandles } from '../CodeownerHelpers';
 import { needWrite, parseNumber } from './CollabHelpers';
 import type { CollabApp } from './CollabHelpers';
 import { readJsonBody } from '../BodyParser';
+import { decodeRouteParam } from '../RouteInput';
 import { presentSingle, usernameFor, usernameMap } from '../IdentityPresenter';
 
 type RequestScope = ReturnType<typeof createRequestScope>;
@@ -153,10 +154,12 @@ function registerCollabPullTriageRoutes(app: CollabApp): void {
     if (!(await needWrite(c.env, owner, repoName, email))) return jsonError(c, 'Forbidden', 403);
     const number = parseNumber(c.req.param('number'));
     if (number === null) return jsonError(c, 'Not found', 404);
+    const reviewer = decodeRouteParam(c.req.param('reviewer'));
+    if (reviewer === null) return jsonError(c, 'Invalid reviewer', 400);
     try {
       const scope = getScope(c);
       const pull = await scope.get(Tokens.PullRequestService).getByNumber(row.id, number);
-      await scope.get(Tokens.CollaborationService).removeReviewer(pull.id, decodeURIComponent(c.req.param('reviewer')));
+      await scope.get(Tokens.CollaborationService).removeReviewer(pull.id, reviewer);
       return c.json({ ok: true });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Not found'), toServiceStatus(error));

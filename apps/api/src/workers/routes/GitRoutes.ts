@@ -17,6 +17,7 @@ import { Tokens, createRequestScope } from '@edge-git/backend-services/compositi
 import { BranchProtectionService } from '@edge-git/backend-services/protection';
 import { scanBytes } from '@edge-git/backend-services/security';
 import { recordAndNotify } from './SocialEmit';
+import { parseContentLength } from './RouteInput';
 import { triggerRequiredChecks } from './TriggerChecks';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import {
@@ -89,8 +90,11 @@ function registerGitRoutes(app: GitApp): void {
     const auth = await gitAuthForRepo(c, owner, repoName, 'git-upload-pack');
     if (auth instanceof Response) return auth;
     const maxFetchBodyBytes = ConfigurationManager.repo.getMaxFetchBodyBytes(c.env);
-    const contentLength = Number(c.req.header('Content-Length'));
-    if (Number.isSafeInteger(contentLength) && contentLength > maxFetchBodyBytes) {
+    // Fail-closed header gate + authoritative body check below: a missing or
+    // malformed Content-Length skips the cheap early 413 and falls through to
+    // the exact `body.byteLength` enforcement, so NaN can never bypass limits.
+    const contentLength = parseContentLength(c.req.header('Content-Length'));
+    if (contentLength !== null && contentLength > maxFetchBodyBytes) {
       return c.text(`ERR fetch request too large: ${contentLength} > ${maxFetchBodyBytes} bytes`, 413);
     }
     const fullName = `${owner}/${repoName}`;
@@ -168,8 +172,8 @@ function registerGitRoutes(app: GitApp): void {
     const auth = await gitAuthForRepo(c, owner, repoName, 'git-receive-pack');
     if (auth instanceof Response) return auth;
     const maxPackBytes = ConfigurationManager.repo.getMaxPackBytes(c.env);
-    const contentLength = Number(c.req.header('Content-Length'));
-    if (Number.isSafeInteger(contentLength) && contentLength > maxPackBytes) {
+    const contentLength = parseContentLength(c.req.header('Content-Length'));
+    if (contentLength !== null && contentLength > maxPackBytes) {
       return c.text(`ERR pack too large: ${contentLength} > ${maxPackBytes} bytes`, 413);
     }
     const fullName = `${owner}/${repoName}`;

@@ -113,7 +113,8 @@ class TokenService {
       return { owner, name, scope: scope as TokenScope };
     });
     const repoDAO = await this.deps.repositoryDAO();
-    const repos = await mapWithConcurrency(parsed, 10, (p) => repoDAO.getByOwnerAndName(p.owner, p.name).catch(() => null));
+    // Fail closed: null means missing repo; `DatabaseError` (outage) propagates.
+    const repos = await mapWithConcurrency(parsed, 10, (p) => repoDAO.getByOwnerAndName(p.owner, p.name));
     const resolved: RepoGrantInput[] = [];
     const seen = new Set<string>();
     for (const [i, p] of parsed.entries()) {

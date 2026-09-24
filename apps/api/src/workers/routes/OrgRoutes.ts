@@ -4,6 +4,7 @@ import { usernameFor, usernameMap } from './IdentityPresenter';
 import { RepoFullName } from '@edge-git/shared/utils';
 import { jsonError, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
+import { decodeRouteParam } from './RouteInput';
 
 type OrgApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -172,10 +173,12 @@ function registerOrgRoutes(app: OrgApp): void {
     if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
     if (body.role !== 'owner' && body.role !== 'member') return jsonError(c, 'Invalid role', 400);
+    const member = decodeRouteParam(c.req.param('member'));
+    if (member === null) return jsonError(c, 'Invalid member', 400);
     try {
       await getScope(c)
         .get(Tokens.OrganizationService)
-        .setMemberRole(c.req.param('org'), email, decodeURIComponent(c.req.param('member')), body.role);
+        .setMemberRole(c.req.param('org'), email, member, body.role);
       return c.json({ ok: true });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
@@ -184,10 +187,12 @@ function registerOrgRoutes(app: OrgApp): void {
 
   app.delete('/user/orgs/:org/members/:member', async (c) => {
     const email = c.get('AuthenticatedUserEmailAddress');
+    const member = decodeRouteParam(c.req.param('member'));
+    if (member === null) return jsonError(c, 'Invalid member', 400);
     try {
       await getScope(c)
         .get(Tokens.OrganizationService)
-        .removeMember(c.req.param('org'), email, decodeURIComponent(c.req.param('member')));
+        .removeMember(c.req.param('org'), email, member);
       return c.json({ ok: true });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));
@@ -220,7 +225,8 @@ function registerOrgRoutes(app: OrgApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
-    const member = decodeURIComponent(c.req.param('member'));
+    const member = decodeRouteParam(c.req.param('member'));
+    if (member === null) return jsonError(c, 'Invalid member', 400);
     const { malformed, oversized, body } = await readJsonBody<{ role?: string }>(c);
     if (oversized) return jsonError(c, 'Payload too large', 413);
     if (malformed) return jsonError(c, 'Invalid JSON body', 400);
@@ -243,7 +249,8 @@ function registerOrgRoutes(app: OrgApp): void {
     const email = c.get('AuthenticatedUserEmailAddress');
     const owner = c.req.param('owner');
     const repoName = RepoFullName.normalizeRepo(c.req.param('repo'));
-    const member = decodeURIComponent(c.req.param('member'));
+    const member = decodeRouteParam(c.req.param('member'));
+    if (member === null) return jsonError(c, 'Invalid member', 400);
     try {
       const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'admin');

@@ -6,6 +6,7 @@ import { tokenIdSchema } from '@edge-git/shared/validation';
 import { jsonError, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 import { presentMany, presentSingle } from './IdentityPresenter';
+import { parseLimitParam } from './RouteInput';
 
 type WebhookApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -167,7 +168,7 @@ function registerWebhookRoutes(app: WebhookApp): void {
       const scope = getScope(c);
       const { repo } = await scope.get(Tokens.RepoService).requireRole(owner, repoName, email, 'read');
       const url = new URL(c.req.url);
-      const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 20, 1), 50);
+      const limit = parseLimitParam(url.searchParams.get('limit'), 20, 50);
       const cursor = url.searchParams.get('cursor') ?? undefined;
       const { deliveries, nextCursor } = await scope.get(Tokens.WebhookDeliveryService).listDeliveries(id, repo.id, limit, cursor);
       return c.json({ deliveries, nextCursor });

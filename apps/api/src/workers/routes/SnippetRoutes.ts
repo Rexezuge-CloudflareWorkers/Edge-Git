@@ -5,6 +5,7 @@ import type { AccessIdentityContext } from '@edge-git/backend-services/auth';
 import { emitWebhookEvent } from './SocialEmit';
 import { jsonError, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
+import { parseLimitParam } from './RouteInput';
 
 type SnippetApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
@@ -12,7 +13,7 @@ function registerSnippetPublicRoutes(app: SnippetApp): void {
   app.get('/snippets/public', async (c) => {
     try {
       const url = new URL(c.req.url);
-      const limit = Math.min(Math.max(Number(url.searchParams.get('limit') ?? 20) || 20, 1), 50);
+      const limit = parseLimitParam(url.searchParams.get('limit'), 20, 50);
       const scope = getScope(c);
       const snippets = await scope.get(Tokens.SnippetService).listPublic(limit);
       return c.json({ snippets: await presentMany(scope, snippets) });
