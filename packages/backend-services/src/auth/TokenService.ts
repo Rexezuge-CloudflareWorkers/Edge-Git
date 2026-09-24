@@ -189,10 +189,9 @@ class TokenService {
       }
     } catch (error) {
       if (error instanceof BadRequestError) throw error;
-      // Count lookup failure must not fail the mint itself. Preserve the
-      // outage as `cause` on no path today (mint succeeds); the comment
-      // stays so future logging can attach it without changing semantics.
-      void error;
+      // Count lookup failure must not fail the mint itself (mint succeeds;
+      // the outage is intentionally not propagated so a transient read
+      // failure cannot block issuance).
     }
     if (resolvedGrants.length > 0) {
       const grantDAO = await this.deps.tokenGrantDAO();
