@@ -21,7 +21,8 @@
     "remove": "Verwijderen",
     "revoke": "Intrekken",
     "saveChanges": "Wijzigingen opslaan",
-    "success": "Gelukt"
+    "success": "Gelukt",
+    "typeToConfirm": "Type {{name}} To Confirm"
   },
   "landing": {
     "title": "Zelfgehoste Git op Cloudflare Workers",
@@ -62,6 +63,12 @@
     "deleteThisRepository": "Deze repository verwijderen",
     "deleteRepositoryDescription": "Verwijdert de repository, Git-gegevens, issues en opmerkingen permanent. Dit kan niet ongedaan worden gemaakt.",
     "deleteRepository": "Repository verwijderen",
+    "changeVisibility": "Change Visibility",
+    "currentVisibility": "Current Visibility: {{visibility}}",
+    "makePublic": "Make Public",
+    "makePrivate": "Make Private",
+    "visibilityDescription": "Changing Visibility Affects Who Can Clone And View This Repository. Making It Public Exposes Code, Issues, And History To Anyone.",
+    "visibilityUpdated": "Repository Visibility Updated.",
     "repositorySettingsUpdated": "Repository-instellingen bijgewerkt.",
     "repositoryDeleted": "Repository verwijderd.",
     "code": "Code",

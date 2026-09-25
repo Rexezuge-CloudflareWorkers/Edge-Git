@@ -21,7 +21,8 @@
     "remove": "Usuń",
     "revoke": "Unieważnij",
     "saveChanges": "Zapisz zmiany",
-    "success": "Sukces"
+    "success": "Sukces",
+    "typeToConfirm": "Type {{name}} To Confirm"
   },
   "landing": {
     "title": "Samodzielny hosting Git na Cloudflare Workers",
@@ -62,6 +63,12 @@
     "deleteThisRepository": "Usuń to repozytorium",
     "deleteRepositoryDescription": "Trwale usuwa repozytorium, jego dane Git, zgłoszenia i komentarze. Tej operacji nie można cofnąć.",
     "deleteRepository": "Usuń repozytorium",
+    "changeVisibility": "Change Visibility",
+    "currentVisibility": "Current Visibility: {{visibility}}",
+    "makePublic": "Make Public",
+    "makePrivate": "Make Private",
+    "visibilityDescription": "Changing Visibility Affects Who Can Clone And View This Repository. Making It Public Exposes Code, Issues, And History To Anyone.",
+    "visibilityUpdated": "Repository Visibility Updated.",
     "repositorySettingsUpdated": "Zaktualizowano ustawienia repozytorium.",
     "repositoryDeleted": "Usunięto repozytorium.",
     "code": "Kod",

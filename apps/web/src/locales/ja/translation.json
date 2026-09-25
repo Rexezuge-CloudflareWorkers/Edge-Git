@@ -21,7 +21,8 @@
     "remove": "削除",
     "revoke": "無効化",
     "saveChanges": "変更を保存",
-    "success": "成功"
+    "success": "成功",
+    "typeToConfirm": "Type {{name}} To Confirm"
   },
   "landing": {
     "title": "Cloudflare Workers 上のセルフホスト Git",
@@ -62,6 +63,12 @@
     "deleteThisRepository": "このリポジトリを削除",
     "deleteRepositoryDescription": "リポジトリ、Git データ、課題、コメントを完全に削除します。この操作は取り消せません。",
     "deleteRepository": "リポジトリを削除",
+    "changeVisibility": "Change Visibility",
+    "currentVisibility": "Current Visibility: {{visibility}}",
+    "makePublic": "Make Public",
+    "makePrivate": "Make Private",
+    "visibilityDescription": "Changing Visibility Affects Who Can Clone And View This Repository. Making It Public Exposes Code, Issues, And History To Anyone.",
+    "visibilityUpdated": "Repository Visibility Updated.",
     "repositorySettingsUpdated": "リポジトリ設定を更新しました。",
     "repositoryDeleted": "リポジトリを削除しました。",
     "code": "コード",

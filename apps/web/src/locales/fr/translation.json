@@ -21,7 +21,8 @@
     "remove": "Retirer",
     "revoke": "Révoquer",
     "saveChanges": "Enregistrer les modifications",
-    "success": "Succès"
+    "success": "Succès",
+    "typeToConfirm": "Type {{name}} To Confirm"
   },
   "landing": {
     "title": "Git auto-hébergé sur Cloudflare Workers",
@@ -62,6 +63,12 @@
     "deleteThisRepository": "Supprimer ce dépôt",
     "deleteRepositoryDescription": "Supprime définitivement le dépôt, ses données Git, ses tickets et ses commentaires. Cette action est irréversible.",
     "deleteRepository": "Supprimer le dépôt",
+    "changeVisibility": "Change Visibility",
+    "currentVisibility": "Current Visibility: {{visibility}}",
+    "makePublic": "Make Public",
+    "makePrivate": "Make Private",
+    "visibilityDescription": "Changing Visibility Affects Who Can Clone And View This Repository. Making It Public Exposes Code, Issues, And History To Anyone.",
+    "visibilityUpdated": "Repository Visibility Updated.",
     "repositorySettingsUpdated": "Paramètres du dépôt mis à jour.",
     "repositoryDeleted": "Dépôt supprimé.",
     "code": "Code",

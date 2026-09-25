@@ -13,7 +13,7 @@ import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Label, Select, Textarea } from '../ui/Input';
 import { RefreshButton } from '../shared/RefreshButton';
-import { ConfirmDeleteModal } from '../modals/ConfirmDeleteModal';
+import { TypeToConfirmModal } from '../modals/TypeToConfirmModal';
 
 export function RepoSettingsTab({
   owner,
@@ -31,10 +31,11 @@ export function RepoSettingsTab({
   onDeleted: () => void;
 }) {
   const [description, setDescription] = useState(repoMeta.description ?? '');
-  const [isPrivate, setIsPrivate] = useState(repoMeta.isPrivate);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [confirmingVisibility, setConfirmingVisibility] = useState(false);
+  const [savingVisibility, setSavingVisibility] = useState(false);
   const [branches, setBranches] = useState<string[]>([]);
   const [defaultBranch, setDefaultBranchName] = useState('');
   const [savingDefault, setSavingDefault] = useState(false);
@@ -71,11 +72,10 @@ export function RepoSettingsTab({
     }
   };
 
-  const dirty = description.trim() !== (repoMeta.description ?? '') || isPrivate !== repoMeta.isPrivate;
+  const dirty = description.trim() !== (repoMeta.description ?? '');
 
   const reset = () => {
     setDescription(repoMeta.description ?? '');
-    setIsPrivate(repoMeta.isPrivate);
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -84,7 +84,6 @@ export function RepoSettingsTab({
     try {
       const updated = await updateRepo(owner, repo, {
         description: description.trim() === '' ? null : description.trim(),
-        isPrivate,
       });
       onUpdated(updated);
       showNotice('success', t('repos.repositorySettingsUpdated', 'Repository Settings Updated.'));
@@ -92,6 +91,22 @@ export function RepoSettingsTab({
       showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToUpdateRepository', 'Failed To Update Repository.'));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const fullName = `${owner}/${repo}`;
+
+  const confirmVisibility = async () => {
+    setSavingVisibility(true);
+    try {
+      const updated = await updateRepo(owner, repo, { isPrivate: !repoMeta.isPrivate });
+      onUpdated(updated);
+      showNotice('success', t('repos.visibilityUpdated', 'Repository Visibility Updated.'));
+    } catch (error) {
+      showNotice('error', toLocalizedErrorMessage(t, error, 'errors.failedToUpdateRepository', 'Failed To Update Repository.'));
+    } finally {
+      setSavingVisibility(false);
+      setConfirmingVisibility(false);
     }
   };
 
@@ -128,15 +143,6 @@ export function RepoSettingsTab({
               onChange={(e) => setDescription(e.target.value)}
             />
           </div>
-          <label className="flex items-center gap-2.5 text-sm text-[var(--color-text-secondary)] cursor-pointer">
-            <input
-              type="checkbox"
-              checked={isPrivate}
-              onChange={(e) => setIsPrivate(e.target.checked)}
-              className="h-4 w-4 accent-[var(--color-accent)]"
-            />
-            {t('repos.privateRepository', 'Private Repository')}
-          </label>
           <div>
             <Button type="submit" variant="primary" size="sm" loading={saving} disabled={!dirty}>
               {t('common.saveChanges', 'Save Changes')}
@@ -184,26 +190,70 @@ export function RepoSettingsTab({
         <CardHeader>
           <CardTitle>{t('repos.dangerZone', 'Danger Zone')}</CardTitle>
         </CardHeader>
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <p className="text-sm font-medium text-[var(--color-text-primary)]">{t('repos.deleteThisRepository', 'Delete This Repository')}</p>
-            <p className="text-sm text-[var(--color-text-secondary)]">
-              {t(
-                'repos.deleteRepositoryDescription',
-                'Permanently Deletes The Repository, Its Git Data, Issues, And Comments. This Cannot Be Undone.',
-              )}
-            </p>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="text-sm font-medium text-[var(--color-text-primary)]">
+                {t('repos.changeVisibility', 'Change Visibility')}
+              </p>
+              <p className="text-sm text-[var(--color-text-secondary)]">
+                {t(
+                  'repos.visibilityDescription',
+                  'Changing Visibility Affects Who Can Clone And View This Repository. Making It Public Exposes Code, Issues, And History To Anyone.',
+                )}
+              </p>
+              <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                {t('repos.currentVisibility', 'Current Visibility: {{visibility}}', {
+                  visibility: repoMeta.isPrivate ? t('repos.private', 'Private') : t('repos.public', 'Public'),
+                })}
+              </p>
+            </div>
+            <Button variant="danger" size="sm" loading={savingVisibility} onClick={() => setConfirmingVisibility(true)}>
+              {repoMeta.isPrivate ? t('repos.makePublic', 'Make Public') : t('repos.makePrivate', 'Make Private')}
+            </Button>
           </div>
-          <Button variant="danger" size="sm" loading={deleting} onClick={() => setConfirmingDelete(true)}>
-            {t('repos.deleteRepository', 'Delete Repository')}
-          </Button>
+          <div className="flex items-center justify-between gap-3 flex-wrap border-t border-[var(--color-border)] pt-4">
+            <div>
+              <p className="text-sm font-medium text-[var(--color-text-primary)]">{t('repos.deleteThisRepository', 'Delete This Repository')}</p>
+              <p className="text-sm text-[var(--color-text-secondary)]">
+                {t(
+                  'repos.deleteRepositoryDescription',
+                  'Permanently Deletes The Repository, Its Git Data, Issues, And Comments. This Cannot Be Undone.',
+                )}
+              </p>
+            </div>
+            <Button variant="danger" size="sm" loading={deleting} onClick={() => setConfirmingDelete(true)}>
+              {t('repos.deleteRepository', 'Delete Repository')}
+            </Button>
+          </div>
         </div>
       </Card>
 
+      {confirmingVisibility && (
+        <TypeToConfirmModal
+          title={repoMeta.isPrivate ? t('repos.makePublic', 'Make Public') : t('repos.makePrivate', 'Make Private')}
+          description={t(
+            'repos.visibilityDescription',
+            'Changing Visibility Affects Who Can Clone And View This Repository. Making It Public Exposes Code, Issues, And History To Anyone.',
+          )}
+          expectedName={fullName}
+          confirmLabel={repoMeta.isPrivate ? t('repos.makePublic', 'Make Public') : t('repos.makePrivate', 'Make Private')}
+          loading={savingVisibility}
+          onConfirm={() => void confirmVisibility()}
+          onCancel={() => setConfirmingVisibility(false)}
+        />
+      )}
+
       {confirmingDelete && (
-        <ConfirmDeleteModal
+        <TypeToConfirmModal
           title={t('repos.deleteRepository', 'Delete Repository')}
-          displayName={`${owner}/${repo}`}
+          description={t(
+            'repos.deleteRepositoryDescription',
+            'Permanently Deletes The Repository, Its Git Data, Issues, And Comments. This Cannot Be Undone.',
+          )}
+          expectedName={fullName}
+          confirmLabel={t('repos.deleteRepository', 'Delete Repository')}
+          loading={deleting}
           onConfirm={() => void confirmDelete()}
           onCancel={() => setConfirmingDelete(false)}
         />

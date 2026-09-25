@@ -21,7 +21,8 @@
     "remove": "제거",
     "revoke": "해지",
     "saveChanges": "변경 사항 저장",
-    "success": "성공"
+    "success": "성공",
+    "typeToConfirm": "Type {{name}} To Confirm"
   },
   "landing": {
     "title": "Cloudflare Workers에서 직접 운영하는 Git",
@@ -62,6 +63,12 @@
     "deleteThisRepository": "이 리포지토리 삭제",
     "deleteRepositoryDescription": "리포지토리와 Git 데이터, 이슈, 댓글이 영구적으로 삭제돼요. 되돌릴 수 없어요.",
     "deleteRepository": "리포지토리 삭제",
+    "changeVisibility": "Change Visibility",
+    "currentVisibility": "Current Visibility: {{visibility}}",
+    "makePublic": "Make Public",
+    "makePrivate": "Make Private",
+    "visibilityDescription": "Changing Visibility Affects Who Can Clone And View This Repository. Making It Public Exposes Code, Issues, And History To Anyone.",
+    "visibilityUpdated": "Repository Visibility Updated.",
     "repositorySettingsUpdated": "리포지토리 설정이 저장됐어요.",
     "repositoryDeleted": "리포지토리가 삭제됐어요.",
     "code": "코드",

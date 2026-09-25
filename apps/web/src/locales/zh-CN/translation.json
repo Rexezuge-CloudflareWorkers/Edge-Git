@@ -21,7 +21,8 @@
     "remove": "移除",
     "revoke": "撤销",
     "saveChanges": "保存更改",
-    "success": "成功"
+    "success": "成功",
+    "typeToConfirm": "Type {{name}} To Confirm"
   },
   "landing": {
     "title": "Cloudflare Workers 上的自托管 Git",
@@ -62,6 +63,12 @@
     "deleteThisRepository": "删除此仓库",
     "deleteRepositoryDescription": "将永久删除该仓库及其 Git 数据、议题和评论。此操作无法撤销。",
     "deleteRepository": "删除仓库",
+    "changeVisibility": "Change Visibility",
+    "currentVisibility": "Current Visibility: {{visibility}}",
+    "makePublic": "Make Public",
+    "makePrivate": "Make Private",
+    "visibilityDescription": "Changing Visibility Affects Who Can Clone And View This Repository. Making It Public Exposes Code, Issues, And History To Anyone.",
+    "visibilityUpdated": "Repository Visibility Updated.",
     "repositorySettingsUpdated": "仓库设置已更新。",
     "repositoryDeleted": "仓库已删除。",
     "code": "代码",

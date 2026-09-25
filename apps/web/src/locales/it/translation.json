@@ -21,7 +21,8 @@
     "remove": "Rimuovi",
     "revoke": "Revoca",
     "saveChanges": "Salva modifiche",
-    "success": "Operazione riuscita"
+    "success": "Operazione riuscita",
+    "typeToConfirm": "Type {{name}} To Confirm"
   },
   "landing": {
     "title": "Git self-hosted su Cloudflare Workers",
@@ -62,6 +63,12 @@
     "deleteThisRepository": "Elimina questo repository",
     "deleteRepositoryDescription": "Elimina definitivamente il repository, i suoi dati Git, le issue e i commenti. Questa azione non può essere annullata.",
     "deleteRepository": "Elimina repository",
+    "changeVisibility": "Change Visibility",
+    "currentVisibility": "Current Visibility: {{visibility}}",
+    "makePublic": "Make Public",
+    "makePrivate": "Make Private",
+    "visibilityDescription": "Changing Visibility Affects Who Can Clone And View This Repository. Making It Public Exposes Code, Issues, And History To Anyone.",
+    "visibilityUpdated": "Repository Visibility Updated.",
     "repositorySettingsUpdated": "Impostazioni del repository aggiornate.",
     "repositoryDeleted": "Repository eliminato.",
     "code": "Codice",
