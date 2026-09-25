@@ -5,7 +5,7 @@ import { disbandOrg, updateOrg } from '../../services/profileService';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Input, Label } from '../ui/Input';
-import { ConfirmDeleteModal } from '../modals/ConfirmDeleteModal';
+import { TypeToConfirmModal } from '../modals/TypeToConfirmModal';
 import { toLocalizedErrorMessage } from '../../lib/backendErrors';
 
 export function OrgSettingsCard({
@@ -98,9 +98,11 @@ export function OrgSettingsCard({
       </Card>
 
       {confirmingDisband && (
-        <ConfirmDeleteModal
+        <TypeToConfirmModal
           title={t('orgs.deleteOrg', 'Delete Organization')}
-          displayName={org.username}
+          description={t('orgs.deleteOrgDescription', 'Delete The Organization Once All Repositories Are Removed. This Cannot Be Undone.')}
+          expectedName={org.username}
+          confirmLabel={t('orgs.deleteOrg', 'Delete Organization')}
           onConfirm={() => void confirmDisband()}
           onCancel={() => setConfirmingDisband(false)}
         />

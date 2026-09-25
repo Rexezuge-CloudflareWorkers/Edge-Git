@@ -21,7 +21,8 @@
     "remove": "Quitar",
     "revoke": "Revocar",
     "saveChanges": "Guardar cambios",
-    "success": "Correcto"
+    "success": "Correcto",
+    "typeToConfirm": "Type {{name}} To Confirm"
   },
   "landing": {
     "title": "Git autoalojado en Cloudflare Workers",
@@ -62,6 +63,12 @@
     "deleteThisRepository": "Eliminar este repositorio",
     "deleteRepositoryDescription": "Elimina permanentemente el repositorio, sus datos de Git, incidencias y comentarios. Esta acción no se puede deshacer.",
     "deleteRepository": "Eliminar repositorio",
+    "changeVisibility": "Change Visibility",
+    "currentVisibility": "Current Visibility: {{visibility}}",
+    "makePublic": "Make Public",
+    "makePrivate": "Make Private",
+    "visibilityDescription": "Changing Visibility Affects Who Can Clone And View This Repository. Making It Public Exposes Code, Issues, And History To Anyone.",
+    "visibilityUpdated": "Repository Visibility Updated.",
     "repositorySettingsUpdated": "Ajustes del repositorio actualizados.",
     "repositoryDeleted": "Repositorio eliminado.",
     "code": "Código",
