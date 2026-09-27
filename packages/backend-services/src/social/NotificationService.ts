@@ -3,6 +3,7 @@ import type { NotificationRow, RepositoryRow } from '@edge-git/backend-data/dao'
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { EmailAddress, TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 import { PermissionService } from '../permission/PermissionService';
+import { UserIdentityService } from '../identity/UserIdentityService';
 
 interface NotificationServiceEnv {
   DB: D1Queryable;
@@ -14,6 +15,15 @@ interface NotificationServiceDeps {
   userDAO?: () => Promise<UserDAO>;
   repositoryDAO?: () => Promise<RepositoryDAO>;
   permissionService?: () => Promise<PermissionService>;
+  userIdentity?: () => Promise<UserIdentityService>;
+}
+
+/**
+Who a notification belongs to: the account id when known, else the address.
+*/
+export interface NotificationOwner {
+  userId: string | null;
+  userEmail: string;
 }
 
 interface FanOutInput {
@@ -53,6 +63,7 @@ class NotificationService {
       userDAO: () => Promise.resolve(new UserDAO(env.DB)),
       repositoryDAO: () => Promise.resolve(new RepositoryDAO(env.DB)),
       permissionService: () => Promise.resolve(new PermissionService({ DB: env.DB })),
+      userIdentity: () => Promise.resolve(new UserIdentityService(env)),
       ...deps,
     };
   }
@@ -85,7 +96,7 @@ class NotificationService {
   // actor, keeping only recipients that still hold read+ on the repo.
   // Private repos therefore never leak via notifications. Returns the
   // recipient emails so callers can also ping live-update subscribers.
-  public async fanOut(input: FanOutInput): Promise<{ notified: number; recipients: string[] }> {
+  public async fanOut(input: FanOutInput): Promise<{ notified: number; recipients: string[]; recipientUserIds: string[] }> {
     const actor = EmailAddress.normalize(input.actorEmail);
     const candidates = new Set<string>();
     if (input.repositoryId) {
@@ -109,7 +120,12 @@ class NotificationService {
       candidates.add(email);
     }
     candidates.delete(actor);
-    if (candidates.size === 0) return { notified: 0, recipients: [] };
+    if (candidates.size === 0) return { notified: 0, recipients: [], recipientUserIds: [] };
+
+    // Address -> account id for the whole fan-out. The id is what notifications
+    // are stored and read against, so the inbox survives a recipient changing
+    // address.
+    const recipientUserIds = await this.resolveRecipientUserIds([...candidates]);
 
     let repo: RepositoryRow | null = null;
     if (input.repositoryId) {
@@ -125,6 +141,8 @@ class NotificationService {
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const recipients = [...candidates].slice(0, MAX_FANOUT_RECIPIENTS);
     const delivered: string[] = [];
+    const deliveredIds: string[] = [];
+    const actorUserId = await this.resolveOneUserId(actor);
     let notified = 0;
     for (const recipient of recipients) {
       if (repo) {
@@ -136,10 +154,13 @@ class NotificationService {
           continue;
         }
       }
+      const recipientUserId = recipientUserIds.get(recipient) ?? null;
       await dao
         .insert({
           id: UUIDUtil.getRandomUUID(),
           userEmail: recipient,
+          userId: recipientUserId,
+          actorUserId,
           repositoryId: input.repositoryId,
           actorEmail: actor,
           type: input.type,
@@ -151,33 +172,56 @@ class NotificationService {
         .catch(() => undefined);
       notified += 1;
       delivered.push(recipient);
+      if (recipientUserId) deliveredIds.push(recipientUserId);
     }
-    return { notified, recipients: delivered };
+    return { notified, recipients: delivered, recipientUserIds: deliveredIds };
+  }
+
+  /**
+  Address -> account id for a fan-out recipient set.
+  */
+  private async resolveRecipientUserIds(emails: string[]): Promise<Map<string, string | null>> {
+    const out = new Map<string, string | null>();
+    for (const email of emails) out.set(email, await this.resolveOneUserId(email));
+    return out;
+  }
+
+  private async resolveOneUserId(email: string): Promise<string | null> {
+    try {
+      const identity = await this.deps.userIdentity();
+      return await identity.resolveUserId(email);
+    } catch {
+      return null;
+    }
   }
 
   public async listByUser(
-    userEmail: string,
+    owner: NotificationOwner,
     limit = 50,
     cursor?: string,
     unreadOnly = false,
   ): Promise<{ notifications: NotificationRow[]; nextCursor: string | null }> {
     const dao = await this.deps.notificationDAO();
-    return dao.listByUser(userEmail.toLowerCase(), Math.min(Math.max(limit, 1), 100), cursor, unreadOnly);
+    return dao.listByUser(NotificationService.normalizeOwner(owner), Math.min(Math.max(limit, 1), 100), cursor, unreadOnly);
   }
 
-  public async unreadCount(userEmail: string): Promise<number> {
+  public async unreadCount(owner: NotificationOwner): Promise<number> {
     const dao = await this.deps.notificationDAO();
-    return dao.unreadCount(userEmail.toLowerCase());
+    return dao.unreadCount(NotificationService.normalizeOwner(owner));
   }
 
-  public async markRead(id: string, userEmail: string): Promise<boolean> {
+  public async markRead(id: string, owner: NotificationOwner): Promise<boolean> {
     const dao = await this.deps.notificationDAO();
-    return dao.markRead(id, userEmail.toLowerCase());
+    return dao.markRead(id, NotificationService.normalizeOwner(owner));
   }
 
-  public async markAllRead(userEmail: string): Promise<number> {
+  public async markAllRead(owner: NotificationOwner): Promise<number> {
     const dao = await this.deps.notificationDAO();
-    return dao.markAllRead(userEmail.toLowerCase());
+    return dao.markAllRead(NotificationService.normalizeOwner(owner));
+  }
+
+  private static normalizeOwner(owner: NotificationOwner): { userId: string | null; userEmail: string } {
+    return { userId: owner.userId || null, userEmail: owner.userEmail.toLowerCase() };
   }
 
   public async pruneReadOlderThan(cutoff: number, limit: number): Promise<number> {

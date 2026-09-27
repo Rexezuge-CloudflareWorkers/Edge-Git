@@ -140,7 +140,7 @@ describe('slice1: SocialEmit channels and never-throw fan-out', () => {
       type: 'push',
       actorEmail: 'a@x.com',
       title: 'Pushed',
-      recipientEmails: ['b@x.com'],
+      recipientUserIds: ['usr_b'],
     });
     expect(published.some((p) => p.shard.startsWith('repo:'))).toBe(true);
     expect(published.some((p) => p.shard === 'inbox:global')).toBe(true);

@@ -8,7 +8,10 @@ import { getBasicCredentials, getBearerToken } from '@edge-git/git-protocol';
 import { DatabaseError } from '@edge-git/backend-errors';
 import { BaseRoute } from '../endpoints/IBaseRoute';
 
-type RequestContext = Context<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
+type RequestContext = Context<{
+  Bindings: Env;
+  Variables: { AuthenticatedUserEmailAddress: string; AuthenticatedUserId?: string };
+}>;
 
 // Single-scope resolution delegates to `BaseRoute.getScope` (Otter pattern) —
 // one fallback (fresh scope for helpers/tests outside middleware ordering)

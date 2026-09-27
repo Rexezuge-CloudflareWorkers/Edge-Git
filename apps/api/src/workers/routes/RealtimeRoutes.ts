@@ -9,7 +9,7 @@ import { getRealtimeStub } from '../doStubs';
 import { jsonError, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { readJsonBody } from './BodyParser';
 
-type RealtimeApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
+type RealtimeApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string; AuthenticatedUserId?: string } }>;
 
 function realtimeDisabled(env: Env): boolean {
   try {
@@ -84,12 +84,16 @@ function registerRealtimeUserRoutes(app: RealtimeApp): void {
   });
 
   app.get('/user/realtime/inbox-ticket', async (c) => {
-    const email = c.get('AuthenticatedUserEmailAddress');
+    // The shard tag is derived from the account id, so the subscription survives
+    // an address change. Without an id (a database predating 0028) inbox realtime
+    // is reported unavailable rather than keyed on a mutable address.
+    const userId = c.get('AuthenticatedUserId');
+    if (!userId) return jsonError(c, 'Realtime is disabled', 503);
     if (realtimeDisabled(c.env)) return jsonError(c, 'Realtime is disabled', 503);
     try {
-      const hash = await RealtimeService.inboxHashForEmail(email);
+      const hash = await RealtimeService.inboxHashForUserId(userId);
       const grant = getScope(c).get(Tokens.RealtimeService).inboxSubscription(hash);
-      const issued = await getRealtimeStub(c.env, grant.shard).issueTicket({ shard: grant.shard, channels: grant.channels, viewer: email });
+      const issued = await getRealtimeStub(c.env, grant.shard).issueTicket({ shard: grant.shard, channels: grant.channels, viewer: userId });
       if ('error' in issued) return jsonError(c, 'Unavailable', 503);
       return c.json({ shard: grant.shard, ticket: issued.ticket, expiresAt: issued.expiresAt, channels: grant.channels });
     } catch {

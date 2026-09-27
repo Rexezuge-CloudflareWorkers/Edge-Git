@@ -1034,7 +1034,7 @@ describe('SocialEmit best-effort fan-out + inbox hashing', () => {
     const second = await RealtimeService.hashRecipients([BOB, ALICE]);
     expect(first).toHaveLength(2);
     expect(new Set([...first, ...second]).size).toBe(2);
-    expect((await RealtimeService.inboxHashForEmail(ALICE)).length).toBe(16);
+    expect((await RealtimeService.inboxHashForUserId(ALICE)).length).toBe(16);
   });
 });
 

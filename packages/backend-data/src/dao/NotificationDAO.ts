@@ -4,6 +4,12 @@ import type { D1Queryable } from '../utils/D1Types';
 export interface NotificationRow {
   id: string;
   user_email: string;
+  /**
+   * Recipient account (0028). The inbox is keyed on this, so notifications
+   * follow an account across an address change. NULL only for rows written
+   * before the migration, which are matched on `user_email` instead.
+   */
+  user_id?: string | null;
   repository_id: string | null;
   // Computed `full_name` alias (`repositories` join) — the stored copy was
   // dropped in 0024. Null for global (repo-less) notifications.
@@ -25,6 +31,14 @@ class NotificationDAO extends BaseDAO {
   public async insert(input: {
     id: string;
     userEmail: string;
+    /**
+    Recipient account. `userEmail` remains the denormalized copy.
+    */
+    userId?: string | null;
+    /**
+    Acting account, for the same reason (attribution resolution).
+    */
+    actorUserId?: string | null;
     repositoryId: string | null;
     actorEmail: string;
     type: string;
@@ -37,7 +51,7 @@ class NotificationDAO extends BaseDAO {
       () =>
         this.database
           .prepare(
-            'INSERT OR IGNORE INTO notifications (id, user_email, repository_id, actor_email, type, title, subject_type, subject_number, is_read, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)',
+            'INSERT OR IGNORE INTO notifications (id, user_email, repository_id, actor_email, type, title, subject_type, subject_number, is_read, created_at, user_id, actor_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)',
           )
           .bind(
             input.id,
@@ -49,6 +63,8 @@ class NotificationDAO extends BaseDAO {
             input.subjectType ?? null,
             input.subjectNumber ?? null,
             input.now,
+            input.userId ?? null,
+            input.actorUserId ?? null,
           )
           .run(),
       'insert notification',
@@ -60,8 +76,23 @@ class NotificationDAO extends BaseDAO {
   private static readonly FULL_NAME_ALIAS =
     "(SELECT owner || '/' || name FROM repositories WHERE id = notifications.repository_id) AS full_name";
 
+  /**
+   * Recipient predicate.
+   *
+   * An id matches every row for that account regardless of which address was
+   * current when the row was written; the address is the fallback for rows
+   * predating 0028, whose `user_id` is NULL.
+   */
+  private static owner(userId: string | null): string {
+    return userId ? '(user_id = ? OR (user_id IS NULL AND user_email = ?))' : 'user_email = ?';
+  }
+
+  private static ownerParams(userId: string | null, userEmail: string): string[] {
+    return userId ? [userId, userEmail] : [userEmail];
+  }
+
   public async listByUser(
-    userEmail: string,
+    owner: { userId: string | null; userEmail: string },
     limit = 50,
     cursor?: string,
     unreadOnly = false,
@@ -69,19 +100,21 @@ class NotificationDAO extends BaseDAO {
     const decoded = this.decodeCursor<{ created_at: number; id: string }>(cursor);
     const readFilter = unreadOnly ? 'AND is_read = 0' : '';
     const pageSize = limit + 1;
+    const where = NotificationDAO.owner(owner.userId);
+    const ownerArgs = NotificationDAO.ownerParams(owner.userId, owner.userEmail);
     const result =
       decoded === undefined
         ? await this.database
             .prepare(
-              `SELECT notifications.*, ${NotificationDAO.FULL_NAME_ALIAS} FROM notifications WHERE user_email = ? ${readFilter} ORDER BY created_at DESC, id DESC LIMIT ?`,
+              `SELECT notifications.*, ${NotificationDAO.FULL_NAME_ALIAS} FROM notifications WHERE ${where} ${readFilter} ORDER BY created_at DESC, id DESC LIMIT ?`,
             )
-            .bind(userEmail, pageSize)
+            .bind(...ownerArgs, pageSize)
             .all<NotificationRow>()
         : await this.database
             .prepare(
-              `SELECT notifications.*, ${NotificationDAO.FULL_NAME_ALIAS} FROM notifications WHERE user_email = ? ${readFilter} AND (created_at < ? OR (created_at = ? AND id < ?)) ORDER BY created_at DESC, id DESC LIMIT ?`,
+              `SELECT notifications.*, ${NotificationDAO.FULL_NAME_ALIAS} FROM notifications WHERE ${where} ${readFilter} AND (created_at < ? OR (created_at = ? AND id < ?)) ORDER BY created_at DESC, id DESC LIMIT ?`,
             )
-            .bind(userEmail, decoded.created_at, decoded.created_at, decoded.id, pageSize)
+            .bind(...ownerArgs, decoded.created_at, decoded.created_at, decoded.id, pageSize)
             .all<NotificationRow>();
     const rows = result.results ?? [];
     const hasMore = rows.length > limit;
@@ -90,25 +123,33 @@ class NotificationDAO extends BaseDAO {
     return { notifications: page, nextCursor: hasMore && last ? this.encodeCursor({ created_at: last.created_at, id: last.id }) : null };
   }
 
-  public async unreadCount(userEmail: string): Promise<number> {
+  public async unreadCount(owner: { userId: string | null; userEmail: string }): Promise<number> {
     const row = await this.database
-      .prepare('SELECT COUNT(*) AS n FROM notifications WHERE user_email = ? AND is_read = 0')
-      .bind(userEmail)
+      .prepare(`SELECT COUNT(*) AS n FROM notifications WHERE ${NotificationDAO.owner(owner.userId)} AND is_read = 0`)
+      .bind(...NotificationDAO.ownerParams(owner.userId, owner.userEmail))
       .first<{ n: number }>();
     return row?.n ?? 0;
   }
 
-  public async markRead(id: string, userEmail: string): Promise<boolean> {
+  public async markRead(id: string, owner: { userId: string | null; userEmail: string }): Promise<boolean> {
     const result = await this.withRetry(
-      () => this.database.prepare('UPDATE notifications SET is_read = 1 WHERE id = ? AND user_email = ?').bind(id, userEmail).run(),
+      () =>
+        this.database
+          .prepare(`UPDATE notifications SET is_read = 1 WHERE id = ? AND ${NotificationDAO.owner(owner.userId)}`)
+          .bind(id, ...NotificationDAO.ownerParams(owner.userId, owner.userEmail))
+          .run(),
       'mark notification read',
     );
     return ((result.meta as { changes?: number })?.changes ?? 0) > 0;
   }
 
-  public async markAllRead(userEmail: string): Promise<number> {
+  public async markAllRead(owner: { userId: string | null; userEmail: string }): Promise<number> {
     const result = await this.withRetry(
-      () => this.database.prepare('UPDATE notifications SET is_read = 1 WHERE user_email = ? AND is_read = 0').bind(userEmail).run(),
+      () =>
+        this.database
+          .prepare(`UPDATE notifications SET is_read = 1 WHERE ${NotificationDAO.owner(owner.userId)} AND is_read = 0`)
+          .bind(...NotificationDAO.ownerParams(owner.userId, owner.userEmail))
+          .run(),
       'mark all notifications read',
     );
     return (result.meta as { changes?: number })?.changes ?? 0;

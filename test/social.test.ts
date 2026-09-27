@@ -307,14 +307,14 @@ describe('NotificationDAO', () => {
       title: 'Push',
       now: 200,
     });
-    expect(await dao.unreadCount('a@example.com')).toBe(2);
-    const unread = await dao.listByUser('a@example.com', 50, undefined, true);
+    expect(await dao.unreadCount({ userId: null, userEmail: 'a@example.com' })).toBe(2);
+    const unread = await dao.listByUser({ userId: null, userEmail: 'a@example.com' }, 50, undefined, true);
     expect(unread.notifications.map((n) => n.id)).toEqual(['n2', 'n1']);
-    expect(await dao.markRead('n2', 'a@example.com')).toBe(true);
-    expect(await dao.markRead('n2', 'other@example.com')).toBe(false);
-    expect(await dao.unreadCount('a@example.com')).toBe(1);
-    expect(await dao.markAllRead('a@example.com')).toBe(1);
-    expect(await dao.unreadCount('a@example.com')).toBe(0);
+    expect(await dao.markRead('n2', { userId: null, userEmail: 'a@example.com' })).toBe(true);
+    expect(await dao.markRead('n2', { userId: null, userEmail: 'other@example.com' })).toBe(false);
+    expect(await dao.unreadCount({ userId: null, userEmail: 'a@example.com' })).toBe(1);
+    expect(await dao.markAllRead({ userId: null, userEmail: 'a@example.com' })).toBe(1);
+    expect(await dao.unreadCount({ userId: null, userEmail: 'a@example.com' })).toBe(0);
   });
 
   it('prunes only read notifications older than cutoff', async () => {
@@ -340,7 +340,7 @@ describe('NotificationDAO', () => {
       title: 'Unread',
       now: 10,
     });
-    await dao.markRead('read-old', 'a@example.com');
+    await dao.markRead('read-old', { userId: null, userEmail: 'a@example.com' });
     expect(await dao.pruneReadOlderThan(100, 100)).toBe(1);
     expect(db.state.notifications.map((n) => n.id)).toEqual(['unread-old']);
   });
@@ -414,7 +414,7 @@ describe('social services', () => {
     });
     // creator has no role → skipped; watcher + mentioned notified; actor excluded.
     expect(inserted.sort()).toEqual(['mentioned@example.com', 'watcher@example.com']);
-    expect(result).toEqual({ notified: 2, recipients: ['watcher@example.com', 'mentioned@example.com'] });
+    expect(result).toMatchObject({ notified: 2, recipients: ['watcher@example.com', 'mentioned@example.com'] });
   });
 });
 

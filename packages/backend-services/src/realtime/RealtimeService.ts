@@ -2,7 +2,7 @@ import { RepositoryDAO } from '@edge-git/backend-data/dao';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { ForbiddenError, NotFoundError } from '@edge-git/backend-errors';
-import { CryptoUtil, EmailAddress } from '@edge-git/shared/utils';
+import { CryptoUtil } from '@edge-git/shared/utils';
 import { INBOX_SHARD, inboxTagForHash, isInboxHash, normalizeChannels, repoShardFor } from '@edge-git/shared/realtime';
 import { PermissionService } from '../permission/PermissionService';
 
@@ -36,18 +36,27 @@ class RealtimeService {
     };
   }
 
-  public static inboxHashForEmail(email: string): Promise<string> {
-    return CryptoUtil.sha256Hex(EmailAddress.normalize(email)).then((hex) => hex.slice(0, 16));
+  /**
+   * Inbox shard tag for an account.
+   *
+   * Hashed from the account id, not the address: this value routes a subscriber
+   * to a Durable Object shard, so keying it on a mutable address would silently
+   * strand every live subscription the moment the account changed address. The
+   * hash is only ever computed server-side — the client receives a ticket scoped
+   * to the resulting channel — so an opaque id leaks nothing a raw address did not.
+   */
+  public static inboxHashForUserId(userId: string): Promise<string> {
+    return CryptoUtil.sha256Hex(`user:${userId}`).then((hex) => hex.slice(0, 16));
   }
 
-  // Recipient emails → per-user inbox tags for the global shard. Bounded and
-  // best-effort: hashing never throws, failures resolve to an empty list.
-  public static async hashRecipients(emails: string[], limit = 500): Promise<string[]> {
+  // Recipient account ids -> per-user inbox tags for the global shard. Bounded
+  // and best-effort: hashing never throws, failures resolve to an empty list.
+  public static async hashRecipients(userIds: string[], limit = 500): Promise<string[]> {
     const hashes = new Set<string>();
     await Promise.all(
-      emails.slice(0, limit).map(async (email) => {
+      userIds.slice(0, limit).map(async (userId) => {
         try {
-          hashes.add(await this.inboxHashForEmail(email));
+          hashes.add(await this.inboxHashForUserId(userId));
         } catch {
           // ignore — that recipient just misses the live ping
         }

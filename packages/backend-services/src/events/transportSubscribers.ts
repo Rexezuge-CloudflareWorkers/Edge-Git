@@ -61,9 +61,11 @@ async function handleRealtimePublish(
     sha: input.subjectOid ?? null,
     extra: input.extra ?? {},
   }).catch(() => undefined);
-  const recipients = input.recipientEmails ?? [];
-  if (recipients.length === 0) return;
-  const hashes = await RealtimeService.hashRecipients(recipients).catch(() => [] as string[]);
+  // Inbox tags are derived from account ids, not addresses, so a recipient who
+  // changes address keeps receiving live updates on the same shard.
+  const recipientIds = input.recipientUserIds ?? [];
+  if (recipientIds.length === 0) return;
+  const hashes = await RealtimeService.hashRecipients(recipientIds).catch(() => [] as string[]);
   if (hashes.length === 0) return;
   await publishToShard(INBOX_SHARD, {
     channel: `inbox:${hashes[0]}`,

@@ -8,12 +8,23 @@ import { flushDueWebhookDeliveries } from '@/workers/routes/SocialEmit';
 import { getScope } from './GitAuth';
 import type { RequestContext } from './GitAuth';
 
+/**
+ * Authenticate the request and resolve the address to an account.
+ *
+ * The account id is what identifies the caller for anything id-keyed
+ * (notifications, realtime inbox), so it is published on the context next to the
+ * address. The address stays because it is the only thing Cloudflare Access
+ * asserts and the only shape some read paths still accept.
+ */
 async function authenticateUserIdentity(c: RequestContext): Promise<string> {
   const scope = getScope(c);
   const email = await scope
     .get(Tokens.AccessAuthService)
     .getAuthenticatedUserEmail(c.req.raw, c.executionCtx as unknown as AccessIdentityContext);
-  await scope.get(Tokens.UserService).upsertUser(email);
+  const account = await scope.get(Tokens.UserService).upsertUser(email);
+  // Absent when the account could not be resolved (a database that has not run
+  // 0028); those callers fall back to the address.
+  if (account.id) c.set('AuthenticatedUserId', account.id);
   return email;
 }
 

@@ -13,9 +13,15 @@ beforeEach(() => {
 // --- Fake D1 covering the 10 lowest route files ---------------------------
 function createLowFakeDb() {
   const state = {
+    // Post-0028 shape: every account has a stable id and a current address, and
+    // the address registry maps that address back to the account.
     users: [
-      { email: ALICE, username: 'alice', created_at: 1 },
-      { email: BOB, username: 'bob', created_at: 1 },
+      { id: 'usr_alice', email: ALICE, current_email: ALICE, username: 'alice', created_at: 1 },
+      { id: 'usr_bob', email: BOB, current_email: BOB, username: 'bob', created_at: 1 },
+    ] as Array<Record<string, unknown>>,
+    userEmails: [
+      { email: ALICE, user_id: 'usr_alice', is_verified: 1, created_at: 1 },
+      { email: BOB, user_id: 'usr_bob', is_verified: 1, created_at: 1 },
     ] as Array<Record<string, unknown>>,
     namespaces: [
       { username_ci: 'alice', kind: 'user', user_email: ALICE, org_id: null },
@@ -102,6 +108,17 @@ function createLowFakeDb() {
         // users
         if (q.includes('FROM users WHERE lower(email)')) {
           return Promise.resolve((state.users.find((u) => String(u.email).toLowerCase() === Pl(0)) ?? null) as T | null);
+        }
+        if (q.includes('FROM user_emails WHERE email = ?')) {
+          return Promise.resolve((state.userEmails.find((r) => r.email === params[0]) ?? null) as T | null);
+        }
+        if (q.includes('FROM users WHERE lower(current_email)')) {
+          return Promise.resolve(
+            (state.users.find((u) => String(u.current_email).toLowerCase() === String(params[0]).toLowerCase()) ?? null) as T | null,
+          );
+        }
+        if (q.includes('FROM users WHERE id = ?')) {
+          return Promise.resolve((state.users.find((u) => u.id === params[0]) ?? null) as T | null);
         }
         if (q.includes('FROM users WHERE lower(username)')) {
           return Promise.resolve((state.users.find((u) => String(u.username ?? '').toLowerCase() === Pl(0)) ?? null) as T | null);
@@ -237,9 +254,9 @@ function createLowFakeDb() {
           return Promise.resolve({ n: state.watches.filter((s) => s.repo_id === params[0]).length } as unknown as T);
         }
         // notifications
-        if (q.includes('COUNT(*) AS n FROM notifications WHERE user_email = ? AND is_read = 0')) {
+        if (q.includes('COUNT(*) AS n FROM notifications WHERE (user_id = ? OR (user_id IS NULL AND user_email = ?)) AND is_read = 0')) {
           return Promise.resolve({
-            n: state.notifications.filter((n) => String(n.user_email).toLowerCase() === Pl(0) && n.is_read === 0).length,
+            n: state.notifications.filter((n) => n.user_id === Pl(0) && n.is_read === 0).length,
           } as unknown as T);
         }
         // pulls / threads (thread tables before pulls)
@@ -379,9 +396,9 @@ function createLowFakeDb() {
         if (q.includes('FROM repo_watches WHERE repo_id = ?')) {
           return Promise.resolve({ results: state.watches.filter((s) => s.repo_id === params[0]) as T[] });
         }
-        if (q.includes('FROM notifications WHERE user_email = ?')) {
+        if (q.includes('FROM notifications WHERE (user_id = ? OR (user_id IS NULL AND user_email = ?))')) {
           const rows = state.notifications
-            .filter((n) => String(n.user_email).toLowerCase() === Pl(0))
+            .filter((n) => n.user_id === Pl(0) || (n.user_id == null && String(n.user_email).toLowerCase() === String(Pl(1)).toLowerCase()))
             .sort((a, b) => (b.created_at as number) - (a.created_at as number));
           // handle LIMIT param (pageSize last)
           const limit = typeof params[params.length - 1] === 'number' ? (params[params.length - 1] as number) : rows.length;
@@ -814,6 +831,7 @@ function createLowFakeDb() {
         if (q.startsWith('INSERT OR IGNORE INTO notifications')) {
           if (!state.notifications.some((n) => n.id === params[0]))
             state.notifications.push({
+              user_id: params[10] ?? null,
               id: params[0],
               user_email: String(params[1]).toLowerCase(),
               repository_id: params[2],
@@ -828,9 +846,9 @@ function createLowFakeDb() {
             });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
-        if (q.startsWith('UPDATE notifications SET is_read = 1 WHERE id = ? AND user_email = ?')) {
+        if (q.startsWith('UPDATE notifications SET is_read = 1 WHERE id = ? AND (user_id = ? OR (user_id IS NULL AND user_email = ?))')) {
           const row = state.notifications.find(
-            (n) => n.id === params[0] && String(n.user_email).toLowerCase() === String(params[1]).toLowerCase(),
+            (n) => n.id === params[0] && n.user_id === params[1] && String(n.user_email).toLowerCase() === String(params[2]).toLowerCase(),
           );
           if (row) {
             row.is_read = 1;
@@ -838,10 +856,10 @@ function createLowFakeDb() {
           }
           return Promise.resolve({ success: true, meta: { changes: 0 } });
         }
-        if (q.startsWith('UPDATE notifications SET is_read = 1 WHERE user_email = ?')) {
+        if (q.startsWith('UPDATE notifications SET is_read = 1 WHERE (user_id = ? OR (user_id IS NULL AND user_email = ?)) AND is_read = 0')) {
           let changed = 0;
           for (const n of state.notifications) {
-            if (String(n.user_email).toLowerCase() === String(params[0]).toLowerCase() && n.is_read === 0) {
+            if ((n.user_id === params[0] || (n.user_id == null && String(n.user_email).toLowerCase() === String(params[1]).toLowerCase())) && n.is_read === 0) {
               n.is_read = 1;
               changed += 1;
             }
