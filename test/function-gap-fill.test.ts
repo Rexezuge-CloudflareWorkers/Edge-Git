@@ -799,7 +799,7 @@ describe('function-gap SocialEmit', () => {
       type: 'push',
       actorEmail: ALICE,
       title: 'hi',
-      recipientEmails: [ALICE],
+      recipientUserIds: [ALICE],
     });
     expect(counter.count).toBe(2);
     await publishLiveUpdate(env as never, { fullName: 'alice/demo', channel: 'bogus!!', type: 'x', actorEmail: ALICE, title: 'hi' });

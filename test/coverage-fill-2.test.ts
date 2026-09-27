@@ -123,10 +123,11 @@ describe('social thin services', () => {
       pruneReadOlderThan: async () => 0,
     };
     const svc = new NotificationService({ DB: null as never }, { notificationDAO: async () => fakeDao as never });
-    await expect(svc.markRead('n1', 'a@x.com')).resolves.toBe(true);
-    await expect(svc.markAllRead('a@x.com')).resolves.toBe(2);
-    await expect(svc.unreadCount('a@x.com')).resolves.toBe(1);
-    await expect(svc.listByUser('a@x.com')).resolves.toMatchObject({ nextCursor: null });
+    const owner = { userId: null, userEmail: 'a@x.com' };
+    await expect(svc.markRead('n1', owner)).resolves.toBe(true);
+    await expect(svc.markAllRead(owner)).resolves.toBe(2);
+    await expect(svc.unreadCount(owner)).resolves.toBe(1);
+    await expect(svc.listByUser(owner)).resolves.toMatchObject({ nextCursor: null });
     await expect(svc.pruneReadOlderThan(1, 10)).resolves.toBe(0);
   });
 });

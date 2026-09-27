@@ -43,6 +43,11 @@ interface RealtimePublishInput {
   subjectOid?: string | null;
   extra?: Record<string, unknown>;
   recipientEmails?: string[];
+  /**
+   * Recipient account ids. Preferred over `recipientEmails` for inbox delivery:
+   * the shard tag is derived from the id, so it survives an address change.
+   */
+  recipientUserIds?: string[];
 }
 
 interface CheckUpdatedInput {

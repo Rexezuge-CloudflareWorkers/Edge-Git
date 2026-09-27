@@ -78,15 +78,18 @@ describe('RealtimeService repo authorization', () => {
 
 describe('RealtimeService inbox helpers', () => {
   it('hashes emails deterministically and normalizes recipient hashes', async () => {
-    const first = await RealtimeService.inboxHashForEmail('V@Example.COM');
-    expect(first).toBe(await RealtimeService.inboxHashForEmail('v@example.com'));
+    const first = await RealtimeService.inboxHashForUserId('usr_abc');
+    expect(first).toBe(await RealtimeService.inboxHashForUserId('usr_abc'));
+    // Keyed on the account, so a different account lands on a different shard
+    // and the same account keeps its shard across an address change.
+    expect(first).not.toBe(await RealtimeService.inboxHashForUserId('usr_def'));
     expect(first).toMatch(/^[0-9a-f]{16}$/);
     expect(RealtimeService.normalizeRecipientHashes([first, first, 'bogus'])).toEqual([first]);
     expect(RealtimeService.normalizeRecipientHashes(null)).toEqual([]);
   });
 
   it('hashes recipient batches for inbox fan-out', async () => {
-    const hashes = await RealtimeService.hashRecipients(['a@example.com', 'b@example.com']);
+    const hashes = await RealtimeService.hashRecipients(['usr_abc', 'usr_def']);
     expect(hashes).toHaveLength(2);
     expect(new Set(hashes).size).toBe(2);
   });

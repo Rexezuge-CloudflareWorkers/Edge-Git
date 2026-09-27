@@ -62,7 +62,7 @@ async function recordAndNotify(env: Env, input: SocialEmitInput): Promise<void> 
         participantEmails: input.participantEmails ?? [],
         mentionUsernames,
       })
-      .catch(() => ({ notified: 0, recipients: [] as string[] }));
+      .catch(() => ({ notified: 0, recipients: [] as string[], recipientUserIds: [] as string[] }));
     await publishLiveUpdate(env, {
       fullName: input.fullName,
       channel: channelForRepoEvent(input.type, input.subjectType ?? null, input.subjectNumber ?? null),
@@ -73,7 +73,7 @@ async function recordAndNotify(env: Env, input: SocialEmitInput): Promise<void> 
       subjectNumber: input.subjectNumber ?? null,
       subjectOid: input.subjectOid ?? null,
       extra: input.payload ?? {},
-      recipientEmails: fanout.recipients,
+      recipientUserIds: fanout.recipientUserIds,
     });
   } catch (error) {
     logSocialFailure('Failed to fan out notifications', input.type, input.fullName, error);
@@ -169,6 +169,7 @@ interface LiveUpdateInput {
   subjectOid?: string | null;
   extra?: Record<string, unknown>;
   recipientEmails?: string[];
+  recipientUserIds?: string[];
 }
 
 // Best-effort live fan-out: one RPC to the repo shard plus (when D1 fan-out
@@ -192,6 +193,7 @@ async function publishLiveUpdate(env: Env, input: LiveUpdateInput): Promise<void
           subjectOid: input.subjectOid,
           extra: input.extra,
           recipientEmails: input.recipientEmails,
+          recipientUserIds: input.recipientUserIds,
         },
         via: realtimePort(env),
       });

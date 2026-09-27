@@ -46,7 +46,7 @@ import { registerCollabPublicRoutes, registerCollabUserRoutes } from './routes/C
 
 type AppRouter = HonoOpenAPIRouterType<{
   Bindings: Env;
-  Variables: { AuthenticatedUserEmailAddress: string };
+  Variables: { AuthenticatedUserEmailAddress: string; AuthenticatedUserId?: string };
 }>;
 
 class EdgeGitWorker extends AbstractEntrypointWorker {
@@ -57,7 +57,7 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
 
     const app = new Hono<{
       Bindings: Env;
-      Variables: { AuthenticatedUserEmailAddress: string };
+      Variables: { AuthenticatedUserEmailAddress: string; AuthenticatedUserId?: string };
     }>();
 
     // Security headers first so even the shell/health early routes carry

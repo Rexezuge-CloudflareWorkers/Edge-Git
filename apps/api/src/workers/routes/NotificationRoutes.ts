@@ -3,7 +3,23 @@ import { jsonError, getScope } from './PublicViewerResolver';
 import { Tokens } from '@edge-git/backend-services/composition';
 import { usernameFor, usernameMap } from './IdentityPresenter';
 
-type NotificationApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
+type NotificationApp = Hono<{
+  Bindings: Env;
+  Variables: { AuthenticatedUserEmailAddress: string; AuthenticatedUserId?: string };
+}>;
+
+/**
+ * The caller's notification owner.
+ *
+ * The account id is preferred so the inbox follows the account across an
+ * address change; the address stays as the fallback for requests where the
+ * account could not be resolved.
+ */
+function ownerOf(c: {
+  get: (k: 'AuthenticatedUserId' | 'AuthenticatedUserEmailAddress') => string | undefined;
+}): { userId: string | null; userEmail: string } {
+  return { userId: c.get('AuthenticatedUserId') || null, userEmail: c.get('AuthenticatedUserEmailAddress') ?? '' };
+}
 
 function parsePositiveInt(raw: string | null, fallback: number, max: number): number {
   const n = Number(raw);
@@ -16,15 +32,15 @@ function parsePositiveInt(raw: string | null, fallback: number, max: number): nu
 // so listing needs no per-row permission re-check.
 function registerUserNotificationRoutes(app: NotificationApp): void {
   app.get('/user/notifications', async (c) => {
-    const email = c.get('AuthenticatedUserEmailAddress');
+    const owner = ownerOf(c);
     const url = new URL(c.req.url);
     const unreadOnly = url.searchParams.get('unreadOnly') === '1' || url.searchParams.get('unreadOnly') === 'true';
     const limit = parsePositiveInt(url.searchParams.get('limit'), 30, 100);
     const cursor = url.searchParams.get('cursor') ?? undefined;
     const scope = getScope(c);
     const [{ notifications, nextCursor }, unreadCount] = await Promise.all([
-      scope.get(Tokens.NotificationService).listByUser(email, limit, cursor, unreadOnly),
-      scope.get(Tokens.NotificationService).unreadCount(email),
+      scope.get(Tokens.NotificationService).listByUser(owner, limit, cursor, unreadOnly),
+      scope.get(Tokens.NotificationService).unreadCount(owner),
     ]);
     const map = await usernameMap(
       scope,
@@ -39,21 +55,18 @@ function registerUserNotificationRoutes(app: NotificationApp): void {
   });
 
   app.get('/user/notifications/unread-count', async (c) => {
-    const email = c.get('AuthenticatedUserEmailAddress');
-    const unreadCount = await getScope(c).get(Tokens.NotificationService).unreadCount(email);
+    const unreadCount = await getScope(c).get(Tokens.NotificationService).unreadCount(ownerOf(c));
     return c.json({ unreadCount });
   });
 
   app.patch('/user/notifications/:id/read', async (c) => {
-    const email = c.get('AuthenticatedUserEmailAddress');
-    const ok = await getScope(c).get(Tokens.NotificationService).markRead(c.req.param('id'), email);
+    const ok = await getScope(c).get(Tokens.NotificationService).markRead(c.req.param('id'), ownerOf(c));
     if (!ok) return jsonError(c, 'Not found', 404);
     return c.json({ ok: true });
   });
 
   app.post('/user/notifications/read-all', async (c) => {
-    const email = c.get('AuthenticatedUserEmailAddress');
-    const marked = await getScope(c).get(Tokens.NotificationService).markAllRead(email);
+    const marked = await getScope(c).get(Tokens.NotificationService).markAllRead(ownerOf(c));
     return c.json({ ok: true, marked });
   });
 }
