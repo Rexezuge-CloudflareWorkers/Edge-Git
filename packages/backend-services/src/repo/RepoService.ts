@@ -1,3 +1,4 @@
+import { UserIdentityService } from '../identity/UserIdentityService';
 import type {
   AuditLogDAO,
   BranchProtectionDAO,
@@ -58,6 +59,7 @@ interface RepoServiceDeps {
   pullThreadDAO?: () => Promise<PullThreadDAO>;
   branchProtectionDAO?: () => Promise<BranchProtectionDAO>;
   userDAO?: () => Promise<UserDAO>;
+  userIdentity?: () => Promise<UserIdentityService>;
   organizationDAO?: () => Promise<OrganizationDAO>;
   organizationMemberDAO?: () => Promise<OrganizationMemberDAO>;
   repoCollaboratorDAO?: () => Promise<RepoCollaboratorDAO>;
@@ -185,6 +187,7 @@ class RepoService {
         now,
         ownerType: 'user',
         ownerUserEmail: callerEmail,
+        ownerUserId: await this.resolveUserId(callerEmail),
         forkedFromRepoId: opts.forkedFromRepoId ?? null,
       });
       return { id };
@@ -272,6 +275,21 @@ class RepoService {
     await enqueueVacuumTombstone(this.deps, repo);
     return { id: repo.id };
   }
+
+  /**
+   * Account id for an address, stamped on new repositories so ownership is
+   * keyed on the account rather than the address: an owner keeps `admin` on
+   * their repositories after changing their address.
+   */
+  private async resolveUserId(email: string): Promise<string | null> {
+    try {
+      const identity = await this.deps.userIdentity();
+      return await identity.resolveUserId(email.toLowerCase());
+    } catch {
+      return null;
+    }
+  }
+
 }
 
 export { RepoService };

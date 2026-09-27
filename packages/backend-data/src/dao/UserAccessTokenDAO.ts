@@ -5,6 +5,12 @@ import type { TokenScope, UserAccessTokenMetadata } from '@edge-git/shared';
 export interface TokenRow {
   token_id: string;
   user_email: string;
+  /**
+   * Owning account (0028). `user_email` is the account's frozen anchor, so a
+   * token keeps authenticating as its owner across an address change only
+   * because the owner is resolved through this key. NULL pre-migration.
+   */
+  user_id?: string | null;
   token_hash: string;
   name: string;
   expires_at: number;
@@ -43,14 +49,15 @@ class UserAccessTokenDAO extends BaseDAO {
     now: number,
     scopes?: readonly TokenScope[] | null,
     tokenPrefix?: string | null,
+    userId?: string | null,
   ): Promise<void> {
     await this.withRetry(
       () =>
         this.database
           .prepare(
-            'INSERT INTO user_access_tokens (token_id, user_email, token_hash, name, expires_at, last_used_at, created_at, token_prefix) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)',
+            'INSERT INTO user_access_tokens (token_id, user_email, token_hash, name, expires_at, last_used_at, created_at, token_prefix, user_id) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)',
           )
-          .bind(tokenId, userEmail.toLowerCase(), tokenHash, name, expiresAt, now, tokenPrefix ?? null)
+          .bind(tokenId, userEmail.toLowerCase(), tokenHash, name, expiresAt, now, tokenPrefix ?? null, userId ?? null)
           .run(),
       'create access token',
     );

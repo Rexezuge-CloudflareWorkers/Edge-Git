@@ -113,7 +113,7 @@ function createProfileFakeDb() {
         return Promise.resolve({ results: [] });
       },
       run(): Promise<{ success: boolean; meta?: { changes?: number } }> {
-        if (q.startsWith('INSERT INTO users (email, created_at)')) {
+        if (q.startsWith('INSERT INTO users')) {
           const [email, created_at] = params as [string, number];
           if (!state.users.some((u) => u.email === email)) state.users.push({ email, created_at, username: null, updated_at: null });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
@@ -162,7 +162,7 @@ function createProfileFakeDb() {
           }
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
-        if (q.startsWith('INSERT INTO organization_members (org_id, user_email, role')) {
+        if (q.startsWith('INSERT INTO organization_members')) {
           const [org_id, user_email, role, created_at] = params as [string, string, string, number];
           const normalized = String(user_email).toLowerCase();
           state.members = state.members.filter(

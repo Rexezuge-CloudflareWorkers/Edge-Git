@@ -34,7 +34,10 @@ interface TeamServiceDeps {
   repositoryDAO?: () => Promise<RepositoryDAO>;
   repoCollaboratorDAO?: () => Promise<RepoCollaboratorDAO>;
   config?: AppConfiguration;
+  userIdentity?: () => Promise<UserIdentityService>;
 }
+
+import { UserIdentityService } from '../identity/UserIdentityService';
 
 // Canonical slug rule: import `SLUG_RE` from `@edge-git/shared/utils` (Layer 0).
 
@@ -48,6 +51,7 @@ class TeamService {
     this.deps = {
       teamDAO: () => Promise.resolve(new TeamDAO(env.DB)),
       teamMemberDAO: () => Promise.resolve(new TeamMemberDAO(env.DB)),
+      userIdentity: () => Promise.resolve(new UserIdentityService(env)),
       teamGrantDAO: () => Promise.resolve(new TeamRepoGrantDAO(env.DB)),
       organizationDAO: () => Promise.resolve(new OrganizationDAO(env.DB)),
       organizationMemberDAO: () => Promise.resolve(new OrganizationMemberDAO(env.DB)),
@@ -209,7 +213,7 @@ class TeamService {
       const max = this.deps.config.getMaxTeamMembers();
       assertQuotaWithinLimit(count, max, 'team members');
     }
-    await memberDAO.upsert(team.id, targetEmail, role, TimestampUtil.getCurrentUnixTimestampInSeconds());
+    await memberDAO.upsert(team.id, targetEmail, role, TimestampUtil.getCurrentUnixTimestampInSeconds(), await this.resolveUserId(targetEmail));
   }
 
   public async setMemberRole(
@@ -229,7 +233,7 @@ class TeamService {
       const admins = await memberDAO.countAdmins(team.id);
       assertNotLastTeamAdmin(existing.role, admins, 'demote');
     }
-    await memberDAO.upsert(team.id, targetEmail, role, TimestampUtil.getCurrentUnixTimestampInSeconds());
+    await memberDAO.upsert(team.id, targetEmail, role, TimestampUtil.getCurrentUnixTimestampInSeconds(), await this.resolveUserId(targetEmail));
   }
 
   public async removeMember(orgUsername: string, teamSlug: string, actorEmail: string, targetUsernameOrEmail: string): Promise<void> {
@@ -311,6 +315,21 @@ class TeamService {
     const rows = await grantDAO.listByTeam(team.id).catch(() => []);
     return rows.map((r) => ({ repoId: r.repo_id, role: r.role }));
   }
+
+  /**
+   * Account id for an address, or null when the address is not registered.
+   * Used to stamp `user_id` on membership rows so a member keeps access after
+   * changing their address; the address column stays for legacy readers.
+   */
+  private async resolveUserId(email: string): Promise<string | null> {
+    try {
+      const identity = await this.deps.userIdentity();
+      return await identity.resolveUserId(email.toLowerCase());
+    } catch {
+      return null;
+    }
+  }
+
 }
 
 export { TeamService };

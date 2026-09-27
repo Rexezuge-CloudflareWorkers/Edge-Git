@@ -12,6 +12,26 @@
  */
 
 declare const __INTEGRATION_MIGRATION_SQL__: string;
+declare const __INTEGRATION_MIGRATION_FILES__: ReadonlyArray<{ name: string; sql: string }>;
+
+export interface MigrationFile {
+  name: string;
+  sql: string;
+}
+
+/** Migration files in apply order. */
+function migrationFiles(): MigrationFile[] {
+  const files = typeof __INTEGRATION_MIGRATION_FILES__ === 'undefined' ? null : __INTEGRATION_MIGRATION_FILES__;
+  if (files && files.length > 0) return [...files];
+  // Fallback for harnesses that only inject the flattened string.
+  return [{ name: 'all.sql', sql: __INTEGRATION_MIGRATION_SQL__ }];
+}
+
+/** Names of the embedded migration files, in apply order. */
+export function migrationFileNames(): string[] {
+  return migrationFiles().map((f) => f.name);
+}
+
 
 function splitSql(sql: string): string[] {
   const statements: string[] = [];
@@ -133,17 +153,91 @@ function splitSql(sql: string): string[] {
   return statements;
 }
 
-export async function applyMigrations(db: D1Database): Promise<void> {
-  const statements = splitSql(__INTEGRATION_MIGRATION_SQL__);
-  for (const stmt of statements) {
-    if (stmt.length === 0) continue;
+function executableStatements(sql: string): string[] {
+  return splitSql(sql).filter((stmt) => {
+    if (stmt.length === 0) return false;
     // Skip pure-comment statements (no executable SQL).
     const withoutComments = stmt
       .replace(/--[^\n]*/g, '')
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .trim();
-    if (withoutComments.length === 0) continue;
-    await db.prepare(stmt).run();
+    return withoutComments.length > 0;
+  });
+}
+
+/** Strip leading `--` / block comments, which the splitter folds into the statement. */
+function stripLeadingComments(stmt: string): string {
+  let out = stmt;
+  for (;;) {
+    const next = out.replace(/^\s*(?:--[^\n]*\n|\/\*[\s\S]*?\*\/)\s*/, '');
+    if (next === out) return out.trim();
+    out = next;
+  }
+}
+
+/** `PRAGMA` statements that scope a connection/transaction rather than the schema. */
+function isConnectionPragma(stmt: string): boolean {
+  return /^pragma\s+(?!foreign_key_check|table_|index_|quick_check|integrity_check)\w/i.test(stripLeadingComments(stmt));
+}
+
+/**
+ * Apply one migration file.
+ *
+ * D1 scopes PRAGMAs to the current transaction, and it does not guarantee that
+ * a `db.batch()` behaves as one transaction for them. Migration 0028 depends on
+ * `PRAGMA foreign_keys = off` holding for every statement that follows — that
+ * pragma is what stops its table rebuilds from cascading rows away through
+ * `ON DELETE CASCADE` — so for any file that opens with a connection PRAGMA we
+ * re-issue that PRAGMA before each statement rather than betting on batch
+ * semantics. Files without one (0021–0027) take the single-batch fast path.
+ */
+async function applyMigrationFile(db: D1Database, file: MigrationFile): Promise<void> {
+  const statements = executableStatements(file.sql);
+  if (statements.length === 0) return;
+  const pragmas = statements.filter((stmt) => isConnectionPragma(stmt));
+  if (pragmas.length === 0) {
+    await db.batch(statements.map((sql) => db.prepare(sql)));
+    return;
+  }
+  const pragmaIndex = new Map(pragmas.map((p) => [p, statements.indexOf(p)]));
+  for (let i = 0; i < statements.length; i += 1) {
+    const statement = statements[i] as string;
+    const preamble = pragmas.filter((p) => (pragmaIndex.get(p) as number) < i);
+    try {
+      await db.batch([...preamble, statement].map((sql) => db.prepare(sql)));
+    } catch (error) {
+      // Name the statement: a batch only reports the file's single failure,
+      // and 0028's guard exists precisely to fail loudly here.
+      throw new Error(
+        `${file.name}: statement ${i + 1}/${statements.length} failed: ${stripLeadingComments(statement).slice(0, 200)}\n${error instanceof Error ? error.message : String(error)}`,
+        { cause: error },
+      );
+    }
+  }
+}
+
+/**
+ * Apply a range of migrations, defaulting to every file.
+ *
+ * `from`/`to` are file names (`0027_drop_plaintext_secrets.sql`). A range is
+ * what the identity-upgrade test needs: re-applying 0021 after 0024 has
+ * already dropped `user_access_tokens.scopes` would make 0023's backfill
+ * reference a column that no longer exists.
+ */
+export async function applyMigrations(db: D1Database, range?: { from?: string; to?: string }): Promise<void> {
+  const files = migrationFiles();
+  const indexOf = (name: string | undefined, fallback: number): number => {
+    if (!name) return fallback;
+    const found = files.findIndex((f) => f.name === name);
+    if (found === -1) {
+      throw new Error(`Unknown migration file: ${name}. Available: ${files.map((f) => f.name).join(', ')}`);
+    }
+    return found;
+  };
+  const start = indexOf(range?.from, 0);
+  const end = indexOf(range?.to, files.length - 1);
+  for (const file of files.slice(start, end + 1)) {
+    await applyMigrationFile(db, file);
   }
 }
 

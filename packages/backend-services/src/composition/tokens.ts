@@ -31,6 +31,7 @@ import type {
   TokenRepoGrantDAO,
   UserAccessTokenDAO,
   UserDAO,
+  UserEmailDAO,
   WatchDAO,
   WebhookDAO,
   WebhookDeliveryDAO,
@@ -66,6 +67,7 @@ import type { AuditService } from '../audit/AuditService';
 import type { AuditObserverRegistry } from '../audit/AuditObserver';
 import type { DomainEventBus } from '../events/DomainEventBus';
 import type { IdentityResolver } from '../identity/IdentityResolver';
+import type { UserIdentityService } from '../identity/UserIdentityService';
 import type { PermissionService } from '../permission/PermissionService';
 import type { SearchService } from '../search/SearchService';
 import type { ActivityService } from '../social/ActivityService';
@@ -108,6 +110,7 @@ const Tokens = {
   ImportKey: Symbol('ImportKey') as Token<() => Promise<string>>,
   AppConfig: Symbol('AppConfig') as Token<AppConfiguration>,
   UserDAO: Symbol('UserDAO') as Token<() => Promise<UserDAO>>,
+  UserEmailDAO: Symbol('UserEmailDAO') as Token<() => Promise<UserEmailDAO>>,
   RepositoryDAO: Symbol('RepositoryDAO') as Token<() => Promise<RepositoryDAO>>,
   UserAccessTokenDAO: Symbol('UserAccessTokenDAO') as Token<() => Promise<UserAccessTokenDAO>>,
   IssueDAO: Symbol('IssueDAO') as Token<() => Promise<IssueDAO>>,
@@ -159,6 +162,7 @@ const Tokens = {
   AuditObserverRegistry: Symbol('AuditObserverRegistry') as Token<AuditObserverRegistry>,
   DomainEventBus: Symbol('DomainEventBus') as Token<DomainEventBus>,
   IdentityResolver: Symbol('IdentityResolver') as Token<IdentityResolver>,
+  UserIdentityService: Symbol('UserIdentityService') as Token<UserIdentityService>,
   PermissionService: Symbol('PermissionService') as Token<PermissionService>,
   SearchService: Symbol('SearchService') as Token<SearchService>,
   StarService: Symbol('StarService') as Token<StarService>,

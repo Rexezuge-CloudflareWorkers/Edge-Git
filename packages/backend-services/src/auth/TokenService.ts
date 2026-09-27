@@ -1,10 +1,12 @@
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { RepositoryDAO, TokenRepoGrantDAO, UserAccessTokenDAO } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
+import { isMissingSchemaError } from '@edge-git/backend-data/utils';
 import { BadRequestError, NotFoundError, UnauthorizedError } from '@edge-git/backend-errors';
 import type { TokenScope, TokenRepoGrantMetadata, UserAccessTokenMetadata } from '@edge-git/shared';
 import { TimestampUtil, UUIDUtil, CryptoUtil, mapWithConcurrency } from '@edge-git/shared/utils';
 import { DEFAULT_TOKEN_SCOPES, TOKEN_SCOPES, coversScope, normalizeTokenScopes } from './TokenScopes';
+import { UserIdentityService } from '../identity/UserIdentityService';
 
 interface TokenServiceEnv {
   DB: D1Queryable;
@@ -38,6 +40,10 @@ interface TokenServiceDeps {
   tokenDAO?: () => Promise<UserAccessTokenDAO>;
   repositoryDAO?: () => Promise<RepositoryDAO>;
   tokenGrantDAO?: () => Promise<TokenRepoGrantDAO>;
+  /**
+  Resolves the account behind a token so a changed address is reported.
+  */
+  userIdentity?: () => Promise<UserIdentityService>;
 }
 
 function tokenPrefixOf(token: string): string {
@@ -55,6 +61,7 @@ class TokenService {
       tokenDAO: () => Promise.resolve(new UserAccessTokenDAO(env.DB)),
       repositoryDAO: () => Promise.resolve(new RepositoryDAO(env.DB)),
       tokenGrantDAO: () => Promise.resolve(new TokenRepoGrantDAO(env.DB)),
+      userIdentity: () => Promise.resolve(new UserIdentityService(env)),
       ...deps,
     };
   }
@@ -81,13 +88,36 @@ class TokenService {
         throw new UnauthorizedError('Your personal access token is temporarily unavailable.');
       }
       return {
-        email: tokenData.userEmail.toLowerCase(),
+        email: await this.resolveAccountEmail(tokenData),
         scopes: tokenData.scopes,
         tokenId: tokenData.tokenId,
         repoGrants: grants.map((g) => ({ repositoryId: g.repository_id, scope: g.scope })),
       };
     }
     throw new UnauthorizedError('Your personal access token is invalid or has expired.');
+  }
+
+  /**
+   * The address a token authenticates as.
+   *
+   * `user_access_tokens.user_email` is the account's frozen anchor, so a token
+   * minted before an address change would otherwise authenticate as a stale
+   * address and lose its owner's access. Resolving through the owning account
+   * returns the address the account currently uses, so a PAT keeps working
+   * across the change. Falls back to the stored anchor for pre-0028 rows.
+   */
+  private async resolveAccountEmail(tokenData: { userEmail: string; userId?: string | null }): Promise<string> {
+    const anchor = tokenData.userEmail.toLowerCase();
+    if (!tokenData.userId) return anchor;
+    try {
+      const identity = await this.deps.userIdentity();
+      const row = await identity.resolveUserById(tokenData.userId);
+      if (row) return row.email;
+    } catch (error) {
+      if (!isMissingSchemaError(error)) throw error;
+      // Registry absent (database predating 0028): the anchor is the address.
+    }
+    return anchor;
   }
 
   public static coversScope(held: readonly TokenScope[], required: TokenScope): boolean {
@@ -177,7 +207,11 @@ class TokenService {
     const expiresAt: number = TimestampUtil.addDays(now, effectiveExpiryInDays);
     const tokenHash = await TokenService.hashToken(token);
     const prefix = tokenPrefixOf(token);
-    await dao.create(tokenId, normalized, tokenHash, trimmedName, expiresAt, now, effectiveScopes, prefix);
+    // Stamp the owning account so the token keeps authenticating as its owner
+    // after an address change (`user_email` is the frozen anchor).
+    const identity = await this.deps.userIdentity();
+    const ownerUserId = await identity.resolveUserId(normalized).catch(() => null);
+    await dao.create(tokenId, normalized, tokenHash, trimmedName, expiresAt, now, effectiveScopes, prefix, ownerUserId);
     // Post-create single-flight: two concurrent creates can both pass the
     // pre-check. If we lost the race and exceeded the cap, roll back our own
     // token so MAX_TOKENS_PER_USER holds under concurrency.

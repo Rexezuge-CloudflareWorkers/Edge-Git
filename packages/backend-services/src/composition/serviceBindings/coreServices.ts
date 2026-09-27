@@ -4,7 +4,7 @@
 import { AccessAuthService, TokenService } from '@edge-git/backend-services/auth';
 import { AuditObserverRegistry, AuditService } from '@edge-git/backend-services/audit';
 import { DomainEventBus, registerDomainEventDefaults } from '@edge-git/backend-services/events';
-import { IdentityResolver } from '@edge-git/backend-services/identity';
+import { IdentityResolver, UserIdentityService } from '@edge-git/backend-services/identity';
 import { OrganizationService } from '@edge-git/backend-services/org';
 import { PermissionService } from '@edge-git/backend-services/permission';
 import { TeamService } from '@edge-git/backend-services/team';
@@ -17,16 +17,26 @@ import type { ServiceGroupContext } from './daoThunks';
 
 function bindCoreServices(scope: Container, { env, daos }: ServiceGroupContext): void {
   scope.bind(Tokens.AccessAuthService, () => createService(AccessAuthService, env));
-  scope.bind(Tokens.TokenService, () =>
+  scope.bind(Tokens.TokenService, (container) =>
     createService(TokenService, env, {
       tokenDAO: daos.tokenDAO,
       repositoryDAO: daos.repositoryDAO,
       tokenGrantDAO: daos.tokenGrantDAO,
+      // Single per-request identity resolver, so the permission and token paths
+      // share one memoized address -> account resolution.
+      userIdentity: () => Promise.resolve(container.get(Tokens.UserIdentityService)),
     }),
   );
-  scope.bind(Tokens.UserService, () =>
+  // Bound before its dependents: address -> account resolution is the entry
+  // point for every id-keyed check, and its memo is per request scope.
+  scope.bind(Tokens.UserIdentityService, () =>
+    createService(UserIdentityService, env, { userDAO: daos.userDAO, userEmailDAO: daos.userEmailDAO }),
+  );
+  scope.bind(Tokens.UserService, (scope) =>
     createService(UserService, env, {
       userDAO: daos.userDAO,
+      userEmailDAO: daos.userEmailDAO,
+      userIdentity: () => Promise.resolve(scope.get(Tokens.UserIdentityService)),
       namespaceDAO: daos.namespaceDAO,
       organizationDAO: daos.organizationDAO,
       repositoryDAO: daos.repositoryDAO,
@@ -76,8 +86,9 @@ function bindCoreServices(scope: Container, { env, daos }: ServiceGroupContext):
   // subscribers resolve lazily via the container so routes and middleware
   // publish intent (`bus.emit(...)`) instead of calling services directly.
   scope.bind(Tokens.DomainEventBus, (container) => registerDomainEventDefaults(new DomainEventBus(), container));
-  scope.bind(Tokens.PermissionService, () =>
+  scope.bind(Tokens.PermissionService, (container) =>
     createService(PermissionService, env, {
+      userIdentity: () => Promise.resolve(container.get(Tokens.UserIdentityService)),
       organizationDAO: daos.organizationDAO,
       organizationMemberDAO: daos.organizationMemberDAO,
       repoCollaboratorDAO: daos.repoCollaboratorDAO,

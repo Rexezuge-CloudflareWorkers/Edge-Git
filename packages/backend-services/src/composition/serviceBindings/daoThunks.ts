@@ -35,6 +35,7 @@ import type {
   TokenRepoGrantDAO,
   UserAccessTokenDAO,
   UserDAO,
+  UserEmailDAO,
   WatchDAO,
   WebhookDAO,
   WebhookDeliveryDAO,
@@ -49,6 +50,7 @@ interface DaoThunks {
   pullThreadDAO: () => Promise<PullThreadDAO>;
   branchProtectionDAO: () => Promise<BranchProtectionDAO>;
   userDAO: () => Promise<UserDAO>;
+  userEmailDAO: () => Promise<UserEmailDAO>;
   organizationDAO: () => Promise<OrganizationDAO>;
   organizationMemberDAO: () => Promise<OrganizationMemberDAO>;
   repoCollaboratorDAO: () => Promise<RepoCollaboratorDAO>;

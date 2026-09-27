@@ -6,6 +6,10 @@ export type TeamMemberRole = 'admin' | 'member';
 export interface TeamMemberRow {
   team_id: string;
   user_email: string;
+  /**
+  Account key (0028). NULL only for rows written before the migration.
+  */
+  user_id?: string | null;
   role: TeamMemberRole;
   joined_at: number;
 }
@@ -15,7 +19,7 @@ class TeamMemberDAO extends BaseDAO {
     super(database);
   }
 
-  public async upsert(teamId: string, userEmail: string, role: TeamMemberRole, now: number): Promise<void> {
+  public async upsert(teamId: string, userEmail: string, role: TeamMemberRole, now: number, userId?: string | null): Promise<void> {
     const normalized = userEmail.toLowerCase();
     await this.withRetry(async () => {
       // Collapse legacy mixed-case duplicates so `lower(user_email)` reads stay unique.
@@ -26,9 +30,9 @@ class TeamMemberDAO extends BaseDAO {
         .catch(() => undefined);
       return this.database
         .prepare(
-          'INSERT INTO team_members (team_id, user_email, role, joined_at) VALUES (?, ?, ?, ?) ON CONFLICT(team_id, user_email) DO UPDATE SET role = excluded.role',
+          'INSERT INTO team_members (team_id, user_email, role, joined_at, user_id) VALUES (?, ?, ?, ?, ?) ON CONFLICT(team_id, user_email) DO UPDATE SET role = excluded.role, user_id = COALESCE(excluded.user_id, team_members.user_id)',
         )
-        .bind(teamId, normalized, role, now)
+        .bind(teamId, normalized, role, now, userId ?? null)
         .run();
     }, 'upsert team member');
   }
@@ -37,6 +41,16 @@ class TeamMemberDAO extends BaseDAO {
     return this.database
       .prepare('SELECT * FROM team_members WHERE team_id = ? AND lower(user_email) = lower(?) LIMIT 1')
       .bind(teamId, userEmail)
+      .first<TeamMemberRow>();
+  }
+
+  /**
+  Membership read by account key. Authoritative once 0028 has backfilled.
+  */
+  public async getByUserId(teamId: string, userId: string): Promise<TeamMemberRow | null> {
+    return this.database
+      .prepare('SELECT * FROM team_members WHERE team_id = ? AND user_id = ? LIMIT 1')
+      .bind(teamId, userId)
       .first<TeamMemberRow>();
   }
 
