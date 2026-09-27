@@ -16,6 +16,12 @@ export interface RepositoryRow {
   owner_ci?: string | null;
   name_ci?: string | null;
   owner_user_email?: string | null;
+  /**
+   * Owning account (0028). This is what permission checks compare against, so an
+   * owner keeps `admin` on their repositories after changing their address.
+   * NULL only on rows written before the migration.
+   */
+  owner_user_id?: string | null;
   org_id?: string | null;
   forked_from_repo_id?: string | null;
   // Computed alias (`repositories` self-join) — the stored copy was dropped
@@ -45,6 +51,7 @@ class RepositoryDAO extends BaseDAO {
     ownerType?: string;
     orgId?: string | null;
     ownerUserEmail?: string | null;
+    ownerUserId?: string | null;
     forkedFromRepoId?: string | null;
   }): Promise<void> {
     const ownerType = input.ownerType ?? 'user';
@@ -55,7 +62,7 @@ class RepositoryDAO extends BaseDAO {
       () =>
         this.database
           .prepare(
-            'INSERT INTO repositories (id, owner_email, owner, name, description, is_private, created_at, updated_at, owner_type, owner_ci, name_ci, owner_user_email, org_id, forked_from_repo_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO repositories (id, owner_email, owner, name, description, is_private, created_at, updated_at, owner_type, owner_ci, name_ci, owner_user_email, org_id, forked_from_repo_id, owner_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           )
           .bind(
             input.id,
@@ -72,10 +79,22 @@ class RepositoryDAO extends BaseDAO {
             ownerUserEmail,
             input.orgId ?? null,
             input.forkedFromRepoId ?? null,
+            input.ownerUserId ?? null,
           )
           .run(),
       'create repository',
     );
+  }
+
+  /**
+  Repositories owned by an account, resolved by key (0028+).
+  */
+  public async listByOwnerUserId(ownerUserId: string, limit = 100): Promise<RepositoryRow[]> {
+    const result = await this.database
+      .prepare(`SELECT repositories.*, ${RepositoryDAO.FORK_ALIAS} FROM repositories WHERE owner_user_id = ? ORDER BY updated_at DESC LIMIT ?`)
+      .bind(ownerUserId, limit)
+      .all<RepositoryRow>();
+    return result.results ?? [];
   }
 
   public async getByOwnerAndName(owner: string, name: string): Promise<RepositoryRow | null> {

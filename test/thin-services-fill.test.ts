@@ -272,7 +272,7 @@ function createFakeDb(seed?: Partial<FakeState>): FakeDb {
           );
           return Promise.resolve({ success: true, meta: { changes: 0 } });
         }
-        if (q.startsWith('INSERT INTO organization_members (org_id, user_email, role, created_at)')) {
+        if (q.startsWith('INSERT INTO organization_members')) {
           const [orgId, userEmail, role, now] = params as Array<string | number>;
           const existing = state.organization_members.find((m) => m.org_id === orgId && lower(m.user_email) === lower(userEmail));
           if (existing) existing.role = role;
@@ -291,7 +291,7 @@ function createFakeDb(seed?: Partial<FakeState>): FakeDb {
           const removed = removeInPlace(state.team_members, (m) => m.team_id === params[0] && lower(m.user_email) === lower(params[1]));
           return Promise.resolve({ success: true, meta: { changes: removed } });
         }
-        if (q.startsWith('INSERT INTO team_members (team_id, user_email, role, joined_at)')) {
+        if (q.startsWith('INSERT INTO team_members')) {
           const [teamId, userEmail, role, now] = params as Array<string | number>;
           const existing = state.team_members.find((m) => m.team_id === teamId && lower(m.user_email) === lower(userEmail));
           if (existing) existing.role = role;
@@ -319,7 +319,7 @@ function createFakeDb(seed?: Partial<FakeState>): FakeDb {
           return Promise.resolve({ success: true, meta: { changes: removed } });
         }
         // Users
-        if (q.startsWith('INSERT INTO users (email, created_at)')) {
+        if (q.startsWith('INSERT INTO users')) {
           const [email, now] = params as Array<string | number>;
           if (state.users.every((u) => u.email !== email)) {
             state.users.push({ email, created_at: now, username: null, updated_at: null });

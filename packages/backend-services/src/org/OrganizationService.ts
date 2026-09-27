@@ -34,7 +34,10 @@ interface OrganizationServiceDeps {
   eventDAO?: () => Promise<EventDAO>;
   notificationDAO?: () => Promise<NotificationDAO>;
   webhookDAO?: () => Promise<WebhookDAO>;
+  userIdentity?: () => Promise<UserIdentityService>;
 }
+
+import { UserIdentityService } from '../identity/UserIdentityService';
 
 // Canonical slug rule: import `SLUG_RE` from `@edge-git/shared/utils` (Layer 0).
 
@@ -55,6 +58,7 @@ class OrganizationService {
       pullRequestDAO: () => Promise.resolve(new PullRequestDAO(env.DB)),
       eventDAO: () => Promise.resolve(new EventDAO(env.DB)),
       notificationDAO: () => Promise.resolve(new NotificationDAO(env.DB)),
+      userIdentity: () => Promise.resolve(new UserIdentityService(env)),
       webhookDAO: () =>
         Promise.reject<WebhookDAO>(new Error('OrganizationService requires an injected webhookDAO outside request scope.')),
       ...deps,
@@ -136,7 +140,7 @@ class OrganizationService {
     } catch {
       // Best-effort: org row is source of truth if namespaces table is unavailable.
     }
-    await memberDAO.upsert(id, normalizedCreator, 'owner', now);
+    await memberDAO.upsert(id, normalizedCreator, 'owner', now, await this.resolveUserId(normalizedCreator));
     const created = await orgDAO.getById(id);
     if (!created) throw new NotFoundError('Organization not found');
     return created;
@@ -161,7 +165,7 @@ class OrganizationService {
     if (role !== 'owner' && role !== 'member') throw new BadRequestError('Invalid role');
     const targetEmail = await this.resolveEmail(targetUsernameOrEmail);
     const memberDAO = await this.deps.organizationMemberDAO();
-    await memberDAO.upsert(org.id, targetEmail, role, TimestampUtil.getCurrentUnixTimestampInSeconds());
+    await memberDAO.upsert(org.id, targetEmail, role, TimestampUtil.getCurrentUnixTimestampInSeconds(), await this.resolveUserId(targetEmail));
   }
 
   public async setMemberRole(orgUsername: string, actorEmail: string, targetUsernameOrEmail: string, role: OrgMemberRole): Promise<void> {
@@ -175,7 +179,7 @@ class OrganizationService {
       const owners = await memberDAO.countOwners(org.id);
       assertNotLastOrgOwner(existing.role, owners, 'demote');
     }
-    await memberDAO.upsert(org.id, targetEmail, role, TimestampUtil.getCurrentUnixTimestampInSeconds());
+    await memberDAO.upsert(org.id, targetEmail, role, TimestampUtil.getCurrentUnixTimestampInSeconds(), await this.resolveUserId(targetEmail));
   }
 
   public async removeMember(orgUsername: string, actorEmail: string, targetUsernameOrEmail: string): Promise<void> {
@@ -298,6 +302,21 @@ class OrganizationService {
       // ignore
     }
   }
+
+  /**
+   * Account id for an address, or null when the address is not registered.
+   * Used to stamp `user_id` on membership rows so a member keeps access after
+   * changing their address; the address column stays for legacy readers.
+   */
+  private async resolveUserId(email: string): Promise<string | null> {
+    try {
+      const identity = await this.deps.userIdentity();
+      return await identity.resolveUserId(email.toLowerCase());
+    } catch {
+      return null;
+    }
+  }
+
 }
 
 export { OrganizationService };

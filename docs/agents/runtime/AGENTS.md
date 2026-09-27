@@ -8,6 +8,15 @@ Scope: Wrangler bindings, build output, env vars. Parent index: `../../../AGENTS
 - The Worker always serves the SPA from `/`, `/new`, `/settings`, `/:owner/:repo`, `/user/*` catch-all in `EdgeGitWorker` (non-matching paths return `404`) so Smart HTTP routes are never intercepted.
 - Bindings: D1 `DB`, KV `CACHE` (single namespace, domain-prefixed keys via `KvCache` in `@edge-git/backend-runtime/kv`: `jwks`/`oauth2`/`code`/`searchCursor`/`refs`/`ratelimit`), DOs `REPO` (`RepoWorker`, `getByName(canonicalDoKey)` lowercased `owner/name` via `repoDoKeyForFullName`, device size from `DO_DEVICE_BYTES`, `/repo` bare) / `CRON_TASKS` (`CronTasksWorker`, `idFromName('global')`), cron `*/10 * * * *`; no R2/Queues/AI bindings.
 
+## D1 migrations
+
+- `migrations/*.sql` applies in filename order via `wrangler d1 migrations apply`; the integration harness concatenates the same files (`test/integration/vitest.config.mts` → `__INTEGRATION_MIGRATION_FILES__`) and applies **one file per `db.batch()`** because D1 scopes PRAGMAs to the current transaction. `applyMigrations(db, {from, to})` applies a range — needed to exercise a legacy database (apply up to `0027`, seed, then apply `0028`).
+- **D1 enforces foreign keys in queries and migrations, and honours neither `PRAGMA foreign_keys = off` nor `PRAGMA legacy_alter_table = on` through the Worker binding** (verified empirically: a dangling FK insert is still rejected with `foreign_keys = off`, and renaming a parent still rewrites its children's FK clauses). `PRAGMA defer_foreign_keys = on` *is* honoured, but per D1's own documentation it does **not** suppress `ON DELETE CASCADE`. Consequences for schema changes:
+  - Never plan a migration around `DROP TABLE` + `RENAME` of a table that other tables reference — the implicit `DELETE FROM` cascades. Use additive `ALTER TABLE … ADD COLUMN` and backfill.
+  - The three `REFERENCES users(email)` clauses cannot be repointed, which is why `0028_user_identity.sql` freezes `users.email` as an anchor instead of rebuilding those tables.
+  - A migration that *must* rebuild should prove enforcement is off before its first destructive statement, so the run aborts instead of deleting rows.
+- `UserIdentityUpgrade.int.test.ts` is the template for "do not break an existing database": seed every cascade edge, apply the migration, then assert zero row loss across all of them plus `PRAGMA foreign_key_check` empty.
+
 ## Required vars (no defaults)
 
 `POLICY_AUD`, `TEAM_DOMAIN` — Cloudflare Access JWT verification (`AccessAuthService`). No default; requests fail without them (except `DEMO_MODE`/`DEV_AUTH_EMAIL` bypass).

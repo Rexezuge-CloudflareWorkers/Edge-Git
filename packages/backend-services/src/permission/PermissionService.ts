@@ -12,6 +12,7 @@ import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { isMissingSchemaError } from '@edge-git/backend-data/utils';
 import { DatabaseError } from '@edge-git/backend-errors';
 import { maxTeamGrantRole } from './TeamGrantPolicy';
+import { UserIdentityService } from '../identity/UserIdentityService';
 import type { RepoRole } from '@edge-git/backend-data/dao';
 
 type RepoPermission = RepoRole;
@@ -28,6 +29,12 @@ interface PermissionServiceDeps {
   teamDAO?: () => Promise<TeamDAO>;
   teamMemberDAO?: () => Promise<TeamMemberDAO>;
   teamGrantDAO?: () => Promise<TeamRepoGrantDAO>;
+  /**
+   * Address → account id. Required for an address to keep its access after it
+   * changes: membership and ownership are keyed on the id, and only the
+   * authenticated address is available at the call site.
+   */
+  userIdentity?: () => Promise<UserIdentityService>;
   // Fail-closed schema mode: when true, missing-table/column errors throw
   // DatabaseError instead of degrading to public-read/collaborator fallbacks.
   // Wired to true in production (all migrations applied; a missing table is
@@ -40,6 +47,10 @@ const ROLE_RANK: Record<RepoPermission, number> = { read: 1, write: 2, admin: 3 
 
 class PermissionService {
   private readonly deps: Required<PermissionServiceDeps>;
+  /**
+  Per-request memo: one address resolution per viewer, not per check.
+  */
+  private readonly viewerIds = new Map<string, string | null>();
 
   constructor(
     private readonly env: PermissionServiceEnv,
@@ -53,6 +64,7 @@ class PermissionService {
       teamDAO: () => Promise.resolve(new TeamDAO(env.DB)),
       teamMemberDAO: () => Promise.resolve(new TeamMemberDAO(env.DB)),
       teamGrantDAO: () => Promise.resolve(new TeamRepoGrantDAO(env.DB)),
+      userIdentity: () => Promise.resolve(new UserIdentityService(env)),
       strictSchema: false,
       ...deps,
     };
@@ -92,11 +104,40 @@ class PermissionService {
     return 'user';
   }
 
+  /**
+   * Account id for the viewing address, or null when unknown.
+   *
+   * Only the address is available at the call site, so it is resolved here and
+   * memoized for the request. Every grant below is then matched on the id, which
+   * is what makes an address change non-destructive: the grant is attached to
+   * the account, not to the string the viewer happens to present. Rows written
+   * before 0028 still match on the address, since their `user_id` is backfilled
+   * but the viewer may not be.
+   */
+  private async resolveViewerId(viewer: string): Promise<string | null> {
+    const key = viewer.toLowerCase();
+    const cached = this.viewerIds.get(key);
+    if (cached !== undefined) return cached;
+    let id: string | null = null;
+    try {
+      const identity = await this.deps.userIdentity();
+      id = await identity.resolveUserId(key);
+    } catch (error) {
+      // A missing registry (database predating 0028) is not an outage: the
+      // address-keyed fallbacks below still answer correctly.
+      if (!isMissingSchemaError(error)) throw error;
+      id = null;
+    }
+    this.viewerIds.set(key, id);
+    return id;
+  }
+
   public async getRole(viewerEmail: string | null, repo: RepositoryRow | null): Promise<RepoPermission | null> {
     if (!repo) return null;
     const isPrivate = PermissionService.isPrivateRepo(repo);
     if (!viewerEmail) return isPrivate ? null : 'read';
     const viewer = viewerEmail.toLowerCase();
+    const viewerId = await this.resolveViewerId(viewer);
 
     // Resolve org (0002 path with graceful fallback for legacy DBs/fakes).
     // Fail closed: only missing-table errors degrade — and only when
@@ -139,7 +180,8 @@ class PermissionService {
     if (orgId) {
       try {
         const memberDAO = await this.deps.organizationMemberDAO();
-        const membership = await memberDAO.get(orgId, viewer);
+        const membership =
+          (viewerId ? await memberDAO.getByUserId(orgId, viewerId) : null) ?? (await memberDAO.get(orgId, viewer));
         if (membership?.role === 'owner') return 'admin';
       } catch (error) {
         if (!this.isTolerableSchemaError(error))
@@ -149,7 +191,8 @@ class PermissionService {
       let best: RepoPermission | null = null;
       try {
         const collabDAO = await this.deps.repoCollaboratorDAO();
-        const grant = await collabDAO.get(repo.id, viewer);
+        const grant =
+          (viewerId ? await collabDAO.getByUserId(repo.id, viewerId) : null) ?? (await collabDAO.get(repo.id, viewer));
         if (grant) best = grant.role;
       } catch (error) {
         if (!this.isTolerableSchemaError(error))
@@ -158,7 +201,7 @@ class PermissionService {
       // Team-derived grants (org repos only): max of direct + team grants.
       // Missing team tables (legacy DBs/fakes) fall through silently.
       try {
-        const teamBest = await this.getTeamRole(orgId, repo.id, viewer);
+        const teamBest = await this.getTeamRole(orgId, repo.id, viewer, viewerId);
         if (teamBest && (!best || ROLE_RANK[teamBest] > ROLE_RANK[best])) best = teamBest;
       } catch (error) {
         if (!this.isTolerableSchemaError(error))
@@ -171,11 +214,17 @@ class PermissionService {
     }
 
     // User-owned repo.
-    const ownerEmail = repo.owner_user_email ?? repo.owner_email;
-    if (ownerEmail?.toLowerCase() === viewer) return 'admin';
+    if (viewerId && repo.owner_user_id) {
+      if (repo.owner_user_id === viewerId) return 'admin';
+    } else {
+      // Pre-0028 row (no backfilled owner id): match on the stored address.
+      const ownerEmail = repo.owner_user_email ?? repo.owner_email;
+      if (ownerEmail?.toLowerCase() === viewer) return 'admin';
+    }
     try {
       const collabDAO = await this.deps.repoCollaboratorDAO();
-      const grant = await collabDAO.get(repo.id, viewer);
+      const grant =
+        (viewerId ? await collabDAO.getByUserId(repo.id, viewerId) : null) ?? (await collabDAO.get(repo.id, viewer));
       if (grant) return grant.role;
     } catch (error) {
       if (!this.isTolerableSchemaError(error))
@@ -193,7 +242,7 @@ class PermissionService {
    * load concurrently with per-request dedup so the git-auth hot path is
    * `1 grant list + 1 fan-out` instead of sequential N+1 round-trips.
    */
-  private async getTeamRole(orgId: string, repoId: string, viewer: string): Promise<RepoPermission | null> {
+  private async getTeamRole(orgId: string, repoId: string, viewer: string, viewerId: string | null): Promise<RepoPermission | null> {
     const grantDAO = await this.deps.teamGrantDAO();
     let grants: Array<{ team_id: string; role: RepoPermission }>;
     try {
@@ -218,7 +267,9 @@ class PermissionService {
     };
     const [teams, memberships] = await Promise.all([
       Promise.all(uniqueTeamIds.map((id) => swallowMissing(teamDAO.getById(id)))),
-      Promise.all(uniqueTeamIds.map((id) => swallowMissing(memberDAO.get(id, viewer)))),
+      Promise.all(
+        uniqueTeamIds.map((id) => swallowMissing((viewerId ? memberDAO.getByUserId(id, viewerId) : null) ?? memberDAO.get(id, viewer))),
+      ),
     ]);
     const teamById = new Map(teams.filter((t): t is NonNullable<typeof t> => t !== null).map((t) => [t.id, t] as const));
     // Positional membership: `memberships[i]` answers `uniqueTeamIds[i]`.

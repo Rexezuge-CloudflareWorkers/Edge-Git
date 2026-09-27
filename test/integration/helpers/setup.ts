@@ -26,14 +26,29 @@ export async function ensureUser(db: D1Database, email: string, username?: strin
   const normalizedEmail = email.toLowerCase();
   const handle = (username ?? normalizedEmail.split('@', 1)[0]).trim() || 'user';
   const handleCi = handle.toLowerCase();
-  await db.prepare(`INSERT OR IGNORE INTO users (email, created_at) VALUES (?, ?)`).bind(normalizedEmail, now).run();
+  // Post-0028 an account is keyed on `id` and its address lives in
+  // `current_email` + `user_emails`; the frozen anchor stays the address so the
+  // pre-existing foreign keys keep resolving.
+  const id = `usr_${crypto.randomUUID().replaceAll('-', '')}`;
   await db
-    .prepare(`UPDATE users SET username = COALESCE(username, ?), updated_at = COALESCE(updated_at, ?) WHERE email = ?`)
-    .bind(handle, now, normalizedEmail)
+    .prepare(`INSERT OR IGNORE INTO users (id, email, current_email, created_at) VALUES (?, ?, ?, ?)`)
+    .bind(id, normalizedEmail, normalizedEmail, now)
+    .run();
+  const row = await db.prepare('SELECT id FROM users WHERE lower(email) = lower(?)').bind(normalizedEmail).first<{ id: string }>();
+  const userId = row?.id ?? id;
+  await db
+    .prepare(`UPDATE users SET username = COALESCE(username, ?), updated_at = COALESCE(updated_at, ?) WHERE id = ?`)
+    .bind(handle, now, userId)
     .run();
   await db
-    .prepare(`INSERT OR IGNORE INTO namespaces (username_ci, kind, user_email, org_id, created_at) VALUES (?, 'user', ?, NULL, ?)`)
-    .bind(handleCi, normalizedEmail, now)
+    .prepare(
+      `INSERT OR IGNORE INTO user_emails (email, user_id, is_verified, created_at) VALUES (?, ?, 1, ?) ON CONFLICT(email) DO UPDATE SET user_id = excluded.user_id, is_verified = 1`,
+    )
+    .bind(normalizedEmail, userId, now)
+    .run();
+  await db
+    .prepare(`INSERT OR IGNORE INTO namespaces (username_ci, kind, user_email, user_id, org_id, created_at) VALUES (?, 'user', ?, ?, NULL, ?)`)
+    .bind(handleCi, normalizedEmail, userId, now)
     .run();
   return handle;
 }
@@ -62,10 +77,11 @@ export async function seedRepo(
   const now = Math.floor(Date.now() / 1000);
   const ownerUsername = await ensureUser(db, input.ownerEmail, input.owner);
   const ownerType = input.ownerType ?? 'user';
+  const ownerRow = await db.prepare('SELECT id FROM users WHERE lower(email) = lower(?)').bind(input.ownerEmail.toLowerCase()).first<{ id: string }>();
   await db
     .prepare(
-      `INSERT OR IGNORE INTO repositories (id, owner_email, owner, name, description, is_private, created_at, updated_at, owner_type, owner_ci, name_ci, owner_user_email, org_id) ` +
-        `VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR IGNORE INTO repositories (id, owner_email, owner, name, description, is_private, created_at, updated_at, owner_type, owner_ci, name_ci, owner_user_email, owner_user_id, org_id) ` +
+        `VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -80,6 +96,7 @@ export async function seedRepo(
       ownerUsername.toLowerCase(),
       input.name.toLowerCase(),
       ownerType === 'user' ? input.ownerEmail.toLowerCase() : null,
+      ownerRow?.id ?? null,
       input.orgId ?? null,
     )
     .run();
@@ -110,12 +127,14 @@ export async function mintPatForEmail(
   const tokenHash = await sha256Hex(`edge-git-pat:${raw}`);
   const now = Math.floor(Date.now() / 1000);
   const expiresAt = now + (input.expiresInDays ?? 90) * 86_400;
+  const ownerRow = await db.prepare('SELECT id FROM users WHERE lower(email) = ?').bind(normalized).first<{ id: string }>();
+  const ownerId = ownerRow?.id ?? null;
   const scopes = input.scopes ?? ['repo:read', 'repo:write', 'admin'];
   await db
     .prepare(
-      `INSERT INTO user_access_tokens (token_id, user_email, token_hash, name, expires_at, last_used_at, created_at, token_prefix) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)`,
+      `INSERT INTO user_access_tokens (token_id, user_id, user_email, token_hash, name, expires_at, last_used_at, created_at, token_prefix) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
     )
-    .bind(tokenId, normalized, tokenHash, input.name ?? 'test-token', expiresAt, now, raw.slice(0, 12))
+    .bind(tokenId, ownerId ?? null, normalized, tokenHash, input.name ?? 'test-token', expiresAt, now, raw.slice(0, 12))
     .run();
   for (const scope of scopes) {
     await db.prepare(`INSERT OR IGNORE INTO token_scopes (token_id, scope, created_at) VALUES (?, ?, ?)`).bind(tokenId, scope, now).run();
@@ -140,8 +159,9 @@ export async function addCollaborator(
 ): Promise<void> {
   const now = Math.floor(Date.now() / 1000);
   await ensureUser(db, userEmail);
+  const row = await db.prepare('SELECT id FROM users WHERE lower(email) = lower(?)').bind(userEmail.toLowerCase()).first<{ id: string }>();
   await db
-    .prepare(`INSERT OR REPLACE INTO repo_collaborators (repo_id, user_email, role, granted_by, created_at) VALUES (?, ?, ?, ?, ?)`)
-    .bind(repoId, userEmail.toLowerCase(), role, grantedBy?.toLowerCase() ?? null, now)
+    .prepare(`INSERT OR REPLACE INTO repo_collaborators (repo_id, user_email, user_id, role, granted_by, created_at) VALUES (?, ?, ?, ?, ?, ?)`)
+    .bind(repoId, userEmail.toLowerCase(), row?.id ?? null, role, grantedBy?.toLowerCase() ?? null, now)
     .run();
 }

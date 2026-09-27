@@ -238,7 +238,10 @@ function registerOrgRoutes(app: OrgApp): void {
       const targetEmail = member.includes('@') ? member.toLowerCase() : await scope.get(Tokens.OrganizationService).resolveEmail(member);
       const now = Math.floor(Date.now() / 1000);
       const collabDao = await scope.get(Tokens.RepoCollaboratorDAO)();
-      await collabDao.upsert(repo.id, targetEmail, role, email, now);
+      // Resolve the target to an account so the grant survives an address
+      // change; the address column stays for legacy readers and the FK.
+      const targetUserId = await scope.get(Tokens.UserIdentityService).resolveUserId(targetEmail);
+      await collabDao.upsert(repo.id, targetEmail, role, email, now, targetUserId);
       return c.json({ ok: true });
     } catch (error) {
       return jsonError(c, toSafeErrorMessage(error, 'Failed'), toServiceStatus(error));

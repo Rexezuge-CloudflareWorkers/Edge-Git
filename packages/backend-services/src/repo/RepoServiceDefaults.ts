@@ -1,3 +1,4 @@
+import { UserIdentityService } from '../identity/UserIdentityService';
 import {
   AuditLogDAO,
   BranchProtectionDAO,
@@ -68,6 +69,7 @@ function createDefaultRepoServiceDeps(env: RepoServiceEnv, overrides: RepoServic
     pullThreadDAO: () => Promise.resolve(new PullThreadDAO(env.DB)),
     branchProtectionDAO: () => Promise.resolve(new BranchProtectionDAO(env.DB)),
     userDAO: () => Promise.resolve(new UserDAO(env.DB)),
+    userIdentity: () => Promise.resolve(new UserIdentityService(env)),
     organizationDAO: () => Promise.resolve(new OrganizationDAO(env.DB)),
     organizationMemberDAO: () => Promise.resolve(new OrganizationMemberDAO(env.DB)),
     repoCollaboratorDAO: () => Promise.resolve(new RepoCollaboratorDAO(env.DB)),

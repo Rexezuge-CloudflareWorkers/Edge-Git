@@ -16,6 +16,7 @@ import {
   SnippetDAO,
   UserAccessTokenDAO,
   UserDAO,
+  UserEmailDAO,
   WikiDAO,
 } from '@edge-git/backend-data/dao';
 import {
@@ -63,6 +64,7 @@ function bindDaoBindings(scope: Container, env: RequestScopeEnv): void {
   const importDAO = async (): Promise<unknown> => new ImportDAO(env.DB, await importKey());
   const daoDefs: Array<[Token<() => Promise<unknown>>, () => Promise<unknown>]> = [
     [Tokens.UserDAO, () => Promise.resolve(new UserDAO(env.DB))],
+    [Tokens.UserEmailDAO, () => Promise.resolve(new UserEmailDAO(env.DB))],
     [Tokens.RepositoryDAO, () => Promise.resolve(new RepositoryDAO(env.DB))],
     [Tokens.UserAccessTokenDAO, () => Promise.resolve(new UserAccessTokenDAO(env.DB))],
     [Tokens.IssueDAO, () => Promise.resolve(new IssueDAO(env.DB))],

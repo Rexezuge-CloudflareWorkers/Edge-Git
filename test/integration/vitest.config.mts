@@ -18,11 +18,16 @@ const migrationsDir = resolve(fileURLToPath(new URL('../../migrations', import.m
 const migrationFiles = readdirSync(migrationsDir)
   .filter((f) => f.endsWith('.sql'))
   .sort();
-const migrationSql = migrationFiles.map((f) => readFileSync(resolve(migrationsDir, f), 'utf-8')).join('\n\n');
+// File boundaries must survive into the test runtime: D1 PRAGMAs are
+// transaction-scoped, so migration 0028 can only rely on
+// `PRAGMA foreign_keys = off` if each file is applied in its own transaction.
+const migrationFileList = migrationFiles.map((name) => ({ name, sql: readFileSync(resolve(migrationsDir, name), 'utf-8') }));
+const migrationSql = migrationFileList.map((f) => f.sql).join('\n\n');
 
 export default defineConfig({
   define: {
     __INTEGRATION_MIGRATION_SQL__: JSON.stringify(migrationSql),
+    __INTEGRATION_MIGRATION_FILES__: JSON.stringify(migrationFileList),
   },
   plugins: [
     cloudflareTest({
