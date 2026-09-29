@@ -21,7 +21,7 @@
     "@edge-git/shared": "workspace:*"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "5.20260919.1",
+    "@cloudflare/workers-types": "5.20260926.1",
     "@types/node": "26.6.3",
     "typescript": "6.0.3"
   }
