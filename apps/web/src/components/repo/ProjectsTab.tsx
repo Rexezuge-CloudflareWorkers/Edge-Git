@@ -49,10 +49,9 @@ export function ProjectsTab({
     e.preventDefault();
     if (!title.trim()) return;
     const created = await create(title);
-    if (created !== null) {
-      boardHook.clearBoard();
-      setTitle('');
-    }
+    if (created === null) return;
+    boardHook.clearBoard();
+    setTitle('');
   };
 
   return (

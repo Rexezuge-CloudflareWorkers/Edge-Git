@@ -100,10 +100,9 @@ class CollaborationService {
     const dao = await this.deps.collaborationDAO();
     const row = await dao.getMilestone(milestoneId, repositoryId);
     if (!row) throw new NotFoundError('Milestone not found');
-    if (input.status !== undefined) {
-      if (input.status !== 'open' && input.status !== 'closed') throw new BadRequestError('status must be open or closed');
-      await dao.setMilestoneStatus(milestoneId, repositoryId, input.status);
-    }
+    if (input.status === undefined) return;
+    if (input.status !== 'open' && input.status !== 'closed') throw new BadRequestError('status must be open or closed');
+    await dao.setMilestoneStatus(milestoneId, repositoryId, input.status);
   }
 
   public async deleteMilestone(repositoryId: string, milestoneId: string): Promise<void> {

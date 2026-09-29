@@ -49,12 +49,11 @@ export class GitService {
   public ensureFreshCache(ttlSeconds: number): void {
     const before = this.cacheHolder.getCache();
     this.cacheHolder.ensureFreshCache(ttlSeconds);
-    if (this.cacheHolder.getCache() !== before) {
-      this.objects.clearCache();
-      this.packs.clearCache();
-      this.history.clearCache();
-      this.merger.clearCache();
-    }
+    if (this.cacheHolder.getCache() === before) return;
+    this.objects.clearCache();
+    this.packs.clearCache();
+    this.history.clearCache();
+    this.merger.clearCache();
   }
 
   async initRepo() {

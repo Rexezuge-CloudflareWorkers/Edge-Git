@@ -121,6 +121,23 @@ export default tseslint.config(
       'unicorn/no-array-callback-reference': 'warn',
       // toSorted() is ES2023 and may not be in all tsconfig lib targets
       'unicorn/no-array-sort': 'warn',
+      // Map.groupBy is ES2024; the tsconfigs target lib ES2022/ES2020, so the
+      // autofix would not typecheck
+      'unicorn/prefer-group-by': 'off',
+      // v76 extended this to boolean expressions. It pushes `if (a) return x;
+      // return y` toward a ternary, which is the inverse of the guard-clause
+      // style this codebase uses for validation and error paths.
+      'unicorn/prefer-ternary': 'off',
+      'unicorn/prefer-logical-operator-over-ternary': 'off',
+      'unicorn/prefer-minimal-ternary': 'off',
+      // New in v75: merges consecutive `if (a) return false;` guards into one
+      // long `||` chain. The validators in this repo (SSRF host blocklists,
+      // git ref/branch name rules) keep one rule per line on purpose.
+      'unicorn/prefer-combined-guards': 'off',
+      // v75 changed the default to also flag short bodies. Every site in this
+      // repo is the last statement of a loop body, where `continue` is a no-op
+      // that only adds noise.
+      'unicorn/prefer-continue': 'off',
     },
   },
 

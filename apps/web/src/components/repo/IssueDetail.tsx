@@ -168,10 +168,9 @@ export function IssueDetail({
     setDraft(value);
     // Throttled typing ping; visibility expires via timeout.
     const now = Date.now();
-    if (liveStatus === 'live' && now - lastTypingSent.current > 4000) {
-      lastTypingSent.current = now;
-      sendTyping(issueChannel(number));
-    }
+    if (liveStatus !== 'live' || now - lastTypingSent.current <= 4000) return;
+    lastTypingSent.current = now;
+    sendTyping(issueChannel(number));
   };
 
   return (
