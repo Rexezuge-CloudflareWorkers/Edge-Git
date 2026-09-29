@@ -129,8 +129,8 @@ importers:
         specifier: 3.4.0
         version: 3.4.0
       hono:
-        specifier: 4.13.8
-        version: 4.13.8
+        specifier: 4.13.9
+        version: 4.13.9
       zod:
         specifier: 4.6.5
         version: 4.6.5
@@ -347,7 +347,7 @@ importers:
         version: link:../shared
       dofs:
         specifier: ^0.1.0
-        version: 0.1.0(patch_hash=a4e0c9784c0152850a43458069a84082829bcd7315a96a2c3a9f323f7e1d5fed)(hono@4.13.8)
+        version: 0.1.0(patch_hash=a4e0c9784c0152850a43458069a84082829bcd7315a96a2c3a9f323f7e1d5fed)(hono@4.13.9)
       isomorphic-git:
         specifier: ^1.36.1
         version: 1.42.2
@@ -2297,8 +2297,8 @@ packages:
   hermes-parser@0.25.1:
     resolution: {integrity: sha512-6pEjquH3rqaI6cYAXYPcz9MS4rY6R4ngRgrgfDshRptUZIc3lw0MCIJIGDj9++mfySOuPTHB4nrSW99BCvOPIA==}
 
-  hono@4.13.8:
-    resolution: {integrity: sha512-/Gng7NfoykZl2pjukW5Z6+8Yxm3BPRf86GTbQnt0SbySkvax4fyL4H3HhY1cCpBGmiW9XDRFzRV+CXK2W8QudQ==}
+  hono@4.13.9:
+    resolution: {integrity: sha512-7dMkQmZoC4E6F7AtaQSPhlWAdnBti+j7rreMZl8QB4jFiEhP9TWbGWUMi8WYzBCgmgulxuvLQupKqo+Co6Omyg==}
     engines: {node: '>=16.9.0'}
 
   hookified@1.15.1:
@@ -4858,10 +4858,10 @@ snapshots:
 
   diff3@0.0.3: {}
 
-  dofs@0.1.0(patch_hash=a4e0c9784c0152850a43458069a84082829bcd7315a96a2c3a9f323f7e1d5fed)(hono@4.13.8):
+  dofs@0.1.0(patch_hash=a4e0c9784c0152850a43458069a84082829bcd7315a96a2c3a9f323f7e1d5fed)(hono@4.13.9):
     dependencies:
       commander: 14.0.3
-      hono: 4.13.8
+      hono: 4.13.9
       neofuse: 0.0.1-rc.3
 
   dom-accessibility-api@0.5.16: {}
@@ -5240,7 +5240,7 @@ snapshots:
     dependencies:
       hermes-estree: 0.25.1
 
-  hono@4.13.8: {}
+  hono@4.13.9: {}
 
   hookified@1.15.1: {}
 
