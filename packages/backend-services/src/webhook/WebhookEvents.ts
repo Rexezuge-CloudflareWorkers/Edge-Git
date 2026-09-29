@@ -151,14 +151,13 @@ function validateWebhookUrl(raw: string): void {
   if (isNumericOrEncodedHost(host)) throw new Error('url must not target a private or reserved address');
   if (isLoopbackHost(host)) throw new Error('url must not target a loopback address');
   const ipv4 = IPV4_HOST_PATTERN.exec(host);
-  if (ipv4) {
-    const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
-    const loopback = a === 127;
-    const rfc1918 = a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
-    const linkLocal = a === 169 && b === 254;
-    const carrierGrade = a === 100 && b >= 64 && b <= 127;
-    if (loopback || rfc1918 || linkLocal || carrierGrade || a === 0) throw new Error('url must not target a private or reserved address');
-  }
+  if (!ipv4) return;
+  const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
+  const loopback = a === 127;
+  const rfc1918 = a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+  const linkLocal = a === 169 && b === 254;
+  const carrierGrade = a === 100 && b >= 64 && b <= 127;
+  if (loopback || rfc1918 || linkLocal || carrierGrade || a === 0) throw new Error('url must not target a private or reserved address');
 }
 
 function generateHookSecret(): string {

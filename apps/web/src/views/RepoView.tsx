@@ -116,10 +116,9 @@ export function RepoView({
   useEffect(() => {
     if (authorized !== false || status !== 'loading' || repoData) return;
     const pending = pendingErrorRef.current;
-    if (pending && pending.key === `${owner}/${repo}`) {
-      setStatus(pending.kind);
-      pendingErrorRef.current = null;
-    }
+    if (!pending || pending.key !== `${owner}/${repo}`) return;
+    setStatus(pending.kind);
+    pendingErrorRef.current = null;
   }, [authorized, status, repoData, owner, repo]);
 
   if (status === 'loading' && !repoData) {
