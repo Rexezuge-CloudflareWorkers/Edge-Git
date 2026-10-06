@@ -60,8 +60,8 @@ importers:
         specifier: ^26.4.2
         version: 26.4.2(typescript@6.0.3)
       isomorphic-git:
-        specifier: ^1.36.1
-        version: 1.42.2
+        specifier: ^1.42.6
+        version: 1.42.6
       jsdom:
         specifier: 30.1.1
         version: 30.1.1
@@ -349,8 +349,8 @@ importers:
         specifier: ^0.1.0
         version: 0.1.0(patch_hash=a4e0c9784c0152850a43458069a84082829bcd7315a96a2c3a9f323f7e1d5fed)(hono@4.13.12)
       isomorphic-git:
-        specifier: ^1.36.1
-        version: 1.42.2
+        specifier: ^1.42.6
+        version: 1.42.6
     devDependencies:
       '@types/node':
         specifier: 26.6.3
@@ -2407,8 +2407,8 @@ packages:
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
 
-  isomorphic-git@1.42.2:
-    resolution: {integrity: sha512-Rb7czWhLO4JYqmg4an01nNomuAgFbWWK2CVfkHGBOvK5t7hrGTKOXPx/csscJ1j9o3uXFzNcC6njgvCafSmIPw==}
+  isomorphic-git@1.42.6:
+    resolution: {integrity: sha512-MJpYjxITU0k0CNzSE3hXmrsHEIyPO8puRf69cNg5Xim7uhRMU0wh+5VkxpJonhKdAqiy+KTDTQWxgAuTxySqeg==}
     engines: {node: '>=14.17'}
     hasBin: true
 
@@ -3434,8 +3434,8 @@ packages:
     resolution: {integrity: sha512-TEZA+Zqxin7Jjsm2cjRohCmen5awh+hT6Zi3VZdqZlNRk7zvOI/9WpBFg/DWlA56bWnzwm6DuB8NS0EsxQH9uQ==}
     engines: {node: ^22.14.0 || >=24.0.0}
 
-  which-typed-array@1.1.22:
-    resolution: {integrity: sha512-fvO4ExWMFsqyhG3AiPAObMuY1lxaqgYcxbc49CNdWDDECOJNgQyvsOWVwbZc+qf3rzRtxojBK+CMEv0Ld5CYpw==}
+  which-typed-array@1.1.24:
+    resolution: {integrity: sha512-wk4Mf4pR5mRP7eYuuTBCIQ9d0ud2Fv2jRLQpfgnRjbOxAFHmjKFValgTpitVKzJJS8ajnYQV2Du1SZ8j6b/EUQ==}
     engines: {node: '>= 0.4'}
 
   which@2.0.2:
@@ -5289,13 +5289,13 @@ snapshots:
 
   is-typed-array@1.1.15:
     dependencies:
-      which-typed-array: 1.1.22
+      which-typed-array: 1.1.24
 
   isarray@2.0.5: {}
 
   isexe@2.0.0: {}
 
-  isomorphic-git@1.42.2:
+  isomorphic-git@1.42.6:
     dependencies:
       async-lock: 1.4.1
       clean-git-ref: 2.0.1
@@ -6546,7 +6546,7 @@ snapshots:
     transitivePeerDependencies:
       - '@noble/hashes'
 
-  which-typed-array@1.1.22:
+  which-typed-array@1.1.24:
     dependencies:
       available-typed-arrays: 1.0.7
       call-bind: 1.0.9
