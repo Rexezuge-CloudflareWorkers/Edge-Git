@@ -1,3 +1,4 @@
+import { stubIdentityService, emptyUserEmailRegistry } from './mocks/identity';
 import { describe, expect, it } from 'vitest';
 import { ZERO_OID as SHARED_ZERO_OID } from '@edge-git/shared/constants';
 import { RepoFullName } from '@edge-git/shared/utils';
@@ -12,7 +13,7 @@ import {
 import { CollaborationDAO } from '@edge-git/backend-data/dao/CollaborationDAO';
 import { SearchDAO } from '@edge-git/backend-data/dao/SearchDAO';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { DatabaseError } from '@edge-git/backend-errors';
+import { DatabaseError } from '@rexezuge/errors';
 import { assertQuotaWithinLimit } from '@edge-git/backend-services/policy/QuotaPolicy';
 import { TeamService } from '@edge-git/backend-services/team/TeamService';
 import { WebhookDeliveryService } from '@edge-git/backend-services/webhook/WebhookDeliveryService';
@@ -211,7 +212,8 @@ describe('hardening sweep: TeamService quota + validation', () => {
   it('fails closed when the org is at its team quota', async () => {
     const svc = new TeamService(
       { DB: createUnreachableDb(), MAX_TEAMS_PER_ORG: '1' },
-      { teamDAO: async () => teamDao, organizationDAO: async () => orgDao, organizationMemberDAO: async () => orgMemberDao },
+      { teamDAO: async () => teamDao, organizationDAO: async () => orgDao, organizationMemberDAO: async () => orgMemberDao ,
+userIdentity: async () => stubIdentityService() as never,},
     );
     await expect(svc.createTeam('acme', 'boss@x.com', { slug: 'team-a' })).rejects.toThrow('Maximum of 1 teams reached');
   });
@@ -219,7 +221,8 @@ describe('hardening sweep: TeamService quota + validation', () => {
   it('rejects invalid slugs and roles before D1', async () => {
     const svc = new TeamService(
       { DB: createUnreachableDb() },
-      { teamDAO: async () => teamDao, organizationDAO: async () => orgDao, organizationMemberDAO: async () => orgMemberDao },
+      { teamDAO: async () => teamDao, organizationDAO: async () => orgDao, organizationMemberDAO: async () => orgMemberDao ,
+userIdentity: async () => stubIdentityService() as never,},
     );
     expect(() => TeamService.validateTeamSlug('Bad Slug!')).toThrow();
     await expect(svc.addMember('acme', 'team-a', 'boss@x.com', 'a@x.com', 'super' as never)).rejects.toThrow('Invalid role');

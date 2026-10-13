@@ -6,7 +6,7 @@ import { recordAndNotify } from './SocialEmit';
 import { getRepoSocial } from './RepoSocialHelper';
 import { Tokens } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
-import { EmailAddress, RepoFullName, mapWithConcurrency } from '@edge-git/shared/utils';
+import { RepoFullName, mapWithConcurrency, normalizeEmail } from '@edge-git/shared/utils';
 import { readJsonBody } from './BodyParser';
 import { parseOverviewArgs, parseWithLastCommit, sanitizeDepthParam, sanitizePathParam, sanitizeRefParam } from './RepoParamParsers';
 import { ErrorSanitizationUtil } from '@edge-git/shared/utils';
@@ -187,9 +187,9 @@ function registerUserRepoRoutes(app: RepoApp): void {
     if (!owner) {
       try {
         const profile = await scope.get(Tokens.UserService).getProfileByEmail(email);
-        owner = (profile.username ?? EmailAddress.normalize(email).split('@', 1)[0]).trim();
+        owner = (profile.username ?? normalizeEmail(email).split('@', 1)[0]).trim();
       } catch {
-        owner = EmailAddress.normalize(email).split('@', 1)[0]?.trim() ?? '';
+        owner = normalizeEmail(email).split('@', 1)[0]?.trim() ?? '';
       }
     }
     const name = (body.name ?? '').trim();

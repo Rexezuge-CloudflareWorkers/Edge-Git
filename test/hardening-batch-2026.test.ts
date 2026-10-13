@@ -1,3 +1,4 @@
+import { stubIdentityService, emptyUserEmailRegistry } from './mocks/identity';
 import { describe, expect, it, vi } from 'vitest';
 import { TokenService } from '@edge-git/backend-services/auth';
 import { DEFAULT_TOKEN_SCOPES, normalizeTokenScopes, coversScope } from '@edge-git/backend-services/auth';
@@ -142,6 +143,7 @@ describe('hardening batch 2026: token defaults + fail-closed', () => {
             prepare: () => ({ bind: () => ({ all: async () => ({ results: [] }), run: async () => ({}) }) }),
           } as never);
         },
+userIdentity: async () => stubIdentityService() as never,
       },
     );
     // Should still authenticate despite lastUsed failure.

@@ -2,7 +2,7 @@ import { AbstractEntrypointWorker } from '@edge-git/backend-runtime/base';
 import { fromHono } from 'chanfana';
 import type { HonoOpenAPIRouterType } from 'chanfana';
 import { Hono } from 'hono';
-import { MiddlewareHandlers, securityHeaders } from '@/middleware';
+import { MiddlewareHandlers, securityHeaders, isSensitiveJsonPath } from '@/middleware';
 import { registerGitRateLimits, registerUserRateLimits } from '@/middleware/rateLimitConfig';
 import { scopeMiddleware } from '@/middleware/scopeMiddleware';
 import { RESERVED_NAMESPACE_NAMES } from '@edge-git/shared/constants';
@@ -62,7 +62,7 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
 
     // Security headers first so even the shell/health early routes carry
     // them; scope + guards follow for the remaining routes.
-    app.use('*', securityHeaders());
+    app.use('*', securityHeaders(isSensitiveJsonPath));
     // Global 500 mask: never leak D1/DO internals on uncaught throws.
     // Route handlers must still use toSafeErrorMessage for caught errors.
     app.onError((error, c) => {

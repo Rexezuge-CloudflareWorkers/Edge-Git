@@ -5,8 +5,8 @@ import {
   InternalServerError,
   NotFoundError,
   UnauthorizedError,
-} from '@edge-git/backend-errors';
-import type { ServiceError, ErrorResponse } from '@edge-git/backend-errors';
+} from '@rexezuge/errors';
+import type { ServiceError, ErrorResponse } from '@rexezuge/errors';
 
 // Strategy: `Response` carrying `{Exception:{Type,Message}}` → typed `ServiceError`.
 // Mirrors AWS `ErrorDeserializationUtil`; unknown types degrade to

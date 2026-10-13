@@ -240,7 +240,7 @@ function registerOrgRoutes(app: OrgApp): void {
       const collabDao = await scope.get(Tokens.RepoCollaboratorDAO)();
       // Resolve the target to an account so the grant survives an address
       // change; the address column stays for legacy readers and the FK.
-      const targetUserId = await scope.get(Tokens.UserIdentityService).resolveUserId(targetEmail);
+      const targetUserId = await scope.get(Tokens.UserIdentityService).resolveAccountId(targetEmail);
       await collabDao.upsert(repo.id, targetEmail, role, email, now, targetUserId);
       return c.json({ ok: true });
     } catch (error) {

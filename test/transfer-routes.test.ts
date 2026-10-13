@@ -147,7 +147,7 @@ function createTransferFakeDb() {
       },
       run(): Promise<{ success: boolean; meta?: { changes?: number } }> {
         if (q.startsWith('INSERT INTO users')) {
-          if (!state.users.some((u) => u.email === params[0])) state.users.push({ email: params[0], created_at: params[1] });
+          if (!state.users.some((u) => u.email === params[0])) state.users.push({ email: params[0], created_at: params[1], id: params[2], current_email: params[3] });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE users SET')) {

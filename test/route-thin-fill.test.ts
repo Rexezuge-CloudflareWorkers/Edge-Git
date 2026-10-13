@@ -13,14 +13,10 @@ import { PktLine } from '@edge-git/git-protocol';
 import { FetchHandler } from '@edge-git/background/FetchHandler';
 import { publishLiveUpdate, publishCheckUpdate, recordAndNotify } from '@/workers/routes/SocialEmit';
 import { triggerRequiredChecks } from '@/workers/routes/TriggerChecks';
-import { resetRateLimitForTests } from '@/middleware/rateLimit';
 
 const ALICE = 'alice@example.com';
 const BOB = 'bob@example.com';
 
-beforeEach(() => {
-  resetRateLimitForTests();
-});
 
 // --- Fake D1 ---------------------------------------------------------------
 // Copied from route-fill-hardening pattern + branch/snippet/check extensions.
@@ -250,7 +246,7 @@ function createThinFakeDb() {
         if (q.includes('FROM check_runs WHERE repository_id = ? AND head_sha = ?')) {
           return Promise.resolve({
             results: state.checks.filter((c) => c.repository_id === params[0] && c.head_sha === P(1).toLowerCase()) as T[],
-          });
+});
         }
         if (q.includes('FROM snippets WHERE owner_email = ?')) {
           const onlyPublic = q.includes("visibility = 'public'");
@@ -420,7 +416,7 @@ function createThinFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO users')) {
-          if (!state.users.some((u) => u.email === params[0])) state.users.push({ email: params[0], created_at: params[1] });
+          if (!state.users.some((u) => u.email === params[0])) state.users.push({ email: params[0], created_at: params[1], id: params[2], current_email: params[3] });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE users SET')) {

@@ -3,8 +3,8 @@ import type { RepositoryDAO } from '@edge-git/backend-data/dao';
 import type { OrganizationDAO } from '@edge-git/backend-data/dao';
 import type { OrganizationMemberDAO } from '@edge-git/backend-data/dao';
 import type { RepoCollaboratorDAO } from '@edge-git/backend-data/dao';
-import { NotFoundError, ForbiddenError } from '@edge-git/backend-errors';
-import { EmailAddress } from '@edge-git/shared/utils';
+import { NotFoundError, ForbiddenError } from '@rexezuge/errors';
+import { normalizeEmail } from '@edge-git/shared/utils';
 import { PermissionService } from '../permission/PermissionService';
 
 interface RepoVisibilityDeps {
@@ -55,7 +55,7 @@ class RepoVisibilityService {
 
   public async listVisibleForUser(userEmail: string, resolveCallerUsername: CallerResolver, limit = 100): Promise<RepositoryRow[]> {
     const dao = await this.deps.repositoryDAO();
-    const normalizedEmail = EmailAddress.normalize(userEmail);
+    const normalizedEmail = normalizeEmail(userEmail);
     const seen = new Map<string, RepositoryRow>();
     const pushAll = (rows: RepositoryRow[]): void => {
       for (const row of rows) {

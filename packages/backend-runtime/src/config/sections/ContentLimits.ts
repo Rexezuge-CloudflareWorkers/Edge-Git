@@ -1,4 +1,4 @@
-import { EnvParser } from '../EnvParser';
+import { EnvParser } from '@rexezuge/runtime';
 import {
   DEFAULT_CHECK_CUSTOMJS_ENABLED,
   DEFAULT_CHECK_CUSTOMJS_MAX_CPU_MS,

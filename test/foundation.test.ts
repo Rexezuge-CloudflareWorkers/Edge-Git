@@ -7,24 +7,22 @@ import {
   MethodNotAllowedError,
   NotFoundError,
   UnauthorizedError,
-} from '@edge-git/backend-errors';
+} from '@rexezuge/errors';
 import { Container } from '@edge-git/backend-runtime/di/Container';
 import { ConsoleLogger, SystemClock, createServiceContext } from '@edge-git/backend-runtime/di/ServiceContext';
 import { KvCache } from '@edge-git/backend-runtime/kv';
 import { AppConfiguration } from '@edge-git/backend-runtime/config/AppConfiguration';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config/ConfigurationManager';
-import { CryptoUtil } from '@edge-git/shared/utils/CryptoUtil';
-import { UUIDUtil } from '@edge-git/shared/utils/UUIDUtil';
-import { TimestampUtil } from '@edge-git/shared/utils/TimestampUtil';
+import { CryptoUtil, TimestampUtil, UUIDUtil } from '@rexezuge/shared';
 
 describe('backend-errors', () => {
   it('exposes status codes and retryability', () => {
-    expect(new BadRequestError('x').getErrorCode()).toBe(400);
-    expect(new UnauthorizedError('x').getErrorCode()).toBe(401);
-    expect(new ForbiddenError('x').getErrorCode()).toBe(403);
-    expect(new NotFoundError('x').getErrorCode()).toBe(404);
-    expect(new MethodNotAllowedError('x').getErrorCode()).toBe(405);
-    expect(new InternalServerError('x').getErrorCode()).toBe(500);
+    expect(new BadRequestError('x').status).toBe(400);
+    expect(new UnauthorizedError('x').status).toBe(401);
+    expect(new ForbiddenError('x').status).toBe(403);
+    expect(new NotFoundError('x').status).toBe(404);
+    expect(new MethodNotAllowedError('x').status).toBe(405);
+    expect(new InternalServerError('x').status).toBe(500);
     expect(new DatabaseError('x', true).retryable).toBe(true);
     expect(new DatabaseError('x').retryable).toBe(false);
   });
@@ -38,10 +36,18 @@ describe('DI container', () => {
     c.bind(token, () => ({ n: (n += 1) }));
     expect(c.has(token)).toBe(true);
     expect(c.get<{ n: number }>(token)).toBe(c.get(token));
-    expect(c.resolve<{ n: number }>(token)).not.toBe(c.get(token));
-    expect(() => c.get('missing' as never)).toThrow('no binding');
-    const child = c.createChild();
-    expect(child.has(token)).toBe(true);
+    expect(c.get<{ n: number }>(token).n).toBe(1);
+    expect(() => c.get('missing' as never)).toThrow();
+    // The kit's container is deliberately minimal: factory + singleton scopes
+    // and branded tokens, nothing else. A container that grows features grows
+    // coupling with it, so `resolve`/`createChild`/`dispose` are gone.
+    expect(Object.getOwnPropertyNames(Object.getPrototypeOf(c)).sort()).toEqual([
+      'bind',
+      'bindValue',
+      'constructor',
+      'get',
+      'has',
+    ]);
   });
 
   it('creates service contexts with defaults and overrides', () => {

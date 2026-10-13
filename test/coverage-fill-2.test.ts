@@ -1,3 +1,4 @@
+import { stubIdentityService, emptyUserEmailRegistry } from './mocks/identity';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { KvCache } from '@edge-git/backend-runtime/kv';
 import type { KvNamespaceLike } from '@edge-git/backend-runtime/kv';
@@ -122,7 +123,8 @@ describe('social thin services', () => {
       listByUser: async () => ({ notifications: [{ id: 'n1' }], nextCursor: null }),
       pruneReadOlderThan: async () => 0,
     };
-    const svc = new NotificationService({ DB: null as never }, { notificationDAO: async () => fakeDao as never });
+    const svc = new NotificationService({ DB: null as never }, { notificationDAO: async () => fakeDao as never ,
+userIdentity: async () => stubIdentityService() as never,});
     const owner = { userId: null, userEmail: 'a@x.com' };
     await expect(svc.markRead('n1', owner)).resolves.toBe(true);
     await expect(svc.markAllRead(owner)).resolves.toBe(2);

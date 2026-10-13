@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { err, getOrThrow, isOk, mapResult, ok } from '@edge-git/shared/utils/Result';
-import { EmailAddress, RepoFullName } from '@edge-git/shared/utils/Identity';
+import { err, getOrThrow, isOk, isValidEmailFormat, mapResult, ok, normalizeEmail } from '@rexezuge/shared';
+import { RepoFullName } from '@edge-git/shared/utils/Identity';
 import {
   CollaborationQueries,
   computeDateCutoffIso,
@@ -13,12 +13,13 @@ import {
   getRequestScope,
   getServiceContext,
   memoizeAsync,
-  setRequestScope,
+  setServiceContext,
 } from '@edge-git/backend-runtime/di/RequestScope';
 import { Container } from '@edge-git/backend-runtime/di/Container';
+import { setRequestScope } from '@rexezuge/runtime';
 import { createServiceContext } from '@edge-git/backend-runtime/di/ServiceContext';
 import { BaseRoute } from '@/endpoints/IBaseRoute';
-import { NotFoundError, ForbiddenError, BadRequestError } from '@edge-git/backend-errors';
+import { NotFoundError, ForbiddenError, BadRequestError } from '@rexezuge/errors';
 import { RepoVisibilityService } from '@edge-git/backend-services/repo/RepoVisibilityService';
 import { scopeMiddleware } from '@/middleware/scopeMiddleware';
 
@@ -40,17 +41,15 @@ describe('Result value object', () => {
 });
 
 describe('Identity value objects', () => {
-  it('normalizes emails and parses repo names', () => {
-    expect(EmailAddress.normalize('  Alice@Example.COM ')).toBe('alice@example.com');
-    expect(EmailAddress.parse('Bob@Example.com').toString()).toBe('bob@example.com');
-    expect(EmailAddress.tryParse(null)).toBeNull();
-    expect(EmailAddress.tryParse('not-an-email')).toBeNull();
-    expect(() => EmailAddress.parse('nope')).toThrow();
-    const addr = EmailAddress.parse('Carol@Example.com');
-    expect(addr.equals('carol@example.com')).toBe(true);
-    expect(addr.equals(EmailAddress.parse('carol@example.com'))).toBe(true);
-    expect(addr.prefix()).toBe('carol');
-    expect(addr.valueOf()).toBe('carol@example.com');
+  it('normalizes emails and validates their shape', () => {
+    expect(normalizeEmail('  Alice@Example.COM ')).toBe('alice@example.com');
+    expect(isValidEmailFormat('Carol@Example.com')).toBe(true);
+    expect(isValidEmailFormat('not-an-email')).toBe(false);
+    // The kit's predicate trims first and is the stricter of the two regexes
+    // that circulated for it: it rejects consecutive dots in the domain.
+    expect(isValidEmailFormat('  carol@example.com  ')).toBe(true);
+    expect(isValidEmailFormat('carol@example..com')).toBe(false);
+    expect(isValidEmailFormat('')).toBe(false);
   });
 
   it('parses owner/name and strips .git', () => {
@@ -123,7 +122,10 @@ describe('RequestScope helpers', () => {
     expect(() => getServiceContext(c as never)).toThrow();
     const scope = new Container();
     const ctx = createServiceContext({ DB: {} } as never);
-    setRequestScope(c as never, scope, ctx);
+    // The container goes on the kit's key; the service context is the only
+    // half this repo still owns, so it has its own setter.
+    setRequestScope(c as never, scope);
+    setServiceContext(c as never, ctx);
     expect(getRequestScope(c as never)).toBe(scope);
     expect(getServiceContext(c as never)).toBe(ctx);
     expect(createRequestContext({ DB: {} } as never).env).toBeDefined();
@@ -220,7 +222,7 @@ describe('RepoVisibilityService', () => {
     });
     const visible = await svc.listVisibleForUser('A@X.com', async () => null);
     expect(visible.map((r) => r.id)).toEqual(['b']);
-    expect(new BadRequestError('x').getErrorCode()).toBe(400);
+    expect(new BadRequestError('x').status).toBe(400);
   });
 });
 

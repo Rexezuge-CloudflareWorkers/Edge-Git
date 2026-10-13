@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { EdgeGitWorker } from '@/workers/EdgeGitWorker';
-import { resetRateLimitForTests } from '@/middleware/rateLimit';
 
 // Gap-fill sweep (Slice 5): working-fake HTTP tests for the thinnest route
 // files (OrgRoutes collaborators, RuleRoutes, SocialRoutes, Org CRUD).
@@ -430,9 +429,6 @@ function patchJson(body: unknown): RequestInit {
   return { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(body) };
 }
 
-beforeEach(() => {
-  resetRateLimitForTests();
-});
 
 describe('gap fill: collaborators (OrgRoutes 185-253)', () => {
   it('lists collaborators for admins', async () => {
@@ -440,7 +436,7 @@ describe('gap fill: collaborators (OrgRoutes 185-253)', () => {
     const res = await callGap(gapEnv(gapDb(state)), '/user/repos/alice/demo/collaborators');
     expect(res.status).toBe(200);
     expect(((await res.json()) as { collaborators: unknown[] }).collaborators).toEqual([]);
-  });
+});
 
   it('denies collaborators for non-admins', async () => {
     const state = seedState();

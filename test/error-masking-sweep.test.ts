@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { toSafeErrorMessage, toServiceStatus } from '@/workers/routes/PublicViewerResolver';
-import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
+import { BadRequestError, NotFoundError } from '@rexezuge/errors';
 
 describe('error masking sweep', () => {
   it('masks 500 internals with fallback', () => {

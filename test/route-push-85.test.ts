@@ -10,8 +10,8 @@ vi.mock('@edge-git/git-service', () => {
 import { PktLine } from '@edge-git/git-protocol';
 import { FetchHandler } from '@edge-git/background/FetchHandler';
 import { PushHandler } from '@edge-git/background/PushHandler';
-import { EnvParser } from '@edge-git/backend-runtime/config/EnvParser';
-import { EmailAddress, RepoFullName, repoDoKey } from '@edge-git/shared/utils';
+import { EnvParser } from '@rexezuge/runtime';
+import { RepoFullName, isValidEmailFormat, normalizeEmail, repoDoKey } from '@edge-git/shared/utils';
 import { parseLimit, hasVisibleRepo } from '@/workers/routes/UserRoutes';
 import { parseProjectNumber } from '@/workers/routes/ProjectRoutes';
 import {
@@ -177,12 +177,10 @@ describe('slice1: EnvParser and Identity edges', () => {
     expect(EnvParser.boolean({ X: 'TRUE' } as unknown as Env, 'X', 'false')).toBe(false);
   });
 
-  it('EmailAddress and RepoFullName value objects', () => {
-    expect(EmailAddress.normalize('  ALICE@Example.COM ')).toBe('alice@example.com');
-    expect(EmailAddress.tryParse(null)).toBe(null);
-    expect(EmailAddress.tryParse('not-an-email')).toBe(null);
-    expect(EmailAddress.parse('a@b.co').prefix()).toBe('a');
-    expect(EmailAddress.parse('a@b.co').equals('A@B.CO')).toBe(true);
+  it('email normalization and the RepoFullName value object', () => {
+    expect(normalizeEmail('  ALICE@Example.COM ')).toBe('alice@example.com');
+    expect(isValidEmailFormat('a@b.co')).toBe(true);
+    expect(isValidEmailFormat('not-an-email')).toBe(false);
     expect(RepoFullName.tryParse('a', '.hidden')).toBe(null);
     expect(RepoFullName.tryParse('a', 'x.lock')).toBe(null);
     expect(RepoFullName.tryParse('a', 'a..b')).toBe(null);

@@ -1,6 +1,6 @@
 import { UserDAO } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { DatabaseError } from '@edge-git/backend-errors';
+import { DatabaseError } from '@rexezuge/errors';
 import { isValidEmailFormat } from '@edge-git/shared/utils';
 
 interface IdentityResolverEnv {

@@ -1,7 +1,7 @@
 import { RepositoryDAO } from '@edge-git/backend-data/dao';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { ForbiddenError, NotFoundError } from '@edge-git/backend-errors';
+import { ForbiddenError, NotFoundError } from '@rexezuge/errors';
 import { CryptoUtil } from '@edge-git/shared/utils';
 import { INBOX_SHARD, inboxTagForHash, isInboxHash, normalizeChannels, repoShardFor } from '@edge-git/shared/realtime';
 import { PermissionService } from '../permission/PermissionService';

@@ -1,6 +1,6 @@
 import { BranchProtectionDAO } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { BadRequestError } from '@edge-git/backend-errors';
+import { BadRequestError } from '@rexezuge/errors';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import type { BranchProtectionRuleMetadata } from '@edge-git/shared';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';

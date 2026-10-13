@@ -1,7 +1,7 @@
 import { getScope } from './PublicViewerResolver';
 import type { Hono } from 'hono';
 import { gitAuthForRepo } from '@/middleware';
-import { clientIp } from '@/middleware/rateLimit';
+import { clientIp } from '@rexezuge/http';
 import { getRepoStub } from '../doStubs';
 import { RepoFullName } from '@edge-git/shared/utils';
 import {
@@ -107,7 +107,7 @@ function registerGitRoutes(app: GitApp): void {
     // rows). Fail-open on KV errors so caching can never break fetches.
     try {
       const cache = getScope(c).get(Tokens.KvCache);
-      const identity = auth.userEmail ?? `ip:${clientIp(c)}`;
+      const identity = auth.userEmail ?? `ip:${clientIp((name) => c.req.header(name))}`;
       const guard = await checkFetchLoop(cache, fullName, identity, body);
       if (!guard.allowed) {
         return c.text('Rate limit exceeded; try again later.', 429, { 'Retry-After': String(guard.retryAfter) });

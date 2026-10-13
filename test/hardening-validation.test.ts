@@ -12,7 +12,7 @@ import { parsePullNumber } from '@/workers/routes/PullShared';
 import { parseNumber as parseCollabNumber } from '@/workers/routes/collab/CollabHelpers';
 import { readJsonBody } from '@/workers/routes/BodyParser';
 import { toSafeErrorMessage, toServiceStatus } from '@/workers/routes/PublicViewerResolver';
-import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
+import { BadRequestError, NotFoundError } from '@rexezuge/errors';
 
 describe('parsePositiveInt hardening', () => {
   it('accepts normal ids', () => {

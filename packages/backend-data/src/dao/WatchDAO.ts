@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 
 class WatchDAO extends BaseDAO {
   constructor(database: D1Queryable) {
@@ -7,21 +7,11 @@ class WatchDAO extends BaseDAO {
   }
 
   public async watch(repoId: string, userEmail: string, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('INSERT OR IGNORE INTO repo_watches (repo_id, user_email, created_at) VALUES (?, ?, ?)')
-          .bind(repoId, userEmail, now)
-          .run(),
-      'watch repo',
-    );
+    await this.run('INSERT OR IGNORE INTO repo_watches (repo_id, user_email, created_at) VALUES (?, ?, ?)', [repoId, userEmail, now]);
   }
 
   public async unwatch(repoId: string, userEmail: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM repo_watches WHERE repo_id = ? AND user_email = ?').bind(repoId, userEmail).run(),
-      'unwatch repo',
-    );
+    await this.run('DELETE FROM repo_watches WHERE repo_id = ? AND user_email = ?', [repoId, userEmail]);
   }
 
   public async isWatching(repoId: string, userEmail: string): Promise<boolean> {
@@ -54,10 +44,7 @@ class WatchDAO extends BaseDAO {
   }
 
   public async deleteByRepo(repoId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM repo_watches WHERE repo_id = ?').bind(repoId).run(),
-      'delete watches by repo',
-    );
+    await this.run('DELETE FROM repo_watches WHERE repo_id = ?', [repoId]);
   }
 }
 

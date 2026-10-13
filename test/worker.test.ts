@@ -148,8 +148,8 @@ function createApiFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO users')) {
-          const [email, created_at] = params as Array<string | number>;
-          if (!state.users.some((u) => u.email === email)) state.users.push({ email, created_at });
+          const [email, created_at, id, current_email] = params as Array<string | number>;
+          if (!state.users.some((u) => u.email === email)) state.users.push({ email, created_at, id, current_email });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE repositories SET')) {

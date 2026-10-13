@@ -1,3 +1,4 @@
+import { stubIdentityService, emptyUserEmailRegistry } from './mocks/identity';
 import { describe, expect, it } from 'vitest';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { EventDAO } from '@edge-git/backend-data/dao/EventDAO';
@@ -395,12 +396,14 @@ describe('social services', () => {
         notificationDAO: async () => ({ insert: async (input: { userEmail: string }) => void inserted.push(input.userEmail) }) as never,
         watchDAO: async () => ({ listWatchers: async () => ['Watcher@Example.COM', 'actor@example.com'] }) as never,
         userDAO: async () =>
-          ({ getByUsernameCi: async (u: string) => (u === 'mentioned' ? { email: 'Mentioned@Example.COM' } : null) }) as never,
+          ({ getByCurrentEmail: async () => null,
+getByUsernameCi: async (u: string) => (u === 'mentioned' ? { email: 'Mentioned@Example.COM' } : null) }) as never,
         repositoryDAO: async () => ({ getById: async () => ({ id: 'r1', owner: 'o', name: 'r', is_private: 0 }) }) as never,
         permissionService: async () =>
           ({
             getRole: async (email: string) => (email === 'watcher@example.com' || email === 'mentioned@example.com' ? 'read' : null),
           }) as never,
+userIdentity: async () => stubIdentityService() as never,
       },
     );
     const result = await svc.fanOut({

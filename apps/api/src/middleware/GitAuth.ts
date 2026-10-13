@@ -5,7 +5,7 @@ import { coversScope } from '@edge-git/backend-services/auth';
 import { RoleRank } from '@edge-git/backend-services/permission';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import { getBasicCredentials, getBearerToken } from '@edge-git/git-protocol';
-import { DatabaseError } from '@edge-git/backend-errors';
+import { DatabaseError } from '@rexezuge/errors';
 import { BaseRoute } from '../endpoints/IBaseRoute';
 
 type RequestContext = Context<{

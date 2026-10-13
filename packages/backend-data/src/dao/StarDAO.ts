@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 
 class StarDAO extends BaseDAO {
   constructor(database: D1Queryable) {
@@ -7,21 +7,11 @@ class StarDAO extends BaseDAO {
   }
 
   public async star(repoId: string, userEmail: string, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('INSERT OR IGNORE INTO repo_stars (repo_id, user_email, created_at) VALUES (?, ?, ?)')
-          .bind(repoId, userEmail, now)
-          .run(),
-      'star repo',
-    );
+    await this.run('INSERT OR IGNORE INTO repo_stars (repo_id, user_email, created_at) VALUES (?, ?, ?)', [repoId, userEmail, now]);
   }
 
   public async unstar(repoId: string, userEmail: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM repo_stars WHERE repo_id = ? AND user_email = ?').bind(repoId, userEmail).run(),
-      'unstar repo',
-    );
+    await this.run('DELETE FROM repo_stars WHERE repo_id = ? AND user_email = ?', [repoId, userEmail]);
   }
 
   public async isStarred(repoId: string, userEmail: string): Promise<boolean> {
@@ -46,10 +36,7 @@ class StarDAO extends BaseDAO {
   }
 
   public async deleteByRepo(repoId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM repo_stars WHERE repo_id = ?').bind(repoId).run(),
-      'delete stars by repo',
-    );
+    await this.run('DELETE FROM repo_stars WHERE repo_id = ?', [repoId]);
   }
 }
 

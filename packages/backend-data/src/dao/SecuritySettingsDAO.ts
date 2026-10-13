@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 
 type SecretScanMode = 'off' | 'warn' | 'block';
 
@@ -20,25 +20,13 @@ class SecuritySettingsDAO extends BaseDAO {
   }
 
   public async setScanMode(repositoryId: string, mode: SecretScanMode, updatedBy: string, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            `INSERT INTO repo_security_settings (repository_id, secret_scan_mode, updated_by, updated_at)
+    await this.run(`INSERT INTO repo_security_settings (repository_id, secret_scan_mode, updated_by, updated_at)
              VALUES (?, ?, ?, ?)
-             ON CONFLICT (repository_id) DO UPDATE SET secret_scan_mode = excluded.secret_scan_mode, updated_by = excluded.updated_by, updated_at = excluded.updated_at`,
-          )
-          .bind(repositoryId, mode, updatedBy, now)
-          .run(),
-      'set secret scan mode',
-    );
+             ON CONFLICT (repository_id) DO UPDATE SET secret_scan_mode = excluded.secret_scan_mode, updated_by = excluded.updated_by, updated_at = excluded.updated_at`, [repositoryId, mode, updatedBy, now]);
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM repo_security_settings WHERE repository_id = ?').bind(repositoryId).run(),
-      'delete security settings',
-    );
+    await this.run('DELETE FROM repo_security_settings WHERE repository_id = ?', [repositoryId]);
   }
 }
 

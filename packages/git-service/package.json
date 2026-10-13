@@ -12,9 +12,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@edge-git/backend-errors": "workspace:*",
     "@edge-git/git-protocol": "workspace:*",
     "@edge-git/shared": "workspace:*",
+    "@rexezuge/errors": "link:../../../SDK/packages/errors",
     "dofs": "^0.1.0",
     "isomorphic-git": "^1.42.6"
   },

@@ -14,6 +14,30 @@ importers:
       '@cloudflare/vitest-pool-workers':
         specifier: 0.22.0
         version: 0.22.0(@vitest/runner@4.1.10)(@vitest/snapshot@4.1.10)(vitest@4.1.10)
+      '@rexezuge/d1':
+        specifier: link:../SDK/packages/d1
+        version: link:../SDK/packages/d1
+      '@rexezuge/errors':
+        specifier: link:../SDK/packages/errors
+        version: link:../SDK/packages/errors
+      '@rexezuge/http':
+        specifier: link:../SDK/packages/http
+        version: link:../SDK/packages/http
+      '@rexezuge/i18n':
+        specifier: link:../SDK/packages/i18n
+        version: link:../SDK/packages/i18n
+      '@rexezuge/identity':
+        specifier: link:../SDK/packages/identity
+        version: link:../SDK/packages/identity
+      '@rexezuge/runtime':
+        specifier: link:../SDK/packages/runtime
+        version: link:../SDK/packages/runtime
+      '@rexezuge/shared':
+        specifier: link:../SDK/packages/shared
+        version: link:../SDK/packages/shared
+      '@rexezuge/web':
+        specifier: link:../SDK/packages/web
+        version: link:../SDK/packages/web
       '@testing-library/jest-dom':
         specifier: 7.0.1
         version: 7.0.1(@testing-library/dom@10.4.2)(vitest@4.1.10)
@@ -107,9 +131,6 @@ importers:
       '@edge-git/backend-data':
         specifier: workspace:*
         version: link:../../packages/backend-data
-      '@edge-git/backend-errors':
-        specifier: workspace:*
-        version: link:../../packages/backend-errors
       '@edge-git/backend-runtime':
         specifier: workspace:*
         version: link:../../packages/backend-runtime
@@ -125,6 +146,21 @@ importers:
       '@edge-git/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@rexezuge/errors':
+        specifier: link:../../../SDK/packages/errors
+        version: link:../../../SDK/packages/errors
+      '@rexezuge/http':
+        specifier: link:../../../SDK/packages/http
+        version: link:../../../SDK/packages/http
+      '@rexezuge/i18n':
+        specifier: link:../../../SDK/packages/i18n
+        version: link:../../../SDK/packages/i18n
+      '@rexezuge/runtime':
+        specifier: link:../../../SDK/packages/runtime
+        version: link:../../../SDK/packages/runtime
+      '@rexezuge/shared':
+        specifier: link:../../../SDK/packages/shared
+        version: link:../../../SDK/packages/shared
       chanfana:
         specifier: 3.4.0
         version: 3.4.0
@@ -147,9 +183,6 @@ importers:
       '@edge-git/backend-data':
         specifier: workspace:*
         version: link:../../packages/backend-data
-      '@edge-git/backend-errors':
-        specifier: workspace:*
-        version: link:../../packages/backend-errors
       '@edge-git/backend-runtime':
         specifier: workspace:*
         version: link:../../packages/backend-runtime
@@ -168,6 +201,12 @@ importers:
       '@jitl/quickjs-wasmfile-release-asyncify':
         specifier: ^0.32.0
         version: 0.32.0
+      '@rexezuge/errors':
+        specifier: link:../../../SDK/packages/errors
+        version: link:../../../SDK/packages/errors
+      '@rexezuge/shared':
+        specifier: link:../../../SDK/packages/shared
+        version: link:../../../SDK/packages/shared
       quickjs-emscripten:
         specifier: 0.32.0
         version: 0.32.0
@@ -181,6 +220,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@rexezuge/web':
+        specifier: link:../../../SDK/packages/web
+        version: link:../../../SDK/packages/web
       class-variance-authority:
         specifier: 0.7.1
         version: 0.7.1
@@ -251,25 +293,22 @@ importers:
 
   packages/backend-data:
     dependencies:
-      '@edge-git/backend-errors':
-        specifier: workspace:*
-        version: link:../backend-errors
       '@edge-git/shared':
         specifier: workspace:*
         version: link:../shared
+      '@rexezuge/d1':
+        specifier: link:../../../SDK/packages/d1
+        version: link:../../../SDK/packages/d1
+      '@rexezuge/errors':
+        specifier: link:../../../SDK/packages/errors
+        version: link:../../../SDK/packages/errors
+      '@rexezuge/shared':
+        specifier: link:../../../SDK/packages/shared
+        version: link:../../../SDK/packages/shared
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 5.20260926.1
         version: 5.20260926.1
-      '@types/node':
-        specifier: 26.6.4
-        version: 26.6.4
-      typescript:
-        specifier: 6.0.3
-        version: 6.0.3
-
-  packages/backend-errors:
-    devDependencies:
       '@types/node':
         specifier: 26.6.4
         version: 26.6.4
@@ -282,6 +321,9 @@ importers:
       '@edge-git/shared':
         specifier: workspace:*
         version: link:../shared
+      '@rexezuge/runtime':
+        specifier: link:../../../SDK/packages/runtime
+        version: link:../../../SDK/packages/runtime
     devDependencies:
       '@types/node':
         specifier: 26.6.4
@@ -295,9 +337,6 @@ importers:
       '@edge-git/backend-data':
         specifier: workspace:*
         version: link:../backend-data
-      '@edge-git/backend-errors':
-        specifier: workspace:*
-        version: link:../backend-errors
       '@edge-git/backend-runtime':
         specifier: workspace:*
         version: link:../backend-runtime
@@ -307,6 +346,18 @@ importers:
       '@edge-git/shared':
         specifier: workspace:*
         version: link:../shared
+      '@rexezuge/errors':
+        specifier: link:../../../SDK/packages/errors
+        version: link:../../../SDK/packages/errors
+      '@rexezuge/i18n':
+        specifier: link:../../../SDK/packages/i18n
+        version: link:../../../SDK/packages/i18n
+      '@rexezuge/identity':
+        specifier: link:../../../SDK/packages/identity
+        version: link:../../../SDK/packages/identity
+      '@rexezuge/shared':
+        specifier: link:../../../SDK/packages/shared
+        version: link:../../../SDK/packages/shared
       jose:
         specifier: 6.2.12
         version: 6.2.12
@@ -320,12 +371,12 @@ importers:
 
   packages/git-protocol:
     dependencies:
-      '@edge-git/backend-errors':
-        specifier: workspace:*
-        version: link:../backend-errors
       '@edge-git/shared':
         specifier: workspace:*
         version: link:../shared
+      '@rexezuge/errors':
+        specifier: link:../../../SDK/packages/errors
+        version: link:../../../SDK/packages/errors
     devDependencies:
       '@types/node':
         specifier: 26.6.4
@@ -336,15 +387,15 @@ importers:
 
   packages/git-service:
     dependencies:
-      '@edge-git/backend-errors':
-        specifier: workspace:*
-        version: link:../backend-errors
       '@edge-git/git-protocol':
         specifier: workspace:*
         version: link:../git-protocol
       '@edge-git/shared':
         specifier: workspace:*
         version: link:../shared
+      '@rexezuge/errors':
+        specifier: link:../../../SDK/packages/errors
+        version: link:../../../SDK/packages/errors
       dofs:
         specifier: ^0.1.0
         version: 0.1.0(patch_hash=a4e0c9784c0152850a43458069a84082829bcd7315a96a2c3a9f323f7e1d5fed)(hono@4.13.12)
@@ -361,6 +412,9 @@ importers:
 
   packages/shared:
     dependencies:
+      '@rexezuge/shared':
+        specifier: link:../../../SDK/packages/shared
+        version: link:../../../SDK/packages/shared
       zod:
         specifier: 4.6.5
         version: 4.6.5
@@ -499,6 +553,7 @@ packages:
 
   '@cloudflare/vitest-pool-workers@0.22.0':
     resolution: {integrity: sha512-OJv/qikkOgxnKxJ5xrLS7zuOLZhc/6iziU+llqZm4tiQf2CJUYwlMuXN68VaWIQebORd1AUx4w6A0oy8XRbuaQ==}
+    deprecated: '@cloudflare/vitest-pool-workers has been renamed to @cloudflare/vitest-plugin. This package will not receive future updates.'
     peerDependencies:
       '@vitest/runner': ^4.1.0
       '@vitest/snapshot': ^4.1.0

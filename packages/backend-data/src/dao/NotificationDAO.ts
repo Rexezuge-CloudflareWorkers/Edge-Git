@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 
 export interface NotificationRow {
   id: string;
@@ -47,28 +47,7 @@ class NotificationDAO extends BaseDAO {
     subjectNumber?: number | null;
     now: number;
   }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'INSERT OR IGNORE INTO notifications (id, user_email, repository_id, actor_email, type, title, subject_type, subject_number, is_read, created_at, user_id, actor_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)',
-          )
-          .bind(
-            input.id,
-            input.userEmail,
-            input.repositoryId,
-            input.actorEmail,
-            input.type,
-            input.title,
-            input.subjectType ?? null,
-            input.subjectNumber ?? null,
-            input.now,
-            input.userId ?? null,
-            input.actorUserId ?? null,
-          )
-          .run(),
-      'insert notification',
-    );
+    await this.run('INSERT OR IGNORE INTO notifications (id, user_email, repository_id, actor_email, type, title, subject_type, subject_number, is_read, created_at, user_id, actor_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)', [input.id, input.userEmail, input.repositoryId, input.actorEmail, input.type, input.title, input.subjectType ?? null, input.subjectNumber ?? null, input.now, input.userId ?? null, input.actorUserId ?? null]);
   }
 
   // `full_name` is computed from `repositories` (0024 dropped the stored
@@ -132,26 +111,12 @@ class NotificationDAO extends BaseDAO {
   }
 
   public async markRead(id: string, owner: { userId: string | null; userEmail: string }): Promise<boolean> {
-    const result = await this.withRetry(
-      () =>
-        this.database
-          .prepare(`UPDATE notifications SET is_read = 1 WHERE id = ? AND ${NotificationDAO.owner(owner.userId)}`)
-          .bind(id, ...NotificationDAO.ownerParams(owner.userId, owner.userEmail))
-          .run(),
-      'mark notification read',
-    );
+    const result = await this.run(`UPDATE notifications SET is_read = 1 WHERE id = ? AND ${NotificationDAO.owner(owner.userId)}`, [id, ...NotificationDAO.ownerParams(owner.userId, owner.userEmail)]);
     return ((result.meta as { changes?: number })?.changes ?? 0) > 0;
   }
 
   public async markAllRead(owner: { userId: string | null; userEmail: string }): Promise<number> {
-    const result = await this.withRetry(
-      () =>
-        this.database
-          .prepare(`UPDATE notifications SET is_read = 1 WHERE ${NotificationDAO.owner(owner.userId)} AND is_read = 0`)
-          .bind(...NotificationDAO.ownerParams(owner.userId, owner.userEmail))
-          .run(),
-      'mark all notifications read',
-    );
+    const result = await this.run(`UPDATE notifications SET is_read = 1 WHERE ${NotificationDAO.owner(owner.userId)} AND is_read = 0`, [...NotificationDAO.ownerParams(owner.userId, owner.userEmail)]);
     return (result.meta as { changes?: number })?.changes ?? 0;
   }
 
@@ -164,10 +129,7 @@ class NotificationDAO extends BaseDAO {
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM notifications WHERE repository_id = ?').bind(repositoryId).run(),
-      'delete notifications by repo',
-    );
+    await this.run('DELETE FROM notifications WHERE repository_id = ?', [repositoryId]);
   }
 }
 

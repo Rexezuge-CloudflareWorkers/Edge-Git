@@ -22,7 +22,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@edge-git/shared": "workspace:*"
+    "@edge-git/shared": "workspace:*",
+    "@rexezuge/runtime": "link:../../../SDK/packages/runtime"
   },
   "devDependencies": {
     "@types/node": "26.6.4",

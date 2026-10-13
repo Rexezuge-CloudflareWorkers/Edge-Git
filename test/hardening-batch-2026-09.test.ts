@@ -1,9 +1,10 @@
+import { stubIdentityService, emptyUserEmailRegistry } from './mocks/identity';
 import { describe, expect, it, vi } from 'vitest';
 import { isMissingSchemaError } from '@edge-git/backend-data/utils';
 import { RepositoryDAO } from '@edge-git/backend-data/dao';
 import { SearchDAO } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { DatabaseError } from '@edge-git/backend-errors';
+import { DatabaseError } from '@rexezuge/errors';
 import { PermissionService } from '@edge-git/backend-services/permission';
 import { createRequestScope } from '@edge-git/backend-services/composition';
 import { Tokens } from '@edge-git/backend-services/composition';
@@ -101,6 +102,7 @@ describe('hardening batch: fail-closed data layer', () => {
         teamDAO: boom,
         teamMemberDAO: boom,
         teamGrantDAO: boom,
+userIdentity: async () => stubIdentityService() as never,
       },
     );
     const repo = { id: 'r1', owner: 'alice', owner_email: 'alice@x.y', name: 'r', is_private: 1 } as never;

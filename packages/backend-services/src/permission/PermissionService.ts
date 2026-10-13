@@ -10,9 +10,9 @@ import {
 } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { isMissingSchemaError } from '@edge-git/backend-data/utils';
-import { DatabaseError } from '@edge-git/backend-errors';
+import { DatabaseError } from '@rexezuge/errors';
 import { maxTeamGrantRole } from './TeamGrantPolicy';
-import { UserIdentityService } from '../identity/UserIdentityService';
+import { UserIdentityService } from '../identity';
 import type { RepoRole } from '@edge-git/backend-data/dao';
 
 type RepoPermission = RepoRole;
@@ -121,7 +121,7 @@ class PermissionService {
     let id: string | null = null;
     try {
       const identity = await this.deps.userIdentity();
-      id = await identity.resolveUserId(key);
+      id = await identity.resolveAccountId(key);
     } catch (error) {
       // A missing registry (database predating 0028) is not an outage: the
       // address-keyed fallbacks below still answer correctly.

@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 
 type NumberedEntity = 'issue' | 'pull' | 'discussion' | 'project';
 
@@ -48,10 +48,7 @@ class NumberingDAO extends BaseDAO {
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM repo_number_counters WHERE repository_id = ?').bind(repositoryId).run(),
-      'delete repo number counters',
-    );
+    await this.run('DELETE FROM repo_number_counters WHERE repository_id = ?', [repositoryId]);
   }
 }
 

@@ -1,6 +1,6 @@
 import { jwtVerify, createRemoteJWKSet } from 'jose';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
-import { UnauthorizedError } from '@edge-git/backend-errors';
+import { UnauthorizedError } from '@rexezuge/errors';
 import { DEMO_USER_EMAIL } from '@edge-git/shared/constants';
 import { isValidEmailFormat } from '@edge-git/shared/utils';
 

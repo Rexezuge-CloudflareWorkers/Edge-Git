@@ -2,7 +2,7 @@ import type { Next } from 'hono';
 import { Tokens } from '@edge-git/backend-services/composition';
 import type { AccessIdentityContext } from '@edge-git/backend-services/auth';
 import { AuditService } from '@edge-git/backend-services/audit';
-import { UnauthorizedError, ForbiddenError, DefaultInternalServerError } from '@edge-git/backend-errors';
+import { UnauthorizedError, ForbiddenError, DefaultInternalServerError } from '@rexezuge/errors';
 import { ErrorSanitizationUtil } from '@edge-git/shared/utils';
 import { flushDueWebhookDeliveries } from '@/workers/routes/SocialEmit';
 import { getScope } from './GitAuth';
@@ -43,8 +43,8 @@ async function userAuthenticationHandler(c: RequestContext, next: Next): Promise
       return c.json(
         {
           Exception: {
-            Type: DefaultInternalServerError.getErrorType(),
-            Message: DefaultInternalServerError.getErrorMessage(),
+            Type: DefaultInternalServerError.type,
+            Message: DefaultInternalServerError.message,
           },
         },
         500,
@@ -151,8 +151,8 @@ class MiddlewareHandlers {
       return c.json(
         {
           Exception: {
-            Type: DefaultInternalServerError.getErrorType(),
-            Message: DefaultInternalServerError.getErrorMessage(),
+            Type: DefaultInternalServerError.type,
+            Message: DefaultInternalServerError.message,
           },
         },
         500,

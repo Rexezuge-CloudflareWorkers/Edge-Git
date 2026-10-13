@@ -1,4 +1,4 @@
-import { UserIdentityService } from '../identity/UserIdentityService';
+import { UserIdentityService } from '../identity';
 import type {
   AuditLogDAO,
   BranchProtectionDAO,
@@ -36,10 +36,10 @@ import type {
   RepoRole,
 } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
+import { BadRequestError, NotFoundError } from '@rexezuge/errors';
 import type { AppConfiguration } from '@edge-git/backend-runtime/config';
 import { isReservedNamespaceName } from '@edge-git/shared/constants';
-import { EmailAddress, RepoFullName, TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
+import { RepoFullName, TimestampUtil, UUIDUtil, normalizeEmail } from '@edge-git/shared/utils';
 import type { PermissionService } from '../permission/PermissionService';
 import { cleanupRepoSidecars } from './repoCleanup';
 import { RepoVisibilityService } from './RepoVisibilityService';
@@ -157,7 +157,7 @@ class RepoService {
 
     const ownerCi = normalizedOwner.toLowerCase();
     const callerCi = await this.resolveCallerUsernameLowercased(userEmail);
-    const callerEmail = EmailAddress.normalize(userEmail);
+    const callerEmail = normalizeEmail(userEmail);
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const id = UUIDUtil.getRandomUUID();
 
@@ -284,7 +284,7 @@ class RepoService {
   private async resolveUserId(email: string): Promise<string | null> {
     try {
       const identity = await this.deps.userIdentity();
-      return await identity.resolveUserId(email.toLowerCase());
+      return await identity.resolveAccountId(email.toLowerCase());
     } catch {
       return null;
     }

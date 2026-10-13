@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 
 export interface OrganizationRow {
   id: string;
@@ -16,14 +16,7 @@ class OrganizationDAO extends BaseDAO {
   }
 
   public async create(input: { id: string; username: string; creatorEmail: string; now: number }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('INSERT INTO organizations (id, username, username_ci, creator_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
-          .bind(input.id, input.username, input.username.toLowerCase(), input.creatorEmail, input.now, input.now)
-          .run(),
-      'create organization',
-    );
+    await this.run('INSERT INTO organizations (id, username, username_ci, creator_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)', [input.id, input.username, input.username.toLowerCase(), input.creatorEmail, input.now, input.now]);
   }
 
   public async getById(id: string): Promise<OrganizationRow | null> {
@@ -35,18 +28,11 @@ class OrganizationDAO extends BaseDAO {
   }
 
   public async rename(id: string, username: string, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('UPDATE organizations SET username = ?, username_ci = ?, updated_at = ? WHERE id = ?')
-          .bind(username, username.toLowerCase(), now, id)
-          .run(),
-      'rename organization',
-    );
+    await this.run('UPDATE organizations SET username = ?, username_ci = ?, updated_at = ? WHERE id = ?', [username, username.toLowerCase(), now, id]);
   }
 
   public async deleteById(id: string): Promise<void> {
-    await this.withRetry(() => this.database.prepare('DELETE FROM organizations WHERE id = ?').bind(id).run(), 'delete organization');
+    await this.run('DELETE FROM organizations WHERE id = ?', [id]);
   }
 }
 

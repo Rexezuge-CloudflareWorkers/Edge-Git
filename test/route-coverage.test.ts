@@ -55,7 +55,7 @@ function createRouteFakeDb() {
       },
       run(): Promise<{ success: boolean; meta?: { changes?: number } }> {
         if (q.startsWith('INSERT INTO users') && !state.users.some((u) => u.email === params[0])) {
-          state.users.push({ email: params[0], created_at: params[1] });
+          state.users.push({ email: params[0], created_at: params[1], id: params[2], current_email: params[3] });
         }
         if (q.startsWith('INSERT INTO repositories')) {
           const [id, owner_email, owner, name] = params as string[];

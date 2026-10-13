@@ -1,10 +1,10 @@
+import { stubIdentityService, emptyUserEmailRegistry } from './mocks/identity';
 import { describe, expect, it } from 'vitest';
 import { EdgeGitWorker } from '@/workers/EdgeGitWorker';
 import { OrganizationService } from '@edge-git/backend-services/org';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { UserService } from '@edge-git/backend-services/user';
 import { RESERVED_NAMESPACE_NAMES, isReservedNamespaceName } from '@edge-git/shared/constants';
-import { getBackendStrings } from '@edge-git/shared/i18n';
 
 const ctx = { waitUntil: () => undefined, passThroughOnException: () => undefined };
 
@@ -81,7 +81,9 @@ describe('reserved namespace validation (services)', () => {
     const orgSvc = new OrganizationService({ DB: {} } as never, {
       namespaceDAO: async () => ({ isTaken: async () => false }) as never,
       organizationDAO: async () => ({ getByUsernameCi: async () => null }) as never,
-      userDAO: async () => ({ getByUsernameCi: async () => null }) as never,
+      userDAO: async () => ({ getByCurrentEmail: async () => null,
+getByUsernameCi: async () => null }) as never,
+userIdentity: async () => stubIdentityService() as never,
     });
     await expect(orgSvc.createOrganization('a@x.co', 'health')).rejects.toThrow('reserved');
     await expect(orgSvc.createOrganization('a@x.co', '  API ')).rejects.toThrow('reserved');
@@ -89,28 +91,40 @@ describe('reserved namespace validation (services)', () => {
     const userSvc = new UserService({ DB: {} } as never, {
       userDAO: async () =>
         ({
-          getByEmail: async () => ({ email: 'a@x.co', username: 'old' }),
+          getByCurrentEmail: async () => null,
+getByEmail: async () => ({ id: 'u-a', email: 'a@x.co', current_email: 'a@x.co', username: 'old' }),
+          getById: async () => ({ id: 'u-a', email: 'a@x.co', current_email: 'a@x.co', username: 'old' }),
           getByUsernameCi: async () => null,
         }) as never,
       namespaceDAO: async () => ({ isTaken: async () => false }) as never,
       organizationDAO: async () => ({ getByUsernameCi: async () => null }) as never,
+userEmailDAO: async () => emptyUserEmailRegistry() as never,
     });
     await expect(userSvc.renameUsername('a@x.co', 'docs')).rejects.toThrow('reserved');
   });
 
   it('skips reserved names when bootstrapping a username from email', async () => {
-    const users = new Map<string, { email: string; username: string | null }>([
-      ['health@example.com', { email: 'health@example.com', username: null }],
+    const users = new Map<string, { id: string; email: string; current_email: string; username: string | null }>([
+      ['health@example.com', { id: 'u-health', email: 'health@example.com', current_email: 'health@example.com', username: null }],
     ]);
     const namespaces = new Set<string>();
     const svc = new UserService({ DB: {} } as never, {
       userDAO: async () =>
         ({
-          upsertUser: async () => undefined,
+          getByCurrentEmail: async () => null,
+          // The kit's `registerAccount` reads `null` as "anchor already held".
+          createUser: async (input: { anchor: string; loginEmail: string }) => {
+            if (users.has(input.anchor)) return null;
+            users.set(input.anchor, { id: `usr_${input.anchor}`, email: input.anchor, current_email: input.loginEmail, username: null });
+            return `usr_${input.anchor}`;
+          },
+          getById: async (id: string) => [...users.values()].find((u) => u.id === id) ?? null,
           getByEmail: async (email: string) => users.get(email) ?? null,
           getByUsernameCi: async (ci: string) => [...users.values()].find((u) => u.username?.toLowerCase() === ci) ?? null,
-          ensureUsername: async (email: string, handle: string) => {
-            users.get(email)!.username = handle;
+          // `WHERE id = ? OR email = ?` — the service hands over whichever it has.
+          ensureUsername: async (ref: string, handle: string) => {
+            const row = users.get(ref) ?? [...users.values()].find((u) => u.id === ref);
+            if (row) row.username = handle;
           },
         }) as never,
       namespaceDAO: async () =>
@@ -121,19 +135,13 @@ describe('reserved namespace validation (services)', () => {
           },
         }) as never,
       organizationDAO: async () => ({ getByUsernameCi: async () => null }) as never,
+userEmailDAO: async () => emptyUserEmailRegistry() as never,
     });
     await svc.upsertUser('health@example.com');
     const bootstrapped = users.get('health@example.com')?.username ?? '';
     expect(bootstrapped.toLowerCase()).not.toBe('health');
     expect(isReservedNamespaceName(bootstrapped)).toBe(false);
     expect(bootstrapped.toLowerCase()).toBe('health-1');
-  });
-});
-
-describe('reserved namespace strings', () => {
-  it('exposes backend locale strings for the reserved error', () => {
-    expect(getBackendStrings('en').namespace.reserved).toBeTruthy();
-    expect(getBackendStrings('zh-CN').namespace.reserved).toBeTruthy();
   });
 });
 

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, Code, Copy, Lock, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useCopyToClipboard } from '@rexezuge/web';
 import { Button } from '../ui/Button';
 import { Label } from '../ui/Input';
 import { cn } from '../../lib/utils';
-import { COPY_FEEDBACK_TIMEOUT_MS } from '../../lib/constants';
 
 export function buildHttpsCloneUrl(origin: string, owner: string, repo: string): string {
   return `${origin}/${owner}/${repo}.git`;
@@ -20,7 +20,9 @@ export function CloneButton({ owner, repo }: { owner: string; repo: string }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [method, setMethod] = useState<CloneMethod>('https');
-  const [copied, setCopied] = useState(false);
+  // `copied` is owned by the hook, so closing the menu needs a way to clear it
+  // without pretending a write happened.
+  const { copied, copy, reset } = useCopyToClipboard();
   const rootRef = useRef<HTMLDivElement>(null);
 
   const origin = globalThis.location?.origin ?? '';
@@ -36,7 +38,7 @@ export function CloneButton({ owner, repo }: { owner: string; repo: string }) {
       }
 
       setOpen(false);
-      setCopied(false);
+      reset();
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') {
@@ -44,7 +46,7 @@ export function CloneButton({ owner, repo }: { owner: string; repo: string }) {
       }
 
       setOpen(false);
-      setCopied(false);
+      reset();
     };
     document.addEventListener('pointerdown', onPointerDown);
     document.addEventListener('keydown', onKeyDown);
@@ -52,13 +54,7 @@ export function CloneButton({ owner, repo }: { owner: string; repo: string }) {
       document.removeEventListener('pointerdown', onPointerDown);
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [open]);
-
-  const handleCopy = (value: string) => {
-    void navigator.clipboard.writeText(value).catch(() => undefined);
-    setCopied(true);
-    setTimeout(() => setCopied(false), COPY_FEEDBACK_TIMEOUT_MS);
-  };
+  }, [open, reset]);
 
   return (
     <div ref={rootRef} className="relative inline-block">
@@ -67,7 +63,7 @@ export function CloneButton({ owner, repo }: { owner: string; repo: string }) {
         size="sm"
         onClick={() => {
           setOpen((o) => !o);
-          setCopied(false);
+          reset();
         }}
         aria-haspopup="dialog"
         aria-expanded={open}
@@ -89,7 +85,7 @@ export function CloneButton({ owner, repo }: { owner: string; repo: string }) {
               type="button"
               onClick={() => {
                 setOpen(false);
-                setCopied(false);
+                reset();
               }}
               aria-label={t('repos.closeCloneMenu', 'Close Clone Menu')}
               className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors p-1 rounded-lg hover:bg-[var(--color-surface-3)]"
@@ -148,7 +144,7 @@ export function CloneButton({ owner, repo }: { owner: string; repo: string }) {
                     />
                     <button
                       type="button"
-                      onClick={() => handleCopy(httpsUrl)}
+                      onClick={() => copy(httpsUrl)}
                       title={t('common.copyToClipboard', 'Copy To Clipboard')}
                       className="px-3 py-2 rounded-r-lg bg-[var(--color-surface-3)] hover:bg-[var(--color-surface-4)] border border-[var(--color-border)] text-[var(--color-text-secondary)] transition-colors duration-150"
                     >

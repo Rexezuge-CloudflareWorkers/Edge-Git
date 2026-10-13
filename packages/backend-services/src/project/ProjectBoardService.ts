@@ -1,6 +1,6 @@
 import { ProjectDAO } from '@edge-git/backend-data/dao';
 import type { ProjectRow } from '@edge-git/backend-data/dao';
-import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
+import { BadRequestError, NotFoundError } from '@rexezuge/errors';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import type { ProjectCardMetadata, ProjectColumnMetadata, ProjectMetadata } from '@edge-git/shared';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';

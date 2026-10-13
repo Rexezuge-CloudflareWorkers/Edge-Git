@@ -1,7 +1,18 @@
-import type { Container } from './Container';
+import { asScopedContext as kitAsScopedContext, getRequestScope as kitGetRequestScope } from '@rexezuge/runtime';
+import type {  ScopedContext } from '@rexezuge/runtime';
+import type { ServiceEnv } from '../config/ServiceEnv';
 import { createServiceContext } from './ServiceContext';
 import type { ServiceContext, ServiceContextOverrides } from './ServiceContext';
-import type { ServiceEnv } from '../config/ServiceEnv';
+
+/**
+ * Per-request wiring on top of the kit's scope.
+ *
+ * The container, the scope key and the `get`/`set` plumbing are the kit's — one
+ * `Container` per request, stored on the framework context under `SCOPE_KEY`.
+ * What stays here is the half Edge-Git added on top: the `ServiceContext` that
+ * carries the clock, the logger and the test seams, plus the memoized async
+ * factory the composition root needs.
+ */
 
 /**
  * Memoized async factory helper for the composition root.
@@ -31,35 +42,10 @@ function memoizeAsync<T>(fn: () => Promise<T>): () => Promise<T> {
  * of calling `createRequestScope(c.env)` per handler (which minted N scopes
  * per request and broke singleton memoization).
  */
-interface ScopedContext {
-  get(key: string): unknown;
-  set(key: string, value: unknown): void;
-  readonly env: ServiceEnv;
-}
-
-const SCOPE_KEY = '__edgeGitScope';
 const SERVICE_CONTEXT_KEY = '__edgeGitServiceContext';
 
-function setRequestScope(c: ScopedContext, scope: Container, ctx: ServiceContext): void {
-  c.set(SCOPE_KEY, scope);
+function setServiceContext(c: ScopedContext, ctx: ServiceContext): void {
   c.set(SERVICE_CONTEXT_KEY, ctx);
-}
-
-/**
- * Structural adapter for Hono contexts.
- * Hono's `Context.get` overloads are not assignable to
- * `ScopedContext['get']`, so call sites used `c as never`. Centralize that
- * single unsafe cast here — one audited location instead of ~30 scattered
- * ones (readability/maintainability; runtime behavior identical).
- */
-function asScopedContext(c: { get(key: string): unknown; set?(key: string, value: unknown): void; readonly env: unknown }): ScopedContext {
-  return c as unknown as ScopedContext;
-}
-
-function getRequestScope(c: ScopedContext): Container {
-  const scope = c.get(SCOPE_KEY) as Container | undefined;
-  if (!scope) throw new Error('Request scope is not set. Register scopeMiddleware before routes.');
-  return scope;
 }
 
 function getServiceContext(c: ScopedContext): ServiceContext {
@@ -72,14 +58,21 @@ function createRequestContext(env: ServiceEnv, overrides: ServiceContextOverride
   return createServiceContext(env, overrides);
 }
 
+/**
+ * Structural adapter for Hono contexts, from the kit. Re-exported so this
+ * module stays the one import site for the scope plumbing.
+ */
+const asScopedContext = kitAsScopedContext;
+const getRequestScope = kitGetRequestScope;
+
 export {
-  memoizeAsync,
-  setRequestScope,
+  asScopedContext,
+  createRequestContext,
   getRequestScope,
   getServiceContext,
-  createRequestContext,
-  asScopedContext,
-  SCOPE_KEY,
-  SERVICE_CONTEXT_KEY,
+  memoizeAsync,
+  setServiceContext,
 };
-export type { ScopedContext };
+
+export { SERVICE_CONTEXT_KEY };
+export {type Container, type ScopedContext} from '@rexezuge/runtime';

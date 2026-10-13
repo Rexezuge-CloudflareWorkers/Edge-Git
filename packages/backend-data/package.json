@@ -17,8 +17,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@edge-git/backend-errors": "workspace:*",
-    "@edge-git/shared": "workspace:*"
+    "@edge-git/shared": "workspace:*",
+    "@rexezuge/d1": "link:../../../SDK/packages/d1",
+    "@rexezuge/errors": "link:../../../SDK/packages/errors",
+    "@rexezuge/shared": "link:../../../SDK/packages/shared"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260926.1",

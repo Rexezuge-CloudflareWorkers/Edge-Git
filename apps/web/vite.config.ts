@@ -25,6 +25,14 @@ function apiProxy({ spaFallback = false }: { spaFallback?: boolean } = {}) {
 }
 
 export default defineConfig({
+  resolve: {
+    // `@rexezuge/web` is consumed from a `link:`-ed local package, so Vite
+    // resolves its real path and would load *its* `react` — a second copy in
+    // the bundle. Two Reacts mean hooks read a different dispatcher than the
+    // renderer: "Cannot read properties of null (reading 'useState')". Dedupe
+    // pins both to this app's copy.
+    dedupe: ['react', 'react-dom'],
+  },
   plugins: [
     react(),
     tailwindcss(),

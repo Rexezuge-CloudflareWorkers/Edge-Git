@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 
 export type OrgMemberRole = 'owner' | 'member';
 
@@ -26,20 +26,17 @@ class OrganizationMemberDAO extends BaseDAO {
    */
   public async upsert(orgId: string, userEmail: string, role: OrgMemberRole, now: number, userId?: string | null): Promise<void> {
     const normalized = userEmail.toLowerCase();
-    await this.withRetry(async () => {
-      // Collapse legacy mixed-case duplicates so `lower(user_email)` reads stay unique.
-      await this.database
-        .prepare('DELETE FROM organization_members WHERE org_id = ? AND lower(user_email) = ? AND user_email != ?')
-        .bind(orgId, normalized, normalized)
-        .run()
-        .catch(() => undefined);
-      return this.database
-        .prepare(
-          'INSERT INTO organization_members (org_id, user_email, role, created_at, user_id) VALUES (?, ?, ?, ?, ?) ON CONFLICT(org_id, user_email) DO UPDATE SET role = excluded.role, user_id = COALESCE(excluded.user_id, organization_members.user_id)',
-        )
-        .bind(orgId, normalized, role, now, userId ?? null)
-        .run();
-    }, 'upsert organization member');
+    // Collapse legacy mixed-case duplicates so `lower(user_email)` reads stay
+    // unique. Best effort: a missing or failing DELETE leaves the duplicate in
+    // place, and the UPSERT below is still correct for the surviving row.
+    await this.run(
+      'DELETE FROM organization_members WHERE org_id = ? AND lower(user_email) = ? AND user_email != ?',
+      [orgId, normalized, normalized],
+    ).catch(() => undefined);
+    await this.run(
+      'INSERT INTO organization_members (org_id, user_email, role, created_at, user_id) VALUES (?, ?, ?, ?, ?) ON CONFLICT(org_id, user_email) DO UPDATE SET role = excluded.role, user_id = COALESCE(excluded.user_id, organization_members.user_id)',
+      [orgId, normalized, role, now, userId ?? null],
+    );
   }
 
   public async get(orgId: string, userEmail: string): Promise<OrganizationMemberRow | null> {
@@ -87,21 +84,11 @@ class OrganizationMemberDAO extends BaseDAO {
   }
 
   public async remove(orgId: string, userEmail: string): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('DELETE FROM organization_members WHERE org_id = ? AND lower(user_email) = lower(?)')
-          .bind(orgId, userEmail)
-          .run(),
-      'remove organization member',
-    );
+    await this.run('DELETE FROM organization_members WHERE org_id = ? AND lower(user_email) = lower(?)', [orgId, userEmail]);
   }
 
   public async deleteByOrg(orgId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM organization_members WHERE org_id = ?').bind(orgId).run(),
-      'delete members by org',
-    );
+    await this.run('DELETE FROM organization_members WHERE org_id = ?', [orgId]);
   }
 
   public async countOwners(orgId: string): Promise<number> {

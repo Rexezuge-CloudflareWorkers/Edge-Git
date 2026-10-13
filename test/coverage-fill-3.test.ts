@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { usernameSchema, teamSlugSchema, repoNameSchema, branchNameSchema, assetNameSchema } from '@edge-git/shared/validation/schemas';
-import { TimestampUtil } from '@edge-git/shared/utils/TimestampUtil';
-import { canonicalizeLanguageTag } from '@edge-git/shared/utils/LanguageTag';
+import { TimestampUtil, canonicalizeLanguageTag } from '@rexezuge/shared';
 import { mapServiceError, toServiceStatus, hideExistence } from '@edge-git/backend-services/errors/ErrorMapper';
 import { AuthorizationGuard } from '@edge-git/backend-services/permission/AuthorizationGuardService';
-import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
+import { BadRequestError, NotFoundError } from '@rexezuge/errors';
 
 describe('shared validation schemas', () => {
   it('accepts valid names and rejects bad input', () => {

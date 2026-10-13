@@ -1,3 +1,4 @@
+import { stubIdentityService, emptyUserEmailRegistry } from './mocks/identity';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Container } from '@edge-git/backend-runtime/di';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
@@ -297,7 +298,8 @@ describe('constructor-injected DAO overrides', () => {
   it('RepoService uses the injected repository DAO instead of constructing one', async () => {
     const row = { id: 'r1', owner: 'alice', name: 'demo' };
     const fakeRepositoryDAO = { getByOwnerAndName: vi.fn().mockResolvedValue(row) };
-    const svc = new RepoService({ DB: {} } as never, { repositoryDAO: async () => fakeRepositoryDAO as never });
+    const svc = new RepoService({ DB: {} } as never, { repositoryDAO: async () => fakeRepositoryDAO as never ,
+userIdentity: async () => stubIdentityService() as never,});
     await expect(svc.getByOwnerAndName('alice', 'demo')).resolves.toBe(row);
     expect(fakeRepositoryDAO.getByOwnerAndName).toHaveBeenCalledWith('alice', 'demo');
     expect(daoMocks.RepositoryDAO).not.toHaveBeenCalled();

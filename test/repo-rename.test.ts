@@ -1,3 +1,4 @@
+import { stubIdentityService, emptyUserEmailRegistry } from './mocks/identity';
 import { describe, expect, it } from 'vitest';
 import { OrganizationService } from '@edge-git/backend-services/org';
 import { cascadeOwnerRepos } from '@edge-git/backend-services/repo';
@@ -27,7 +28,9 @@ describe('rename services cascade the owner only', () => {
     const svc = new UserService({ DB: {} } as never, {
       userDAO: async () =>
         ({
-          getByEmail: async () => ({ email: 'a@x.co', username: 'old' }),
+          getByCurrentEmail: async () => null,
+getByEmail: async () => ({ id: 'u-a', email: 'a@x.co', current_email: 'a@x.co', username: 'old' }),
+          getById: async () => ({ id: 'u-a', email: 'a@x.co', current_email: 'a@x.co', username: 'old' }),
           getByUsernameCi: async () => null,
           setUsername: async () => undefined,
         }) as never,
@@ -45,6 +48,7 @@ describe('rename services cascade the owner only', () => {
             renamed.push({ oldCi, next });
           },
         }) as never,
+userEmailDAO: async () => emptyUserEmailRegistry() as never,
     });
     await svc.renameUsername('a@x.co', 'newhandle');
     expect(renamed).toEqual([{ oldCi: 'old', next: 'newhandle' }]);
@@ -66,13 +70,15 @@ describe('rename services cascade the owner only', () => {
           release: async () => undefined,
           claim: async () => undefined,
         }) as never,
-      userDAO: async () => ({ getByUsernameCi: async () => null }) as never,
+      userDAO: async () => ({ getByCurrentEmail: async () => null,
+getByUsernameCi: async () => null }) as never,
       repositoryDAO: async () =>
         ({
           renameOwner: async (oldCi: string, next: string) => {
             renamed.push({ oldCi, next });
           },
         }) as never,
+userIdentity: async () => stubIdentityService() as never,
     });
     await svc.rename('acme', 'owner@x.co', 'acme-new');
     expect(renamed).toEqual([{ oldCi: 'acme', next: 'acme-new' }]);

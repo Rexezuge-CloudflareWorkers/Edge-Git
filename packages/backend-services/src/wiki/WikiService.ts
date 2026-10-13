@@ -1,7 +1,7 @@
 import { WikiDAO } from '@edge-git/backend-data/dao';
 import type { WikiPageRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
+import { BadRequestError, NotFoundError } from '@rexezuge/errors';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import type { WikiPageMetadata, WikiRevisionMetadata } from '@edge-git/shared';
 import { TimestampUtil, UUIDUtil, SLUG_RE } from '@edge-git/shared/utils';

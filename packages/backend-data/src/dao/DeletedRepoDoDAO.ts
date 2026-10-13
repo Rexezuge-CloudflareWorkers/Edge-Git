@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 
 interface DeletedRepoDoRow {
   do_key: string;
@@ -20,16 +20,7 @@ class DeletedRepoDoDAO extends BaseDAO {
   }
 
   public async enqueue(doKey: string, fullName: string, repoId: string, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'INSERT INTO deleted_repo_dos (do_key, full_name, repo_id, deleted_at, attempts) VALUES (?, ?, ?, ?, 0) ON CONFLICT (do_key) DO UPDATE SET full_name = excluded.full_name, repo_id = excluded.repo_id, deleted_at = excluded.deleted_at, attempts = 0',
-          )
-          .bind(doKey, fullName, repoId, now)
-          .run(),
-      'enqueue deleted repo DO vacuum',
-    );
+    await this.run('INSERT INTO deleted_repo_dos (do_key, full_name, repo_id, deleted_at, attempts) VALUES (?, ?, ?, ?, 0) ON CONFLICT (do_key) DO UPDATE SET full_name = excluded.full_name, repo_id = excluded.repo_id, deleted_at = excluded.deleted_at, attempts = 0', [doKey, fullName, repoId, now]);
   }
 
   public async listDue(olderThan: number, limit: number): Promise<DeletedRepoDoRow[]> {
@@ -50,7 +41,7 @@ class DeletedRepoDoDAO extends BaseDAO {
   }
 
   public async remove(doKey: string): Promise<void> {
-    await this.withRetry(() => this.database.prepare('DELETE FROM deleted_repo_dos WHERE do_key = ?').bind(doKey).run(), 'remove deleted repo DO vacuum');
+    await this.run('DELETE FROM deleted_repo_dos WHERE do_key = ?', [doKey]);
   }
 }
 

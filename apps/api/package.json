@@ -8,12 +8,16 @@
   },
   "dependencies": {
     "@edge-git/backend-data": "workspace:*",
-    "@edge-git/backend-errors": "workspace:*",
     "@edge-git/backend-runtime": "workspace:*",
     "@edge-git/backend-services": "workspace:*",
     "@edge-git/background": "workspace:*",
     "@edge-git/git-protocol": "workspace:*",
     "@edge-git/shared": "workspace:*",
+    "@rexezuge/errors": "link:../../../SDK/packages/errors",
+    "@rexezuge/http": "link:../../../SDK/packages/http",
+    "@rexezuge/i18n": "link:../../../SDK/packages/i18n",
+    "@rexezuge/runtime": "link:../../../SDK/packages/runtime",
+    "@rexezuge/shared": "link:../../../SDK/packages/shared",
     "chanfana": "3.4.0",
     "hono": "4.13.12",
     "zod": "4.6.5"

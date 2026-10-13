@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 
 type DeployKeyPermission = 'read' | 'write';
 
@@ -32,26 +32,7 @@ class DeployKeyDAO extends BaseDAO {
     createdBy: string;
     now: number;
   }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'INSERT INTO deploy_keys (id, repository_id, name, token_hash, token_prefix, permission, expires_at, last_used_at, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)',
-          )
-          .bind(
-            input.id,
-            input.repositoryId,
-            input.name,
-            input.tokenHash,
-            input.tokenPrefix,
-            input.permission,
-            input.expiresAt,
-            input.createdBy,
-            input.now,
-          )
-          .run(),
-      'create deploy key',
-    );
+    await this.run('INSERT INTO deploy_keys (id, repository_id, name, token_hash, token_prefix, permission, expires_at, last_used_at, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)', [input.id, input.repositoryId, input.name, input.tokenHash, input.tokenPrefix, input.permission, input.expiresAt, input.createdBy, input.now]);
   }
 
   public async listByRepo(repositoryId: string): Promise<DeployKeyRow[]> {
@@ -79,10 +60,7 @@ class DeployKeyDAO extends BaseDAO {
   }
 
   public async updateLastUsedByHash(tokenHash: string, now: number): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('UPDATE deploy_keys SET last_used_at = ? WHERE token_hash = ?').bind(now, tokenHash).run(),
-      'update deploy key last used',
-    );
+    await this.run('UPDATE deploy_keys SET last_used_at = ? WHERE token_hash = ?', [now, tokenHash]);
   }
 
   public async countByRepo(repositoryId: string): Promise<number> {
@@ -94,10 +72,7 @@ class DeployKeyDAO extends BaseDAO {
   }
 
   public async deleteByIdAndRepo(id: string, repositoryId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM deploy_keys WHERE id = ? AND repository_id = ?').bind(id, repositoryId).run(),
-      'delete deploy key',
-    );
+    await this.run('DELETE FROM deploy_keys WHERE id = ? AND repository_id = ?', [id, repositoryId]);
   }
 
   public async pruneExpired(now: number, limit: number): Promise<number> {
@@ -105,10 +80,7 @@ class DeployKeyDAO extends BaseDAO {
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM deploy_keys WHERE repository_id = ?').bind(repositoryId).run(),
-      'delete deploy keys',
-    );
+    await this.run('DELETE FROM deploy_keys WHERE repository_id = ?', [repositoryId]);
   }
 }
 

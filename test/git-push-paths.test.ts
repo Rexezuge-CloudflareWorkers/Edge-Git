@@ -4,7 +4,6 @@ import { PktLine } from '@edge-git/git-protocol';
 import { TokenService } from '@edge-git/backend-services/auth';
 import { triggerRequiredChecks } from '@/workers/routes/TriggerChecks';
 import { EdgeGitWorker } from '@/workers/EdgeGitWorker';
-import { resetRateLimitForTests } from '@/middleware/rateLimit';
 
 const ALICE = 'alice@example.com';
 const PAT = 'slice5-push-pat';
@@ -150,7 +149,6 @@ describe('slice5: git-receive-pack secret scan + protections', () => {
   let tokenHash = '';
 
   beforeEach(async () => {
-    resetRateLimitForTests();
     tokenHash = await TokenService.hashToken(PAT);
   });
 

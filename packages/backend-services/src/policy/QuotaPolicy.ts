@@ -1,4 +1,4 @@
-import { BadRequestError } from '@edge-git/backend-errors';
+import { BadRequestError } from '@rexezuge/errors';
 
 // Quota Policy (Policy pattern): single fail-closed limit check shared by
 // `TeamService` (teams/members/grants), `OrganizationService`, and

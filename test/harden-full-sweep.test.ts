@@ -1,3 +1,4 @@
+import { stubIdentityService, emptyUserEmailRegistry } from './mocks/identity';
 import { describe, expect, it, vi } from 'vitest';
 import { mapWithConcurrency } from '../packages/shared/src/utils/ConcurrencyUtil';
 import { SLUG_RE } from '../packages/shared/src/utils/SlugValidation';
@@ -77,6 +78,7 @@ describe('harden full sweep: token listTokens batched', () => {
               return { id, owner: 'o', name: id };
             },
           } as never),
+userIdentity: async () => stubIdentityService() as never,
       },
     );
     const out = await svc.listTokens('A@x.com');
@@ -94,6 +96,7 @@ describe('harden full sweep: token listTokens batched', () => {
         tokenDAO: () => Promise.resolve({ getByUserEmail: async () => [] } as never),
         tokenGrantDAO: () => Promise.resolve({ listByToken: grantList } as never),
         repositoryDAO: () => Promise.resolve({ getById: vi.fn() } as never),
+userIdentity: async () => stubIdentityService() as never,
       },
     );
     await expect(svc.listTokens('a@x.com')).resolves.toEqual([]);

@@ -1,8 +1,8 @@
 import { IssueDAO, RepositoryDAO, SearchDAO } from '@edge-git/backend-data/dao';
 import type { CodeHit, DiscussionRow, IssueRow, PullRequestRow, RepositoryRow, SnippetRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { BadRequestError } from '@edge-git/backend-errors';
-import { EmailAddress, TimestampUtil, mapWithConcurrency } from '@edge-git/shared/utils';
+import { BadRequestError } from '@rexezuge/errors';
+import { TimestampUtil, mapWithConcurrency, normalizeEmail } from '@edge-git/shared/utils';
 import { PermissionService } from '../permission/PermissionService';
 
 interface SearchServiceEnv {
@@ -86,7 +86,7 @@ class SearchService {
   private static normalizeViewer(viewerEmail: string | null): string | null {
     if (!viewerEmail) return null;
     try {
-      return EmailAddress.normalize(viewerEmail);
+      return normalizeEmail(viewerEmail);
     } catch {
       return viewerEmail;
     }

@@ -1,4 +1,4 @@
-import { BadRequestError } from '@edge-git/backend-errors';
+import { BadRequestError } from '@rexezuge/errors';
 import {
   MAX_SHARED_URL_LENGTH,
   stripHostTrailingDot,

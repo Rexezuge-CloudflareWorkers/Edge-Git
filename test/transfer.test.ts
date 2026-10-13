@@ -1,3 +1,4 @@
+import { stubIdentityService, emptyUserEmailRegistry } from './mocks/identity';
 import { describe, expect, it } from 'vitest';
 import {
   PktLine,
@@ -404,6 +405,7 @@ describe('TokenService repo grants and rotation', () => {
         tokenDAO: async () => tokenDAO as never,
         repositoryDAO: async () => repositoryDAO as never,
         tokenGrantDAO: async () => tokenGrantDAO as never,
+userIdentity: async () => stubIdentityService() as never,
       },
     );
     const created = await svc.createToken(

@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 
 export interface ReleaseRow {
   id: string;
@@ -43,27 +43,7 @@ class ReleaseDAO extends BaseDAO {
     now: number;
     publishedAt?: number | null;
   }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'INSERT INTO releases (id, repository_id, tag_name, name, body, is_draft, is_prerelease, created_by, created_at, published_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          )
-          .bind(
-            input.id,
-            input.repositoryId,
-            input.tagName,
-            input.name,
-            input.body,
-            input.isDraft ? 1 : 0,
-            input.isPrerelease ? 1 : 0,
-            input.createdBy,
-            input.now,
-            input.publishedAt ?? (input.isDraft ? null : input.now),
-          )
-          .run(),
-      'create release',
-    );
+    await this.run('INSERT INTO releases (id, repository_id, tag_name, name, body, is_draft, is_prerelease, created_by, created_at, published_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [input.id, input.repositoryId, input.tagName, input.name, input.body, input.isDraft ? 1 : 0, input.isPrerelease ? 1 : 0, input.createdBy, input.now, input.publishedAt ?? (input.isDraft ? null : input.now)]);
   }
 
   public async listByRepo(repositoryId: string): Promise<ReleaseRow[]> {
@@ -124,25 +104,12 @@ class ReleaseDAO extends BaseDAO {
       values.push(patch.publishedAt);
     }
     if (sets.length === 0) return;
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(`UPDATE releases SET ${sets.join(', ')} WHERE id = ? AND repository_id = ?`)
-          .bind(...values, id, repositoryId)
-          .run(),
-      'update release',
-    );
+    await this.run(`UPDATE releases SET ${sets.join(', ')} WHERE id = ? AND repository_id = ?`, [...values, id, repositoryId]);
   }
 
   public async deleteRelease(id: string, repositoryId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM release_assets WHERE release_id = ?').bind(id).run(),
-      'delete release assets',
-    ).catch(() => undefined);
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM releases WHERE id = ? AND repository_id = ?').bind(id, repositoryId).run(),
-      'delete release',
-    );
+    await this.run('DELETE FROM release_assets WHERE release_id = ?', [id]).catch(() => undefined);
+    await this.run('DELETE FROM releases WHERE id = ? AND repository_id = ?', [id, repositoryId]);
   }
 
   public async createAsset(input: {
@@ -156,26 +123,7 @@ class ReleaseDAO extends BaseDAO {
     createdBy: string;
     now: number;
   }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'INSERT INTO release_assets (id, release_id, repository_id, name, size, content_type, sha256, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          )
-          .bind(
-            input.id,
-            input.releaseId,
-            input.repositoryId,
-            input.name,
-            input.size,
-            input.contentType,
-            input.sha256,
-            input.createdBy,
-            input.now,
-          )
-          .run(),
-      'create release asset',
-    );
+    await this.run('INSERT INTO release_assets (id, release_id, repository_id, name, size, content_type, sha256, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [input.id, input.releaseId, input.repositoryId, input.name, input.size, input.contentType, input.sha256, input.createdBy, input.now]);
   }
 
   public async listAssets(releaseId: string): Promise<ReleaseAssetRow[]> {
@@ -209,10 +157,7 @@ class ReleaseDAO extends BaseDAO {
   }
 
   public async deleteAsset(assetId: string, releaseId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM release_assets WHERE id = ? AND release_id = ?').bind(assetId, releaseId).run(),
-      'delete release asset',
-    );
+    await this.run('DELETE FROM release_assets WHERE id = ? AND release_id = ?', [assetId, releaseId]);
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {

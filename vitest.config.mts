@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url';
 const apiSrcPath = fileURLToPath(new URL('apps/api/src', import.meta.url));
 const backgroundSrcPath = fileURLToPath(new URL('apps/background/src', import.meta.url));
 const backendDataSrcPath = fileURLToPath(new URL('packages/backend-data/src', import.meta.url));
-const backendErrorsSrcPath = fileURLToPath(new URL('packages/backend-errors/src', import.meta.url));
 const backendRuntimeSrcPath = fileURLToPath(new URL('packages/backend-runtime/src', import.meta.url));
 const gitProtocolSrcPath = fileURLToPath(new URL('packages/git-protocol/src', import.meta.url));
 const gitServiceSrcPath = fileURLToPath(new URL('packages/git-service/src', import.meta.url));
@@ -38,7 +37,6 @@ export default defineConfig({
     alias: [
       { find: /^@edge-git\/background$/, replacement: `${backgroundSrcPath}/index.ts` },
       { find: /^@edge-git\/backend-data$/, replacement: `${backendDataSrcPath}/index.ts` },
-      { find: /^@edge-git\/backend-errors$/, replacement: `${backendErrorsSrcPath}/index.ts` },
       { find: /^@edge-git\/backend-runtime$/, replacement: `${backendRuntimeSrcPath}/index.ts` },
       { find: /^@edge-git\/backend-services$/, replacement: `${backendServicesSrcPath}/index.ts` },
       { find: /^@edge-git\/git-protocol$/, replacement: `${gitProtocolSrcPath}/index.ts` },
@@ -46,7 +44,6 @@ export default defineConfig({
       { find: /^@edge-git\/shared$/, replacement: `${sharedSrcPath}/index.ts` },
       { find: '@edge-git/background', replacement: backgroundSrcPath },
       { find: '@edge-git/backend-data', replacement: backendDataSrcPath },
-      { find: '@edge-git/backend-errors', replacement: backendErrorsSrcPath },
       { find: '@edge-git/backend-runtime', replacement: backendRuntimeSrcPath },
       { find: '@edge-git/backend-services', replacement: backendServicesSrcPath },
       { find: '@edge-git/git-protocol', replacement: gitProtocolSrcPath },
@@ -57,5 +54,10 @@ export default defineConfig({
       { find: 'cloudflare:workflows', replacement: cloudflareWorkflowsMockPath },
       { find: /^@\//, replacement: `${apiSrcPath}/` },
     ],
+    // `@rexezuge/web` is consumed from a `link:`-ed local package, so the
+    // resolver follows its real path and would load *its* React — a second copy
+    // next to this app's, whose hooks then read a different dispatcher than the
+    // renderer and fail with "Cannot read properties of null (reading 'useState')".
+    dedupe: ['react', 'react-dom'],
   },
 });

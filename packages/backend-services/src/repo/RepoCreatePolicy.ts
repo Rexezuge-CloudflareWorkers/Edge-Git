@@ -1,4 +1,4 @@
-import { BadRequestError, ForbiddenError } from '@edge-git/backend-errors';
+import { BadRequestError, ForbiddenError } from '@rexezuge/errors';
 
 const MAX_REPO_DESCRIPTION_LENGTH = 500;
 

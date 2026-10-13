@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 import type { RepoRole } from './RepoCollaboratorDAO';
 
 export interface TeamRepoGrantRow {
@@ -16,16 +16,7 @@ class TeamRepoGrantDAO extends BaseDAO {
   }
 
   public async upsert(teamId: string, repoId: string, role: RepoRole, grantedBy: string | null, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'INSERT INTO team_repo_grants (team_id, repo_id, role, granted_by, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(team_id, repo_id) DO UPDATE SET role = excluded.role',
-          )
-          .bind(teamId, repoId, role, grantedBy, now)
-          .run(),
-      'upsert team repo grant',
-    );
+    await this.run('INSERT INTO team_repo_grants (team_id, repo_id, role, granted_by, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(team_id, repo_id) DO UPDATE SET role = excluded.role', [teamId, repoId, role, grantedBy, now]);
   }
 
   public async get(teamId: string, repoId: string): Promise<TeamRepoGrantRow | null> {
@@ -60,24 +51,15 @@ class TeamRepoGrantDAO extends BaseDAO {
   }
 
   public async remove(teamId: string, repoId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM team_repo_grants WHERE team_id = ? AND repo_id = ?').bind(teamId, repoId).run(),
-      'remove team repo grant',
-    );
+    await this.run('DELETE FROM team_repo_grants WHERE team_id = ? AND repo_id = ?', [teamId, repoId]);
   }
 
   public async deleteByTeam(teamId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM team_repo_grants WHERE team_id = ?').bind(teamId).run(),
-      'delete grants by team',
-    );
+    await this.run('DELETE FROM team_repo_grants WHERE team_id = ?', [teamId]);
   }
 
   public async deleteByRepo(repoId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM team_repo_grants WHERE repo_id = ?').bind(repoId).run(),
-      'delete grants by repo',
-    );
+    await this.run('DELETE FROM team_repo_grants WHERE repo_id = ?', [repoId]);
   }
 }
 

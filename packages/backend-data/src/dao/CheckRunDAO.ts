@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 import type { CheckConclusion, CheckRunMetadata, CheckRunStatus } from '@edge-git/shared';
 
 export interface CheckRunRow {
@@ -49,30 +49,7 @@ class CheckRunDAO extends BaseDAO {
     creatorEmail: string;
     now: number;
   }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'INSERT INTO check_runs (id, repository_id, head_sha, context, status, conclusion, details_url, output_title, output_summary, creator_email, created_at, updated_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          )
-          .bind(
-            input.id,
-            input.repositoryId,
-            input.headSha,
-            input.context,
-            'queued',
-            null,
-            null,
-            null,
-            null,
-            input.creatorEmail.toLowerCase(),
-            input.now,
-            input.now,
-            null,
-          )
-          .run(),
-      'create check run',
-    );
+    await this.run('INSERT INTO check_runs (id, repository_id, head_sha, context, status, conclusion, details_url, output_title, output_summary, creator_email, created_at, updated_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [input.id, input.repositoryId, input.headSha, input.context, 'queued', null, null, null, null, input.creatorEmail.toLowerCase(), input.now, input.now, null]);
   }
 
   public async getById(id: string, repositoryId: string): Promise<CheckRunMetadata | null> {
@@ -129,26 +106,7 @@ class CheckRunDAO extends BaseDAO {
       completedAt?: number | null;
     },
   ): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'UPDATE check_runs SET status = ?, conclusion = ?, details_url = ?, output_title = ?, output_summary = ?, updated_at = ?, completed_at = ? WHERE id = ? AND repository_id = ?',
-          )
-          .bind(
-            patch.status,
-            patch.conclusion ?? null,
-            patch.detailsUrl ?? null,
-            patch.outputTitle ?? null,
-            patch.outputSummary ?? null,
-            patch.now,
-            patch.completedAt ?? (patch.status === 'completed' ? patch.now : null),
-            id,
-            repositoryId,
-          )
-          .run(),
-      'update check run',
-    );
+    await this.run('UPDATE check_runs SET status = ?, conclusion = ?, details_url = ?, output_title = ?, output_summary = ?, updated_at = ?, completed_at = ? WHERE id = ? AND repository_id = ?', [patch.status, patch.conclusion ?? null, patch.detailsUrl ?? null, patch.outputTitle ?? null, patch.outputSummary ?? null, patch.now, patch.completedAt ?? (patch.status === 'completed' ? patch.now : null), id, repositoryId]);
   }
 
   public async pruneOlderThan(cutoff: number, limit: number): Promise<number> {
@@ -156,10 +114,7 @@ class CheckRunDAO extends BaseDAO {
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM check_runs WHERE repository_id = ?').bind(repositoryId).run(),
-      'delete check runs by repo',
-    );
+    await this.run('DELETE FROM check_runs WHERE repository_id = ?', [repositoryId]);
   }
 }
 

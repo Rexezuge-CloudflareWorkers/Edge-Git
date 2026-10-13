@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 
 export type RepoRole = 'admin' | 'write' | 'read';
 
@@ -28,19 +28,17 @@ class RepoCollaboratorDAO extends BaseDAO {
   public async upsert(repoId: string, userEmail: string, role: RepoRole, grantedBy: string | null, now: number, userId?: string | null): Promise<void> {
     const normalized = userEmail.toLowerCase();
     const normalizedGrant = grantedBy?.toLowerCase() ?? null;
-    await this.withRetry(async () => {
-      await this.database
-        .prepare('DELETE FROM repo_collaborators WHERE repo_id = ? AND lower(user_email) = ? AND user_email != ?')
-        .bind(repoId, normalized, normalized)
-        .run()
-        .catch(() => undefined);
-      return this.database
-        .prepare(
-          'INSERT INTO repo_collaborators (repo_id, user_email, role, granted_by, created_at, user_id) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(repo_id, user_email) DO UPDATE SET role = excluded.role, granted_by = excluded.granted_by, user_id = COALESCE(excluded.user_id, repo_collaborators.user_id)',
-        )
-        .bind(repoId, normalized, role, normalizedGrant, now, userId ?? null)
-        .run();
-    }, 'upsert repo collaborator');
+    // Collapse legacy mixed-case duplicates so `lower(user_email)` reads stay
+    // unique. Best effort: a missing or failing DELETE leaves the duplicate in
+    // place, and the UPSERT below is still correct for the surviving row.
+    await this.run(
+      'DELETE FROM repo_collaborators WHERE repo_id = ? AND lower(user_email) = ? AND user_email != ?',
+      [repoId, normalized, normalized],
+    ).catch(() => undefined);
+    await this.run(
+      'INSERT INTO repo_collaborators (repo_id, user_email, role, granted_by, created_at, user_id) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(repo_id, user_email) DO UPDATE SET role = excluded.role, granted_by = excluded.granted_by, user_id = COALESCE(excluded.user_id, repo_collaborators.user_id)',
+      [repoId, normalized, role, normalizedGrant, now, userId ?? null],
+    );
   }
 
   public async get(repoId: string, userEmail: string): Promise<RepoCollaboratorRow | null> {
@@ -88,21 +86,11 @@ class RepoCollaboratorDAO extends BaseDAO {
   }
 
   public async remove(repoId: string, userEmail: string): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('DELETE FROM repo_collaborators WHERE repo_id = ? AND lower(user_email) = lower(?)')
-          .bind(repoId, userEmail)
-          .run(),
-      'remove repo collaborator',
-    );
+    await this.run('DELETE FROM repo_collaborators WHERE repo_id = ? AND lower(user_email) = lower(?)', [repoId, userEmail]);
   }
 
   public async deleteByRepo(repoId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM repo_collaborators WHERE repo_id = ?').bind(repoId).run(),
-      'delete collaborators by repo',
-    );
+    await this.run('DELETE FROM repo_collaborators WHERE repo_id = ?', [repoId]);
   }
 }
 

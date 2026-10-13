@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 
 interface WebhookDeliveryRow {
   id: string;
@@ -32,26 +32,7 @@ class WebhookDeliveryDAO extends BaseDAO {
     nextRetryAt: number;
     now: number;
   }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            "INSERT INTO webhook_deliveries (id, hook_id, repository_id, event, event_id, payload, status, attempts, next_retry_at, last_http_status, last_error, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', 0, ?, NULL, NULL, ?, ?)",
-          )
-          .bind(
-            input.id,
-            input.hookId,
-            input.repositoryId,
-            input.event,
-            input.eventId ?? null,
-            input.payload ?? '{}',
-            input.nextRetryAt,
-            input.now,
-            input.now,
-          )
-          .run(),
-      'enqueue webhook delivery',
-    );
+    await this.run("INSERT INTO webhook_deliveries (id, hook_id, repository_id, event, event_id, payload, status, attempts, next_retry_at, last_http_status, last_error, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', 0, ?, NULL, NULL, ?, ?)", [input.id, input.hookId, input.repositoryId, input.event, input.eventId ?? null, input.payload ?? '{}', input.nextRetryAt, input.now, input.now]);
   }
 
   public async getById(id: string): Promise<WebhookDeliveryRow | null> {
@@ -74,14 +55,7 @@ class WebhookDeliveryDAO extends BaseDAO {
    * from `pending` proceeds to POST. Returns true when this caller won.
    */
   public async claim(id: string, now: number): Promise<boolean> {
-    const result = await this.withRetry(
-      () =>
-        this.database
-          .prepare("UPDATE webhook_deliveries SET attempts = attempts + 1, updated_at = ? WHERE id = ? AND status = 'pending'")
-          .bind(now, id)
-          .run(),
-      'claim webhook delivery',
-    );
+    const result = await this.run("UPDATE webhook_deliveries SET attempts = attempts + 1, updated_at = ? WHERE id = ? AND status = 'pending'", [now, id]);
     return ((result.meta as { changes?: number })?.changes ?? 0) > 0;
   }
 
@@ -89,29 +63,11 @@ class WebhookDeliveryDAO extends BaseDAO {
     id: string,
     input: { status: 'pending' | 'success' | 'failed'; nextRetryAt: number; httpStatus: number | null; error: string | null; now: number },
   ): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'UPDATE webhook_deliveries SET status = ?, next_retry_at = ?, last_http_status = ?, last_error = ?, updated_at = ? WHERE id = ?',
-          )
-          .bind(input.status, input.nextRetryAt, input.httpStatus, input.error, input.now, id)
-          .run(),
-      'settle webhook delivery',
-    );
+    await this.run('UPDATE webhook_deliveries SET status = ?, next_retry_at = ?, last_http_status = ?, last_error = ?, updated_at = ? WHERE id = ?', [input.status, input.nextRetryAt, input.httpStatus, input.error, input.now, id]);
   }
 
   public async resetForRedelivery(id: string, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            "UPDATE webhook_deliveries SET status = 'pending', attempts = 0, next_retry_at = ?, last_http_status = NULL, last_error = NULL, updated_at = ? WHERE id = ?",
-          )
-          .bind(now, now, id)
-          .run(),
-      'reset webhook delivery',
-    );
+    await this.run("UPDATE webhook_deliveries SET status = 'pending', attempts = 0, next_retry_at = ?, last_http_status = NULL, last_error = NULL, updated_at = ? WHERE id = ?", [now, now, id]);
   }
 
   public async listByHook(
@@ -149,10 +105,7 @@ class WebhookDeliveryDAO extends BaseDAO {
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM webhook_deliveries WHERE repository_id = ?').bind(repositoryId).run(),
-      'delete webhook deliveries by repo',
-    );
+    await this.run('DELETE FROM webhook_deliveries WHERE repository_id = ?', [repositoryId]);
   }
 
   public async pruneOlderThan(cutoff: number, limit: number): Promise<number> {

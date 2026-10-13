@@ -7,7 +7,6 @@ import { resolve } from 'node:path';
 const apiSrcPath = fileURLToPath(new URL('../../apps/api/src', import.meta.url));
 const backgroundSrcPath = fileURLToPath(new URL('../../apps/background/src', import.meta.url));
 const backendDataSrcPath = fileURLToPath(new URL('../../packages/backend-data/src', import.meta.url));
-const backendErrorsSrcPath = fileURLToPath(new URL('../../packages/backend-errors/src', import.meta.url));
 const backendRuntimeSrcPath = fileURLToPath(new URL('../../packages/backend-runtime/src', import.meta.url));
 const gitProtocolSrcPath = fileURLToPath(new URL('../../packages/git-protocol/src', import.meta.url));
 const sharedSrcPath = fileURLToPath(new URL('../../packages/shared/src', import.meta.url));
@@ -63,7 +62,6 @@ export default defineConfig({
     alias: [
       { find: /^@edge-git\/background$/, replacement: `${backgroundSrcPath}/index.ts` },
       { find: /^@edge-git\/backend-data$/, replacement: `${backendDataSrcPath}/index.ts` },
-      { find: /^@edge-git\/backend-errors$/, replacement: `${backendErrorsSrcPath}/index.ts` },
       { find: /^@edge-git\/backend-runtime$/, replacement: `${backendRuntimeSrcPath}/index.ts` },
       { find: /^@edge-git\/git-protocol$/, replacement: `${gitProtocolSrcPath}/index.ts` },
       { find: /^@edge-git\/shared$/, replacement: `${sharedSrcPath}/index.ts` },
@@ -71,7 +69,6 @@ export default defineConfig({
       { find: /^@edge-git\/git-service$/, replacement: `${gitServiceSrcPath}/index.ts` },
       { find: '@edge-git/background', replacement: backgroundSrcPath },
       { find: '@edge-git/backend-data', replacement: backendDataSrcPath },
-      { find: '@edge-git/backend-errors', replacement: backendErrorsSrcPath },
       { find: '@edge-git/backend-runtime', replacement: backendRuntimeSrcPath },
       { find: '@edge-git/git-protocol', replacement: gitProtocolSrcPath },
       { find: '@edge-git/shared', replacement: sharedSrcPath },

@@ -1,3 +1,4 @@
+import { stubIdentityService, emptyUserEmailRegistry } from './mocks/identity';
 import { describe, expect, it, vi } from 'vitest';
 import {
   BadRequestError,
@@ -7,7 +8,7 @@ import {
   InternalServerError,
   NotFoundError,
   UnauthorizedError,
-} from '@edge-git/backend-errors';
+} from '@rexezuge/errors';
 import {
   buildBody,
   deserializeError,
@@ -63,7 +64,7 @@ describe('hardening: AWS Exception envelope', () => {
     expect(db.body.Exception?.Type).toBe('DatabaseError');
     const masked = mapServiceError(new Error('D1 secret leak'), 'en');
     expect(masked.status).toBe(500);
-    expect(masked.body.Exception?.Type).toBe(DefaultInternalServerError.getErrorType());
+    expect(masked.body.Exception?.Type).toBe(DefaultInternalServerError.type);
     expect(masked.body.Exception?.Message ?? '').not.toContain('D1');
     expect(buildBody(new ForbiddenError('no'))).toEqual({ Exception: { Type: 'Forbidden', Message: 'no' } });
     expect(toServiceStatus(new BadRequestError('b'))).toBe(400);
@@ -97,11 +98,11 @@ describe('hardening: AWS Exception envelope', () => {
     expect(deserializeErrorBody({ Exception: { Type: 'DatabaseError', Message: 'db' } }, 'f')).toBeInstanceOf(DatabaseError);
     // Lenient web-compat parsing: envelope, legacy, plain text.
     expect(parseErrorPayload({ Exception: { Type: 'NotFound', Message: 'gone' } }, 404)).toBeInstanceOf(NotFoundError);
-    expect(parseErrorPayload({ error: 'Forbidden', message: 'stop' }, 403).getErrorMessage()).toBe('stop');
+    expect(parseErrorPayload({ error: 'Forbidden', message: 'stop' }, 403).message).toBe('stop');
     expect(parseErrorPayload(JSON.stringify({ Exception: { Type: 'Unauthorized', Message: 'u' } }), 401)).toBeInstanceOf(UnauthorizedError);
-    expect(parseErrorPayload('plain boom', 500).getErrorMessage()).toBe('plain boom');
-    expect(parseErrorPayload('', 500).getErrorCode()).toBe(500);
-    expect(parseErrorPayload(null, 404).getErrorCode()).toBe(500);
+    expect(parseErrorPayload('plain boom', 500).message).toBe('plain boom');
+    expect(parseErrorPayload('', 500).status).toBe(500);
+    expect(parseErrorPayload(null, 404).status).toBe(500);
   });
 
   it('serializes route errors as Exception envelope with masked 500s', async () => {
@@ -243,6 +244,7 @@ describe('hardening: team grants batch without N+1 or team_id dependence', () =>
             { team_id: 't2', repo_id: 'r1', role: 'admin' },
           ],
         }) as never,
+userIdentity: async () => stubIdentityService() as never,
     });
   }
 

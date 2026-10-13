@@ -1,7 +1,7 @@
 import { DeployKeyDAO } from '@edge-git/backend-data/dao';
 import type { DeployKeyPermission } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
+import { BadRequestError, NotFoundError } from '@rexezuge/errors';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import type { DeployKeyMetadata } from '@edge-git/shared';
 import { CryptoUtil, TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';

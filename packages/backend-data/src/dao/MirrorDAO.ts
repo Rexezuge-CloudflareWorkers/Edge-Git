@@ -1,6 +1,6 @@
-import { DatabaseError } from '@edge-git/backend-errors';
+import { DatabaseError } from '@rexezuge/errors';
 import { decryptData, encryptData } from '../crypto/aes-gcm';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 import { EncryptedDAO } from './BaseDAO';
 
 interface RepoMirrorRow {
@@ -51,26 +51,9 @@ class MirrorDAO extends EncryptedDAO {
     now: number;
   }): Promise<void> {
     const envelope = await encryptData(input.sourceUrl, this.masterKey);
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            `INSERT INTO repo_mirrors (repository_id, interval_minutes, enabled, last_run_at, last_status, last_error, consecutive_failures, created_by, created_at, updated_at, encrypted_source_url, source_url_iv)
+    await this.run(`INSERT INTO repo_mirrors (repository_id, interval_minutes, enabled, last_run_at, last_status, last_error, consecutive_failures, created_by, created_at, updated_at, encrypted_source_url, source_url_iv)
              VALUES (?, ?, 1, NULL, NULL, NULL, 0, ?, ?, ?, ?, ?)
-             ON CONFLICT (repository_id) DO UPDATE SET interval_minutes = excluded.interval_minutes, enabled = 1, updated_at = excluded.updated_at, encrypted_source_url = excluded.encrypted_source_url, source_url_iv = excluded.source_url_iv`,
-          )
-          .bind(
-            input.repositoryId,
-            input.intervalMinutes,
-            input.createdBy,
-            input.now,
-            input.now,
-            envelope.encrypted,
-            envelope.iv,
-          )
-          .run(),
-      'upsert repo mirror',
-    );
+             ON CONFLICT (repository_id) DO UPDATE SET interval_minutes = excluded.interval_minutes, enabled = 1, updated_at = excluded.updated_at, encrypted_source_url = excluded.encrypted_source_url, source_url_iv = excluded.source_url_iv`, [input.repositoryId, input.intervalMinutes, input.createdBy, input.now, input.now, envelope.encrypted, envelope.iv]);
   }
 
   public async getByRepo(repositoryId: string): Promise<RepoMirrorRow | null> {
@@ -91,49 +74,21 @@ class MirrorDAO extends EncryptedDAO {
 
   public async recordRun(repositoryId: string, ok: boolean, error: string | null, now: number, maxFailures: number): Promise<void> {
     if (ok) {
-      await this.withRetry(
-        () =>
-          this.database
-            .prepare(
-              "UPDATE repo_mirrors SET last_run_at = ?, last_status = 'ok', last_error = NULL, consecutive_failures = 0, updated_at = ? WHERE repository_id = ?",
-            )
-            .bind(now, now, repositoryId)
-            .run(),
-        'record mirror success',
-      );
+      await this.run("UPDATE repo_mirrors SET last_run_at = ?, last_status = 'ok', last_error = NULL, consecutive_failures = 0, updated_at = ? WHERE repository_id = ?", [now, now, repositoryId]);
       return;
     }
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            `UPDATE repo_mirrors SET last_run_at = ?, last_status = 'failed', last_error = ?,
+    await this.run(`UPDATE repo_mirrors SET last_run_at = ?, last_status = 'failed', last_error = ?,
              consecutive_failures = consecutive_failures + 1,
              enabled = CASE WHEN consecutive_failures + 1 >= ? THEN 0 ELSE enabled END,
-             updated_at = ? WHERE repository_id = ?`,
-          )
-          .bind(now, (error ?? 'mirror failed').slice(0, 500), maxFailures, now, repositoryId)
-          .run(),
-      'record mirror failure',
-    );
+             updated_at = ? WHERE repository_id = ?`, [now, (error ?? 'mirror failed').slice(0, 500), maxFailures, now, repositoryId]);
   }
 
   public async setEnabled(repositoryId: string, enabled: boolean, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('UPDATE repo_mirrors SET enabled = ?, consecutive_failures = 0, updated_at = ? WHERE repository_id = ?')
-          .bind(enabled ? 1 : 0, now, repositoryId)
-          .run(),
-      'set mirror enabled',
-    );
+    await this.run('UPDATE repo_mirrors SET enabled = ?, consecutive_failures = 0, updated_at = ? WHERE repository_id = ?', [enabled ? 1 : 0, now, repositoryId]);
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM repo_mirrors WHERE repository_id = ?').bind(repositoryId).run(),
-      'delete repo mirror',
-    );
+    await this.run('DELETE FROM repo_mirrors WHERE repository_id = ?', [repositoryId]);
   }
 }
 

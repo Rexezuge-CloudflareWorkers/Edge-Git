@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 import { buildSetClause } from './UpdateClause';
 
 export interface ProjectRow {
@@ -61,16 +61,7 @@ class ProjectDAO extends BaseDAO {
     creatorEmail: string;
     now: number;
   }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            "INSERT INTO projects (id, repository_id, number, title, description, status, creator_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?)",
-          )
-          .bind(input.id, input.repositoryId, input.number, input.title, input.description, input.creatorEmail, input.now, input.now)
-          .run(),
-      'create project',
-    );
+    await this.run("INSERT INTO projects (id, repository_id, number, title, description, status, creator_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?)", [input.id, input.repositoryId, input.number, input.title, input.description, input.creatorEmail, input.now, input.now]);
   }
 
   public async listByRepo(repositoryId: string): Promise<ProjectRow[]> {
@@ -108,14 +99,7 @@ class ProjectDAO extends BaseDAO {
   }
 
   public async setStatus(id: string, repositoryId: string, status: 'open' | 'closed', now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('UPDATE projects SET status = ?, updated_at = ? WHERE id = ? AND repository_id = ?')
-          .bind(status, now, id, repositoryId)
-          .run(),
-      'update project status',
-    );
+    await this.run('UPDATE projects SET status = ?, updated_at = ? WHERE id = ? AND repository_id = ?', [status, now, id, repositoryId]);
   }
 
   public async updateProject(
@@ -130,14 +114,7 @@ class ProjectDAO extends BaseDAO {
     if (assignments.length === 0) return;
     assignments.push({ column: 'updated_at', value: now });
     const { clause, values } = buildSetClause(assignments);
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(`UPDATE projects SET ${clause} WHERE id = ? AND repository_id = ?`)
-          .bind(...values, id, repositoryId)
-          .run(),
-      'update project',
-    );
+    await this.run(`UPDATE projects SET ${clause} WHERE id = ? AND repository_id = ?`, [...values, id, repositoryId]);
   }
 
   public async deleteProject(id: string, repositoryId: string): Promise<void> {
@@ -151,21 +128,11 @@ class ProjectDAO extends BaseDAO {
       .bind(id)
       .run()
       .catch(() => undefined);
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM projects WHERE id = ? AND repository_id = ?').bind(id, repositoryId).run(),
-      'delete project',
-    );
+    await this.run('DELETE FROM projects WHERE id = ? AND repository_id = ?', [id, repositoryId]);
   }
 
   public async createColumn(input: { id: string; projectId: string; title: string; position: number; now: number }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('INSERT INTO project_columns (id, project_id, title, position, created_at) VALUES (?, ?, ?, ?, ?)')
-          .bind(input.id, input.projectId, input.title, input.position, input.now)
-          .run(),
-      'create project column',
-    );
+    await this.run('INSERT INTO project_columns (id, project_id, title, position, created_at) VALUES (?, ?, ?, ?, ?)', [input.id, input.projectId, input.title, input.position, input.now]);
   }
 
   public async listColumns(projectId: string): Promise<ProjectColumnRow[]> {
@@ -186,10 +153,7 @@ class ProjectDAO extends BaseDAO {
   }
 
   public async renameColumn(id: string, projectId: string, title: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('UPDATE project_columns SET title = ? WHERE id = ? AND project_id = ?').bind(title, id, projectId).run(),
-      'rename project column',
-    );
+    await this.run('UPDATE project_columns SET title = ? WHERE id = ? AND project_id = ?', [title, id, projectId]);
   }
 
   public async deleteColumn(id: string, projectId: string): Promise<void> {
@@ -198,10 +162,7 @@ class ProjectDAO extends BaseDAO {
       .bind(id)
       .run()
       .catch(() => undefined);
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM project_columns WHERE id = ? AND project_id = ?').bind(id, projectId).run(),
-      'delete project column',
-    );
+    await this.run('DELETE FROM project_columns WHERE id = ? AND project_id = ?', [id, projectId]);
   }
 
   public async createCard(input: {
@@ -217,29 +178,7 @@ class ProjectDAO extends BaseDAO {
     creatorEmail: string;
     now: number;
   }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'INSERT INTO project_cards (id, project_id, column_id, kind, note_title, note_body, issue_id, pull_request_id, position, archived, creator_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)',
-          )
-          .bind(
-            input.id,
-            input.projectId,
-            input.columnId,
-            input.kind,
-            input.noteTitle,
-            input.noteBody,
-            input.issueId,
-            input.pullRequestId,
-            input.position,
-            input.creatorEmail,
-            input.now,
-            input.now,
-          )
-          .run(),
-      'create project card',
-    );
+    await this.run('INSERT INTO project_cards (id, project_id, column_id, kind, note_title, note_body, issue_id, pull_request_id, position, archived, creator_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)', [input.id, input.projectId, input.columnId, input.kind, input.noteTitle, input.noteBody, input.issueId, input.pullRequestId, input.position, input.creatorEmail, input.now, input.now]);
   }
 
   public async listCards(projectId: string, includeArchived = false): Promise<ProjectCardRow[]> {
@@ -266,32 +205,15 @@ class ProjectDAO extends BaseDAO {
   }
 
   public async moveCard(id: string, projectId: string, columnId: string, position: number, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('UPDATE project_cards SET column_id = ?, position = ?, updated_at = ? WHERE id = ? AND project_id = ?')
-          .bind(columnId, position, now, id, projectId)
-          .run(),
-      'move project card',
-    );
+    await this.run('UPDATE project_cards SET column_id = ?, position = ?, updated_at = ? WHERE id = ? AND project_id = ?', [columnId, position, now, id, projectId]);
   }
 
   public async setCardArchived(id: string, projectId: string, archived: boolean, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('UPDATE project_cards SET archived = ?, updated_at = ? WHERE id = ? AND project_id = ?')
-          .bind(archived ? 1 : 0, now, id, projectId)
-          .run(),
-      'archive project card',
-    );
+    await this.run('UPDATE project_cards SET archived = ?, updated_at = ? WHERE id = ? AND project_id = ?', [archived ? 1 : 0, now, id, projectId]);
   }
 
   public async deleteCard(id: string, projectId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM project_cards WHERE id = ? AND project_id = ?').bind(id, projectId).run(),
-      'delete project card',
-    );
+    await this.run('DELETE FROM project_cards WHERE id = ? AND project_id = ?', [id, projectId]);
   }
 
   public async countCardsInColumn(columnId: string): Promise<number> {

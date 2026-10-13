@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 import type { TokenScope } from '@edge-git/shared';
 
 interface TokenRepoGrantRow {
@@ -23,34 +23,18 @@ class TokenRepoGrantDAO extends BaseDAO {
   }
 
   public async setGrants(tokenId: string, grants: Array<{ repositoryId: string; scope: TokenScope }>, now: number): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM token_repo_grants WHERE token_id = ?').bind(tokenId).run(),
-      'clear token repo grants',
-    );
+    await this.run('DELETE FROM token_repo_grants WHERE token_id = ?', [tokenId]);
     for (const grant of grants) {
-      await this.withRetry(
-        () =>
-          this.database
-            .prepare('INSERT INTO token_repo_grants (token_id, repository_id, scope, created_at) VALUES (?, ?, ?, ?)')
-            .bind(tokenId, grant.repositoryId, grant.scope, now)
-            .run(),
-        'insert token repo grant',
-      );
+      await this.run('INSERT INTO token_repo_grants (token_id, repository_id, scope, created_at) VALUES (?, ?, ?, ?)', [tokenId, grant.repositoryId, grant.scope, now]);
     }
   }
 
   public async deleteByToken(tokenId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM token_repo_grants WHERE token_id = ?').bind(tokenId).run(),
-      'delete token repo grants',
-    );
+    await this.run('DELETE FROM token_repo_grants WHERE token_id = ?', [tokenId]);
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM token_repo_grants WHERE repository_id = ?').bind(repositoryId).run(),
-      'delete token grants for repo',
-    );
+    await this.run('DELETE FROM token_repo_grants WHERE repository_id = ?', [repositoryId]);
   }
 }
 

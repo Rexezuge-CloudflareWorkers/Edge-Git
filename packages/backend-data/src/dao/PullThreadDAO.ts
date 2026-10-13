@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 
 export interface PullReviewThreadRow {
   id: string;
@@ -38,16 +38,7 @@ class PullThreadDAO extends BaseDAO {
     authorEmail: string;
     now: number;
   }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'INSERT INTO pull_review_threads (id, pull_request_id, path, line, side, commit_oid, status, author_email, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          )
-          .bind(input.id, input.pullRequestId, input.path, input.line, input.side, input.commitOid, 'open', input.authorEmail, input.now)
-          .run(),
-      'open pull review thread',
-    );
+    await this.run('INSERT INTO pull_review_threads (id, pull_request_id, path, line, side, commit_oid, status, author_email, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [input.id, input.pullRequestId, input.path, input.line, input.side, input.commitOid, 'open', input.authorEmail, input.now]);
   }
 
   public async listThreads(pullRequestId: string): Promise<PullReviewThreadRow[]> {
@@ -66,25 +57,11 @@ class PullThreadDAO extends BaseDAO {
   }
 
   public async resolveThread(threadId: string, resolvedBy: string, resolved: boolean, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('UPDATE pull_review_threads SET status = ?, resolved_by = ?, resolved_at = ? WHERE id = ?')
-          .bind(resolved ? 'resolved' : 'open', resolved ? resolvedBy : null, resolved ? now : null, threadId)
-          .run(),
-      'resolve pull review thread',
-    );
+    await this.run('UPDATE pull_review_threads SET status = ?, resolved_by = ?, resolved_at = ? WHERE id = ?', [resolved ? 'resolved' : 'open', resolved ? resolvedBy : null, resolved ? now : null, threadId]);
   }
 
   public async addThreadComment(id: string, threadId: string, authorEmail: string, body: string, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('INSERT INTO pull_thread_comments (id, thread_id, author_email, body, created_at) VALUES (?, ?, ?, ?, ?)')
-          .bind(id, threadId, authorEmail, body, now)
-          .run(),
-      'add pull thread comment',
-    );
+    await this.run('INSERT INTO pull_thread_comments (id, thread_id, author_email, body, created_at) VALUES (?, ?, ?, ?, ?)', [id, threadId, authorEmail, body, now]);
   }
 
   public async listThreadComments(threadId: string): Promise<PullThreadCommentRow[]> {
@@ -96,24 +73,8 @@ class PullThreadDAO extends BaseDAO {
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'DELETE FROM pull_thread_comments WHERE thread_id IN (SELECT id FROM pull_review_threads WHERE pull_request_id IN (SELECT id FROM pull_requests WHERE repository_id = ?))',
-          )
-          .bind(repositoryId)
-          .run(),
-      'delete pull thread comments by repo',
-    ).catch(() => undefined);
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('DELETE FROM pull_review_threads WHERE pull_request_id IN (SELECT id FROM pull_requests WHERE repository_id = ?)')
-          .bind(repositoryId)
-          .run(),
-      'delete pull review threads by repo',
-    ).catch(() => undefined);
+    await this.run('DELETE FROM pull_thread_comments WHERE thread_id IN (SELECT id FROM pull_review_threads WHERE pull_request_id IN (SELECT id FROM pull_requests WHERE repository_id = ?))', [repositoryId]).catch(() => undefined);
+    await this.run('DELETE FROM pull_review_threads WHERE pull_request_id IN (SELECT id FROM pull_requests WHERE repository_id = ?)', [repositoryId]).catch(() => undefined);
   }
 }
 

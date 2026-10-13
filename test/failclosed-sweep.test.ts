@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { EdgeGitWorker } from '@/workers/EdgeGitWorker';
-import { resetRateLimitForTests } from '@/middleware/rateLimit';
 
 // Fail-closed sweep (Slice 5): every major route against a totally down D1.
 // Goals: (1) prove no handler hangs or throws uncaught under outage — every
@@ -37,9 +36,7 @@ function postJson(body: unknown): RequestInit {
 }
 
 describe('fail-closed sweep under D1 outage', () => {
-  beforeEach(() => {
-    resetRateLimitForTests();
-  });
+  
 
   it('public reads always resolve (shell, JSON, or typed error)', async () => {
     const env = authedEnv();

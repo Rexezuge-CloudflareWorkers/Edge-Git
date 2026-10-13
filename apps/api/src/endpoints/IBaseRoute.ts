@@ -1,10 +1,9 @@
 import type { Context } from 'hono';
-import { ServiceError, DatabaseError, DefaultInternalServerError } from '@edge-git/backend-errors';
-import { getBackendStrings } from '@edge-git/shared/i18n';
+import { ServiceError, DatabaseError } from '@rexezuge/errors';
 import { ErrorSanitizationUtil, canonicalizeLanguageTag } from '@edge-git/shared/utils';
 import { createRequestScope } from '@edge-git/backend-services/composition';
 import { getRequestScope, asScopedContext } from '@edge-git/backend-runtime/di';
-import { toServiceStatus as toMappedStatus } from '@edge-git/backend-services/errors';
+import { mapServiceError, toServiceStatus as toMappedStatus } from '@edge-git/backend-services/errors';
 import { readJsonBody } from '../workers/routes/BodyParser';
 
 type HonoContext = Context<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -130,34 +129,17 @@ abstract class BaseRoute {
   public static toErrorResponse(c: HonoContext, error: unknown): Response {
     if (error instanceof DatabaseError) {
       console.error('Caught database error during execution:', ErrorSanitizationUtil.sanitizeErrorForLogging(error));
-      return Response.json(
-        { Exception: { Type: error.getErrorType(), Message: error.getErrorMessage() } },
-        { status: error.getErrorCode() },
-      );
+    } else if (error instanceof ServiceError && error.status < 500) {
+      console.warn(`Responding with ${error.type}:`, ErrorSanitizationUtil.sanitizeErrorForLogging(error));
+    } else {
+      console.error('Caught service error during execution:', ErrorSanitizationUtil.sanitizeErrorForLogging(error));
     }
-    if (error instanceof ServiceError) {
-      const code = error.getErrorCode();
-      const body = { Exception: { Type: error.getErrorType(), Message: error.getErrorMessage() } };
-      if (code < 500) {
-        console.warn(`Responding with ${error.getErrorType()}:`, ErrorSanitizationUtil.sanitizeErrorForLogging(error));
-      } else {
-        console.error('Caught service error during execution:', ErrorSanitizationUtil.sanitizeErrorForLogging(error));
-      }
-      return Response.json(body, { status: code });
-    }
-    // Untyped errors are masked as 500; log the cause server-side only.
-    console.error('Unhandled route error', ErrorSanitizationUtil.sanitizeErrorForLogging(error));
-    const locale = this.resolveLocale(c);
-    const strings = getBackendStrings(locale);
-    return Response.json(
-      {
-        Exception: {
-          Type: DefaultInternalServerError.getErrorType(),
-          Message: strings.common.internalError,
-        },
-      },
-      { status: 500 },
-    );
+    // One boundary owns the envelope, the localized internal message and the
+    // rule that a non-exposing error never carries its own message outward —
+    // the same `mapServiceError` the service layer maps through, so a typed
+    // 5xx cannot leak here while being masked there.
+    const { status, body } = mapServiceError(error, this.resolveLocale(c));
+    return Response.json(body, { status });
   }
 
   private static resolveLocale(c: HonoContext): string {

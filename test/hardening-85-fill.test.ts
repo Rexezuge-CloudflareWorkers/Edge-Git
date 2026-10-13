@@ -19,9 +19,9 @@ import {
   PayloadTooLargeError,
   RateLimitedError,
   UnauthorizedError,
-} from '@edge-git/backend-errors';
+} from '@rexezuge/errors';
 import { mapServiceError, toServiceStatus } from '@edge-git/backend-services/errors';
-import { CursorUtil } from '@edge-git/backend-data/utils';
+import { CursorCodec } from '@rexezuge/shared';
 import { IssueService } from '@edge-git/backend-services/issue';
 import { ProjectService } from '@edge-git/backend-services/project';
 import { ImportService } from '@edge-git/backend-services/transfer';
@@ -102,19 +102,21 @@ describe('BaseRoute single source of truth', () => {
   });
 });
 
-describe('CursorUtil strict cursors', () => {
+describe('CursorCodec strict cursors', () => {
   it('decodeOrThrow rejects tampered cursors', () => {
-    expect(CursorUtil.decodeOrThrow(undefined)).toBeUndefined();
-    expect(() => CursorUtil.decodeOrThrow('!!!not-base64!!!')).toThrow('Invalid cursor');
-    const good = CursorUtil.encode({ timestamp: 1, log_id: 'a' });
-    expect(CursorUtil.decodeOrThrow<{ timestamp: number }>(good)).toMatchObject({ timestamp: 1 });
-    expect(CursorUtil.isValidCursor(undefined)).toBe(true);
-    expect(CursorUtil.isValidCursor('!!!')).toBe(false);
-    expect(CursorUtil.isValidCursor(good)).toBe(true);
+    // The kit's strict decode takes a cursor the client actually sent; an
+    // absent one is "first page", which `BaseDAO.decodeCursorOrThrow` splits
+    // off before delegating.
+    expect(() => CursorCodec.decodeOrThrow('!!!not-base64!!!')).toThrow('Invalid cursor');
+    const good = CursorCodec.encode({ timestamp: 1, log_id: 'a' });
+    expect(CursorCodec.decodeOrThrow<{ timestamp: number }>(good)).toMatchObject({ timestamp: 1 });
+    expect(CursorCodec.isValidCursor(undefined)).toBe(true);
+    expect(CursorCodec.isValidCursor('!!!')).toBe(false);
+    expect(CursorCodec.isValidCursor(good)).toBe(true);
   });
 
   it('parseAuditQuery keeps valid cursor, rejects tampered', () => {
-    const good = CursorUtil.encode({ timestamp: 5, log_id: 'x' });
+    const good = CursorCodec.encode({ timestamp: 5, log_id: 'x' });
     const q = parseAuditQuery(`https://x/user/audit?cursor=${encodeURIComponent(good)}&limit=10`);
     expect(q.cursor).toBeDefined();
     expect(() => parseAuditQuery('https://x/user/audit?cursor=!!!&limit=abc')).toThrow('Invalid cursor');
@@ -267,10 +269,10 @@ describe('FetchHandler masks internal errors', () => {
 
 describe('New backend-error codes', () => {
   it('exposes 409/413/429 types', () => {
-    expect(new ConflictError().getErrorCode()).toBe(409);
-    expect(new ConflictError().getErrorType()).toBe('Conflict');
-    expect(new PayloadTooLargeError().getErrorCode()).toBe(413);
-    expect(new RateLimitedError().getErrorCode()).toBe(429);
-    expect(new RateLimitedError().getErrorType()).toBe('RateLimited');
+    expect(new ConflictError().status).toBe(409);
+    expect(new ConflictError().type).toBe('Conflict');
+    expect(new PayloadTooLargeError().status).toBe(413);
+    expect(new RateLimitedError().status).toBe(429);
+    expect(new RateLimitedError().type).toBe('RateLimited');
   });
 });

@@ -1,19 +1,15 @@
-import { useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useCopyToClipboard } from '@rexezuge/web';
 import { Label } from '../ui/Input';
 import { cn } from '../../lib/utils';
-import { COPY_FEEDBACK_TIMEOUT_MS } from '../../lib/constants';
 
 export function ReadOnlyField({ label, value, showCopy = false }: { label: string; value: string; showCopy?: boolean }) {
   const { t } = useTranslation();
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = () => {
-    void navigator.clipboard.writeText(value);
-    setCopied(true);
-    setTimeout(() => setCopied(false), COPY_FEEDBACK_TIMEOUT_MS);
-  };
+  // The checkmark tracks a write that actually resolved. This field carries
+  // copy-once secrets and destructive-action names, so a false success sends
+  // the operator away believing they have something they do not.
+  const { copied, copy } = useCopyToClipboard();
 
   return (
     <div>
@@ -30,7 +26,7 @@ export function ReadOnlyField({ label, value, showCopy = false }: { label: strin
         {showCopy && (
           <button
             type="button"
-            onClick={handleCopy}
+            onClick={() => copy(value)}
             className="px-3 py-2 rounded-r-lg bg-[var(--color-surface-3)] hover:bg-[var(--color-surface-4)] border border-[var(--color-border)] text-[var(--color-text-secondary)] transition-colors duration-150"
             title={t('common.copyToClipboard', 'Copy To Clipboard')}
           >

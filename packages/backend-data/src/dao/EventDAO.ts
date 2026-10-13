@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 
 export type RepoEventType =
   | 'repo_created'
@@ -58,26 +58,7 @@ class EventDAO extends BaseDAO {
     payload?: string;
     now: number;
   }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'INSERT INTO repo_events (id, repository_id, actor_email, type, subject_type, subject_number, subject_oid, payload, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          )
-          .bind(
-            input.id,
-            input.repositoryId,
-            input.actorEmail,
-            input.type,
-            input.subjectType ?? null,
-            input.subjectNumber ?? null,
-            input.subjectOid ?? null,
-            input.payload ?? '{}',
-            input.now,
-          )
-          .run(),
-      'append repo event',
-    );
+    await this.run('INSERT INTO repo_events (id, repository_id, actor_email, type, subject_type, subject_number, subject_oid, payload, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [input.id, input.repositoryId, input.actorEmail, input.type, input.subjectType ?? null, input.subjectNumber ?? null, input.subjectOid ?? null, input.payload ?? '{}', input.now]);
   }
 
   // `full_name` is computed from `repositories` (0024 dropped the stored
@@ -112,10 +93,7 @@ class EventDAO extends BaseDAO {
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM repo_events WHERE repository_id = ?').bind(repositoryId).run(),
-      'delete events by repo',
-    );
+    await this.run('DELETE FROM repo_events WHERE repository_id = ?', [repositoryId]);
   }
 
   public async pruneOlderThan(cutoff: number, limit: number): Promise<number> {

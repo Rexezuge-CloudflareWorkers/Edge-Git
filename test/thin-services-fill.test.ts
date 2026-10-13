@@ -1,3 +1,4 @@
+import { stubIdentityService, emptyUserEmailRegistry } from './mocks/identity';
 import { describe, expect, it } from 'vitest';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { encryptData } from '@edge-git/backend-data/crypto/aes-gcm';
@@ -126,6 +127,10 @@ function createFakeDb(seed?: Partial<FakeState>): FakeDb {
         // Users
         if (q.includes('FROM users WHERE lower(email)')) {
           const row = state.users.find((u) => lower(u.email) === lower(params[0]));
+          return Promise.resolve((row ?? null) as T | null);
+        }
+        if (q.includes('FROM users WHERE id = ?')) {
+          const row = state.users.find((u) => u.id === params[0]);
           return Promise.resolve((row ?? null) as T | null);
         }
         if (q.includes('FROM users WHERE lower(username)')) {
@@ -322,13 +327,13 @@ function createFakeDb(seed?: Partial<FakeState>): FakeDb {
         if (q.startsWith('INSERT INTO users')) {
           const [email, now] = params as Array<string | number>;
           if (state.users.every((u) => u.email !== email)) {
-            state.users.push({ email, created_at: now, username: null, updated_at: null });
+            state.users.push({ email, created_at: now, id: params[2], current_email: params[3], username: null, updated_at: null });
           }
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE users SET username = COALESCE(username, ?)')) {
-          const [username, now, email] = params as Array<string | number>;
-          const row = state.users.find((u) => lower(u.email) === lower(email));
+          const [username, now, idOrEmail] = params as Array<string | number>;
+          const row = state.users.find((u) => u.id === idOrEmail || lower(u.email) === lower(idOrEmail));
           if (row) {
             if (row.username == null) row.username = username;
             if (row.updated_at == null) row.updated_at = now;
@@ -336,8 +341,8 @@ function createFakeDb(seed?: Partial<FakeState>): FakeDb {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE users SET username = ?, updated_at = ? WHERE email = ?')) {
-          const [username, now, email] = params as Array<string | number>;
-          const row = state.users.find((u) => lower(u.email) === lower(email));
+          const [username, now, idOrEmail] = params as Array<string | number>;
+          const row = state.users.find((u) => u.id === idOrEmail || lower(u.email) === lower(idOrEmail));
           if (row) {
             row.username = username;
             row.updated_at = now;
@@ -663,7 +668,7 @@ describe('TeamService members', () => {
   it('adds members and guards the last admin', async () => {
     const db = createFakeDb();
     seedAcme(db);
-    db.users.push({ email: 'u@x.co', created_at: 1, username: 'bob', updated_at: 1 });
+    db.users.push({ id: 'u-u', email: 'u@x.co', current_email: 'u@x.co', created_at: 1, username: 'bob', updated_at: 1 });
     const svc = new TeamService({ DB: db });
     await svc.createTeam('acme', 'owner@x.co', { slug: 'frontend' });
 
@@ -842,10 +847,10 @@ describe('UserService upsert/bootstrap', () => {
 
   it('suffixes colliding usernames', async () => {
     const db = createFakeDb();
-    db.users.push({ email: 'other@x.co', created_at: 1, username: 'bob', updated_at: 1 });
+    db.users.push({ id: 'u-other', email: 'other@x.co', current_email: 'other@x.co', created_at: 1, username: 'bob', updated_at: 1 });
     db.namespaces.push({ username_ci: 'bob', kind: 'user', user_email: 'other@x.co', org_id: null, created_at: 1 });
     db.organizations.push({ id: 'o1', username: 'carol', username_ci: 'carol', creator_email: 'c@x.co', created_at: 1, updated_at: 1 });
-    db.users.push({ email: 'dave@t.co', created_at: 1, username: 'dave', updated_at: 1 });
+    db.users.push({ id: 'u-dave', email: 'dave@t.co', current_email: 'dave@t.co', created_at: 1, username: 'dave', updated_at: 1 });
     const svc = new UserService({ DB: db });
     await svc.upsertUser('bob@example.com');
     await expect(svc.getProfileByEmail('bob@example.com')).resolves.toMatchObject({ username: 'bob-1' });
@@ -866,7 +871,7 @@ describe('UserService upsert/bootstrap', () => {
 
 describe('UserService rename', () => {
   function seedAlice(db: FakeDb): void {
-    db.users.push({ email: 'alice@example.com', created_at: 1, username: 'alice', updated_at: 1 });
+    db.users.push({ id: 'u-alice', email: 'alice@example.com', current_email: 'alice@example.com', created_at: 1, username: 'alice', updated_at: 1 });
     db.namespaces.push({ username_ci: 'alice', kind: 'user', user_email: 'alice@example.com', org_id: null, created_at: 1 });
   }
 
@@ -891,7 +896,7 @@ describe('UserService rename', () => {
     // Owner cascade follows the rename.
     expect(db.repositories[0].owner).toBe('Alice2');
     // A different account cannot hijack the renamed-away handle.
-    db.users.push({ email: 'bob@x.co', created_at: 1, username: 'bob', updated_at: 1 });
+    db.users.push({ id: 'u-bob', email: 'bob@x.co', current_email: 'bob@x.co', created_at: 1, username: 'bob', updated_at: 1 });
     const bobSvc = new UserService({ DB: db });
     await expect(bobSvc.renameUsername('bob@x.co', 'alice')).rejects.toThrow('already taken');
     // The owning email can reclaim it (rename back).
@@ -903,6 +908,8 @@ describe('UserService rename', () => {
     await expect(svc.renameUsername('alice@example.com', 'ALICE')).resolves.toMatchObject({ username: 'alice' });
   });
 
+  const ALICE_ROW = { id: 'u-alice', email: 'alice@example.com', current_email: 'alice@example.com', username: 'alice' };
+
   it('reclaims a self-owned namespace when the claim races', async () => {
     // Pre-check sees a free name, but claim() loses a race; the existing row
     // belongs to the caller, so the rename proceeds without releasing.
@@ -910,7 +917,9 @@ describe('UserService rename', () => {
     const svc = new UserService({ DB: {} } as never, {
       userDAO: async () =>
         ({
-          getByEmail: async () => ({ email: 'alice@example.com', username: 'alice' }),
+          getByCurrentEmail: async () => null,
+          getByEmail: async () => ALICE_ROW,
+          getById: async () => ALICE_ROW,
           getByUsernameCi: async () => null,
           setUsername: async () => undefined,
         }) as never,
@@ -932,6 +941,7 @@ describe('UserService rename', () => {
           renameOwner: async () => undefined,
           updateForkSourceFullName: async () => undefined,
         }) as never,
+userEmailDAO: async () => emptyUserEmailRegistry() as never,
     });
     await expect(svc.renameUsername('alice@example.com', 'alice2')).resolves.toEqual({
       email: 'alice@example.com',
@@ -945,7 +955,9 @@ describe('UserService rename', () => {
     const svc = new UserService({ DB: {} } as never, {
       userDAO: async () =>
         ({
-          getByEmail: async () => ({ email: 'alice@example.com', username: 'alice' }),
+          getByCurrentEmail: async () => null,
+          getByEmail: async () => ALICE_ROW,
+          getById: async () => ALICE_ROW,
           getByUsernameCi: async () => null,
           setUsername: async () => {
             throw new Error('D1 busy');
@@ -967,6 +979,7 @@ describe('UserService rename', () => {
           renameOwner: async () => undefined,
           updateForkSourceFullName: async () => undefined,
         }) as never,
+userEmailDAO: async () => emptyUserEmailRegistry() as never,
     });
     await expect(svc.renameUsername('alice@example.com', 'alice2')).rejects.toThrow('D1 busy');
     expect(released).toBe('alice2');
@@ -975,7 +988,7 @@ describe('UserService rename', () => {
   it('rejects taken, invalid, reserved, and missing renames', async () => {
     const db = createFakeDb();
     seedAlice(db);
-    db.users.push({ email: 'bob@x.co', created_at: 1, username: 'taken2', updated_at: 1 });
+    db.users.push({ id: 'u-bob', email: 'bob@x.co', current_email: 'bob@x.co', created_at: 1, username: 'taken2', updated_at: 1 });
     db.namespaces.push({ username_ci: 'taken2', kind: 'user', user_email: 'bob@x.co', org_id: null, created_at: 1 });
     const svc = new UserService({ DB: db });
     await expect(svc.renameUsername('alice@example.com', 'taken2')).rejects.toThrow('already taken');
@@ -986,7 +999,7 @@ describe('UserService rename', () => {
 
   it('falls back to legacy usernames when the namespace table is missing', async () => {
     const db = createFakeDb();
-    db.users.push({ email: 'legacy@x.co', created_at: 1, username: 'legacy', updated_at: 1 });
+    db.users.push({ id: 'u-legacy', email: 'legacy@x.co', current_email: 'legacy@x.co', created_at: 1, username: 'legacy', updated_at: 1 });
     const throwing = {
       ...db,
       prepare: (query: string) => {

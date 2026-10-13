@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { AccessAuthService } from '@edge-git/backend-services/auth';
-import { UnauthorizedError, DatabaseError } from '@edge-git/backend-errors';
+import { UnauthorizedError, DatabaseError } from '@rexezuge/errors';
 import { PktLine } from '@edge-git/git-protocol';
 import { parseReceivePackRequest } from '@edge-git/git-protocol';
 import { parseCommand, validateFetchRequestCounts } from '@edge-git/git-protocol';
-import { Container, createServiceContext, setRequestScope } from '@edge-git/backend-runtime/di';
+import { Container, createServiceContext, setServiceContext } from '@edge-git/backend-runtime/di';
+import { setRequestScope } from '@rexezuge/runtime';
 import { AppConfiguration } from '@edge-git/backend-runtime/config';
 import { ContentLimits } from '@edge-git/backend-runtime/config';
 import { RetentionLimits } from '@edge-git/backend-runtime/config';
@@ -175,7 +176,8 @@ describe('gitAuthForRepo fail-closed', () => {
       req: { raw: new Request('https://x/', { headers }) },
       executionCtx: {},
     };
-    setRequestScope(c as never, scope, ctx);
+    setRequestScope(c as never, scope);
+    setServiceContext(c as never, ctx);
     return { c: c as never, scope };
   }
 

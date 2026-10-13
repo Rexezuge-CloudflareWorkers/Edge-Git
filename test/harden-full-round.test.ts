@@ -1,3 +1,4 @@
+import { stubIdentityService, emptyUserEmailRegistry } from './mocks/identity';
 import { describe, expect, it } from 'vitest';
 import { decodeRouteParam, parseContentLength, parseLimitParam } from '@/workers/routes/RouteInput';
 import {
@@ -17,7 +18,7 @@ import {
 import { isZeroOid as protocolIsZeroOid } from '@edge-git/git-protocol/ProtectionPolicy';
 import { isZeroOid as serviceIsZeroOid } from '@edge-git/git-service/RefValidation';
 import { TokenService } from '@edge-git/backend-services/auth';
-import { DatabaseError } from '@edge-git/backend-errors';
+import { DatabaseError } from '@rexezuge/errors';
 
 describe('harden full round: RouteInput fail-closed parsing', () => {
   it('decodes valid params and rejects malformed escapes with null (400, never 500)', () => {
@@ -85,6 +86,7 @@ describe('harden full round: TokenService grant resolution fails closed', () => 
           },
         } as never),
       tokenGrantDAO: () => Promise.resolve({} as never),
+userIdentity: async () => stubIdentityService() as never,
     });
     await expect(
       svc.createToken('a@example.com', 'scoped', 30, ['repo:read'], [{ owner: 'a', name: 'r', scope: 'repo:read' }]),
@@ -96,6 +98,7 @@ describe('harden full round: TokenService grant resolution fails closed', () => 
       tokenDAO: () => Promise.resolve({ getByUserEmail: async () => [] } as never),
       repositoryDAO: () => Promise.resolve({ getByOwnerAndName: async () => null } as never),
       tokenGrantDAO: () => Promise.resolve({} as never),
+userIdentity: async () => stubIdentityService() as never,
     });
     await expect(
       svc.createToken('a@example.com', 'scoped', 30, ['repo:read'], [{ owner: 'ghost', name: 'missing', scope: 'repo:read' }]),

@@ -10,9 +10,9 @@ import {
 } from '@edge-git/backend-data/dao';
 import type { OrganizationRow, RepoRole, TeamMemberRole, TeamRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { BadRequestError, ForbiddenError, NotFoundError } from '@edge-git/backend-errors';
+import { BadRequestError, ForbiddenError, NotFoundError } from '@rexezuge/errors';
 import { AppConfiguration } from '@edge-git/backend-runtime/config';
-import { EmailAddress, SLUG_RE, TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
+import { SLUG_RE, TimestampUtil, UUIDUtil, normalizeEmail } from '@edge-git/shared/utils';
 import { GHOST_USERNAME } from '../identity/IdentityResolver';
 import { assertNotLastTeamAdmin } from '../policy/MembershipPolicy';
 import { assertQuotaWithinLimit } from '../policy/QuotaPolicy';
@@ -37,7 +37,7 @@ interface TeamServiceDeps {
   userIdentity?: () => Promise<UserIdentityService>;
 }
 
-import { UserIdentityService } from '../identity/UserIdentityService';
+import { UserIdentityService } from '../identity';
 
 // Canonical slug rule: import `SLUG_RE` from `@edge-git/shared/utils` (Layer 0).
 
@@ -71,14 +71,14 @@ class TeamService {
 
   private async requireOrg(username: string): Promise<OrganizationRow> {
     const dao = await this.deps.organizationDAO();
-    const org = await dao.getByUsernameCi(EmailAddress.normalize(username));
+    const org = await dao.getByUsernameCi(normalizeEmail(username));
     if (!org) throw new NotFoundError('Organization not found');
     return org;
   }
 
   private async orgRole(orgId: string, userEmail: string): Promise<'owner' | 'member' | null> {
     const dao = await this.deps.organizationMemberDAO();
-    const row = await dao.get(orgId, EmailAddress.normalize(userEmail));
+    const row = await dao.get(orgId, normalizeEmail(userEmail));
     return row?.role ?? null;
   }
 
@@ -120,11 +120,11 @@ class TeamService {
 
   public async resolveEmail(usernameOrEmail: string): Promise<string> {
     const raw = usernameOrEmail.trim();
-    if (raw.includes('@')) return EmailAddress.normalize(raw);
+    if (raw.includes('@')) return normalizeEmail(raw);
     const userDAO = await this.deps.userDAO();
-    const user = await userDAO.getByUsernameCi(EmailAddress.normalize(raw));
+    const user = await userDAO.getByUsernameCi(normalizeEmail(raw));
     if (!user) throw new NotFoundError('User not found');
-    return EmailAddress.normalize(user.email);
+    return normalizeEmail(user.email);
   }
 
   public async createTeam(
@@ -324,7 +324,7 @@ class TeamService {
   private async resolveUserId(email: string): Promise<string | null> {
     try {
       const identity = await this.deps.userIdentity();
-      return await identity.resolveUserId(email.toLowerCase());
+      return await identity.resolveAccountId(email.toLowerCase());
     } catch {
       return null;
     }

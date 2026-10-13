@@ -2,11 +2,11 @@ import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { RepositoryDAO, TokenRepoGrantDAO, UserAccessTokenDAO } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
 import { isMissingSchemaError } from '@edge-git/backend-data/utils';
-import { BadRequestError, NotFoundError, UnauthorizedError } from '@edge-git/backend-errors';
+import { BadRequestError, NotFoundError, UnauthorizedError } from '@rexezuge/errors';
 import type { TokenScope, TokenRepoGrantMetadata, UserAccessTokenMetadata } from '@edge-git/shared';
 import { TimestampUtil, UUIDUtil, CryptoUtil, mapWithConcurrency } from '@edge-git/shared/utils';
 import { DEFAULT_TOKEN_SCOPES, TOKEN_SCOPES, coversScope, normalizeTokenScopes } from './TokenScopes';
-import { UserIdentityService } from '../identity/UserIdentityService';
+import { UserIdentityService } from '../identity';
 
 interface TokenServiceEnv {
   DB: D1Queryable;
@@ -111,7 +111,7 @@ class TokenService {
     if (!tokenData.userId) return anchor;
     try {
       const identity = await this.deps.userIdentity();
-      const row = await identity.resolveUserById(tokenData.userId);
+      const row = await identity.resolveAccountById(tokenData.userId);
       if (row) return row.email;
     } catch (error) {
       if (!isMissingSchemaError(error)) throw error;
@@ -210,7 +210,7 @@ class TokenService {
     // Stamp the owning account so the token keeps authenticating as its owner
     // after an address change (`user_email` is the frozen anchor).
     const identity = await this.deps.userIdentity();
-    const ownerUserId = await identity.resolveUserId(normalized).catch(() => null);
+    const ownerUserId = await identity.resolveAccountId(normalized).catch(() => null);
     await dao.create(tokenId, normalized, tokenHash, trimmedName, expiresAt, now, effectiveScopes, prefix, ownerUserId);
     // Post-create single-flight: two concurrent creates can both pass the
     // pre-check. If we lost the race and exceeded the cap, roll back our own
