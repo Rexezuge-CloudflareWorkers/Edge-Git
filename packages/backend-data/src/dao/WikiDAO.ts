@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 
 export interface WikiPageRow {
   id: string;
@@ -36,16 +36,7 @@ class WikiDAO extends BaseDAO {
     authorEmail: string;
     now: number;
   }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'INSERT INTO wiki_pages (id, repository_id, slug, title, body, revision, updated_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)',
-          )
-          .bind(input.id, input.repositoryId, input.slug, input.title, input.body, input.authorEmail, input.now, input.now)
-          .run(),
-      'create wiki page',
-    );
+    await this.run('INSERT INTO wiki_pages (id, repository_id, slug, title, body, revision, updated_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)', [input.id, input.repositoryId, input.slug, input.title, input.body, input.authorEmail, input.now, input.now]);
     await this.database
       .prepare('INSERT INTO wiki_revisions (id, page_id, revision, body, author_email, created_at) VALUES (?, ?, 1, ?, ?, ?)')
       .bind(`${input.id}:1`, input.id, input.body, input.authorEmail, input.now)
@@ -97,16 +88,7 @@ class WikiDAO extends BaseDAO {
     const nextRevision = current.revision + 1;
     const nextTitle = input.title ?? current.title;
     const nextBody = input.body ?? current.body;
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'UPDATE wiki_pages SET title = ?, body = ?, revision = ?, updated_by = ?, updated_at = ? WHERE id = ? AND repository_id = ?',
-          )
-          .bind(nextTitle, nextBody, nextRevision, authorEmail, now, id, repositoryId)
-          .run(),
-      'update wiki page',
-    );
+    await this.run('UPDATE wiki_pages SET title = ?, body = ?, revision = ?, updated_by = ?, updated_at = ? WHERE id = ? AND repository_id = ?', [nextTitle, nextBody, nextRevision, authorEmail, now, id, repositoryId]);
     await this.database
       .prepare('INSERT OR IGNORE INTO wiki_revisions (id, page_id, revision, body, author_email, created_at) VALUES (?, ?, ?, ?, ?, ?)')
       .bind(`${id}:${nextRevision}`, id, nextRevision, nextBody, authorEmail, now)
@@ -126,10 +108,7 @@ class WikiDAO extends BaseDAO {
       .bind(id)
       .run()
       .catch(() => undefined);
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM wiki_pages WHERE id = ? AND repository_id = ?').bind(id, repositoryId).run(),
-      'delete wiki page',
-    );
+    await this.run('DELETE FROM wiki_pages WHERE id = ? AND repository_id = ?', [id, repositoryId]);
   }
 
   public async listRevisions(pageId: string): Promise<WikiRevisionRow[]> {

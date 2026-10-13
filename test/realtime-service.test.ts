@@ -55,7 +55,7 @@ describe('RealtimeService repo authorization', () => {
       .catch((e: Error) => e);
     expect(error).toBeInstanceOf(Error);
     expect(error.message).toBe('Repository not found.');
-    expect((error as { getErrorCode?: () => number }).getErrorCode?.()).toBe(404);
+    expect((error as { status?: number }).status).toBe(404);
   });
 
   it('returns 404 for unknown repos', async () => {

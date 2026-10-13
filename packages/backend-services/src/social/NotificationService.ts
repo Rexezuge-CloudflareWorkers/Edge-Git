@@ -1,9 +1,9 @@
 import { NotificationDAO, RepositoryDAO, UserDAO, WatchDAO } from '@edge-git/backend-data/dao';
 import type { NotificationRow, RepositoryRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { EmailAddress, TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
+import { TimestampUtil, UUIDUtil, normalizeEmail } from '@edge-git/shared/utils';
 import { PermissionService } from '../permission/PermissionService';
-import { UserIdentityService } from '../identity/UserIdentityService';
+import { UserIdentityService } from '../identity';
 
 interface NotificationServiceEnv {
   DB: D1Queryable;
@@ -83,8 +83,8 @@ class NotificationService {
     const candidates = usernames.slice(0, 50);
     for (const username of candidates) {
       try {
-        const user = await userDAO.getByUsernameCi(EmailAddress.normalize(username));
-        if (user) emails.push(EmailAddress.normalize(user.email));
+        const user = await userDAO.getByUsernameCi(normalizeEmail(username));
+        if (user) emails.push(normalizeEmail(user.email));
       } catch {
         // ignore — missing users table or unknown username
       }
@@ -97,14 +97,14 @@ class NotificationService {
   // Private repos therefore never leak via notifications. Returns the
   // recipient emails so callers can also ping live-update subscribers.
   public async fanOut(input: FanOutInput): Promise<{ notified: number; recipients: string[]; recipientUserIds: string[] }> {
-    const actor = EmailAddress.normalize(input.actorEmail);
+    const actor = normalizeEmail(input.actorEmail);
     const candidates = new Set<string>();
     if (input.repositoryId) {
       try {
         const watchDAO = await this.deps.watchDAO();
         const watchers = await watchDAO.listWatchers(input.repositoryId, MAX_FANOUT_RECIPIENTS);
         for (const watcher of watchers) {
-          candidates.add(EmailAddress.normalize(watcher));
+          candidates.add(normalizeEmail(watcher));
         }
       } catch {
         // ignore — legacy DBs without repo_watches
@@ -189,7 +189,7 @@ class NotificationService {
   private async resolveOneUserId(email: string): Promise<string | null> {
     try {
       const identity = await this.deps.userIdentity();
-      return await identity.resolveUserId(email);
+      return await identity.resolveAccountId(email);
     } catch {
       return null;
     }

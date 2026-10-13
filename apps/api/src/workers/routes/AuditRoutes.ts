@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoFullName } from '@edge-git/shared/utils';
-import { BadRequestError } from '@edge-git/backend-errors';
+import { BadRequestError } from '@rexezuge/errors';
 import { clampAuditLimit, truncateAuditFilter } from '@edge-git/shared/validation';
 import { jsonError, toSafeErrorMessage, toServiceStatus, getScope } from './PublicViewerResolver';
 import { resolveFilterEmail, usernameFor, usernameMap } from './IdentityPresenter';

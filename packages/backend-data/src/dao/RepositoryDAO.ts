@@ -1,6 +1,6 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
-import { DatabaseError } from '@edge-git/backend-errors';
+import type { D1Queryable } from '@rexezuge/d1';
+import { DatabaseError } from '@rexezuge/errors';
 import { buildSetClause } from './UpdateClause';
 
 export interface RepositoryRow {
@@ -58,32 +58,7 @@ class RepositoryDAO extends BaseDAO {
     const ownerCi = input.owner.toLowerCase();
     const nameCi = input.name.toLowerCase();
     const ownerUserEmail = input.ownerUserEmail ?? (ownerType === 'user' ? input.ownerEmail : null);
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'INSERT INTO repositories (id, owner_email, owner, name, description, is_private, created_at, updated_at, owner_type, owner_ci, name_ci, owner_user_email, org_id, forked_from_repo_id, owner_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          )
-          .bind(
-            input.id,
-            input.ownerEmail,
-            input.owner,
-            input.name,
-            input.description,
-            input.isPrivate ? 1 : 0,
-            input.now,
-            input.now,
-            ownerType,
-            ownerCi,
-            nameCi,
-            ownerUserEmail,
-            input.orgId ?? null,
-            input.forkedFromRepoId ?? null,
-            input.ownerUserId ?? null,
-          )
-          .run(),
-      'create repository',
-    );
+    await this.run('INSERT INTO repositories (id, owner_email, owner, name, description, is_private, created_at, updated_at, owner_type, owner_ci, name_ci, owner_user_email, org_id, forked_from_repo_id, owner_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [input.id, input.ownerEmail, input.owner, input.name, input.description, input.isPrivate ? 1 : 0, input.now, input.now, ownerType, ownerCi, nameCi, ownerUserEmail, input.orgId ?? null, input.forkedFromRepoId ?? null, input.ownerUserId ?? null]);
   }
 
   /**
@@ -161,14 +136,7 @@ class RepositoryDAO extends BaseDAO {
   public async renameOwner(oldOwnerCi: string, newOwner: string, now?: number): Promise<void> {
     const newCi = newOwner.toLowerCase();
     const stamp = now ?? Math.floor(Date.now() / 1000);
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('UPDATE repositories SET owner = ?, owner_ci = ?, updated_at = ? WHERE owner_ci = ?')
-          .bind(newOwner, newCi, stamp, oldOwnerCi.toLowerCase())
-          .run(),
-      'rename repo owner',
-    );
+    await this.run('UPDATE repositories SET owner = ?, owner_ci = ?, updated_at = ? WHERE owner_ci = ?', [newOwner, newCi, stamp, oldOwnerCi.toLowerCase()]);
   }
 
   public async listForks(sourceRepoId: string, limit = 100): Promise<RepositoryRow[]> {
@@ -202,18 +170,11 @@ class RepositoryDAO extends BaseDAO {
     if (patch.description !== undefined) assignments.push({ column: 'description', value: patch.description });
     if (patch.isPrivate !== undefined) assignments.push({ column: 'is_private', value: patch.isPrivate ? 1 : 0 });
     const { clause, values } = buildSetClause(assignments);
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(`UPDATE repositories SET ${clause} WHERE id = ?`)
-          .bind(...values, id)
-          .run(),
-      'update repository',
-    );
+    await this.run(`UPDATE repositories SET ${clause} WHERE id = ?`, [...values, id]);
   }
 
   public async deleteById(id: string): Promise<void> {
-    await this.withRetry(() => this.database.prepare('DELETE FROM repositories WHERE id = ?').bind(id).run(), 'delete repository');
+    await this.run('DELETE FROM repositories WHERE id = ?', [id]);
   }
 
   // Backfill support: most-recently-updated repos first. Offset pagination is

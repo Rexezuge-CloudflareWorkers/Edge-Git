@@ -1,6 +1,6 @@
-import type { D1Queryable } from '../utils/D1Types';
-import { isMissingSchemaError } from '../utils/D1ErrorClassifier';
-import { DatabaseError } from '@edge-git/backend-errors';
+import type { D1Queryable } from '@rexezuge/d1';
+import { isMissingSchemaError } from '@rexezuge/d1';
+import { DatabaseError } from '@rexezuge/errors';
 import { buildScopedLikeStatement, likeParamsForTokens } from './SearchQueries';
 
 function rowsOrEmpty<T>(result: { results?: T[] } | null | undefined): T[] {

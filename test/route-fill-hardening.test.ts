@@ -15,7 +15,7 @@ import { triggerRequiredChecks } from '@/workers/routes/TriggerChecks';
 import { isCrossRepoPull, isPackLimitError } from '@/workers/routes/CrossFork';
 import { toSafeErrorMessage, toServiceStatus } from '@/workers/routes/PublicViewerResolver';
 import { normalizeAssetContentType } from '@edge-git/shared/validation';
-import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
+import { BadRequestError, NotFoundError } from '@rexezuge/errors';
 
 const ALICE = 'alice@example.com';
 const BOB = 'bob@example.com';
@@ -346,7 +346,7 @@ function createFillFakeDb() {
       },
       run(): Promise<{ success: boolean; meta?: { changes?: number } }> {
         if (q.startsWith('INSERT INTO users')) {
-          if (!state.users.some((u) => u.email === params[0])) state.users.push({ email: params[0], created_at: params[1] });
+          if (!state.users.some((u) => u.email === params[0])) state.users.push({ email: params[0], created_at: params[1], id: params[2], current_email: params[3] });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE users SET')) {

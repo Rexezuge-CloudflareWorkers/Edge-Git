@@ -1,6 +1,6 @@
-import { DatabaseError } from '@edge-git/backend-errors';
+import { DatabaseError } from '@rexezuge/errors';
 import { decryptData, encryptData } from '../crypto/aes-gcm';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 import { EncryptedDAO } from './BaseDAO';
 
 interface RepoWebhookRow {
@@ -60,27 +60,7 @@ class WebhookDAO extends EncryptedDAO {
     now: number;
   }): Promise<void> {
     const envelope = await encryptData(input.secret, this.masterKey);
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'INSERT INTO repo_webhooks (id, repository_id, url, url_prefix, secret_suffix, is_active, consecutive_failures, last_delivery_at, last_delivery_status, creator_email, created_at, updated_at, encrypted_secret, secret_iv) VALUES (?, ?, ?, ?, ?, 1, 0, NULL, NULL, ?, ?, ?, ?, ?)',
-          )
-          .bind(
-            input.id,
-            input.repositoryId,
-            input.url,
-            input.urlPrefix,
-            input.secretSuffix,
-            input.creatorEmail,
-            input.now,
-            input.now,
-            envelope.encrypted,
-            envelope.iv,
-          )
-          .run(),
-      'create repo webhook',
-    );
+    await this.run('INSERT INTO repo_webhooks (id, repository_id, url, url_prefix, secret_suffix, is_active, consecutive_failures, last_delivery_at, last_delivery_status, creator_email, created_at, updated_at, encrypted_secret, secret_iv) VALUES (?, ?, ?, ?, ?, 1, 0, NULL, NULL, ?, ?, ?, ?, ?)', [input.id, input.repositoryId, input.url, input.urlPrefix, input.secretSuffix, input.creatorEmail, input.now, input.now, envelope.encrypted, envelope.iv]);
     // Events live only in the junction table (0024 dropped the JSON column).
     await this.replaceEvents(input.id, input.events, input.now);
   }
@@ -91,27 +71,14 @@ class WebhookDAO extends EncryptedDAO {
   }
 
   public async replaceEvents(hookId: string, events: readonly string[], now: number): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM webhook_events WHERE hook_id = ?').bind(hookId).run(),
-      'replace webhook events',
-    );
+    await this.run('DELETE FROM webhook_events WHERE hook_id = ?', [hookId]);
     for (const event of events) {
-      await this.withRetry(
-        () =>
-          this.database
-            .prepare('INSERT OR IGNORE INTO webhook_events (hook_id, event, created_at) VALUES (?, ?, ?)')
-            .bind(hookId, event, now)
-            .run(),
-        'insert webhook event',
-      );
+      await this.run('INSERT OR IGNORE INTO webhook_events (hook_id, event, created_at) VALUES (?, ?, ?)', [hookId, event, now]);
     }
   }
 
   public async deleteEvents(hookId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM webhook_events WHERE hook_id = ?').bind(hookId).run(),
-      'delete webhook events',
-    );
+    await this.run('DELETE FROM webhook_events WHERE hook_id = ?', [hookId]);
   }
 
   // `full_name` is computed from `repositories` (0024 dropped the stored
@@ -169,14 +136,7 @@ class WebhookDAO extends EncryptedDAO {
       params.push(patch.isActive ? 1 : 0);
     }
     params.push(id, repositoryId);
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(`UPDATE repo_webhooks SET ${sets.join(', ')} WHERE id = ? AND repository_id = ?`)
-          .bind(...params)
-          .run(),
-      'update repo webhook',
-    );
+    await this.run(`UPDATE repo_webhooks SET ${sets.join(', ')} WHERE id = ? AND repository_id = ?`, [...params]);
     if (patch.events !== undefined) {
       await this.replaceEvents(id, patch.events, patch.now);
     }
@@ -184,66 +144,26 @@ class WebhookDAO extends EncryptedDAO {
 
   public async rotateSecret(id: string, repositoryId: string, secret: string, secretSuffix: string, now: number): Promise<void> {
     const envelope = await encryptData(secret, this.masterKey);
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'UPDATE repo_webhooks SET secret_suffix = ?, consecutive_failures = 0, updated_at = ?, encrypted_secret = ?, secret_iv = ? WHERE id = ? AND repository_id = ?',
-          )
-          .bind(secretSuffix, now, envelope.encrypted, envelope.iv, id, repositoryId)
-          .run(),
-      'rotate repo webhook secret',
-    );
+    await this.run('UPDATE repo_webhooks SET secret_suffix = ?, consecutive_failures = 0, updated_at = ?, encrypted_secret = ?, secret_iv = ? WHERE id = ? AND repository_id = ?', [secretSuffix, now, envelope.encrypted, envelope.iv, id, repositoryId]);
   }
 
   public async recordDeliveryOutcome(hookId: string, success: boolean, now: number, disableAfterFailures: number): Promise<void> {
     if (success) {
-      await this.withRetry(
-        () =>
-          this.database
-            .prepare(
-              'UPDATE repo_webhooks SET last_delivery_at = ?, last_delivery_status = ?, consecutive_failures = 0, updated_at = ? WHERE id = ?',
-            )
-            .bind(now, 'success', now, hookId)
-            .run(),
-        'record webhook delivery success',
-      );
+      await this.run('UPDATE repo_webhooks SET last_delivery_at = ?, last_delivery_status = ?, consecutive_failures = 0, updated_at = ? WHERE id = ?', [now, 'success', now, hookId]);
       return;
     }
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            `UPDATE repo_webhooks SET last_delivery_at = ?, last_delivery_status = ?, consecutive_failures = consecutive_failures + 1,
-             is_active = CASE WHEN consecutive_failures + 1 >= ? THEN 0 ELSE is_active END, updated_at = ? WHERE id = ?`,
-          )
-          .bind(now, 'failure', disableAfterFailures, now, hookId)
-          .run(),
-      'record webhook delivery failure',
-    );
+    await this.run(`UPDATE repo_webhooks SET last_delivery_at = ?, last_delivery_status = ?, consecutive_failures = consecutive_failures + 1,
+             is_active = CASE WHEN consecutive_failures + 1 >= ? THEN 0 ELSE is_active END, updated_at = ? WHERE id = ?`, [now, 'failure', disableAfterFailures, now, hookId]);
   }
 
   public async deleteById(id: string, repositoryId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM repo_webhooks WHERE id = ? AND repository_id = ?').bind(id, repositoryId).run(),
-      'delete repo webhook',
-    );
+    await this.run('DELETE FROM repo_webhooks WHERE id = ? AND repository_id = ?', [id, repositoryId]);
     await this.deleteEvents(id).catch(() => undefined);
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('DELETE FROM webhook_events WHERE hook_id IN (SELECT id FROM repo_webhooks WHERE repository_id = ?)')
-          .bind(repositoryId)
-          .run(),
-      'delete webhook events by repo',
-    ).catch(() => undefined);
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM repo_webhooks WHERE repository_id = ?').bind(repositoryId).run(),
-      'delete webhooks by repo',
-    );
+    await this.run('DELETE FROM webhook_events WHERE hook_id IN (SELECT id FROM repo_webhooks WHERE repository_id = ?)', [repositoryId]).catch(() => undefined);
+    await this.run('DELETE FROM repo_webhooks WHERE repository_id = ?', [repositoryId]);
   }
 }
 

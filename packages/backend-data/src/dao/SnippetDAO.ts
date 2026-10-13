@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 
 export interface SnippetRow {
   id: string;
@@ -24,25 +24,11 @@ class SnippetDAO extends BaseDAO {
   }
 
   public async createSnippet(input: { id: string; ownerEmail: string; title: string; visibility: string; now: number }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('INSERT INTO snippets (id, owner_email, title, visibility, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
-          .bind(input.id, input.ownerEmail, input.title, input.visibility, input.now, input.now)
-          .run(),
-      'create snippet',
-    );
+    await this.run('INSERT INTO snippets (id, owner_email, title, visibility, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)', [input.id, input.ownerEmail, input.title, input.visibility, input.now, input.now]);
   }
 
   public async addFile(input: { id: string; snippetId: string; filename: string; body: string; now: number }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('INSERT INTO snippet_files (id, snippet_id, filename, body, created_at) VALUES (?, ?, ?, ?, ?)')
-          .bind(input.id, input.snippetId, input.filename, input.body, input.now)
-          .run(),
-      'add snippet file',
-    );
+    await this.run('INSERT INTO snippet_files (id, snippet_id, filename, body, created_at) VALUES (?, ?, ?, ?, ?)', [input.id, input.snippetId, input.filename, input.body, input.now]);
   }
 
   public async getById(id: string): Promise<SnippetRow | null> {
@@ -108,14 +94,7 @@ class SnippetDAO extends BaseDAO {
     }
     if (sets.length === 0) return;
     sets.push('updated_at = ?');
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(`UPDATE snippets SET ${sets.join(', ')} WHERE id = ?`)
-          .bind(...values, now, id)
-          .run(),
-      'update snippet',
-    );
+    await this.run(`UPDATE snippets SET ${sets.join(', ')} WHERE id = ?`, [...values, now, id]);
   }
 
   public async replaceFiles(snippetId: string, files: Array<{ filename: string; body: string }>, now: number): Promise<void> {
@@ -125,14 +104,7 @@ class SnippetDAO extends BaseDAO {
       .run()
       .catch(() => undefined);
     for (const [index, file] of files.entries()) {
-      await this.withRetry(
-        () =>
-          this.database
-            .prepare('INSERT INTO snippet_files (id, snippet_id, filename, body, created_at) VALUES (?, ?, ?, ?, ?)')
-            .bind(`${snippetId}:${index}:${file.filename}`, snippetId, file.filename, file.body, now)
-            .run(),
-        'replace snippet file',
-      );
+      await this.run('INSERT INTO snippet_files (id, snippet_id, filename, body, created_at) VALUES (?, ?, ?, ?, ?)', [`${snippetId}:${index}:${file.filename}`, snippetId, file.filename, file.body, now]);
     }
   }
 
@@ -142,7 +114,7 @@ class SnippetDAO extends BaseDAO {
       .bind(id)
       .run()
       .catch(() => undefined);
-    await this.withRetry(() => this.database.prepare('DELETE FROM snippets WHERE id = ?').bind(id).run(), 'delete snippet');
+    await this.run('DELETE FROM snippets WHERE id = ?', [id]);
   }
 
   public async searchPublic(term: string, limit: number): Promise<SnippetRow[]> {

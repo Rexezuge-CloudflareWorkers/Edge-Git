@@ -1,57 +1,18 @@
 /**
- * Canonical email value object.
- * Consolidates 100+ scattered `email.toLowerCase()` call sites into a single
- * normalization point. Layer 0 stays dependency-free: validation failures
- * throw plain `Error`; callers in layers 2-3 map to `BadRequestError`.
+ * Git-side identity: the canonical `owner/name` repository identifier.
+ *
+ * The email half of this file moved to the kit. `isValidEmailFormat` is defined
+ * once in `@rexezuge/shared` (on `Identity.ts`, the wider group's home) and
+ * re-exported by `EmailUtil`, which is also the single home of `normalizeEmail`
+ * — the one trim+lowercase rule the docs call out as load-bearing, because two
+ * copies that disagreed made `" Alice@Example.com "` one account to one layer
+ * and a different account to another. Edge-Git's `EmailAddress` value class was
+ * sugar over exactly that rule, so call sites now use `normalizeEmail` directly.
+ *
+ * `RepoFullName` and the Durable-Object key helpers stay here: an `owner/name`
+ * git identifier, its `.git`-stripping and the DO routing key are git business
+ * logic, the same class of concern as `GitOids`/`BranchValidation`.
  */
-const EMAIL_FORMAT_RE = /^[^@\s]+@[^\s@][^\s.@]*\.[^\s@]+$/;
-
-function isValidEmailFormat(raw: string): boolean {
-  if (!raw || raw.length > 254) return false;
-  return EMAIL_FORMAT_RE.test(raw);
-}
-
-class EmailAddress {
-  private constructor(private readonly canonical: string) {}
-
-  public static normalize(email: string): string {
-    return email.trim().toLowerCase();
-  }
-
-  public static parse(email: string): EmailAddress {
-    const canonical = this.normalize(email);
-    if (!canonical || !canonical.includes('@')) {
-      throw new Error('Invalid email address');
-    }
-    return new this(canonical);
-  }
-
-  public static tryParse(email: string | null | undefined): EmailAddress | null {
-    if (!email) return null;
-    try {
-      return this.parse(email);
-    } catch {
-      return null;
-    }
-  }
-
-  public toString(): string {
-    return this.canonical;
-  }
-
-  public valueOf(): string {
-    return this.canonical;
-  }
-
-  public equals(other: EmailAddress | string): boolean {
-    const rhs = typeof other === 'string' ? (this.constructor as typeof EmailAddress).normalize(other) : other.canonical;
-    return this.canonical === rhs;
-  }
-
-  public prefix(): string {
-    return this.canonical.split('@', 1)[0] ?? '';
-  }
-}
 
 /**
  * Canonical `owner/name` repository identifier.
@@ -130,7 +91,7 @@ class RepoFullName {
   }
 }
 
-export { EmailAddress, RepoFullName, OWNER_PATTERN, REPO_PATTERN, isValidEmailFormat };
+export { RepoFullName, OWNER_PATTERN, REPO_PATTERN };
 
 /**
  * Canonical `REPO.getByName()` key for an `owner/name` pair without throwing.

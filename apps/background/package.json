@@ -22,13 +22,14 @@
   },
   "dependencies": {
     "@edge-git/backend-data": "workspace:*",
-    "@edge-git/backend-errors": "workspace:*",
     "@edge-git/backend-runtime": "workspace:*",
     "@edge-git/backend-services": "workspace:*",
     "@edge-git/git-protocol": "workspace:*",
     "@edge-git/git-service": "workspace:*",
     "@edge-git/shared": "workspace:*",
     "@jitl/quickjs-wasmfile-release-asyncify": "^0.32.0",
+    "@rexezuge/errors": "^1.6.0",
+    "@rexezuge/shared": "^1.6.0",
     "quickjs-emscripten": "0.32.0"
   },
   "devDependencies": {

@@ -1,7 +1,7 @@
 import { SnippetDAO } from '@edge-git/backend-data/dao';
 import type { SnippetRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { BadRequestError, ForbiddenError, NotFoundError } from '@edge-git/backend-errors';
+import { BadRequestError, ForbiddenError, NotFoundError } from '@rexezuge/errors';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import type { SnippetFileMetadata, SnippetMetadata } from '@edge-git/shared';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';

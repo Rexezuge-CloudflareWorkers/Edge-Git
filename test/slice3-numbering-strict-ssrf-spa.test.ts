@@ -1,6 +1,7 @@
+import { stubIdentityService, emptyUserEmailRegistry } from './mocks/identity';
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { DatabaseError } from '@edge-git/backend-errors';
+import { DatabaseError } from '@rexezuge/errors';
 import { NumberingDAO } from '@edge-git/backend-data/dao';
 import { IssueService } from '@edge-git/backend-services/issue';
 import { PermissionService } from '@edge-git/backend-services/permission';
@@ -9,7 +10,6 @@ import { allocateNumberWithFallback } from '@edge-git/backend-services/numbering
 import { workerFetchAdapter } from '@edge-git/background/transfer/fetchAdapter';
 import { EdgeGitWorker } from '@/workers/EdgeGitWorker';
 import { SPA_HTML } from '@/generated/spa-shell';
-import { resetRateLimitForTests } from '@/middleware/rateLimit';
 
 // --- NumberingDAO -----------------------------------------------------------
 
@@ -170,6 +170,9 @@ function strictDeps(overrides: Record<string, unknown> = {}) {
     teamDAO: async () => ({ getById: async () => null }),
     teamMemberDAO: async () => ({ get: async () => null }),
     teamGrantDAO: async () => ({ listByRepo: missing }),
+    // The viewer is resolved through the kit's identity service, which would
+    // otherwise build a real `UserEmailDAO` over this `{}` fake.
+    userIdentity: async () => stubIdentityService(),
     ...overrides,
   } as never;
 }
@@ -282,9 +285,7 @@ describe('slice3: fetchAdapter redirect loops', () => {
 describe('slice3: SPA catch-all route table', () => {
   const CTX = { waitUntil: () => undefined, passThroughOnException: () => undefined };
 
-  beforeEach(() => {
-    resetRateLimitForTests();
-  });
+  
 
   async function get(path: string, env: Record<string, unknown> = {}): Promise<Response> {
     const worker = new EdgeGitWorker() as unknown as { onRequest(r: Request, e: unknown, c: unknown): Promise<Response> };

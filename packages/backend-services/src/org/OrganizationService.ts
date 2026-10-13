@@ -12,7 +12,7 @@ import {
 } from '@edge-git/backend-data/dao';
 import type { OrganizationRow, OrgMemberRole } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { BadRequestError, ForbiddenError, NotFoundError } from '@edge-git/backend-errors';
+import { BadRequestError, ForbiddenError, NotFoundError } from '@rexezuge/errors';
 import { isReservedNamespaceName } from '@edge-git/shared/constants';
 import { SLUG_RE, TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 import { cascadeOwnerRepos } from '../repo/repoRenameCascade';
@@ -37,7 +37,7 @@ interface OrganizationServiceDeps {
   userIdentity?: () => Promise<UserIdentityService>;
 }
 
-import { UserIdentityService } from '../identity/UserIdentityService';
+import { UserIdentityService } from '../identity';
 
 // Canonical slug rule: import `SLUG_RE` from `@edge-git/shared/utils` (Layer 0).
 
@@ -311,7 +311,7 @@ class OrganizationService {
   private async resolveUserId(email: string): Promise<string | null> {
     try {
       const identity = await this.deps.userIdentity();
-      return await identity.resolveUserId(email.toLowerCase());
+      return await identity.resolveAccountId(email.toLowerCase());
     } catch {
       return null;
     }

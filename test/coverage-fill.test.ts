@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   AbstractEntrypointWorker,
-  AbstractDurableObjectWorker,
   AbstractQueueWorker,
   AbstractWorkflowWorker,
 } from '@edge-git/backend-runtime/base';
@@ -14,9 +13,9 @@ import {
 // re-exports the `dofs` runtime (unparsable in the node test env).
 import { ErrorNormalizer, ErrorWithCode, normalizePath } from '../packages/git-service/src/ErrorNormalizer';
 import { IsoGitFs } from '../packages/git-service/src/IsoGitFs';
-import { CursorUtil } from '@edge-git/backend-data/utils/CursorUtil';
-import { executeD1WithRetry, assertD1Success } from '@edge-git/backend-data/utils/D1Utils';
-import { isD1ErrorRetryable } from '@edge-git/backend-data/utils/D1ErrorClassifier';
+import { CursorCodec } from '@rexezuge/shared';
+import { executeWithRetry } from '@rexezuge/d1';
+import { isD1ErrorRetryable } from '@rexezuge/d1';
 import { TeamDAO } from '@edge-git/backend-data/dao/TeamDAO';
 import { TeamMemberDAO } from '@edge-git/backend-data/dao/TeamMemberDAO';
 import { TeamRepoGrantDAO } from '@edge-git/backend-data/dao/TeamRepoGrantDAO';
@@ -58,21 +57,6 @@ class TestEntrypoint extends AbstractEntrypointWorker {
   }
 }
 
-class TestDO extends AbstractDurableObjectWorker {
-  public constructor(
-    ctx: never,
-    env: Env,
-    private readonly mode: 'ok' | 'throw' = 'ok',
-  ) {
-    super(ctx, env);
-  }
-
-  protected onRequest(): Promise<Response> {
-    if (this.mode === 'throw') throw new Error('do-boom');
-    return Promise.resolve(new Response('do-ok'));
-  }
-}
-
 class TestQueue extends AbstractQueueWorker<string> {
   public seen: string[] = [];
   protected onQueue(batch: { messages: string[] }): Promise<void> {
@@ -95,18 +79,14 @@ describe('backend-runtime base workers', () => {
     await expect(ok.fetch(new Request('https://x/'), {} as Env, ctx as never)).resolves.toMatchObject({ status: 200 });
     const failing = new TestEntrypoint('throw-request');
     await expect(failing.fetch(new Request('https://x/'), {} as Env, ctx as never)).resolves.toMatchObject({ status: 500 });
-    await expect(ok.fetch(new Request('https://x/__scheduled?cron=*'), {} as Env, ctx as never)).resolves.toMatchObject({ status: 204 });
+    // No `/__scheduled` bypass: a cron trigger reaches `scheduled()`, so a URL
+    // cannot run the whole cron body.
+    await expect(ok.fetch(new Request('https://x/__scheduled?cron=*'), {} as Env, ctx as never)).resolves.toMatchObject({ status: 200 });
     await expect(ok.scheduled({ cron: '*', scheduledTime: 1, noRetry: () => undefined }, {} as Env, ctx as never)).resolves.toBeUndefined();
     const failingCron = new TestEntrypoint('throw-scheduled');
     await expect(
       failingCron.scheduled({ cron: '*', scheduledTime: 1, noRetry: () => undefined }, {} as Env, ctx as never),
     ).resolves.toBeUndefined();
-  });
-
-  it('durable object worker maps errors to 500 JSON', async () => {
-    const doCtx = { waitUntil: () => undefined, blockConcurrencyWhile: async <T>(fn: () => Promise<T>) => fn() };
-    await expect(new TestDO(doCtx as never, {} as Env).fetch(new Request('https://x/'))).resolves.toMatchObject({ status: 200 });
-    await expect(new TestDO(doCtx as never, {} as Env, 'throw').fetch(new Request('https://x/'))).resolves.toMatchObject({ status: 500 });
   });
 
   it('queue and workflow workers dispatch', async () => {
@@ -333,20 +313,18 @@ describe('dao thin coverage', () => {
 });
 
 describe('cursor/d1/search/config utils', () => {
-  it('CursorUtil round-trips and tolerates garbage', () => {
-    const encoded = CursorUtil.encode({ a: 1 });
-    expect(CursorUtil.decode<{ a: number }>(encoded)).toEqual({ a: 1 });
-    expect(CursorUtil.decode(undefined)).toBeUndefined();
-    expect(CursorUtil.decode('!!!')).toBeUndefined();
+  it('CursorCodec round-trips and tolerates garbage', () => {
+    const encoded = CursorCodec.encode({ a: 1 });
+    expect(CursorCodec.decode<{ a: number }>(encoded)).toEqual({ a: 1 });
+    expect(CursorCodec.decode(undefined)).toBeUndefined();
+    expect(CursorCodec.decode('!!!')).toBeUndefined();
   });
 
   it('D1 retry helpers classify and retry', async () => {
     expect(isD1ErrorRetryable('database is locked')).toBe(true);
     expect(isD1ErrorRetryable('no such table')).toBe(false);
-    assertD1Success({ success: true } as never, 'x');
-    expect(() => assertD1Success({ success: false, error: 'boom' } as never, 'x')).toThrow('Failed to x');
     let attempts = 0;
-    const out = await executeD1WithRetry(
+    const out = await executeWithRetry(
       async () => {
         attempts += 1;
         if (attempts === 1) return { success: false, error: 'database is locked' } as never;

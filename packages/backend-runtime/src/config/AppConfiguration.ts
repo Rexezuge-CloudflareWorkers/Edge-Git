@@ -1,4 +1,4 @@
-import { EnvParser } from './EnvParser';
+import { EnvParser } from '@rexezuge/runtime';
 import { DEFAULT_DEBUG_MODE, DEFAULT_SITE_URL } from './ConfigurationDefaults';
 
 import { AuthConfig } from './sections/AuthConfig';

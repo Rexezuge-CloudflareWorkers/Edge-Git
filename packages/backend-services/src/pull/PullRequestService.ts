@@ -1,7 +1,7 @@
 import { NumberingDAO, PullRequestDAO } from '@edge-git/backend-data/dao';
 import type { PullRequestCommentRow, PullRequestReviewRow, PullRequestRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
+import { BadRequestError, NotFoundError } from '@rexezuge/errors';
 import { TimestampUtil, UUIDUtil, isValidBranchName } from '@edge-git/shared/utils';
 import { allocateNumberWithFallback } from '../numbering/numberAllocator';
 import { isBlockedByReviews } from './PullReviewGate';

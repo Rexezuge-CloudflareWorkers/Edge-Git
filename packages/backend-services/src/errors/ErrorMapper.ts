@@ -1,6 +1,6 @@
-import { ServiceError, DefaultInternalServerError } from '@edge-git/backend-errors';
-import type { ErrorResponse } from '@edge-git/backend-errors';
-import { getBackendStrings } from '@edge-git/shared/i18n';
+import { ServiceError, DefaultInternalServerError } from '@rexezuge/errors';
+import type { ErrorResponse } from '@rexezuge/errors';
+import { getLocalizedStrings } from '@rexezuge/i18n';
 
 interface MappedError {
   status: number;
@@ -16,20 +16,30 @@ interface MappedError {
 // Git smart-http pkt-line paths never serialize this envelope — they keep
 // plain-text / `ERR` packets; only JSON APIs use it.
 function buildBody(error: ServiceError): ErrorResponse {
-  return { Exception: { Type: error.getErrorType(), Message: error.getErrorMessage() } };
+  // The envelope and its 5xx masking both live in the kit, so a new boundary
+  // cannot get the disclosure rule subtly wrong.
+  return error.toErrorResponse().body;
 }
 
 function mapServiceError(error: unknown, locale?: string | null): MappedError {
   if (error instanceof ServiceError) {
-    return { status: error.getErrorCode(), body: buildBody(error) };
+    const { status, body } = error.toErrorResponse();
+    if (error.expose) return { status, body };
+    // The kit substitutes one English constant for a message it will not
+    // disclose. This is the only place that still knows the client's locale,
+    // so the localized string is substituted here instead — an operator-facing
+    // message (`error.message`) never reaches the wire either way.
+    return {
+      status,
+      body: { Exception: { ...body.Exception, Message: getLocalizedStrings(locale ?? 'en').common.internalError } },
+    };
   }
-  const strings = getBackendStrings(locale ?? 'en');
   return {
-    status: 500,
+    status: DefaultInternalServerError.status,
     body: {
       Exception: {
-        Type: DefaultInternalServerError.getErrorType(),
-        Message: strings.common.internalError,
+        Type: DefaultInternalServerError.type,
+        Message: getLocalizedStrings(locale ?? 'en').common.internalError,
       },
     },
   };

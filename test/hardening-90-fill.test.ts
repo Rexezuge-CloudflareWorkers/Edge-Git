@@ -1,3 +1,4 @@
+import { stubIdentityService, emptyUserEmailRegistry } from './mocks/identity';
 import { describe, expect, it, beforeEach } from 'vitest';
 import { AccessAuthService } from '@edge-git/backend-services/auth';
 import { TokenService } from '@edge-git/backend-services/auth';
@@ -6,7 +7,7 @@ import { CheckService } from '@edge-git/backend-services/checks/CheckService';
 import { WebhookService } from '@edge-git/backend-services/webhook/WebhookService';
 import { buildWebhookPayload } from '@edge-git/backend-services/webhook/WebhookEvents';
 import { isSensitiveJsonPath, applySecurityHeaders } from '@/middleware/securityHeaders';
-import { clientIp } from '@/middleware/rateLimit';
+import { clientIp } from '@rexezuge/http';
 import { readJsonBody, MAX_JSON_BYTES } from '@/workers/routes/BodyParser';
 import { sanitizeRefParam, sanitizePathParam, sanitizeDepthParam } from '@/workers/routes/RepoRoutes';
 import { isSafeFilePath } from '@/workers/routes/FileWriteRoutes';
@@ -74,6 +75,7 @@ describe('harden-90 token concurrency guard', () => {
         } as never),
       repositoryDAO: () => Promise.resolve({} as never),
       tokenGrantDAO: () => Promise.resolve({} as never),
+userIdentity: async () => stubIdentityService() as never,
     });
     await expect(svc.createToken('a@example.com', 'x')).rejects.toThrow(/Maximum 1 tokens/);
     expect(deleted).toHaveLength(1);
@@ -93,6 +95,7 @@ describe('harden-90 token concurrency guard', () => {
           } as never),
         tokenGrantDAO: () => Promise.resolve({ deleteByToken: async () => undefined } as never),
         repositoryDAO: () => Promise.resolve({} as never),
+userIdentity: async () => stubIdentityService() as never,
       },
     );
     await svc.deleteToken('tid', 'User@Example.COM');
@@ -121,7 +124,7 @@ describe('harden-90 import cancel scoping', () => {
   });
 
   it('returns NotFound when repository mismatches', async () => {
-    const { NotFoundError } = await import('@edge-git/backend-errors');
+    const { NotFoundError } = await import('@rexezuge/errors');
     const svc = new ImportService(
       { DB: {} as never },
       {
@@ -231,8 +234,8 @@ describe('harden-90 detailsUrl SSRF guard', () => {
 
 describe('harden-90 rate-limit ip grouping', () => {
   it('ignores X-Forwarded-For entirely', () => {
-    expect(clientIp(ctxWith({ 'X-Forwarded-For': '9.9.9.9' }))).toBe('unknown');
-    expect(clientIp(ctxWith({ 'CF-Connecting-IP': '1.2.3.4', 'X-Forwarded-For': '9.9.9.9' }))).toBe('1.2.3.4');
+    expect(clientIp((name) => ctxWith({ 'X-Forwarded-For': '9.9.9.9' }).req.header(name))).toBe('unknown');
+    expect(clientIp((name) => ctxWith({ 'CF-Connecting-IP': '1.2.3.4', 'X-Forwarded-For': '9.9.9.9' }).req.header(name))).toBe('1.2.3.4');
   });
 });
 

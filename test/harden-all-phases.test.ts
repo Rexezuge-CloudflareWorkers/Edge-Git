@@ -2,26 +2,30 @@ import { describe, expect, it } from 'vitest';
 import { AppConfiguration } from '@edge-git/backend-runtime/config';
 import { EnvParser } from '@edge-git/backend-runtime/config';
 import { createLogger } from '@edge-git/backend-runtime/logger';
-import { DatabaseError } from '@edge-git/backend-errors';
+import { DatabaseError } from '@rexezuge/errors';
 import { allocateNumberWithFallback } from '@edge-git/backend-services/numbering';
 import { maxTeamGrantRole } from '@edge-git/backend-services/permission';
 // Deep import (why: the `@edge-git/git-service` barrel pulls the `dofs`
 // runtime at module load, which breaks node vitest ESM in combination with
 // API route imports; `GitLogger` is dependency-free).
 import { consoleGitLogger, mergeGitLogger, nullGitLogger } from '@edge-git/git-service/GitLogger';
-import { rateLimit, resetRateLimitForTests } from '@/middleware/rateLimit';
+import { rateLimit } from '@/middleware/rateLimit';
 import { PushBodyInvalidError, PushProtectionsUnavailableError } from '@/workers/routes/PushProtections';
 import { getRepoSocial } from '@/workers/routes/RepoSocialHelper';
 
 describe('harden all phases', () => {
-  it('EnvParser strict rejects malformed explicit values but allows unset', () => {
-    expect(EnvParser.strictPositiveInt({}, 'MAX_PACK_OBJECTS', '10000')).toBe(10_000);
-    expect(() => EnvParser.strictPositiveInt({ MAX_PACK_OBJECTS: 'banana' }, 'MAX_PACK_OBJECTS', '10000')).toThrow(
-      /MAX_PACK_OBJECTS/,
-    );
-    expect(() => EnvParser.strictPositiveInt({ MAX_PACK_OBJECTS: '0' }, 'MAX_PACK_OBJECTS', '10000')).toThrow();
+  it('EnvParser reports malformed explicit values but allows unset', () => {
+    // The kit drops the throwing `strictPositiveInt`: nothing in production
+    // opted in, and a fail-fast parse on a request path turns a dashboard typo
+    // into a 500 instead of a startup warning.
     expect(EnvParser.isValidPositiveInt({ MAX_PACK_OBJECTS: 'banana' }, 'MAX_PACK_OBJECTS')).toBe(false);
     expect(EnvParser.isValidPositiveInt({}, 'MAX_PACK_OBJECTS')).toBe(true);
+    expect(EnvParser.positiveInt({}, 'MAX_PACK_OBJECTS', '10000')).toBe(10_000);
+    expect(EnvParser.positiveInt({ MAX_PACK_OBJECTS: 'banana' }, 'MAX_PACK_OBJECTS', '10000')).toBe(10_000);
+    expect(EnvParser.positiveInt({ MAX_PACK_OBJECTS: '0' }, 'MAX_PACK_OBJECTS', '10000')).toBe(10_000);
+    // Zero is a meaningful retention/quota configuration, so it is not silently
+    // replaced by the default the way a non-positive int is.
+    expect(EnvParser.nonNegativeInt({ RETENTION_DAYS: '0' }, 'RETENTION_DAYS', '30')).toBe(0);
   });
 
   it('AppConfiguration.validate reports malformed numeric env', () => {
@@ -109,7 +113,6 @@ describe('harden all phases', () => {
     expect(() => rateLimit({ windowMs: 0, max: 10, keyPrefix: 'x' })).toThrow(/windowMs/);
     expect(() => rateLimit({ windowMs: 1000, max: -1, keyPrefix: 'x' })).toThrow(/max/);
     expect(() => rateLimit({ windowMs: 1000, max: 10, keyPrefix: '  ' })).toThrow(/keyPrefix/);
-    resetRateLimitForTests();
   });
 
   it('push protection errors carry stable names', () => {

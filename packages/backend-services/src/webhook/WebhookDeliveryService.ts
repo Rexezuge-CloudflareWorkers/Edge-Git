@@ -1,7 +1,7 @@
 import { WebhookDeliveryDAO } from '@edge-git/backend-data/dao';
 import type { RepoWebhookRow, WebhookDAO, WebhookDeliveryRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { NotFoundError } from '@edge-git/backend-errors';
+import { NotFoundError } from '@rexezuge/errors';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import type { WebhookDeliveryMetadata, WebhookEventName } from '@edge-git/shared';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';

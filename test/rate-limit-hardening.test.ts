@@ -1,5 +1,6 @@
-import { describe, expect, it, beforeEach } from 'vitest';
-import { rateLimit, resetRateLimitForTests, clientIp, getRateLimitBucketCountForTests } from '@/middleware';
+import { describe, expect, it } from 'vitest';
+import { rateLimit } from '@/middleware';
+import { clientIp } from '@rexezuge/http';
 
 function makeCtx(headers: Record<string, string | null> = {}, identity?: string) {
   return {
@@ -14,21 +15,25 @@ function makeCtx(headers: Record<string, string | null> = {}, identity?: string)
   } as never;
 }
 
+/**
+ * Each `it` builds its own limiter, which is the point of the kit's design: the
+ * bucket map lives in the limiter's closure, so a fresh `rateLimit(...)` starts
+ * empty. There is no module-level bucket map left to reset between specs, and
+ * no `resetRateLimitForTests` seam to remember to call.
+ */
 describe('rate-limit hardening', () => {
-  beforeEach(() => resetRateLimitForTests());
-
   it('prefers CF-Connecting-IP over spoofable X-Forwarded-For', () => {
     const c = makeCtx({ 'CF-Connecting-IP': '1.2.3.4', 'X-Forwarded-For': '9.9.9.9' });
-    expect(clientIp(c as never)).toBe('1.2.3.4');
+    expect(clientIp((name) => c.req.header(name))).toBe('1.2.3.4');
   });
 
   it('does NOT trust spoofable X-Forwarded-For (fail-closed grouping)', () => {
     const c = makeCtx({ 'X-Forwarded-For': ' 5.6.7.8, 1.1.1.1' });
-    expect(clientIp(c as never)).toBe('unknown');
+    expect(clientIp((name) => c.req.header(name))).toBe('unknown');
   });
 
   it('returns unknown with no ip headers', () => {
-    expect(clientIp(makeCtx() as never)).toBe('unknown');
+    expect(clientIp((name) => makeCtx().req.header(name))).toBe('unknown');
   });
 
   it('isolates buckets by authenticated identity, not just ip', async () => {
@@ -38,21 +43,30 @@ describe('rate-limit hardening', () => {
     // Same IP but different identity gets its own bucket.
     const second = await guard(makeCtx({}, 'bob@example.com'), next as never);
     expect(second).toBeUndefined();
-    // Same identity again is limited.
-    const limited = (await guard(makeCtx({}, 'alice@example.com'), next as never)) as unknown as Response;
-    expect((limited as Response).status).toBe(429);
+    // Same identity again is limited, and answers with the family's envelope.
+    const limited = (await guard(makeCtx({}, 'alice@example.com'), next as never)) as Response;
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('Retry-After')).toMatch(/^\d+$/);
+    await expect(limited.json()).resolves.toMatchObject({ Exception: { Type: 'RateLimited' } });
   });
 
-  it('evicts oldest buckets instead of clearing all under flood', async () => {
+  it('keeps bucket count bounded under a flood of distinct identities', async () => {
     const guard = rateLimit({ windowMs: 60_000, max: 1, keyPrefix: 'flood-test' });
     const next = async () => undefined;
-    // Fill past the 5000 hard cap with distinct identities.
+    // Fill past the hard cap with distinct identities.
     for (let i = 0; i < 5100; i += 1) {
       await guard(makeCtx({}, `user-${i}@example.com`), next as never);
     }
-    // LRU eviction keeps size at/below cap instead of unbounded growth.
-    expect(getRateLimitBucketCountForTests()).toBeLessThanOrEqual(5001);
-    expect(getRateLimitBucketCountForTests()).toBeGreaterThan(0);
+    // The cap evicts **oldest-first** rather than clearing the map, so the
+    // earliest bucket is gone (served fresh) while the most recent one is still
+    // being enforced. "Clear everything" would also bound memory, and would
+    // let a flood reset every legitimate caller's budget at once.
+    const oldest = await guard(makeCtx({}, 'user-0@example.com'), next as never);
+    expect(oldest).toBeUndefined();
+    const newest = (await guard(makeCtx({}, 'user-5099@example.com'), next as never)) as Response;
+    expect(newest.status).toBe(429);
+    const fresh = await guard(makeCtx({}, 'user-5100@example.com'), next as never);
+    expect(fresh).toBeUndefined();
   });
 
   it('resets window after expiry', async () => {
@@ -65,5 +79,11 @@ describe('rate-limit hardening', () => {
     await new Promise((r) => setTimeout(r, 5));
     await guard(makeCtx({}, 'w@example.com'), next as never);
     expect(calls).toBe(2);
+  });
+
+  it('rejects a misconfigured limiter at registration instead of installing an unlimited one', () => {
+    expect(() => rateLimit({ windowMs: 0, max: 1, keyPrefix: 'x' })).toThrow(/windowMs/);
+    expect(() => rateLimit({ windowMs: 1000, max: 0, keyPrefix: 'x' })).toThrow(/max/);
+    expect(() => rateLimit({ windowMs: 1000, max: 1, keyPrefix: '  ' })).toThrow(/keyPrefix/);
   });
 });

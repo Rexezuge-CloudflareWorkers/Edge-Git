@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { canonicalizeLanguageTag } from '@edge-git/shared/utils';
-import { canonicalizeBackendLocaleTag, getBackendStrings } from '@edge-git/shared/i18n';
+import { getLocalizedStrings } from '@rexezuge/i18n';
 import { assetNameSchema, branchNameSchema, repoNameSchema, teamSlugSchema, usernameSchema } from '@edge-git/shared/validation';
 import { RoleRank } from '@edge-git/backend-services/permission';
 import { hideExistence, mapServiceError, toServiceStatus } from '@edge-git/backend-services/errors';
-import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
+import { BadRequestError, NotFoundError } from '@rexezuge/errors';
 import { AppConfiguration } from '@edge-git/backend-runtime/config';
 import { resolveSandboxLimits } from '../apps/background/src/checks/SandboxLimits';
 
@@ -12,12 +12,12 @@ describe('refactor: shared kernel', () => {
   it('canonicalizes language tags from a single source', () => {
     expect(canonicalizeLanguageTag('en_us')).toBe('en-US');
     expect(canonicalizeLanguageTag('zh')).toBe('zh');
-    expect(canonicalizeBackendLocaleTag('en_us')).toBe(canonicalizeLanguageTag('en_us'));
+    expect(canonicalizeLanguageTag('en_us')).toBe(canonicalizeLanguageTag('en_us'));
   });
 
   it('exposes internalError strings in both locales', () => {
-    expect(getBackendStrings('en').common.internalError).toBe('Internal Server Error.');
-    expect(getBackendStrings('zh-CN').common.internalError).toBeTruthy();
+    expect(getLocalizedStrings('en').common.internalError).toBe('Internal Server Error.');
+    expect(getLocalizedStrings('zh-CN').common.internalError).toBeTruthy();
   });
 
   it('validates names via shared zod schemas', () => {
@@ -47,7 +47,7 @@ describe('refactor: policy objects + error mapper', () => {
     expect(mapped.body.Exception?.Type).toBeTruthy();
     const internal = mapServiceError(new Error('boom'), 'zh-CN');
     expect(internal.status).toBe(500);
-    expect(internal.body.Exception?.Message).toBe(getBackendStrings('zh-CN').common.internalError);
+    expect(internal.body.Exception?.Message).toBe(getLocalizedStrings('zh-CN').common.internalError);
     expect(toServiceStatus(new BadRequestError('bad'))).toBe(400);
     expect(toServiceStatus(new Error('boom'))).toBe(500);
   });

@@ -5,7 +5,7 @@
 // `null` on miss, missing binding, or backend error; writes return `false`
 // when skipped (no binding, oversize value, backend error) and `true` when
 // stored. Callers treat KV as a pure optimization — D1/DO stay authoritative.
-import { createLogger } from '../logger';
+import { createLogger } from '@rexezuge/runtime';
 import { KV_DOMAINS, buildKvKey, clampTtl, utf8ByteLength } from './KvDomains';
 import type { KvDomainName } from './KvDomains';
 

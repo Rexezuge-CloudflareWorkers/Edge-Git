@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 
 export interface PullRequestRow {
   id: string;
@@ -77,32 +77,7 @@ class PullRequestDAO extends BaseDAO {
     now: number;
     headRepositoryId?: string | null;
   }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'INSERT INTO pull_requests (id, repository_id, number, title, body, status, base_branch, head_branch, base_oid, head_oid, merge_base_oid, creator_email, merged_by, merged_at, created_at, updated_at, head_repository_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)',
-          )
-          .bind(
-            input.id,
-            input.repositoryId,
-            input.number,
-            input.title,
-            input.body,
-            'open',
-            input.baseBranch,
-            input.headBranch,
-            input.baseOid,
-            input.headOid,
-            input.mergeBaseOid,
-            input.creatorEmail,
-            input.now,
-            input.now,
-            input.headRepositoryId ?? null,
-          )
-          .run(),
-      'create pull request',
-    );
+    await this.run('INSERT INTO pull_requests (id, repository_id, number, title, body, status, base_branch, head_branch, base_oid, head_oid, merge_base_oid, creator_email, merged_by, merged_at, created_at, updated_at, head_repository_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)', [input.id, input.repositoryId, input.number, input.title, input.body, 'open', input.baseBranch, input.headBranch, input.baseOid, input.headOid, input.mergeBaseOid, input.creatorEmail, input.now, input.now, input.headRepositoryId ?? null]);
   }
 
   // `full_name` / `head_full_name` are computed from `repositories` (0024
@@ -134,23 +109,11 @@ class PullRequestDAO extends BaseDAO {
   }
 
   public async setStatus(id: string, status: 'open' | 'closed' | 'merged', now: number): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('UPDATE pull_requests SET status = ?, updated_at = ? WHERE id = ?').bind(status, now, id).run(),
-      'update pull request status',
-    );
+    await this.run('UPDATE pull_requests SET status = ?, updated_at = ? WHERE id = ?', [status, now, id]);
   }
 
   public async markMerged(id: string, mergedBy: string, commitOid: string | null, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'UPDATE pull_requests SET status = ?, merged_by = ?, merged_at = ?, head_oid = COALESCE(?, head_oid), updated_at = ? WHERE id = ?',
-          )
-          .bind('merged', mergedBy, now, commitOid, now, id)
-          .run(),
-      'mark pull request merged',
-    );
+    await this.run('UPDATE pull_requests SET status = ?, merged_by = ?, merged_at = ?, head_oid = COALESCE(?, head_oid), updated_at = ? WHERE id = ?', ['merged', mergedBy, now, commitOid, now, id]);
   }
 
   public async updateOids(
@@ -158,16 +121,7 @@ class PullRequestDAO extends BaseDAO {
     oids: { baseOid?: string | null; headOid?: string | null; mergeBaseOid?: string | null },
     now: number,
   ): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'UPDATE pull_requests SET base_oid = COALESCE(?, base_oid), head_oid = COALESCE(?, head_oid), merge_base_oid = COALESCE(?, merge_base_oid), updated_at = ? WHERE id = ?',
-          )
-          .bind(oids.baseOid ?? null, oids.headOid ?? null, oids.mergeBaseOid ?? null, now, id)
-          .run(),
-      'update pull request oids',
-    );
+    await this.run('UPDATE pull_requests SET base_oid = COALESCE(?, base_oid), head_oid = COALESCE(?, head_oid), merge_base_oid = COALESCE(?, merge_base_oid), updated_at = ? WHERE id = ?', [oids.baseOid ?? null, oids.headOid ?? null, oids.mergeBaseOid ?? null, now, id]);
   }
 
   public async setDraft(id: string, isDraft: boolean, now: number): Promise<void> {
@@ -187,26 +141,9 @@ class PullRequestDAO extends BaseDAO {
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('DELETE FROM pull_request_reviews WHERE pull_request_id IN (SELECT id FROM pull_requests WHERE repository_id = ?)')
-          .bind(repositoryId)
-          .run(),
-      'delete pull request reviews by repo',
-    );
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('DELETE FROM pull_request_comments WHERE pull_request_id IN (SELECT id FROM pull_requests WHERE repository_id = ?)')
-          .bind(repositoryId)
-          .run(),
-      'delete pull request comments by repo',
-    );
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM pull_requests WHERE repository_id = ?').bind(repositoryId).run(),
-      'delete pull requests by repo',
-    );
+    await this.run('DELETE FROM pull_request_reviews WHERE pull_request_id IN (SELECT id FROM pull_requests WHERE repository_id = ?)', [repositoryId]);
+    await this.run('DELETE FROM pull_request_comments WHERE pull_request_id IN (SELECT id FROM pull_requests WHERE repository_id = ?)', [repositoryId]);
+    await this.run('DELETE FROM pull_requests WHERE repository_id = ?', [repositoryId]);
   }
 
   public async addReview(input: {
@@ -218,16 +155,7 @@ class PullRequestDAO extends BaseDAO {
     commitOid: string | null;
     now: number;
   }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'INSERT INTO pull_request_reviews (id, pull_request_id, author_email, state, body, commit_oid, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          )
-          .bind(input.id, input.pullRequestId, input.authorEmail, input.state, input.body, input.commitOid, input.now)
-          .run(),
-      'add pull request review',
-    );
+    await this.run('INSERT INTO pull_request_reviews (id, pull_request_id, author_email, state, body, commit_oid, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', [input.id, input.pullRequestId, input.authorEmail, input.state, input.body, input.commitOid, input.now]);
   }
 
   public async listReviews(pullRequestId: string): Promise<PullRequestReviewRow[]> {
@@ -239,14 +167,7 @@ class PullRequestDAO extends BaseDAO {
   }
 
   public async addComment(id: string, pullRequestId: string, authorEmail: string, body: string, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('INSERT INTO pull_request_comments (id, pull_request_id, author_email, body, created_at) VALUES (?, ?, ?, ?, ?)')
-          .bind(id, pullRequestId, authorEmail, body, now)
-          .run(),
-      'add pull request comment',
-    );
+    await this.run('INSERT INTO pull_request_comments (id, pull_request_id, author_email, body, created_at) VALUES (?, ?, ?, ?, ?)', [id, pullRequestId, authorEmail, body, now]);
   }
 
   public async listComments(pullRequestId: string): Promise<PullRequestCommentRow[]> {
@@ -265,14 +186,7 @@ class PullRequestDAO extends BaseDAO {
   }
 
   public async dismissReview(reviewId: string, dismissedBy: string, reason: string | null, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('UPDATE pull_request_reviews SET dismissed = 1, dismissed_by = ?, dismissed_at = ?, dismiss_reason = ? WHERE id = ?')
-          .bind(dismissedBy, now, reason, reviewId)
-          .run(),
-      'dismiss pull request review',
-    );
+    await this.run('UPDATE pull_request_reviews SET dismissed = 1, dismissed_by = ?, dismissed_at = ?, dismiss_reason = ? WHERE id = ?', [dismissedBy, now, reason, reviewId]);
   }
 }
 

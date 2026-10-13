@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { CursorUtil } from '@edge-git/backend-data/utils/CursorUtil';
-import { isD1ErrorRetryable } from '@edge-git/backend-data/utils/D1ErrorClassifier';
-import { executeD1WithRetry } from '@edge-git/backend-data/utils/D1Utils';
+import { CursorCodec } from '@rexezuge/shared';
+import { isD1ErrorRetryable } from '@rexezuge/d1';
+import { executeWithRetry } from '@rexezuge/d1';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config';
 import { AppConfiguration } from '@edge-git/backend-runtime/config/AppConfiguration';
-import { EnvParser } from '@edge-git/backend-runtime/config/EnvParser';
+import { EnvParser } from '@rexezuge/runtime';
 import { IssueService } from '@edge-git/backend-services/issue';
 import { RepoService } from '@edge-git/backend-services/repo';
 import { TokenService } from '@edge-git/backend-services/auth';
 import { UserService } from '@edge-git/backend-services/user';
-import { DatabaseError } from '@edge-git/backend-errors';
+import { DatabaseError } from '@rexezuge/errors';
 
 // Minimal in-memory D1 fake covering the queries used by DAOs under test.
 function createFakeDb(seed: { now?: number } = {}): D1Queryable & {
@@ -163,8 +163,8 @@ function createFakeDb(seed: { now?: number } = {}): D1Queryable & {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO users')) {
-          const [email, created_at] = params as Array<string | number>;
-          if (!state.users.some((u) => u.email === email)) state.users.push({ email, created_at });
+          const [email, created_at, id, current_email] = params as Array<string | number>;
+          if (!state.users.some((u) => u.email === email)) state.users.push({ email, created_at, id, current_email });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE repositories SET')) {
@@ -357,7 +357,7 @@ describe('Config', () => {
 describe('D1 utils', () => {
   it('retries retryable failures then succeeds', async () => {
     let attempts = 0;
-    const result = await executeD1WithRetry(
+    const result = await executeWithRetry(
       () => {
         attempts += 1;
         if (attempts < 3) throw new Error('database is locked');
@@ -372,7 +372,7 @@ describe('D1 utils', () => {
 
   it('throws DatabaseError for non-retryable failures', async () => {
     await expect(
-      executeD1WithRetry(() => Promise.resolve({ success: false, error: 'UNIQUE constraint failed' }), 'dup'),
+      executeWithRetry(() => Promise.resolve({ success: false, error: 'UNIQUE constraint failed' }), 'dup'),
     ).rejects.toBeInstanceOf(DatabaseError);
     expect(isD1ErrorRetryable('database is locked')).toBe(true);
     expect(isD1ErrorRetryable('UNIQUE constraint failed')).toBe(false);
@@ -380,8 +380,8 @@ describe('D1 utils', () => {
   });
 
   it('round-trips cursors', () => {
-    expect(CursorUtil.decode(CursorUtil.encode({ a: 1 }))).toEqual({ a: 1 });
-    expect(CursorUtil.decode('!!!')).toBeUndefined();
-    expect(CursorUtil.decode(undefined)).toBeUndefined();
+    expect(CursorCodec.decode(CursorCodec.encode({ a: 1 }))).toEqual({ a: 1 });
+    expect(CursorCodec.decode('!!!')).toBeUndefined();
+    expect(CursorCodec.decode(undefined)).toBeUndefined();
   });
 });

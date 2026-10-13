@@ -81,7 +81,7 @@ export default tseslint.config(
       'unicorn/prefer-module': 'off',
       // Top-level await not available in all Workers entry points
       'unicorn/prefer-top-level-await': 'off',
-      // Error subclassing via `new MyError()` is intentional in backend-errors
+      // Error subclassing via `new MyError()` is intentional in the error layer
       'unicorn/custom-error-definition': 'off',
       // Template literals throughout the codebase are fine as-is
       'unicorn/no-useless-undefined': 'off',
@@ -201,24 +201,7 @@ export default tseslint.config(
       ],
     },
   },
-  // Layer 0: backend-errors — zero @edge-git/* deps
-  {
-    files: ['packages/backend-errors/**/*.{ts,js}'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: ['@edge-git/*'],
-              message: 'backend-errors must not import from other @edge-git packages — it is a zero-dependency base layer',
-            },
-          ],
-        },
-      ],
-    },
-  },
-  // Layer 1: backend-runtime — only shared and backend-errors
+  // Layer 1: backend-runtime — shared + the kit
   {
     files: ['packages/backend-runtime/**/*.{ts,js}'],
     rules: {
@@ -249,7 +232,7 @@ export default tseslint.config(
       ],
     },
   },
-  // Layer 2: backend-data — only shared and backend-errors
+  // Layer 2: backend-data — shared + the kit
   {
     files: ['packages/backend-data/**/*.{ts,js}'],
     rules: {
@@ -277,7 +260,7 @@ export default tseslint.config(
       ],
     },
   },
-  // Layer 2: git-protocol — only shared and backend-errors
+  // Layer 2: git-protocol — shared + the kit
   {
     files: ['packages/git-protocol/**/*.{ts,js}'],
     rules: {

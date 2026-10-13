@@ -1,20 +1,41 @@
-import type { D1Queryable, D1Result } from '../utils/D1Types';
-import { CursorUtil } from '../utils/CursorUtil';
-import { executeD1WithRetry } from '../utils/D1Utils';
+import { BaseDAO as KitBaseDAO, executeWithRetry } from '@rexezuge/d1';
+import type { D1PreparedStatement, D1Queryable, D1Result } from '@rexezuge/d1';
+import { CursorCodec } from '@rexezuge/shared';
+import { assertSqlIdentifier } from '@rexezuge/d1';
 
-const SQL_IDENTIFIER_PATTERN = /^[a-z_]\w*$/i;
-
-function assertSqlIdentifier(value: string, label: string): void {
-  if (!SQL_IDENTIFIER_PATTERN.test(value)) {
-    throw new Error(`Invalid SQL identifier for ${label}: ${value}`);
+/**
+ * Edge-Git's DAO base.
+ *
+ * The retry policy, the `success: false` → `DatabaseError` normalization and
+ * the sql-first `run`/`first`/`all`/`count`/`batch` helpers are the kit's, so a
+ * D1 constraint failure is one typed error everywhere and every read site
+ * states its SQL instead of wrapping it in a closure it mostly did not need.
+ *
+ * What stays here is what is *not* a D1 policy: the by-primary-key lookup and
+ * the opaque-cursor helpers, both of which every DAO in this repo reaches for.
+ * Cursors live in `@rexezuge/shared`'s `CursorCodec` rather than the local
+ * `CursorUtil` — same encoding, one copy.
+ */
+abstract class BaseDAO extends KitBaseDAO {
+  protected constructor(database: D1Queryable) {
+    super(database);
   }
-}
 
-abstract class BaseDAO {
-  constructor(protected readonly database: D1Queryable) {}
-
+  /**
+   * Escape hatch for the operations the sql-first helpers do not cover — a
+   * `Database.batch()` the kit does not own, or a statement whose result shape
+   * the caller must inspect itself. Prefer `run`/`first`/`all`.
+   */
   protected withRetry(operation: () => Promise<D1Result>, context: string): Promise<D1Result> {
-    return executeD1WithRetry(operation, context);
+    return executeWithRetry(operation, context);
+  }
+
+  /**
+   * One prepared statement with its bindings applied. Bindings are always
+   * parameters — never interpolation.
+   */
+  protected prepare(sql: string, bindings: unknown[] = []): D1PreparedStatement {
+    return bindings.length > 0 ? this.database.prepare(sql).bind(...bindings) : this.database.prepare(sql);
   }
 
   // Instance variants of the static helpers below, bound to this DAO's
@@ -36,20 +57,36 @@ abstract class BaseDAO {
   // Shared opaque-cursor codec. Per-DAO `encodeCursor/parseCursor` wrappers
   // should delegate here and only add payload validation.
   protected encodeCursor(value: unknown): string {
-    return CursorUtil.encode(value);
+    return CursorCodec.encode(value);
   }
 
   protected decodeCursor<T>(cursor: string | undefined): T | undefined {
-    return CursorUtil.decode<T>(cursor);
+    return CursorCodec.decode<T>(cursor);
   }
 
+  /**
+   * Strict decode for the paginated query DAOs.
+   *
+   * "OrThrow" is about a cursor the client *sent*: a malformed one is a bug or
+   * a tamper attempt and must not silently read as "start from the beginning".
+   * An absent cursor is not an error — it is the first page — so it still
+   * decodes to `undefined` and the caller keeps its `decoded === undefined`
+   * branch. The kit's `decodeOrThrow` takes a `string` and throws on `atob('')`,
+   * so the absent case is split off here rather than at each of the four DAOs.
+   */
   protected decodeCursorOrThrow<T>(cursor: string | undefined): T | undefined {
-    return CursorUtil.decodeOrThrow<T>(cursor);
+    return cursor ? CursorCodec.decodeOrThrow<T>(cursor) : undefined;
   }
 
   // Generic row lookup by primary key. Table/column identifiers are allow-listed
   // to keep dynamic SQL safe; values always go through bindings.
-  protected static async findById<T>(db: D1Queryable, table: string, idColumn: string, idValue: string, columns = '*'): Promise<T | null> {
+  protected static async findById<T>(
+    db: D1Queryable,
+    table: string,
+    idColumn: string,
+    idValue: string,
+    columns = '*',
+  ): Promise<T | null> {
     assertSqlIdentifier(table, 'table');
     assertSqlIdentifier(idColumn, 'idColumn');
     let selectColumns = '*';
@@ -61,42 +98,19 @@ abstract class BaseDAO {
       });
       selectColumns = validated.join(', ');
     }
-    const row: T | null = await db.prepare(`SELECT ${selectColumns} FROM ${table} WHERE ${idColumn} = ? LIMIT 1`).bind(idValue).first<T>();
+    const row: T | null = await db
+      .prepare(`SELECT ${selectColumns} FROM ${table} WHERE ${idColumn} = ? LIMIT 1`)
+      .bind(idValue)
+      .first<T>();
     return row ?? null;
-  }
-
-  // Generic batched delete of rows older than a cutoff. Mirrors the per-DAO
-  // DELETE ... WHERE id IN (SELECT ... LIMIT ?) pattern with retry.
-  protected static async deleteOlderThan(
-    db: D1Queryable,
-    table: string,
-    timeColumn: string,
-    cutoff: number | string,
-    limit: number,
-    idColumn: string,
-  ): Promise<number> {
-    assertSqlIdentifier(table, 'table');
-    assertSqlIdentifier(timeColumn, 'timeColumn');
-    assertSqlIdentifier(idColumn, 'idColumn');
-    const result: D1Result = await executeD1WithRetry(
-      (): Promise<D1Result> =>
-        db
-          .prepare(
-            `DELETE FROM ${table}
-             WHERE ${idColumn} IN (
-               SELECT ${idColumn} FROM ${table}
-               WHERE ${timeColumn} < ?
-               LIMIT ?
-             )`,
-          )
-          .bind(cutoff, limit)
-          .run(),
-      `delete old rows from ${table}`,
-    );
-    return (result.meta as { changes?: number })?.changes ?? 0;
   }
 }
 
+/**
+ * Base for a DAO whose columns hold AES-GCM envelopes. The master key is a
+ * constructor argument, never an env lookup, so a DAO cannot read a key it was
+ * not wired with.
+ */
 abstract class EncryptedDAO extends BaseDAO {
   constructor(
     database: D1Queryable,
@@ -107,3 +121,5 @@ abstract class EncryptedDAO extends BaseDAO {
 }
 
 export { BaseDAO, EncryptedDAO };
+
+export {type D1Queryable, type D1Result} from '@rexezuge/d1';

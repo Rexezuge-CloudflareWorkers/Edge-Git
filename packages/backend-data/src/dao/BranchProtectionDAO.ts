@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 import type { BranchProtectionRuleMetadata } from '@edge-git/shared';
 
 export interface BranchProtectionRuleRow {
@@ -47,26 +47,7 @@ class BranchProtectionDAO extends BaseDAO {
     createdBy: string;
     now: number;
   }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'INSERT INTO branch_protection_rules (id, repository_id, pattern, require_pr, required_approvals, block_force_push, block_deletion, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          )
-          .bind(
-            input.id,
-            input.repositoryId,
-            input.pattern,
-            input.requirePr ? 1 : 0,
-            input.requiredApprovals,
-            input.blockForcePush ? 1 : 0,
-            input.blockDeletion ? 1 : 0,
-            input.createdBy.toLowerCase(),
-            input.now,
-          )
-          .run(),
-      'create branch protection rule',
-    );
+    await this.run('INSERT INTO branch_protection_rules (id, repository_id, pattern, require_pr, required_approvals, block_force_push, block_deletion, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [input.id, input.repositoryId, input.pattern, input.requirePr ? 1 : 0, input.requiredApprovals, input.blockForcePush ? 1 : 0, input.blockDeletion ? 1 : 0, input.createdBy.toLowerCase(), input.now]);
     // Checks live only in the junction table: fail closed by rolling back
     // the rule when the junction write fails.
     try {
@@ -86,19 +67,9 @@ class BranchProtectionDAO extends BaseDAO {
   }
 
   public async replaceContexts(ruleId: string, contexts: readonly string[], now: number): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM branch_protection_required_checks WHERE rule_id = ?').bind(ruleId).run(),
-      'replace branch protection checks',
-    );
+    await this.run('DELETE FROM branch_protection_required_checks WHERE rule_id = ?', [ruleId]);
     for (const context of contexts) {
-      await this.withRetry(
-        () =>
-          this.database
-            .prepare('INSERT OR IGNORE INTO branch_protection_required_checks (rule_id, context, created_at) VALUES (?, ?, ?)')
-            .bind(ruleId, context, now)
-            .run(),
-        'insert branch protection check',
-      );
+      await this.run('INSERT OR IGNORE INTO branch_protection_required_checks (rule_id, context, created_at) VALUES (?, ?, ?)', [ruleId, context, now]);
     }
   }
 
@@ -142,31 +113,13 @@ class BranchProtectionDAO extends BaseDAO {
   }
 
   public async delete(id: string, repositoryId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM branch_protection_rules WHERE id = ? AND repository_id = ?').bind(id, repositoryId).run(),
-      'delete branch protection rule',
-    );
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM branch_protection_required_checks WHERE rule_id = ?').bind(id).run(),
-      'delete branch protection checks',
-    ).catch(() => undefined);
+    await this.run('DELETE FROM branch_protection_rules WHERE id = ? AND repository_id = ?', [id, repositoryId]);
+    await this.run('DELETE FROM branch_protection_required_checks WHERE rule_id = ?', [id]).catch(() => undefined);
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'DELETE FROM branch_protection_required_checks WHERE rule_id IN (SELECT id FROM branch_protection_rules WHERE repository_id = ?)',
-          )
-          .bind(repositoryId)
-          .run(),
-      'delete branch protection checks by repo',
-    ).catch(() => undefined);
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM branch_protection_rules WHERE repository_id = ?').bind(repositoryId).run(),
-      'delete branch protection rules by repo',
-    );
+    await this.run('DELETE FROM branch_protection_required_checks WHERE rule_id IN (SELECT id FROM branch_protection_rules WHERE repository_id = ?)', [repositoryId]).catch(() => undefined);
+    await this.run('DELETE FROM branch_protection_rules WHERE repository_id = ?', [repositoryId]);
   }
 }
 

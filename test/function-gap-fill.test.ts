@@ -21,12 +21,11 @@ import {
   ConflictError,
   PayloadTooLargeError,
   RateLimitedError,
-  AiSummaryRetryableError,
   ProviderApiNonRetryableError,
   ProviderApiRetryableError,
   OAuth2TokenNonRetryableError,
   OAuth2TokenRetryableError,
-} from '@edge-git/backend-errors';
+} from '@rexezuge/errors';
 import { mapServiceError, toServiceStatus as mapToStatus } from '@edge-git/backend-services/errors';
 import { toServiceStatus as apiToStatus, toSafeErrorMessage } from '@/workers/routes/PublicViewerResolver';
 import {
@@ -42,7 +41,6 @@ import {
 } from '@edge-git/background/scheduled/TaskRegistry';
 import { CronTasksWorker } from '@edge-git/background/CronTasksWorker';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { resetRateLimitForTests } from '@/middleware/rateLimit';
 
 const ALICE = 'alice@example.com';
 const BOB = 'bob@example.com';
@@ -50,18 +48,17 @@ const OID_A = 'a'.repeat(40);
 const OID_B = 'b'.repeat(40);
 const OID_ZERO = '0'.repeat(40);
 
-beforeEach(() => {
-  resetRateLimitForTests();
-});
 
 // ---------------------------------------------------------------------------
 // gap fake D1 for EdgeGitWorker + TriggerChecks + SocialEmit
 // ---------------------------------------------------------------------------
 function createGapFakeDb() {
   const state = {
+    // A `users` row carries the account id — that is the identity every grant,
+    // repository and token points at, so a row without one is not an account.
     users: [
-      { email: ALICE, username: 'alice', created_at: 1 },
-      { email: BOB, username: 'bob', created_at: 1 },
+      { id: 'u-alice', email: ALICE, current_email: ALICE, username: 'alice', created_at: 1 },
+      { id: 'u-bob', email: BOB, current_email: BOB, username: 'bob', created_at: 1 },
     ] as Array<Record<string, unknown>>,
     namespaces: [
       { username_ci: 'alice', kind: 'user', user_email: ALICE, org_id: null },
@@ -149,6 +146,9 @@ function createGapFakeDb() {
         if (q.includes('FROM users WHERE lower(email)')) {
           return Promise.resolve((state.users.find((u) => String(u.email).toLowerCase() === Pl(0)) ?? null) as T | null);
         }
+        if (q.includes('FROM users WHERE id = ?')) {
+          return Promise.resolve((state.users.find((u) => u.id === Pl(0)) ?? null) as T | null);
+        }
         if (q.includes('FROM users WHERE lower(username)')) {
           return Promise.resolve((state.users.find((u) => String(u.username ?? '').toLowerCase() === Pl(0)) ?? null) as T | null);
         }
@@ -210,7 +210,7 @@ function createGapFakeDb() {
         if (q.includes('FROM check_runs WHERE repository_id = ? AND head_sha = ?')) {
           return Promise.resolve({
             results: state.checks.filter((c) => c.repository_id === params[0] && String(c.head_sha).toLowerCase() === Pl(1)) as T[],
-          });
+});
         }
         if (q.includes('FROM repositories WHERE') && q.includes('owner_email')) {
           return Promise.resolve({ results: state.repos.filter((r) => String(r.owner_email).toLowerCase() === Pl(0)) as T[] });
@@ -285,11 +285,15 @@ function createGapFakeDb() {
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('INSERT INTO users')) {
-          if (!state.users.some((u) => u.email === params[0])) state.users.push({ email: params[0], created_at: params[1] });
+          if (!state.users.some((u) => u.email === params[0])) state.users.push({ email: params[0], created_at: params[1], id: params[2], current_email: params[3] });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE users SET')) {
-          const row = state.users.find((u) => String(u.email).toLowerCase() === String(params[params.length - 1]).toLowerCase());
+          // `WHERE id = ? OR email = ?` — match on either, as the statement does.
+          const ref = String(params[params.length - 1]).toLowerCase();
+          const row = state.users.find(
+            (u) => String(u.id).toLowerCase() === ref || String(u.email).toLowerCase() === ref,
+          );
           if (row) row.username = (params[0] as string) ?? row.username;
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
@@ -493,59 +497,66 @@ function packResponse(): Uint8Array {
 describe('function-gap backend-errors', () => {
   it('DatabaseError defaults message and honors retryable flag', () => {
     const def = new DatabaseError();
-    expect(def.getErrorType()).toBe('DatabaseError');
-    expect(def.getErrorCode()).toBe(500);
+    expect(def.type).toBe('DatabaseError');
+    expect(def.status).toBe(500);
     expect(def.retryable).toBe(false);
-    expect(def.getErrorMessage()).toContain('database');
+    expect(def.message).toContain('database');
     const retry = new DatabaseError('custom db boom', true);
     expect(retry.retryable).toBe(true);
-    expect(retry.getErrorMessage()).toBe('custom db boom');
+    expect(retry.message).toBe('custom db boom');
   });
 
   it('InternalServerError defaults and singleton share type', () => {
     const err = new InternalServerError();
-    expect(err.getErrorCode()).toBe(500);
-    expect(err.getErrorType()).toBe('InternalServerError');
-    expect(err.getErrorMessage()).toContain('internal error');
-    expect(DefaultInternalServerError.getErrorType()).toBe('InternalServerError');
+    expect(err.status).toBe(500);
+    expect(err.type).toBe('InternalServerError');
+    expect(err.message).toContain('internal error');
+    expect(DefaultInternalServerError.type).toBe('InternalServerError');
     const custom = new InternalServerError('boom');
-    expect(custom.getErrorMessage()).toBe('boom');
+    expect(custom.message).toBe('boom');
   });
 
   it('RetryableError is retryable with dynamic type', () => {
     const err = new RetryableError('try again');
     expect(err.retryable).toBe(true);
-    expect(err.getErrorCode()).toBe(500);
-    expect(err.getErrorType()).toBe('RetryableError');
-    expect(err.getErrorMessage()).toBe('try again');
+    // The kit splits the two outcomes by who owns the fault: a transient
+    // failure is upstream's (502 Bad Gateway), not the server's own.
+    expect(err.status).toBe(502);
+    expect(err.type).toBe('RetryableError');
+    expect(err.message).toBe('try again');
   });
 
   it('NonRetryableError is not retryable with dynamic type', () => {
     const err = new NonRetryableError('fatal');
     expect(err.retryable).toBe(false);
-    expect(err.getErrorCode()).toBe(500);
-    expect(err.getErrorType()).toBe('NonRetryableError');
-    expect(err.getErrorMessage()).toBe('fatal');
+    expect(err.status).toBe(400);
+    expect(err.type).toBe('NonRetryableError');
+    expect(err.message).toBe('fatal');
   });
 
   it('maps Bad/Forbidden/NotFound/Unauthorized/MethodNotAllowed codes', () => {
-    expect(new BadRequestError('bad').getErrorCode()).toBe(400);
-    expect(new BadRequestError().getErrorType()).toBe('BadRequest');
-    expect(new ForbiddenError().getErrorCode()).toBe(403);
-    expect(new NotFoundError().getErrorCode()).toBe(404);
-    expect(new UnauthorizedError().getErrorCode()).toBe(401);
-    expect(new MethodNotAllowedError().getErrorCode()).toBe(405);
-    expect(new MethodNotAllowedError().getErrorType()).toBe('MethodNotAllowed');
+    expect(new BadRequestError('bad').status).toBe(400);
+    expect(new BadRequestError().type).toBe('BadRequest');
+    expect(new ForbiddenError().status).toBe(403);
+    expect(new NotFoundError().status).toBe(404);
+    expect(new UnauthorizedError().status).toBe(401);
+    expect(new MethodNotAllowedError().status).toBe(405);
+    expect(new MethodNotAllowedError().type).toBe('MethodNotAllowed');
   });
 
   it('ProviderErrors preserve retryable hierarchy and ai options', () => {
-    const ai = new AiSummaryRetryableError('ai fail', { aiUsage: { tokens: 1 }, aiOutputText: 'partial' });
-    expect(ai.retryable).toBe(true);
-    expect(ai.aiOutputText).toBe('partial');
     expect(new ProviderApiRetryableError('x').retryable).toBe(true);
+    expect(new ProviderApiRetryableError('x').status).toBe(502);
     expect(new ProviderApiNonRetryableError('x').retryable).toBe(false);
+    expect(new ProviderApiNonRetryableError('x').status).toBe(400);
     expect(new OAuth2TokenRetryableError('x').retryable).toBe(true);
     expect(new OAuth2TokenNonRetryableError('x').retryable).toBe(false);
+    // A concrete subclass reports *itself*, not the outcome it extends, so the
+    // caller can tell which upstream failed. This only holds if the published
+    // dist keeps class names -- see `keepNames` in the kit's minify-dist step.
+    expect(new ProviderApiRetryableError('x').type).toBe('ProviderApiRetryableError');
+    expect(new OAuth2TokenNonRetryableError('x').type).toBe('OAuth2TokenNonRetryableError');
+    expect(new ProviderApiRetryableError('x').name).toBe('ProviderApiRetryableError');
   });
 
   it('mapServiceError maps ServiceError vs plain errors', () => {

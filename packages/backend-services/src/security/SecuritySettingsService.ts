@@ -1,7 +1,7 @@
 import { SecuritySettingsDAO } from '@edge-git/backend-data/dao';
 import type { SecretScanMode } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { BadRequestError } from '@edge-git/backend-errors';
+import { BadRequestError } from '@rexezuge/errors';
 import type { RepoSecuritySettingsMetadata } from '@edge-git/shared';
 import { TimestampUtil } from '@edge-git/shared/utils';
 

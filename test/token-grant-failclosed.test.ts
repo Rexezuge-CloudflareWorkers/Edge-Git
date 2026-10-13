@@ -1,3 +1,4 @@
+import { stubIdentityService, emptyUserEmailRegistry } from './mocks/identity';
 import { describe, expect, it, vi } from 'vitest';
 import { TokenService } from '@edge-git/backend-services/auth';
 
@@ -42,6 +43,7 @@ describe('TokenService scoped-grant fail-closed', () => {
       tokenDAO: () => Promise.resolve(tokenDAO as never),
       tokenGrantDAO: () => Promise.resolve(tokenGrantDAO as never),
       repositoryDAO: () => Promise.resolve(repositoryDAO as never),
+userIdentity: async () => stubIdentityService() as never,
     });
     await expect(
       svc.createToken('Alice@Example.com', 'scoped', 30, ['repo:read'], [{ owner: 'a', name: 'r', scope: 'repo:read' }]),
@@ -55,6 +57,7 @@ describe('TokenService scoped-grant fail-closed', () => {
       tokenDAO: () => Promise.resolve({ getByUserEmail: async () => [], create: async () => undefined } as never),
       tokenGrantDAO: () => Promise.resolve({ setGrants } as never),
       repositoryDAO: () => Promise.resolve({} as never),
+userIdentity: async () => stubIdentityService() as never,
     });
     const created = await svc.createToken('a@example.com', 'plain');
     expect(created.tokenId).toBeTruthy();
@@ -72,6 +75,7 @@ describe('TokenService scoped-grant fail-closed', () => {
           },
         } as never),
       repositoryDAO: () => Promise.resolve({} as never),
+userIdentity: async () => stubIdentityService() as never,
     });
     await expect(svc.listTokens('A@EXAMPLE.com')).rejects.toThrow();
   });
@@ -90,6 +94,7 @@ describe('TokenService scoped-grant fail-closed', () => {
         } as never),
       tokenGrantDAO: () => Promise.resolve({} as never),
       repositoryDAO: () => Promise.resolve({} as never),
+userIdentity: async () => stubIdentityService() as never,
     });
     const out = await svc.rotateToken('tid-9', 'User@Example.COM');
     expect(out.token).toBeTruthy();
@@ -103,6 +108,7 @@ describe('TokenService scoped-grant fail-closed', () => {
       tokenDAO: () => Promise.resolve({ getByUserEmail: async () => [expired], rotate: async () => true } as never),
       tokenGrantDAO: () => Promise.resolve({} as never),
       repositoryDAO: () => Promise.resolve({} as never),
+userIdentity: async () => stubIdentityService() as never,
     });
     await expect(svc.rotateToken('tid-old', 'user@example.com')).rejects.toThrow(/expired/i);
   });

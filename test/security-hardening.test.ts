@@ -9,7 +9,7 @@ import { validateWebhookUrl, verifyDeliverySignature, signDelivery } from '@edge
 import { normalizePublicGitUrl, getBasicCredentials, getBearerToken, validateFilterSpec } from '@edge-git/git-protocol';
 import { RepoFullName } from '@edge-git/shared/utils/Identity';
 import { isSafeFilePath } from '@/workers/routes/FileWriteRoutes';
-import { rateLimit, resetRateLimitForTests, SECURITY_HEADERS } from '@/middleware';
+import { rateLimit, SECURITY_HEADERS } from '@/middleware';
 
 function createTokenFakeDb() {
   const tokens: Array<Record<string, unknown>> = [];
@@ -280,7 +280,6 @@ describe('identity and file-path guards', () => {
 
 describe('rate limit and security headers', () => {
   it('buckets per key and returns 429 with Retry-After', async () => {
-    resetRateLimitForTests();
     const guard = rateLimit({ windowMs: 60_000, max: 2, keyPrefix: 'test-harness' });
     const calls: string[] = [];
     const next = async () => {

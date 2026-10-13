@@ -12,13 +12,13 @@ import {
 } from '@edge-git/backend-data/dao';
 import type { UserRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
+import { BadRequestError, NotFoundError } from '@rexezuge/errors';
 import { isReservedNamespaceName } from '@edge-git/shared/constants';
 import { TimestampUtil } from '@edge-git/shared/utils';
 import { cascadeOwnerRepos } from '../repo/repoRenameCascade';
-import { UserIdentityService } from '../identity/UserIdentityService';
-import { registerAccount, resolveAccount, resolveUserId } from './accountLookup';
-import type { AccountLookupDeps, AccountSummary } from './accountLookup';
+import { UserIdentityService } from '../identity';
+import { registerAccount, resolveAccount } from '@rexezuge/identity';
+import type { AccountLookupDeps, AccountSummary } from '@rexezuge/identity';
 
 interface UserServiceEnv {
   DB: D1Queryable;
@@ -142,7 +142,7 @@ class UserService {
    * grant, repository, or token survive an address change.
    */
   public async resolveUserId(email: string): Promise<string | null> {
-    return resolveUserId(this.lookupDeps(), email);
+    return resolveAccount(this.lookupDeps(), email).then((account) => account?.id ?? null);
   }
 
   private lookupDeps(): AccountLookupDeps {

@@ -1,7 +1,7 @@
 import { PullRequestDAO, PullThreadDAO } from '@edge-git/backend-data/dao';
 import type { PullReviewThreadRow, PullThreadCommentRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { BadRequestError, NotFoundError } from '@edge-git/backend-errors';
+import { BadRequestError, NotFoundError } from '@rexezuge/errors';
 import { TimestampUtil, UUIDUtil } from '@edge-git/shared/utils';
 
 interface PullThreadServiceEnv {

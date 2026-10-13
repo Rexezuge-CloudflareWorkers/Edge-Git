@@ -1,6 +1,6 @@
-import { DatabaseError } from '@edge-git/backend-errors';
+import { DatabaseError } from '@rexezuge/errors';
 import { decryptData, encryptData } from '../crypto/aes-gcm';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 import { EncryptedDAO } from './BaseDAO';
 
 type ImportStatus = 'pending' | 'running' | 'done' | 'failed' | 'cancelled';
@@ -62,16 +62,7 @@ class ImportDAO extends EncryptedDAO {
 
   public async create(input: { id: string; repositoryId: string; sourceUrl: string; createdBy: string; now: number }): Promise<void> {
     const envelope = await encryptData(input.sourceUrl, this.masterKey);
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'INSERT INTO repo_imports (id, repository_id, status, error, imported_refs, created_by, created_at, updated_at, encrypted_source_url, source_url_iv) VALUES (?, ?, ?, NULL, 0, ?, ?, ?, ?, ?)',
-          )
-          .bind(input.id, input.repositoryId, 'pending', input.createdBy, input.now, input.now, envelope.encrypted, envelope.iv)
-          .run(),
-      'create repo import',
-    );
+    await this.run('INSERT INTO repo_imports (id, repository_id, status, error, imported_refs, created_by, created_at, updated_at, encrypted_source_url, source_url_iv) VALUES (?, ?, ?, NULL, 0, ?, ?, ?, ?, ?)', [input.id, input.repositoryId, 'pending', input.createdBy, input.now, input.now, envelope.encrypted, envelope.iv]);
   }
 
   public async getById(id: string): Promise<RepoImportRow | null> {
@@ -115,29 +106,13 @@ class ImportDAO extends EncryptedDAO {
       .all<RepoImportRow>();
     const rows = await this.withDecryptedSourceUrl(result.results ?? []);
     for (const row of rows) {
-      await this.withRetry(
-        () =>
-          this.database
-            .prepare("UPDATE repo_imports SET status = 'running', updated_at = ? WHERE id = ? AND status IN ('pending', 'running')")
-            .bind(now, row.id)
-            .run(),
-        'claim repo import',
-      );
+      await this.run("UPDATE repo_imports SET status = 'running', updated_at = ? WHERE id = ? AND status IN ('pending', 'running')", [now, row.id]);
     }
     return rows;
   }
 
   public async markDone(id: string, refsJson: string, importedRefs: number, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            "UPDATE repo_imports SET status = 'done', error = NULL, imported_refs = ?, updated_at = ? WHERE id = ? AND status IN ('pending', 'running')",
-          )
-          .bind(importedRefs, now, id)
-          .run(),
-      'mark repo import done',
-    );
+    await this.run("UPDATE repo_imports SET status = 'done', error = NULL, imported_refs = ?, updated_at = ? WHERE id = ? AND status IN ('pending', 'running')", [importedRefs, now, id]);
     // Refs live only in the junction table (0024 dropped the JSON column);
     // the JSON argument is parsed transiently, never stored.
     await this.replaceRefs(id, parseRefsJson(refsJson), now);
@@ -152,57 +127,23 @@ class ImportDAO extends EncryptedDAO {
   }
 
   public async replaceRefs(importId: string, refs: ReadonlyArray<{ ref: string; oid: string | null }>, now: number): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM repo_import_refs WHERE import_id = ?').bind(importId).run(),
-      'replace repo import refs',
-    );
+    await this.run('DELETE FROM repo_import_refs WHERE import_id = ?', [importId]);
     for (const ref of refs) {
-      await this.withRetry(
-        () =>
-          this.database
-            .prepare('INSERT OR IGNORE INTO repo_import_refs (import_id, ref_name, oid, created_at) VALUES (?, ?, ?, ?)')
-            .bind(importId, ref.ref, ref.oid, now)
-            .run(),
-        'insert repo import ref',
-      );
+      await this.run('INSERT OR IGNORE INTO repo_import_refs (import_id, ref_name, oid, created_at) VALUES (?, ?, ?, ?)', [importId, ref.ref, ref.oid, now]);
     }
   }
 
   public async markFailed(id: string, error: string, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare("UPDATE repo_imports SET status = 'failed', error = ?, updated_at = ? WHERE id = ? AND status IN ('pending', 'running')")
-          .bind(error.slice(0, 500), now, id)
-          .run(),
-      'mark repo import failed',
-    );
+    await this.run("UPDATE repo_imports SET status = 'failed', error = ?, updated_at = ? WHERE id = ? AND status IN ('pending', 'running')", [error.slice(0, 500), now, id]);
   }
 
   public async markCancelled(id: string, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare("UPDATE repo_imports SET status = 'cancelled', updated_at = ? WHERE id = ? AND status IN ('pending', 'running')")
-          .bind(now, id)
-          .run(),
-      'cancel repo import',
-    );
+    await this.run("UPDATE repo_imports SET status = 'cancelled', updated_at = ? WHERE id = ? AND status IN ('pending', 'running')", [now, id]);
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('DELETE FROM repo_import_refs WHERE import_id IN (SELECT id FROM repo_imports WHERE repository_id = ?)')
-          .bind(repositoryId)
-          .run(),
-      'delete repo import refs',
-    ).catch(() => undefined);
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM repo_imports WHERE repository_id = ?').bind(repositoryId).run(),
-      'delete repo imports',
-    );
+    await this.run('DELETE FROM repo_import_refs WHERE import_id IN (SELECT id FROM repo_imports WHERE repository_id = ?)', [repositoryId]).catch(() => undefined);
+    await this.run('DELETE FROM repo_imports WHERE repository_id = ?', [repositoryId]);
   }
 }
 

@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 
 export interface DiscussionCategoryRow {
   id: string;
@@ -81,16 +81,7 @@ class DiscussionDAO extends BaseDAO {
     kind: string;
     now: number;
   }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'INSERT INTO discussion_categories (id, repository_id, slug, title, description, kind, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          )
-          .bind(input.id, input.repositoryId, input.slug, input.title, input.description, input.kind, input.now)
-          .run(),
-      'create discussion category',
-    );
+    await this.run('INSERT INTO discussion_categories (id, repository_id, slug, title, description, kind, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', [input.id, input.repositoryId, input.slug, input.title, input.description, input.kind, input.now]);
   }
 
   public async ensureDefaultCategories(repositoryId: string, now: number): Promise<DiscussionCategoryRow[]> {
@@ -125,26 +116,7 @@ class DiscussionDAO extends BaseDAO {
     authorEmail: string;
     now: number;
   }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            "INSERT INTO discussions (id, repository_id, category_id, number, title, body, author_email, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)",
-          )
-          .bind(
-            input.id,
-            input.repositoryId,
-            input.categoryId,
-            input.number,
-            input.title,
-            input.body,
-            input.authorEmail,
-            input.now,
-            input.now,
-          )
-          .run(),
-      'create discussion',
-    );
+    await this.run("INSERT INTO discussions (id, repository_id, category_id, number, title, body, author_email, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)", [input.id, input.repositoryId, input.categoryId, input.number, input.title, input.body, input.authorEmail, input.now, input.now]);
   }
 
   public async listByRepo(repositoryId: string, categoryId?: string): Promise<DiscussionRow[]> {
@@ -188,10 +160,7 @@ class DiscussionDAO extends BaseDAO {
   }
 
   public async setStatus(id: string, status: 'open' | 'locked' | 'answered', now: number): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('UPDATE discussions SET status = ?, updated_at = ? WHERE id = ?').bind(status, now, id).run(),
-      'update discussion status',
-    );
+    await this.run('UPDATE discussions SET status = ?, updated_at = ? WHERE id = ?', [status, now, id]);
   }
 
   public async updateDiscussion(
@@ -215,14 +184,7 @@ class DiscussionDAO extends BaseDAO {
     }
     if (sets.length === 0) return;
     sets.push('updated_at = ?');
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(`UPDATE discussions SET ${sets.join(', ')} WHERE id = ?`)
-          .bind(...values, now, id)
-          .run(),
-      'update discussion',
-    );
+    await this.run(`UPDATE discussions SET ${sets.join(', ')} WHERE id = ?`, [...values, now, id]);
   }
 
   public async deleteDiscussion(id: string): Promise<void> {
@@ -231,20 +193,11 @@ class DiscussionDAO extends BaseDAO {
       .bind(id)
       .run()
       .catch(() => undefined);
-    await this.withRetry(() => this.database.prepare('DELETE FROM discussions WHERE id = ?').bind(id).run(), 'delete discussion');
+    await this.run('DELETE FROM discussions WHERE id = ?', [id]);
   }
 
   public async createComment(input: { id: string; discussionId: string; authorEmail: string; body: string; now: number }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'INSERT INTO discussion_comments (id, discussion_id, author_email, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-          )
-          .bind(input.id, input.discussionId, input.authorEmail, input.body, input.now, input.now)
-          .run(),
-      'create discussion comment',
-    );
+    await this.run('INSERT INTO discussion_comments (id, discussion_id, author_email, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)', [input.id, input.discussionId, input.authorEmail, input.body, input.now, input.now]);
   }
 
   public async listComments(discussionId: string): Promise<DiscussionCommentRow[]> {
@@ -265,21 +218,11 @@ class DiscussionDAO extends BaseDAO {
   }
 
   public async updateComment(id: string, discussionId: string, body: string, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('UPDATE discussion_comments SET body = ?, updated_at = ? WHERE id = ? AND discussion_id = ?')
-          .bind(body, now, id, discussionId)
-          .run(),
-      'update discussion comment',
-    );
+    await this.run('UPDATE discussion_comments SET body = ?, updated_at = ? WHERE id = ? AND discussion_id = ?', [body, now, id, discussionId]);
   }
 
   public async deleteComment(id: string, discussionId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM discussion_comments WHERE id = ? AND discussion_id = ?').bind(id, discussionId).run(),
-      'delete discussion comment',
-    );
+    await this.run('DELETE FROM discussion_comments WHERE id = ? AND discussion_id = ?', [id, discussionId]);
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {

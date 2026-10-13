@@ -1,4 +1,4 @@
-import { EmailAddress, TimestampUtil, repoDoKeyForFullName } from '@edge-git/shared/utils';
+import { TimestampUtil, normalizeEmail, repoDoKeyForFullName } from '@edge-git/shared/utils';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import type { RepoServiceDeps } from './RepoService';
 
@@ -51,7 +51,7 @@ async function resolveCreationContext(
 }
 
 async function resolveCallerUsernameLowercased(userDAO: RepoServiceDeps['userDAO'], userEmail: string): Promise<string | null> {
-  const normalized = EmailAddress.normalize(userEmail);
+  const normalized = normalizeEmail(userEmail);
   try {
     const dao = await userDAO?.();
     const user = await dao?.getByEmail(normalized);

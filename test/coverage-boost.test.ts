@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { NonRetryableError } from '@edge-git/backend-errors/NonRetryableError';
-import { RetryableError } from '@edge-git/backend-errors/RetryableError';
 import {
-  AiSummaryRetryableError,
+  InternalServerError,
+  MethodNotAllowedError,
+  NonRetryableError,
   OAuth2TokenNonRetryableError,
   OAuth2TokenRetryableError,
   ProviderApiNonRetryableError,
   ProviderApiRetryableError,
-} from '@edge-git/backend-errors/ProviderErrors';
-import { UnauthorizedError, MethodNotAllowedError, InternalServerError } from '@edge-git/backend-errors';
+  RetryableError,
+  UnauthorizedError,
+} from '@rexezuge/errors';
 import { mapServiceError, hideExistence } from '@edge-git/backend-services/errors';
 import { ConsoleLogger, FixedClock, NullLogger, SystemClock, createServiceContext } from '@edge-git/backend-runtime/di/ServiceContext';
 import { SearchService } from '@edge-git/backend-services/search';
@@ -17,19 +18,22 @@ import { buildQuery, unwrapList, apiAuthedFirst } from '../apps/web/src/lib/api'
 import { canWrite, canWriteRepo } from '../apps/web/src/lib/permissions';
 import { normalizeLocale, resolveLocale } from '../apps/web/src/lib/locale';
 
-describe('backend-errors constructors', () => {
-  it('exposes codes, types, messages', () => {
-    expect(new NonRetryableError('boom').getErrorCode()).toBe(500);
-    expect(new NonRetryableError('boom').getErrorType()).toBe('NonRetryableError');
-    expect(new RetryableError('retry').getErrorCode()).toBe(500);
-    expect(new UnauthorizedError('no').getErrorCode()).toBe(401);
-    expect(new MethodNotAllowedError('no').getErrorCode()).toBe(405);
-    expect(new InternalServerError('x').getErrorCode()).toBe(500);
-    expect(new AiSummaryRetryableError('ai', { aiUsage: { t: 1 } }).aiUsage).toMatchObject({ t: 1 });
-    expect(new ProviderApiRetryableError('p').getErrorCode()).toBe(500);
-    expect(new ProviderApiNonRetryableError('p').getErrorCode()).toBe(500);
-    expect(new OAuth2TokenRetryableError('o').getErrorCode()).toBe(500);
-    expect(new OAuth2TokenNonRetryableError('o').getErrorCode()).toBe(500);
+describe('@rexezuge/errors constructors', () => {
+  it('exposes status, type, message', () => {
+    // The kit's `OutcomeError` defaults status from the retry flag rather than
+    // from a name lookup: a permanent provider failure is the caller's fault
+    // (400), a transient one is an upstream fault (502). The old in-repo copy
+    // reported 500 for both, so a revoked grant read as a server fault.
+    expect(new NonRetryableError('boom').status).toBe(400);
+    expect(new NonRetryableError('boom').type).toBe('NonRetryableError');
+    expect(new RetryableError('retry').status).toBe(502);
+    expect(new UnauthorizedError('no').status).toBe(401);
+    expect(new MethodNotAllowedError('no').status).toBe(405);
+    expect(new InternalServerError('x').status).toBe(500);
+    expect(new ProviderApiRetryableError('p').status).toBe(502);
+    expect(new ProviderApiNonRetryableError('p').status).toBe(400);
+    expect(new OAuth2TokenRetryableError('o').status).toBe(502);
+    expect(new OAuth2TokenNonRetryableError('o').status).toBe(400);
   });
 
   it('maps unknown errors to generic 500', () => {

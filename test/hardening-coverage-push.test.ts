@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { EnvParser } from '@edge-git/backend-runtime/config/EnvParser';
+import { EnvParser } from '@rexezuge/runtime';
 import { AppConfiguration } from '@edge-git/backend-runtime/config';
 import { repoDoKey, repoDoKeyForFullName } from '@edge-git/shared/utils';
 import { RepoLifecycle } from '@edge-git/background/RepoLifecycle';

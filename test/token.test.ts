@@ -1,3 +1,4 @@
+import { stubIdentityService, emptyUserEmailRegistry } from './mocks/identity';
 import { describe, expect, it } from 'vitest';
 import { TokenService, coversScope, normalizeTokenScopes } from '@edge-git/backend-services/auth';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
@@ -150,6 +151,7 @@ describe('TokenService scoped lifecycle', () => {
           Promise.resolve({
             listByToken: () => Promise.reject(new Error('D1 unavailable')),
           } as never),
+userIdentity: async () => stubIdentityService() as never,
       },
     );
     await expect(failing.authenticateWithPAT(created.token)).rejects.toThrow('temporarily unavailable');

@@ -8,8 +8,8 @@ import {
 } from '@edge-git/backend-data/dao';
 import type { RepositoryRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { BadRequestError, ForbiddenError, NotFoundError } from '@edge-git/backend-errors';
-import { EmailAddress, RepoFullName } from '@edge-git/shared/utils';
+import { BadRequestError, ForbiddenError, NotFoundError } from '@rexezuge/errors';
+import { RepoFullName, normalizeEmail } from '@edge-git/shared/utils';
 import { PermissionService } from '../permission/PermissionService';
 import { RepoService } from '../repo/RepoService';
 
@@ -81,7 +81,7 @@ class ForkService {
   }
 
   private async resolveDefaultOwner(userEmail: string): Promise<string> {
-    const normalized = EmailAddress.normalize(userEmail);
+    const normalized = normalizeEmail(userEmail);
     try {
       const userDao = await this.deps.userDAO();
       const user = await userDao.getByEmail(normalized);
@@ -93,7 +93,7 @@ class ForkService {
   }
 
   private async resolveCallerUsernameLowercased(userEmail: string): Promise<string | null> {
-    const normalized = EmailAddress.normalize(userEmail);
+    const normalized = normalizeEmail(userEmail);
     try {
       const userDao = await this.deps.userDAO();
       const user = await userDao.getByEmail(normalized);
@@ -116,7 +116,7 @@ class ForkService {
     const callerLowercased = await this.resolveCallerUsernameLowercased(forkerEmail);
     if (callerLowercased && ownerCi === callerLowercased) return;
 
-    const callerEmail = EmailAddress.normalize(forkerEmail);
+    const callerEmail = normalizeEmail(forkerEmail);
     let org: { id: string; username: string } | null = null;
     try {
       const orgDao = await this.deps.organizationDAO();

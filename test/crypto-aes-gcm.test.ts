@@ -18,14 +18,15 @@ describe('AES-GCM crypto (per-feature envelope)', () => {
     }
   });
 
-  it('uses random IVs per encryption and reuses an explicit IV deterministically', async () => {
+  it('uses a fresh random IV per encryption, so the same input never repeats a ciphertext', async () => {
     const key = await generateAESGCMKey();
     const first = await encryptData('same', key);
     const second = await encryptData('same', key);
     expect(first.iv).not.toBe(second.iv);
     expect(first.encrypted).not.toBe(second.encrypted);
-    const reused = await encryptData('same', key, first.iv);
-    expect(reused).toEqual(first);
+    // Reusing an IV under one key destroys GCM's guarantees outright, so the
+    // IV is not caller-supplied: there is no third argument to pass one.
+    expect(encryptData.length).toBe(2);
   });
 
   it('fails closed with the wrong per-feature key', async () => {

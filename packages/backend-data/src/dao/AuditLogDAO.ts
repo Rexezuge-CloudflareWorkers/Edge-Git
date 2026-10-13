@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 
 export interface AuditLogRow {
   log_id: string;
@@ -52,31 +52,7 @@ class AuditLogDAO extends BaseDAO {
     orgId?: string | null;
     repoId?: string | null;
   }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'INSERT INTO audit_logs (log_id, timestamp, user_email, action, resource, method, path, status_code, detail, ip_address, user_agent, org_id, repo_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          )
-          .bind(
-            input.logId,
-            input.timestamp,
-            input.userEmail,
-            input.action,
-            input.resource ?? null,
-            input.method,
-            input.path,
-            input.statusCode,
-            input.detail ?? null,
-            input.ipAddress ?? null,
-            input.userAgent ?? null,
-            input.orgId ?? null,
-            input.repoId ?? null,
-            input.timestamp,
-          )
-          .run(),
-      'append audit log',
-    );
+    await this.run('INSERT INTO audit_logs (log_id, timestamp, user_email, action, resource, method, path, status_code, detail, ip_address, user_agent, org_id, repo_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [input.logId, input.timestamp, input.userEmail, input.action, input.resource ?? null, input.method, input.path, input.statusCode, input.detail ?? null, input.ipAddress ?? null, input.userAgent ?? null, input.orgId ?? null, input.repoId ?? null, input.timestamp]);
   }
 
   public async query(filters: AuditLogFilters, limit = 50, cursor?: string): Promise<{ logs: AuditLogRow[]; nextCursor: string | null }> {
@@ -181,17 +157,11 @@ class AuditLogDAO extends BaseDAO {
   }
 
   public async deleteByOrg(orgId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM audit_logs WHERE org_id = ?').bind(orgId).run(),
-      'delete audit logs by org',
-    );
+    await this.run('DELETE FROM audit_logs WHERE org_id = ?', [orgId]);
   }
 
   public async deleteByRepo(repoId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM audit_logs WHERE repo_id = ?').bind(repoId).run(),
-      'delete audit logs by repo',
-    );
+    await this.run('DELETE FROM audit_logs WHERE repo_id = ?', [repoId]);
   }
 
   public async pruneOlderThan(cutoff: number, limit: number): Promise<number> {

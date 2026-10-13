@@ -1,14 +1,10 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { EdgeGitWorker } from '@/workers/EdgeGitWorker';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { resetRateLimitForTests } from '@/middleware/rateLimit';
 
 const ALICE = 'alice@example.com';
 const BOB = 'bob@example.com';
 
-beforeEach(() => {
-  resetRateLimitForTests();
-});
 
 // --- Fake D1 covering the 10 lowest route files ---------------------------
 function createLowFakeDb() {
@@ -352,7 +348,7 @@ function createLowFakeDb() {
             results: state.projects
               .filter((p) => p.repository_id === params[0])
               .sort((a, b) => (b.number as number) - (a.number as number)) as T[],
-          });
+});
         }
         if (q.includes('FROM project_columns WHERE project_id = ?')) {
           return Promise.resolve({ results: state.projectColumns.filter((c) => c.project_id === params[0]) as T[] });
@@ -432,7 +428,7 @@ function createLowFakeDb() {
       run(): Promise<{ success: boolean; meta?: { changes?: number } }> {
         // users
         if (q.startsWith('INSERT INTO users')) {
-          if (!state.users.some((u) => u.email === params[0])) state.users.push({ email: params[0], created_at: params[1] });
+          if (!state.users.some((u) => u.email === params[0])) state.users.push({ email: params[0], created_at: params[1], id: params[2], current_email: params[3] });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE users SET')) {
@@ -1185,6 +1181,115 @@ describe('ProjectRoutes low fill', () => {
     expect((await callWorker(env, '/user/repos/alice/demo/projects/1/cards', postJson({ kind: 'note' }))).status).toBe(400);
     const ok = await callWorker(env, '/user/repos/alice/demo/projects/1/cards', postJson({ columnId, kind: 'note', noteTitle: 'Task' }));
     expect(ok.status).toBe(201);
+  });
+
+  it('updates a project, closes it, and rejects a bad number', async () => {
+    const { db } = createLowFakeDb();
+    const env = createEnv(db);
+    await callWorker(env, '/user/repos/alice/demo/projects', postJson({ title: 'Board' }));
+
+    const renamed = await callWorker(env, '/user/repos/alice/demo/projects/1', patchJson({ title: 'Roadmap' }));
+    expect(renamed.status).toBe(200);
+    expect(((await renamed.json()) as { project: { title: string } }).project.title).toBe('Roadmap');
+
+    // A `status` key routes to `setStatus` rather than the field patch, and a
+    // closed board is the one state change that fans a notification out.
+    const closed = await callWorker(env, '/user/repos/alice/demo/projects/1', patchJson({ status: 'closed' }));
+    expect(closed.status).toBe(200);
+    expect(((await closed.json()) as { project: { status: string } }).project.status).toBe('closed');
+
+    expect((await callWorker(env, '/user/repos/alice/demo/projects/nope', patchJson({ title: 'x' }))).status).toBe(400);
+    expect((await callWorker(env, '/user/repos/alice/demo/projects/0', patchJson({ title: 'x' }))).status).toBe(400);
+  });
+
+  it('deletes a project and its columns and cards', async () => {
+    const { db, state } = createLowFakeDb();
+    const env = createEnv(db);
+    await callWorker(env, '/user/repos/alice/demo/projects', postJson({ title: 'Board' }));
+    const board = (await (await callWorker(env, '/user/repos/alice/demo/projects/1')).json()) as { columns: Array<{ id: string }> };
+    await callWorker(
+      env,
+      '/user/repos/alice/demo/projects/1/cards',
+      postJson({ columnId: board.columns[0].id, noteTitle: 'Task' }),
+    );
+    expect(state.projectCards).toHaveLength(1);
+
+    expect((await callWorker(env, '/user/repos/alice/demo/projects/nope', { method: 'DELETE' })).status).toBe(400);
+    expect((await callWorker(env, '/user/repos/alice/demo/projects/1', { method: 'DELETE' })).status).toBe(200);
+    expect(state.projects).toHaveLength(0);
+    expect(state.projectColumns).toHaveLength(0);
+    expect(state.projectCards).toHaveLength(0);
+  });
+
+  it('renames and deletes a column', async () => {
+    const { db, state } = createLowFakeDb();
+    const env = createEnv(db);
+    await callWorker(env, '/user/repos/alice/demo/projects', postJson({ title: 'Board' }));
+    const board = (await (await callWorker(env, '/user/repos/alice/demo/projects/1')).json()) as { columns: Array<{ id: string }> };
+    const columnId = board.columns[0].id;
+
+    const renamed = await callWorker(env, `/user/repos/alice/demo/projects/1/columns/${columnId}`, patchJson({ title: 'Doing' }));
+    expect(renamed.status).toBe(200);
+    expect(state.projectColumns.find((c) => c.id === columnId)?.title).toBe('Doing');
+
+    // An unknown column is a 404 from the service, not a silent success.
+    expect((await callWorker(env, '/user/repos/alice/demo/projects/1/columns/nope', patchJson({ title: 'x' }))).status).toBe(404);
+    expect((await callWorker(env, '/user/repos/alice/demo/projects/0', patchJson({ title: 'x' }))).status).toBe(400);
+    expect((await callWorker(env, '/user/repos/alice/demo/projects/0', { method: 'DELETE' })).status).toBe(400);
+    expect((await callWorker(env, '/user/repos/alice/demo/projects/0/columns', postJson({ title: 'x' }))).status).toBe(400);
+    expect((await callWorker(env, '/user/repos/alice/demo/projects/0/cards', postJson({ columnId: 'c' }))).status).toBe(400);
+    expect((await callWorker(env, `/user/repos/alice/demo/projects/1/columns/${columnId}`, { method: 'DELETE' })).status).toBe(200);
+    expect(state.projectColumns.find((c) => c.id === columnId)).toBeUndefined();
+  });
+
+  it('moves, archives, and deletes a card', async () => {
+    const { db, state } = createLowFakeDb();
+    const env = createEnv(db);
+    await callWorker(env, '/user/repos/alice/demo/projects', postJson({ title: 'Board' }));
+    const board = (await (await callWorker(env, '/user/repos/alice/demo/projects/1')).json()) as { columns: Array<{ id: string }> };
+    const [from, to] = board.columns;
+    const created = await callWorker(
+      env,
+      '/user/repos/alice/demo/projects/1/cards',
+      postJson({ columnId: from.id, noteTitle: 'Task' }),
+    );
+    const cardId = ((await created.json()) as { card: { id: string } }).card.id;
+
+    const moved = await callWorker(env, `/user/repos/alice/demo/projects/1/cards/${cardId}/move`, patchJson({ toColumnId: to.id }));
+    expect(moved.status).toBe(200);
+    expect(state.projectCards.find((c) => c.id === cardId)?.column_id).toBe(to.id);
+
+    const archived = await callWorker(env, `/user/repos/alice/demo/projects/1/cards/${cardId}`, patchJson({ archived: true }));
+    expect(archived.status).toBe(200);
+    expect(state.projectCards.find((c) => c.id === cardId)?.archived).toBe(1);
+
+    expect((await callWorker(env, '/user/repos/alice/demo/projects/nope/cards/nope/move', patchJson({ toColumnId: to.id }))).status).toBe(400);
+    expect((await callWorker(env, `/user/repos/alice/demo/projects/1/cards/${cardId}`, { method: 'DELETE' })).status).toBe(200);
+    expect(state.projectCards).toHaveLength(0);
+  });
+
+  it('refuses project mutations to a signed-in non-writer, and hides a private repo entirely', async () => {
+    const { db } = createLowFakeDb();
+    await callWorker(createEnv(db), '/user/repos/alice/demo/projects', postJson({ title: 'Board' }));
+
+    // `r-demo` is public, so bob can read the board but holds no grant on it:
+    // every mutation is a 403 rather than a silent success.
+    const bob = createEnv(db, { DEV_AUTH_EMAIL: BOB });
+    expect((await callWorker(bob, '/user/repos/alice/demo/projects', postJson({ title: 'Sneaky' }))).status).toBe(403);
+    expect((await callWorker(bob, '/user/repos/alice/demo/projects/1', patchJson({ title: 'x' }))).status).toBe(403);
+    expect((await callWorker(bob, '/user/repos/alice/demo/projects/1', { method: 'DELETE' })).status).toBe(403);
+    expect((await callWorker(bob, '/user/repos/alice/demo/projects/1/columns', postJson({ title: 'x' }))).status).toBe(403);
+    expect((await callWorker(bob, '/user/repos/alice/demo/projects/1/columns/c1', patchJson({ title: 'x' }))).status).toBe(403);
+    expect((await callWorker(bob, '/user/repos/alice/demo/projects/1/columns/c1', { method: 'DELETE' })).status).toBe(403);
+    expect((await callWorker(bob, '/user/repos/alice/demo/projects/1/cards', postJson({ columnId: 'c', noteTitle: 'x' }))).status).toBe(403);
+    expect((await callWorker(bob, '/user/repos/alice/demo/projects/1/cards/c1/move', patchJson({ toColumnId: 'c2' }))).status).toBe(403);
+    expect((await callWorker(bob, '/user/repos/alice/demo/projects/1/cards/c1', patchJson({ archived: true }))).status).toBe(403);
+    expect((await callWorker(bob, '/user/repos/alice/demo/projects/1/cards/c1', { method: 'DELETE' })).status).toBe(403);
+
+    // An anonymous caller cannot see a private repo at all, so the mutation
+    // answers 404 — existence is not confirmed to someone with no `read`.
+    const anon = createEnv(db, { DEV_AUTH_EMAIL: '' });
+    expect((await callWorker(anon, '/user/repos/alice/demo/projects', postJson({ title: 'x' }))).status).toBe(401);
   });
 
   it('enforces card-per-column limits', async () => {

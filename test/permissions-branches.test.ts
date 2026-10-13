@@ -1,3 +1,4 @@
+import { stubIdentityService, emptyUserEmailRegistry } from './mocks/identity';
 import { describe, expect, it } from 'vitest';
 import { PermissionService } from '@edge-git/backend-services/permission';
 import { RepoService } from '@edge-git/backend-services/repo';
@@ -9,6 +10,7 @@ describe('PermissionService edge branches', () => {
       organizationDAO: async () => ({ getByUsernameCi: async () => null, getById: async () => null }) as never,
       organizationMemberDAO: async () => ({ get: async () => null }) as never,
       repoCollaboratorDAO: async () => ({ get: async () => null }) as never,
+userIdentity: async () => stubIdentityService() as never,
     });
     await expect(svc.getRole('a@x.co', null)).resolves.toBeNull();
     // owner_type org but org row gone (deleted org): hide existence for
@@ -22,6 +24,7 @@ describe('PermissionService edge branches', () => {
       organizationDAO: async () => ({ getById: async () => ({ id: 'o1' }) }) as never,
       organizationMemberDAO: async () => ({ get: async () => ({ role: 'owner' }) }) as never,
       repoCollaboratorDAO: async () => ({ get: async () => null }) as never,
+userIdentity: async () => stubIdentityService() as never,
     });
     const orgRepo = { id: 'r1', owner: 'acme', owner_ci: 'acme', name: 'r', owner_type: 'org', org_id: 'o1', is_private: 1 } as never;
     await expect(withOrg.getRole('owner@x.co', orgRepo)).resolves.toBe('admin');
@@ -36,6 +39,7 @@ describe('PermissionService edge branches', () => {
       organizationDAO: async () => ({ getByUsernameCi: throwing, getById: throwing }) as never,
       organizationMemberDAO: async () => ({ get: throwing }) as never,
       repoCollaboratorDAO: async () => ({ get: throwing }) as never,
+userIdentity: async () => stubIdentityService() as never,
     });
     const pub = { id: 'r1', owner: 'alice', owner_email: 'a@x.co', owner_type: null, org_id: null, is_private: 0 } as never;
     const priv = { ...pub, is_private: 1 } as never;
@@ -92,12 +96,14 @@ describe('RepoService visibility branches', () => {
             return null;
           },
         }) as never,
-      userDAO: async () => ({ getByEmail: async () => ({ email: 'alice@x.co', username: 'alice' }) }) as never,
+      userDAO: async () => ({ getByCurrentEmail: async () => null,
+getByEmail: async () => ({ email: 'alice@x.co', username: 'alice' }) }) as never,
       organizationDAO: async () => ({ getById: async () => ({ id: 'o1', username: 'acme' }), getByUsernameCi: async () => null }) as never,
       organizationMemberDAO: async () =>
         ({ listOrgsByUser: async () => [{ org_id: 'o1' }], get: async () => ({ role: 'owner' }) }) as never,
       repoCollaboratorDAO: async () => ({ listByUser: async () => [{ repo_id: 'r3' }], get: async () => ({ role: 'read' }) }) as never,
       namespaceDAO: async () => ({ get: async () => null }) as never,
+userIdentity: async () => stubIdentityService() as never,
     });
     const visible = await svc.listVisibleForUser('alice@x.co', 10);
     expect(visible.map((r) => r.id).sort()).toEqual(['r1', 'r2', 'r3']);
@@ -115,13 +121,19 @@ describe('UserService profile branches', () => {
     const svc = new UserService({ DB: {} } as never, {
       userDAO: async () =>
         ({
-          upsertUser: async () => undefined,
+          getByCurrentEmail: async () => null,
+          createUser: async (input: { anchor: string; loginEmail: string; now: number }) => {
+            if (store.has(input.anchor)) return null;
+            store.set(input.anchor, { email: input.anchor, username: null });
+            return `usr_${input.anchor}`;
+          },
           getByEmail: async (e: string) => store.get(e) ?? null,
           getByUsernameCi: async () => null,
           ensureUsername: async () => undefined,
         }) as never,
       namespaceDAO: async () => ({ isTaken: async () => false, claimIgnore: async () => undefined }) as never,
       organizationDAO: async () => ({ getByUsernameCi: async () => null }) as never,
+userEmailDAO: async () => emptyUserEmailRegistry() as never,
     });
     expect(() => UserService.validateUsername('bad name!')).toThrow('Invalid');
     await expect(svc.getProfileByEmail('missing@x.co')).rejects.toThrow('not found');

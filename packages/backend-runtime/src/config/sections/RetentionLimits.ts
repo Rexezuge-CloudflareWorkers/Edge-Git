@@ -1,4 +1,4 @@
-import { EnvParser } from '../EnvParser';
+import { EnvParser } from '@rexezuge/runtime';
 import {
   DEFAULT_AUDIT_LOG_RETENTION_DAYS,
   DEFAULT_BACKGROUND_TASK_RUN_RETENTION_DAYS,

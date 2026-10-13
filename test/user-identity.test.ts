@@ -73,10 +73,10 @@ describe('UserIdentityService', () => {
       userDAO: async () => d.userDAO as never,
       userEmailDAO: async () => d.userEmailDAO as never,
     });
-    await expect(svc.resolveUserId('alice@old.test')).resolves.toBe(ALICE_ID);
+    await expect(svc.resolveAccountId('alice@old.test')).resolves.toBe(ALICE_ID);
     await expect(svc.resolveAccount('ALICE@OLD.TEST')).resolves.toMatchObject({ id: ALICE_ID, email: 'alice@old.test' });
-    await expect(svc.resolveUserId('nobody@x.test')).resolves.toBeNull();
-    await expect(svc.resolveUserId('not-an-email')).resolves.toBeNull();
+    await expect(svc.resolveAccountId('nobody@x.test')).resolves.toBeNull();
+    await expect(svc.resolveAccountId('not-an-email')).resolves.toBeNull();
   });
 
   it('changes the sign-in address without changing the account', async () => {
@@ -95,10 +95,10 @@ describe('UserIdentityService', () => {
     expect(d.users[0]?.current_email).toBe('alice@new.test');
 
     // The new address authenticates the same account...
-    await expect(svc.resolveUserId('alice@new.test')).resolves.toBe(ALICE_ID);
+    await expect(svc.resolveAccountId('alice@new.test')).resolves.toBe(ALICE_ID);
     // ...and the old one no longer does, so a reassigned address cannot
     // inherit the account.
-    await expect(svc.resolveUserId('alice@old.test')).resolves.toBeNull();
+    await expect(svc.resolveAccountId('alice@old.test')).resolves.toBeNull();
     // The revoked row is retained for attribution.
     expect(d.registry.get('alice@old.test')?.is_verified).toBe(0);
     expect(d.registry.get('alice@old.test')?.user_id).toBe(ALICE_ID);
@@ -158,18 +158,24 @@ describe('UserService account registration', () => {
     const svc = new UserService({ DB: {} } as never, {
       userDAO: async () =>
         ({
-          ...d.userDAO,
-          createUser: async (input: { id?: string | null; anchor: string; loginEmail: string; now: number }) => {
+          getByCurrentEmail: async () => null,
+...d.userDAO,
+          // The kit's `registerAccount` reads `null` as "the anchor was already
+          // held, retry with an opaque one", so the fake reports that rather
+          // than silently succeeding on a taken anchor.
+          createUser: async (input: { anchor: string; loginEmail: string; now: number }) => {
             inserts.push(input.anchor);
-            if (d.users.some((u) => u.email === input.anchor)) return;
+            if (d.users.some((u) => u.email === input.anchor)) return null;
+            const id = `usr_${String(inserts.length).padStart(32, '0')}`;
             d.users.push({
-              id: input.id ?? `usr_${String(inserts.length).padStart(32, '0')}`,
+              id,
               email: input.anchor,
               current_email: input.loginEmail,
               username: null,
               created_at: input.now,
               updated_at: null,
             });
+            return id;
           },
           ensureUsername: async (ref: string, handle: string) => {
             const row = d.users.find((u) => u.id === ref || u.email === ref);

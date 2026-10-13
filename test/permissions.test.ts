@@ -1,3 +1,4 @@
+import { stubIdentityService, emptyUserEmailRegistry } from './mocks/identity';
 import { describe, expect, it } from 'vitest';
 import { PermissionService } from '@edge-git/backend-services/permission';
 import { OrganizationService } from '@edge-git/backend-services/org';
@@ -48,6 +49,7 @@ describe('PermissionService roles', () => {
       organizationDAO: async () => ({ getByUsernameCi: async () => null }) as never,
       organizationMemberDAO: async () => ({ get: async () => null }) as never,
       repoCollaboratorDAO: async () => ({ get: async () => null }) as never,
+userIdentity: async () => stubIdentityService() as never,
     });
     const pub = userRepo('r1', { is_private: 0 });
     await expect(svc.getRole('alice@example.com', pub as never)).resolves.toBe('admin');
@@ -80,6 +82,7 @@ describe('PermissionService roles', () => {
       teamDAO: async () => ({ getById: async () => null }) as never,
       teamMemberDAO: async () => ({ get: async () => null }) as never,
       teamGrantDAO: async () => ({ listByRepo: async () => [] }) as never,
+userIdentity: async () => stubIdentityService() as never,
     });
     const repo = orgRepo();
     await expect(svc.getRole('owner@example.com', repo as never)).resolves.toBe('admin');
@@ -96,7 +99,9 @@ describe('OrganizationService namespace and members', () => {
     const svc = new OrganizationService({ DB: {} } as never, {
       namespaceDAO: async () => ({ isTaken: async () => true }) as never,
       organizationDAO: async () => ({ getByUsernameCi: async () => null }) as never,
-      userDAO: async () => ({ getByUsernameCi: async () => null }) as never,
+      userDAO: async () => ({ getByCurrentEmail: async () => null,
+getByUsernameCi: async () => null }) as never,
+userIdentity: async () => stubIdentityService() as never,
     });
     await expect(svc.createOrganization('a@x.co', 'alice')).rejects.toThrow('taken');
   });
@@ -111,7 +116,9 @@ describe('OrganizationService namespace and members', () => {
           upsert: async () => undefined,
           remove: async () => undefined,
         }) as never,
-      userDAO: async () => ({ getByUsernameCi: async () => ({ email: 'a@x.co' }) }) as never,
+      userDAO: async () => ({ getByCurrentEmail: async () => null,
+getByUsernameCi: async () => ({ email: 'a@x.co' }) }) as never,
+userIdentity: async () => stubIdentityService() as never,
     });
     await expect(svc.setMemberRole('acme', 'a@x.co', 'a@x.co', 'member')).rejects.toThrow('last owner');
     await expect(svc.removeMember('acme', 'a@x.co', 'a@x.co')).rejects.toThrow('last owner');
@@ -121,7 +128,9 @@ describe('OrganizationService namespace and members', () => {
     const svc = new OrganizationService({ DB: {} } as never, {
       organizationDAO: async () => ({ getByUsernameCi: async () => ({ id: 'o1', username: 'acme', username_ci: 'acme' }) }) as never,
       organizationMemberDAO: async () => ({ get: async () => ({ role: 'member' }) }) as never,
-      userDAO: async () => ({ getByUsernameCi: async () => null }) as never,
+      userDAO: async () => ({ getByCurrentEmail: async () => null,
+getByUsernameCi: async () => null }) as never,
+userIdentity: async () => stubIdentityService() as never,
     });
     await expect(svc.addMember('acme', 'member@x.co', 'new@x.co', 'member')).rejects.toThrow();
   });
@@ -129,22 +138,32 @@ describe('OrganizationService namespace and members', () => {
 
 describe('UserService usernames', () => {
   it('derives a handle on upsert and renames with cascade', async () => {
-    const users = new Map<string, { email: string; username: string | null }>([
-      ['alice@example.com', { email: 'alice@example.com', username: null }],
+    const users = new Map<string, { id: string; email: string; current_email: string; username: string | null }>([
+      ['alice@example.com', { id: 'u-alice', email: 'alice@example.com', current_email: 'alice@example.com', username: null }],
     ]);
     const namespaces = new Set<string>();
     const renamedOwners: Array<{ oldCi: string; next: string }> = [];
     const svc = new UserService({ DB: {} } as never, {
       userDAO: async () =>
         ({
-          upsertUser: async () => undefined,
+          getByCurrentEmail: async () => null,
+          // The kit's `registerAccount` reads `null` as "anchor already held".
+          createUser: async (input: { anchor: string; loginEmail: string }) => {
+            if (users.has(input.anchor)) return null;
+            users.set(input.anchor, { id: `usr_${input.anchor}`, email: input.anchor, current_email: input.loginEmail, username: null });
+            return `usr_${input.anchor}`;
+          },
+          getById: async (id: string) => [...users.values()].find((u) => u.id === id) ?? null,
           getByEmail: async (email: string) => users.get(email) ?? null,
           getByUsernameCi: async (ci: string) => [...users.values()].find((u) => u.username?.toLowerCase() === ci) ?? null,
-          ensureUsername: async (email: string, handle: string) => {
-            users.get(email)!.username = handle;
+          // `WHERE id = ? OR email = ?` — the service hands over whichever it has.
+          ensureUsername: async (ref: string, handle: string) => {
+            const row = users.get(ref) ?? [...users.values()].find((u) => u.id === ref);
+            if (row) row.username = handle;
           },
-          setUsername: async (email: string, handle: string) => {
-            users.get(email)!.username = handle;
+          setUsername: async (ref: string, handle: string) => {
+            const row = users.get(ref) ?? [...users.values()].find((u) => u.id === ref);
+            if (row) row.username = handle;
           },
         }) as never,
       namespaceDAO: async () =>
@@ -169,6 +188,7 @@ describe('UserService usernames', () => {
             renamedOwners.push({ oldCi, next });
           },
         }) as never,
+userEmailDAO: async () => emptyUserEmailRegistry() as never,
     });
     await svc.upsertUser('Alice@Example.com'.toLowerCase());
     expect(users.get('alice@example.com')?.username).toBe('alice');
@@ -185,11 +205,14 @@ describe('UserService usernames', () => {
     const svc = new UserService({ DB: {} } as never, {
       userDAO: async () =>
         ({
-          getByEmail: async () => ({ email: 'a@x.co', username: 'old' }),
+          getByCurrentEmail: async () => null,
+getByEmail: async () => ({ id: 'u-a', email: 'a@x.co', current_email: 'a@x.co', username: 'old' }),
+          getById: async () => ({ id: 'u-a', email: 'a@x.co', current_email: 'a@x.co', username: 'old' }),
           getByUsernameCi: async () => null,
         }) as never,
       namespaceDAO: async () => ({ isTaken: async () => true }) as never,
       organizationDAO: async () => ({ getByUsernameCi: async () => null }) as never,
+userEmailDAO: async () => emptyUserEmailRegistry() as never,
     });
     await expect(svc.renameUsername('a@x.co', 'taken')).rejects.toThrow('taken');
   });
@@ -209,7 +232,8 @@ describe('RepoService org creation', () => {
         }) as never,
       userDAO: async () =>
         ({
-          getByEmail: async (email: string) => ({ email, username: email.split('@', 1)[0] }),
+          getByCurrentEmail: async () => null,
+getByEmail: async (email: string) => ({ email, username: email.split('@', 1)[0] }),
         }) as never,
       organizationDAO: async () =>
         ({
@@ -230,6 +254,7 @@ describe('RepoService org creation', () => {
           listByUser: async () => [],
         }) as never,
       namespaceDAO: async () => ({ get: async () => null }) as never,
+userIdentity: async () => stubIdentityService() as never,
     });
     await svc.createRepo('owner@x.co', 'acme', 'api', null, false);
     await svc.createRepo('member@x.co', 'acme', 'web', null, true);
@@ -301,7 +326,8 @@ describe('OrganizationService happy paths', () => {
           }) as never,
         userDAO: async () =>
           ({
-            getByUsernameCi: async (ci: string) => (ci === 'alice' ? { email: 'alice@x.co', username: 'alice' } : null),
+            getByCurrentEmail: async () => null,
+getByUsernameCi: async (ci: string) => (ci === 'alice' ? { email: 'alice@x.co', username: 'alice' } : null),
             getByEmail: async (email: string) => ({ email, username: email.split('@', 1)[0] }),
           }) as never,
         repositoryDAO: async () =>
@@ -310,6 +336,7 @@ describe('OrganizationService happy paths', () => {
             listByOrgId: async () => [],
             listByOwner: async () => [],
           }) as never,
+userIdentity: async () => stubIdentityService() as never,
       }),
     };
   }
@@ -342,8 +369,10 @@ describe('OrganizationService happy paths', () => {
       organizationDAO: async () => ({ getByUsernameCi: async () => ({ id: 'o1', username: 'acme', username_ci: 'acme' }) }) as never,
       organizationMemberDAO: async () => ({ get: async () => ({ role: 'owner' }), deleteByOrg: async () => undefined }) as never,
       namespaceDAO: async () => ({ release: async () => undefined }) as never,
-      userDAO: async () => ({ getByUsernameCi: async () => null }) as never,
+      userDAO: async () => ({ getByCurrentEmail: async () => null,
+getByUsernameCi: async () => null }) as never,
       repositoryDAO: async () => ({ listByOrgId: async () => [{ id: 'r1' }], listByOwner: async () => [] }) as never,
+userIdentity: async () => stubIdentityService() as never,
     });
     await expect(withRepos.disband('acme', 'alice@x.co')).rejects.toThrow('repositories');
   });

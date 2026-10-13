@@ -3,7 +3,7 @@
 // Extracted from `ReleaseService` so tag/asset rules are unit-testable
 // without D1 and reusable from routes. The service keeps orchestration
 // (DAO calls, limits, timestamps); this module owns only pure input rules.
-import { BadRequestError } from '@edge-git/backend-errors';
+import { BadRequestError } from '@rexezuge/errors';
 
 const TAG_NAME_RE = /^[\w./-]{1,100}$/;
 const TAG_FORBIDDEN_RE = /[~^:?*[\]\\@{ \t\n]/;

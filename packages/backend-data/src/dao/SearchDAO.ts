@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 import { rowsOrEmpty, searchScopedWithTokens, throwUnlessMissingSchema } from './SearchFallback';
 import { SearchCodeIndexDAO } from './SearchCodeIndexDAO';
 import type { CodeFileInput, CodeHit, CodeOidEntry } from './SearchCodeIndexDAO';

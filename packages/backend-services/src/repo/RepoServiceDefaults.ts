@@ -1,4 +1,4 @@
-import { UserIdentityService } from '../identity/UserIdentityService';
+import { UserIdentityService } from '../identity';
 import {
   AuditLogDAO,
   BranchProtectionDAO,
@@ -48,6 +48,8 @@ import type { RepoServiceDeps, RepoServiceEnv } from './RepoService';
  * makes the fail-closed stubs discoverable in one place.
  */
 function createDefaultRepoServiceDeps(env: RepoServiceEnv, overrides: RepoServiceDeps = {}): Required<RepoServiceDeps> {
+  const userIdentity =
+    overrides.userIdentity ?? ((): Promise<UserIdentityService> => Promise.resolve(new UserIdentityService(env)));
   const permissionService =
     overrides.permissionService ??
     ((): Promise<PermissionService> =>
@@ -57,6 +59,12 @@ function createDefaultRepoServiceDeps(env: RepoServiceEnv, overrides: RepoServic
           organizationMemberDAO: overrides.organizationMemberDAO ?? (() => Promise.resolve(new OrganizationMemberDAO(env.DB))),
           repoCollaboratorDAO: overrides.repoCollaboratorDAO ?? (() => Promise.resolve(new RepoCollaboratorDAO(env.DB))),
           namespaceDAO: overrides.namespaceDAO ?? (() => Promise.resolve(new NamespaceDAO(env.DB))),
+          // The viewer is resolved here for every role check, so the identity
+          // resolver the caller injected into `RepoService` has to reach this
+          // `PermissionService` too — otherwise a caller that supplies one gets
+          // a different resolution path than it asked for, and the two disagree
+          // about who the viewer is.
+          userIdentity,
         }),
       ));
   // Lazy `PermissionService` avoids a circular import at module load:
@@ -69,7 +77,7 @@ function createDefaultRepoServiceDeps(env: RepoServiceEnv, overrides: RepoServic
     pullThreadDAO: () => Promise.resolve(new PullThreadDAO(env.DB)),
     branchProtectionDAO: () => Promise.resolve(new BranchProtectionDAO(env.DB)),
     userDAO: () => Promise.resolve(new UserDAO(env.DB)),
-    userIdentity: () => Promise.resolve(new UserIdentityService(env)),
+    userIdentity,
     organizationDAO: () => Promise.resolve(new OrganizationDAO(env.DB)),
     organizationMemberDAO: () => Promise.resolve(new OrganizationMemberDAO(env.DB)),
     repoCollaboratorDAO: () => Promise.resolve(new RepoCollaboratorDAO(env.DB)),

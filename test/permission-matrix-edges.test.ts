@@ -1,3 +1,4 @@
+import { stubIdentityService, emptyUserEmailRegistry } from './mocks/identity';
 import { describe, expect, it } from 'vitest';
 import { PermissionService } from '@edge-git/backend-services/permission';
 
@@ -37,6 +38,7 @@ function service(opts: {
         // Member of the first team only — team grants for other teams do not apply.
         get: async (teamId: string) => (teamId === 't0' ? { team_id: teamId } : null),
       }) as never,
+userIdentity: async () => stubIdentityService() as never,
   });
 }
 

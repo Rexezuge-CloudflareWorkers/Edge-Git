@@ -1,5 +1,6 @@
 import type { Context, Next } from 'hono';
-import { createServiceContext, setRequestScope, asScopedContext } from '@edge-git/backend-runtime/di';
+import { setRequestScope as kitSetRequestScope } from '@rexezuge/runtime';
+import { createServiceContext, setServiceContext, asScopedContext } from '@edge-git/backend-runtime/di';
 import { createRequestScope } from '@edge-git/backend-services/composition';
 
 type ScopeContext = Context<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
@@ -12,9 +13,9 @@ type ScopeContext = Context<{ Bindings: Env; Variables: { AuthenticatedUserEmail
  * request and defeated singleton memoization).
  */
 async function scopeMiddleware(c: ScopeContext, next: Next): Promise<Response | void> {
-  const scope = createRequestScope(c.env);
-  const ctx = createServiceContext(c.env);
-  setRequestScope(asScopedContext(c), scope, ctx);
+  const scoped = asScopedContext(c);
+  kitSetRequestScope(scoped, createRequestScope(c.env));
+  setServiceContext(scoped, createServiceContext(c.env));
   await next();
 }
 

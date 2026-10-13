@@ -1,6 +1,6 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
-import { isMissingSchemaError } from '../utils/D1ErrorClassifier';
+import type { D1Queryable } from '@rexezuge/d1';
+import { isMissingSchemaError } from '@rexezuge/d1';
 import { rowsOrEmpty, throwUnlessMissingSchema } from './SearchFallback';
 import { UPSERT_CODE_FILE_SQL } from './SearchQueries';
 
@@ -45,10 +45,7 @@ class SearchCodeIndexDAO extends BaseDAO {
 
   public async upsertCodeFile(input: CodeFileInput): Promise<number> {
     try {
-      const result = await this.withRetry(
-        () => this.database.prepare(UPSERT_CODE_FILE_SQL).bind(input.repoId, input.path, input.oid, input.content, input.now).run(),
-        'upsert code index',
-      );
+      const result = await this.run(UPSERT_CODE_FILE_SQL, [input.repoId, input.path, input.oid, input.content, input.now]);
       return result.meta?.changes ?? 0;
     } catch (error) {
       if (!isMissingSchemaError(error)) throw error;
@@ -95,21 +92,11 @@ class SearchCodeIndexDAO extends BaseDAO {
   public async pruneStaleCodePaths(repoId: string, keepPaths: string[]): Promise<number> {
     try {
       if (keepPaths.length === 0) {
-        const result = await this.withRetry(
-          () => this.database.prepare('DELETE FROM code_index WHERE repo_id = ?').bind(repoId).run(),
-          'delete stale code index',
-        );
+        const result = await this.run('DELETE FROM code_index WHERE repo_id = ?', [repoId]);
         return result.meta?.changes ?? 0;
       }
       const placeholders = keepPaths.map(() => '?').join(', ');
-      const result = await this.withRetry(
-        () =>
-          this.database
-            .prepare(`DELETE FROM code_index WHERE repo_id = ? AND path NOT IN (${placeholders})`)
-            .bind(repoId, ...keepPaths)
-            .run(),
-        'delete stale code index',
-      );
+      const result = await this.run(`DELETE FROM code_index WHERE repo_id = ? AND path NOT IN (${placeholders})`, [repoId, ...keepPaths]);
       return result.meta?.changes ?? 0;
     } catch (error) {
       if (!isMissingSchemaError(error)) throw error;
@@ -126,10 +113,7 @@ class SearchCodeIndexDAO extends BaseDAO {
 
   public async deleteCodeFile(repoId: string, path: string): Promise<void> {
     try {
-      await this.withRetry(
-        () => this.database.prepare('DELETE FROM code_index WHERE repo_id = ? AND path = ?').bind(repoId, path).run(),
-        'delete code index file',
-      );
+      await this.run('DELETE FROM code_index WHERE repo_id = ? AND path = ?', [repoId, path]);
     } catch (error) {
       if (!isMissingSchemaError(error)) throw error;
     }
@@ -137,10 +121,7 @@ class SearchCodeIndexDAO extends BaseDAO {
 
   public async deleteCodeByRepo(repoId: string): Promise<void> {
     try {
-      await this.withRetry(
-        () => this.database.prepare('DELETE FROM code_index WHERE repo_id = ?').bind(repoId).run(),
-        'delete code index by repo',
-      );
+      await this.run('DELETE FROM code_index WHERE repo_id = ?', [repoId]);
     } catch (error) {
       if (!isMissingSchemaError(error)) throw error;
     }

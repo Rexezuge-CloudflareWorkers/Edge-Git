@@ -1,3 +1,4 @@
+import { stubIdentityService, emptyUserEmailRegistry } from './mocks/identity';
 import { describe, expect, it } from 'vitest';
 import { toBodyErrorStatus } from '../apps/api/src/workers/routes/BodyParser';
 import { CollaborationService } from '../packages/backend-services/src/collab/CollaborationService';
@@ -63,6 +64,7 @@ describe('followup: resolveGrantInputs validates before D1', () => {
             },
           } as never),
         tokenGrantDAO: () => Promise.resolve({} as never),
+userIdentity: async () => stubIdentityService() as never,
       },
     );
     // @ts-expect-error private access for unit test
@@ -84,6 +86,7 @@ describe('followup: resolveGrantInputs validates before D1', () => {
             },
           } as never),
         tokenGrantDAO: () => Promise.resolve({} as never),
+userIdentity: async () => stubIdentityService() as never,
       },
     );
     // @ts-expect-error private access for unit test

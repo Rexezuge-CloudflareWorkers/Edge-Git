@@ -1,3 +1,4 @@
+import { stubIdentityService, emptyUserEmailRegistry } from './mocks/identity';
 import { describe, expect, it, vi } from 'vitest';
 import { TeamService } from '@edge-git/backend-services/team';
 import { AuditService } from '@edge-git/backend-services/audit';
@@ -92,7 +93,8 @@ describe('TeamService guards', () => {
           get: async (_org: string, email: string) =>
             email === 'owner@x.com' ? { role: 'owner' } : email === 'member@x.com' ? { role: 'member' } : null,
         }) as never,
-      userDAO: async () => ({ getByUsernameCi: async () => ({ email: 'bob@x.com', username: 'bob' }) }) as never,
+      userDAO: async () => ({ getByCurrentEmail: async () => null,
+getByUsernameCi: async () => ({ email: 'bob@x.com', username: 'bob' }) }) as never,
       repositoryDAO: async () => ({ getById: async () => null }) as never,
       ...overrides,
     };
@@ -213,6 +215,7 @@ describe('PermissionService team grants', () => {
             { team_id: 't2', repo_id: 'r1', role: 'admin' },
           ],
         }) as never,
+userIdentity: async () => stubIdentityService() as never,
     });
   }
 

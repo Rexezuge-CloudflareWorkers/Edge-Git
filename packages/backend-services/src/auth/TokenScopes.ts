@@ -1,4 +1,4 @@
-import { BadRequestError } from '@edge-git/backend-errors';
+import { BadRequestError } from '@rexezuge/errors';
 import type { TokenScope } from '@edge-git/shared';
 
 const TOKEN_SCOPES: readonly TokenScope[] = ['repo:read', 'repo:write', 'admin'];

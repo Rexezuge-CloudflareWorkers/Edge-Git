@@ -10,7 +10,7 @@ import { resolveCallerUsernameLowercased, resolveCreationContext, enqueueVacuumT
 import { defaultPostJson, STORED_ERROR_CHAR_LIMIT } from '@edge-git/backend-services/webhook';
 import { toServiceStatus, mapServiceError } from '@edge-git/backend-services/errors';
 import { DomainEventBus } from '@edge-git/backend-services/events';
-import { BadRequestError, ForbiddenError, NotFoundError } from '@edge-git/backend-errors';
+import { BadRequestError, ForbiddenError, NotFoundError } from '@rexezuge/errors';
 import { SearchDAO } from '@edge-git/backend-data/dao';
 import { BaseRoute } from '@/endpoints/IBaseRoute';
 

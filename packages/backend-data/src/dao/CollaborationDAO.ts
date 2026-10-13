@@ -1,6 +1,6 @@
 import { BaseDAO } from './BaseDAO';
 import { CollaborationQueries } from './CollaborationQueries';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 
 export interface LabelRow {
   id: string;
@@ -36,19 +36,9 @@ class CollaborationDAO extends BaseDAO {
   // Generic subject-label/assignee writer shared by the issue/pull mirrors
   // below (Strategy pattern): one implementation, table names injected.
   private async setSubjectLabels(subjectId: string, labelIds: string[], tables: { link: string; idColumn: string }): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare(`DELETE FROM ${tables.link} WHERE ${tables.idColumn} = ?`).bind(subjectId).run(),
-      `clear ${tables.link}`,
-    );
+    await this.run(`DELETE FROM ${tables.link} WHERE ${tables.idColumn} = ?`, [subjectId]);
     for (const labelId of labelIds) {
-      await this.withRetry(
-        () =>
-          this.database
-            .prepare(`INSERT OR IGNORE INTO ${tables.link} (${tables.idColumn}, label_id) VALUES (?, ?)`)
-            .bind(subjectId, labelId)
-            .run(),
-        `set ${tables.link}`,
-      );
+      await this.run(`INSERT OR IGNORE INTO ${tables.link} (${tables.idColumn}, label_id) VALUES (?, ?)`, [subjectId, labelId]);
     }
   }
 
@@ -58,19 +48,9 @@ class CollaborationDAO extends BaseDAO {
     now: number,
     tables: { link: string; idColumn: string },
   ): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare(`DELETE FROM ${tables.link} WHERE ${tables.idColumn} = ?`).bind(subjectId).run(),
-      `clear ${tables.link}`,
-    );
+    await this.run(`DELETE FROM ${tables.link} WHERE ${tables.idColumn} = ?`, [subjectId]);
     for (const email of emails) {
-      await this.withRetry(
-        () =>
-          this.database
-            .prepare(`INSERT OR IGNORE INTO ${tables.link} (${tables.idColumn}, user_email, created_at) VALUES (?, ?, ?)`)
-            .bind(subjectId, email.toLowerCase(), now)
-            .run(),
-        `set ${tables.link}`,
-      );
+      await this.run(`INSERT OR IGNORE INTO ${tables.link} (${tables.idColumn}, user_email, created_at) VALUES (?, ?, ?)`, [subjectId, email.toLowerCase(), now]);
     }
   }
 
@@ -90,14 +70,7 @@ class CollaborationDAO extends BaseDAO {
     description: string | null;
     now: number;
   }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(CollaborationQueries.insertLabel())
-          .bind(input.id, input.repositoryId, input.name, input.color, input.description, input.now)
-          .run(),
-      'create label',
-    );
+    await this.run(CollaborationQueries.insertLabel(), [input.id, input.repositoryId, input.name, input.color, input.description, input.now]);
   }
 
   public async listLabels(repositoryId: string): Promise<LabelRow[]> {
@@ -120,10 +93,7 @@ class CollaborationDAO extends BaseDAO {
   }
 
   public async deleteLabel(id: string, repositoryId: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM labels WHERE id = ? AND repository_id = ?').bind(id, repositoryId).run(),
-      'delete label',
-    );
+    await this.run('DELETE FROM labels WHERE id = ? AND repository_id = ?', [id, repositoryId]);
   }
 
   public async createMilestone(input: {
@@ -134,14 +104,7 @@ class CollaborationDAO extends BaseDAO {
     dueOn: number | null;
     now: number;
   }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(CollaborationQueries.insertMilestoneOpen())
-          .bind(input.id, input.repositoryId, input.title, input.description, input.dueOn, input.now)
-          .run(),
-      'create milestone',
-    );
+    await this.run(CollaborationQueries.insertMilestoneOpen(), [input.id, input.repositoryId, input.title, input.description, input.dueOn, input.now]);
   }
 
   public async listMilestones(repositoryId: string): Promise<MilestoneRow[]> {
@@ -157,11 +120,7 @@ class CollaborationDAO extends BaseDAO {
   }
 
   public async setMilestoneStatus(id: string, repositoryId: string, status: 'open' | 'closed'): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database.prepare('UPDATE milestones SET status = ? WHERE id = ? AND repository_id = ?').bind(status, id, repositoryId).run(),
-      'update milestone status',
-    );
+    await this.run('UPDATE milestones SET status = ? WHERE id = ? AND repository_id = ?', [status, id, repositoryId]);
   }
 
   public async deleteMilestone(id: string, repositoryId: string): Promise<void> {
@@ -175,10 +134,7 @@ class CollaborationDAO extends BaseDAO {
       .bind(id)
       .run()
       .catch(() => undefined);
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM milestones WHERE id = ? AND repository_id = ?').bind(id, repositoryId).run(),
-      'delete milestone',
-    );
+    await this.run('DELETE FROM milestones WHERE id = ? AND repository_id = ?', [id, repositoryId]);
   }
 
   public async setIssueLabels(issueId: string, labelIds: string[]): Promise<void> {
@@ -202,10 +158,7 @@ class CollaborationDAO extends BaseDAO {
   }
 
   public async setIssueMilestone(issueId: string, milestoneId: string | null): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('UPDATE issues SET milestone_id = ? WHERE id = ?').bind(milestoneId, issueId).run(),
-      'set issue milestone',
-    );
+    await this.run('UPDATE issues SET milestone_id = ? WHERE id = ?', [milestoneId, issueId]);
   }
 
   public async setPullLabels(pullRequestId: string, labelIds: string[]): Promise<void> {
@@ -229,29 +182,16 @@ class CollaborationDAO extends BaseDAO {
   }
 
   public async setPullMilestone(pullId: string, milestoneId: string | null): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('UPDATE pull_requests SET milestone_id = ? WHERE id = ?').bind(milestoneId, pullId).run(),
-      'set pull milestone',
-    );
+    await this.run('UPDATE pull_requests SET milestone_id = ? WHERE id = ?', [milestoneId, pullId]);
   }
 
   public async setPullDraft(pullId: string, isDraft: boolean): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('UPDATE pull_requests SET is_draft = ? WHERE id = ?')
-          .bind(isDraft ? 1 : 0, pullId)
-          .run(),
-      'set pull draft',
-    );
+    await this.run('UPDATE pull_requests SET is_draft = ? WHERE id = ?', [isDraft ? 1 : 0, pullId]);
   }
 
   public async requestReviewers(pullRequestId: string, emails: string[], now: number): Promise<void> {
     for (const email of emails) {
-      await this.withRetry(
-        () => this.database.prepare(CollaborationQueries.insertReviewerIgnore()).bind(pullRequestId, email.toLowerCase(), now).run(),
-        'request reviewer',
-      );
+      await this.run(CollaborationQueries.insertReviewerIgnore(), [pullRequestId, email.toLowerCase(), now]);
     }
   }
 
@@ -261,14 +201,7 @@ class CollaborationDAO extends BaseDAO {
   }
 
   public async removeReviewer(pullRequestId: string, email: string): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('DELETE FROM pull_reviewers WHERE pull_request_id = ? AND user_email = ?')
-          .bind(pullRequestId, email.toLowerCase())
-          .run(),
-      'remove reviewer',
-    );
+    await this.run('DELETE FROM pull_reviewers WHERE pull_request_id = ? AND user_email = ?', [pullRequestId, email.toLowerCase()]);
   }
 
   public async syncReviewerStatus(

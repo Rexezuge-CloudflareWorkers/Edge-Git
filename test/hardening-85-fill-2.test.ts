@@ -19,7 +19,7 @@ vi.mock('@edge-git/git-service', () => {
 import { PktLine } from '@edge-git/git-protocol';
 import { FetchHandler } from '@edge-git/background/FetchHandler';
 import { SearchService } from '@edge-git/backend-services/search';
-import { rateLimit, resetRateLimitForTests } from '../apps/api/src/middleware/rateLimit';
+import { rateLimit } from '../apps/api/src/middleware/rateLimit';
 
 function encodeCommand(command: string, args: string[]): Uint8Array {
   const lines = [
@@ -134,7 +134,6 @@ describe('SearchService statics fill', () => {
 
 describe('rateLimit buckets', () => {
   it('allows then 429s and recovers per identity', async () => {
-    resetRateLimitForTests();
     const mw = rateLimit({ windowMs: 60_000, max: 2, keyPrefix: 'fill-test' });
     const mkCtx = () =>
       ({
@@ -148,6 +147,5 @@ describe('rateLimit buckets', () => {
     const limited = (await mw(mkCtx(), next)) as unknown as Response;
     expect(limited.status).toBe(429);
     expect(next).toHaveBeenCalledTimes(2);
-    resetRateLimitForTests();
   });
 });

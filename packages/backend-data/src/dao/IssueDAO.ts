@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 
 export interface IssueRow {
   id: string;
@@ -47,16 +47,7 @@ class IssueDAO extends BaseDAO {
     creatorEmail: string;
     now: number;
   }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'INSERT INTO issues (id, repository_id, number, title, body, status, creator_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          )
-          .bind(input.id, input.repositoryId, input.number, input.title, input.body, 'open', input.creatorEmail, input.now, input.now)
-          .run(),
-      'create issue',
-    );
+    await this.run('INSERT INTO issues (id, repository_id, number, title, body, status, creator_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [input.id, input.repositoryId, input.number, input.title, input.body, 'open', input.creatorEmail, input.now, input.now]);
   }
 
   // `full_name` is computed from `repositories` (0024 dropped the stored
@@ -80,36 +71,16 @@ class IssueDAO extends BaseDAO {
   }
 
   public async setStatus(id: string, status: 'open' | 'closed', now: number): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('UPDATE issues SET status = ?, updated_at = ? WHERE id = ?').bind(status, now, id).run(),
-      'update issue status',
-    );
+    await this.run('UPDATE issues SET status = ?, updated_at = ? WHERE id = ?', [status, now, id]);
   }
 
   public async deleteByRepo(repositoryId: string): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('DELETE FROM comments WHERE issue_id IN (SELECT id FROM issues WHERE repository_id = ?)')
-          .bind(repositoryId)
-          .run(),
-      'delete comments by repo',
-    );
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM issues WHERE repository_id = ?').bind(repositoryId).run(),
-      'delete issues by repo',
-    );
+    await this.run('DELETE FROM comments WHERE issue_id IN (SELECT id FROM issues WHERE repository_id = ?)', [repositoryId]);
+    await this.run('DELETE FROM issues WHERE repository_id = ?', [repositoryId]);
   }
 
   public async addComment(id: string, issueId: string, authorEmail: string, body: string, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('INSERT INTO comments (id, issue_id, author_email, body, created_at) VALUES (?, ?, ?, ?, ?)')
-          .bind(id, issueId, authorEmail, body, now)
-          .run(),
-      'add comment',
-    );
+    await this.run('INSERT INTO comments (id, issue_id, author_email, body, created_at) VALUES (?, ?, ?, ?, ?)', [id, issueId, authorEmail, body, now]);
   }
 
   public async listComments(issueId: string): Promise<CommentRow[]> {

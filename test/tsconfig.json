@@ -8,8 +8,6 @@
       "@edge-git/background/*": ["../apps/background/src/*"],
       "@edge-git/backend-data": ["../packages/backend-data/src"],
       "@edge-git/backend-data/*": ["../packages/backend-data/src/*"],
-      "@edge-git/backend-errors": ["../packages/backend-errors/src"],
-      "@edge-git/backend-errors/*": ["../packages/backend-errors/src/*"],
       "@edge-git/backend-runtime": ["../packages/backend-runtime/src"],
       "@edge-git/backend-runtime/*": ["../packages/backend-runtime/src/*"],
       "@edge-git/backend-services": ["../packages/backend-services/src"],

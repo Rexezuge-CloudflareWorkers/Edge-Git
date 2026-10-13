@@ -67,7 +67,7 @@ import type { AuditService } from '../audit/AuditService';
 import type { AuditObserverRegistry } from '../audit/AuditObserver';
 import type { DomainEventBus } from '../events/DomainEventBus';
 import type { IdentityResolver } from '../identity/IdentityResolver';
-import type { UserIdentityService } from '../identity/UserIdentityService';
+import type { UserIdentityService } from '../identity';
 import type { PermissionService } from '../permission/PermissionService';
 import type { SearchService } from '../search/SearchService';
 import type { ActivityService } from '../social/ActivityService';

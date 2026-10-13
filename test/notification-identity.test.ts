@@ -105,11 +105,12 @@ describe('NotificationService.fanOut', () => {
     const service = new NotificationService({ DB: {} } as never, {
       notificationDAO: async () => ({ insert: async (i: Record<string, unknown>) => void inserted.push(i) }) as never,
       watchDAO: async () => ({ listWatchers: async () => [] }) as never,
-      userDAO: async () => ({ getByUsernameCi: async () => null }) as never,
+      userDAO: async () => ({ getByCurrentEmail: async () => null,
+getByUsernameCi: async () => null }) as never,
       repositoryDAO: async () => ({ getById: async () => null }) as never,
       permissionService: async () => ({ getRole: async () => 'read' }) as never,
       userIdentity: async () =>
-        ({ resolveUserId: async (email: string) => (email === 'alice@old.test' ? ALICE : null) }) as never,
+        ({ resolveAccountId: async (email: string) => (email === 'alice@old.test' ? ALICE : null) }) as never,
     });
 
     const result = await service.fanOut({
@@ -135,10 +136,11 @@ describe('NotificationService.fanOut', () => {
     const service = new NotificationService({ DB: {} } as never, {
       notificationDAO: async () => ({ insert: async (i: Record<string, unknown>) => void inserted.push(i) }) as never,
       watchDAO: async () => ({ listWatchers: async () => [] }) as never,
-      userDAO: async () => ({ getByUsernameCi: async () => null }) as never,
+      userDAO: async () => ({ getByCurrentEmail: async () => null,
+getByUsernameCi: async () => null }) as never,
       repositoryDAO: async () => ({ getById: async () => null }) as never,
       permissionService: async () => ({ getRole: async () => 'read' }) as never,
-      userIdentity: async () => ({ resolveUserId: async () => null }) as never,
+      userIdentity: async () => ({ resolveAccountId: async () => null }) as never,
     });
 
     const result = await service.fanOut({

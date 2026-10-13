@@ -1,7 +1,7 @@
 import { AuditLogDAO } from '@edge-git/backend-data/dao';
 import type { AuditLogFilters, AuditLogRow } from '@edge-git/backend-data/dao';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
-import { ForbiddenError } from '@edge-git/backend-errors';
+import { ForbiddenError } from '@rexezuge/errors';
 import { OrganizationDAO, OrganizationMemberDAO } from '@edge-git/backend-data/dao';
 import { buildRequestEvent } from './AuditPayloadBuilder';
 import type { AuditEvent } from './AuditEventBuilder';

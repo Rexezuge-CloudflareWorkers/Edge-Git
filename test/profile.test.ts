@@ -114,13 +114,13 @@ function createProfileFakeDb() {
       },
       run(): Promise<{ success: boolean; meta?: { changes?: number } }> {
         if (q.startsWith('INSERT INTO users')) {
-          const [email, created_at] = params as [string, number];
-          if (!state.users.some((u) => u.email === email)) state.users.push({ email, created_at, username: null, updated_at: null });
+          const [email, created_at, id, current_email] = params as Array<string | number>;
+          if (!state.users.some((u) => u.email === email)) state.users.push({ email, created_at, id, current_email, username: null, updated_at: null });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE users SET username = COALESCE(username, ?)')) {
-          const [username, now, email] = params as [string, number, string];
-          const row = state.users.find((u) => u.email === email);
+          const [username, now, idOrEmail] = params as Array<string | number>;
+          const row = state.users.find((u) => u.id === idOrEmail || u.email === idOrEmail);
           if (row && !row.username) {
             row.username = username;
             row.updated_at = now;

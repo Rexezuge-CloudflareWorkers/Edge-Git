@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 
 export interface TeamRow {
   id: string;
@@ -27,26 +27,7 @@ class TeamDAO extends BaseDAO {
     createdBy: string;
     now: number;
   }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare(
-            'INSERT INTO teams (id, org_id, slug, slug_ci, name, description, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          )
-          .bind(
-            input.id,
-            input.orgId,
-            input.slug,
-            input.slug.toLowerCase(),
-            input.name,
-            input.description ?? null,
-            input.createdBy,
-            input.now,
-            input.now,
-          )
-          .run(),
-      'create team',
-    );
+    await this.run('INSERT INTO teams (id, org_id, slug, slug_ci, name, description, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [input.id, input.orgId, input.slug, input.slug.toLowerCase(), input.name, input.description ?? null, input.createdBy, input.now, input.now]);
   }
 
   public async getById(id: string): Promise<TeamRow | null> {
@@ -74,22 +55,15 @@ class TeamDAO extends BaseDAO {
   }
 
   public async rename(id: string, slug: string, name: string, description: string | null, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('UPDATE teams SET slug = ?, slug_ci = ?, name = ?, description = ?, updated_at = ? WHERE id = ?')
-          .bind(slug, slug.toLowerCase(), name, description, now, id)
-          .run(),
-      'rename team',
-    );
+    await this.run('UPDATE teams SET slug = ?, slug_ci = ?, name = ?, description = ?, updated_at = ? WHERE id = ?', [slug, slug.toLowerCase(), name, description, now, id]);
   }
 
   public async deleteById(id: string): Promise<void> {
-    await this.withRetry(() => this.database.prepare('DELETE FROM teams WHERE id = ?').bind(id).run(), 'delete team');
+    await this.run('DELETE FROM teams WHERE id = ?', [id]);
   }
 
   public async deleteByOrg(orgId: string): Promise<void> {
-    await this.withRetry(() => this.database.prepare('DELETE FROM teams WHERE org_id = ?').bind(orgId).run(), 'delete teams by org');
+    await this.run('DELETE FROM teams WHERE org_id = ?', [orgId]);
   }
 }
 

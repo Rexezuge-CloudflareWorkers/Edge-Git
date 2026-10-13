@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 
 /**
  * `users` rows.
@@ -55,19 +55,35 @@ class UserDAO extends BaseDAO {
   }
 
   /**
-   * Create an account. The anchor is generated here rather than derived from the
-   * login address so that a previously used address is always re-claimable.
+   * Create an account under `input.anchor`.
+   *
+   * Returns the new account's id, or `null` when the insert was a silent no-op
+   * because the anchor is already held. That `null` is what makes the caller's
+   * retry with an opaque anchor safe: without it the retry would hand back an
+   * id the database never stored, and the address registry would be pointed at a
+   * phantom account that resolves to nothing.
+   *
+   * The no-op is established by reading the anchor row back and requiring *this*
+   * insert's generated id to be the one there, not by inspecting `meta.changes`.
+   * `ON CONFLICT DO NOTHING` reports neither form reliably — `changes` is absent
+   * on some paths, and the named-target form only covers the constraints it
+   * names — while the read-back is exactly the question being asked.
+   *
+   * `ON CONFLICT` without a target: `users` carries both the anchor primary key
+   * and a unique index on `current_email`, and naming only the anchor would let a
+   * `current_email` collision raise, which the caller cannot tell from a
+   * transient D1 failure — it would propagate and the retry would never run.
    */
-  public async createUser(input: { id?: string | null; anchor: string; loginEmail: string; now: number }): Promise<void> {
-    const id = input.id ?? UserDAO.newId();
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('INSERT INTO users (email, created_at, id, current_email) VALUES (?, ?, ?, ?) ON CONFLICT(email) DO NOTHING')
-          .bind(input.anchor, input.now, id, input.loginEmail)
-          .run(),
-      'create user',
-    );
+  public async createUser(input: { anchor: string; loginEmail: string; now: number }): Promise<string | null> {
+    const id = UserDAO.newId();
+    await this.run('INSERT INTO users (email, created_at, id, current_email) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING', [
+      input.anchor,
+      input.now,
+      id,
+      input.loginEmail,
+    ]);
+    const row = await this.getByEmail(input.anchor);
+    return row?.id === id ? id : null;
   }
 
   /**
@@ -76,55 +92,34 @@ class UserDAO extends BaseDAO {
    * database.
    */
   public async upsertUser(email: string, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('INSERT INTO users (email, created_at, id, current_email) VALUES (?, ?, ?, ?) ON CONFLICT(email) DO NOTHING')
-          .bind(email, now, UserDAO.newId(), email)
-          .run(),
-      'upsert user',
-    );
+    await this.run('INSERT INTO users (email, created_at, id, current_email) VALUES (?, ?, ?, ?) ON CONFLICT(email) DO NOTHING', [email, now, UserDAO.newId(), email]);
   }
 
   public async ensureUsername(idOrEmail: string, username: string, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('UPDATE users SET username = COALESCE(username, ?), updated_at = COALESCE(updated_at, ?) WHERE id = ? OR email = ?')
-          .bind(username, now, idOrEmail, idOrEmail)
-          .run(),
-      'ensure username',
-    );
+    await this.run('UPDATE users SET username = COALESCE(username, ?), updated_at = COALESCE(updated_at, ?) WHERE id = ? OR email = ?', [username, now, idOrEmail, idOrEmail]);
   }
 
   public async setUsername(idOrEmail: string, username: string, now: number): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('UPDATE users SET username = ?, updated_at = ? WHERE id = ? OR email = ?')
-          .bind(username, now, idOrEmail, idOrEmail)
-          .run(),
-      'set username',
-    );
+    await this.run('UPDATE users SET username = ?, updated_at = ? WHERE id = ? OR email = ?', [username, now, idOrEmail, idOrEmail]);
   }
 
   /**
   Anchor lookup — used for legacy `*_email` values and cascade resolution.
   */
   public async getByEmail(email: string): Promise<UserRow | null> {
-    return this.database.prepare('SELECT * FROM users WHERE lower(email) = lower(?) LIMIT 1').bind(email).first<UserRow>();
+    return this.first<UserRow>('SELECT * FROM users WHERE lower(email) = lower(?) LIMIT 1', [email]);
   }
 
   public async getById(id: string): Promise<UserRow | null> {
-    return this.database.prepare('SELECT * FROM users WHERE id = ? LIMIT 1').bind(id).first<UserRow>();
+    return this.first<UserRow>('SELECT * FROM users WHERE id = ? LIMIT 1', [id]);
   }
 
   public async getByCurrentEmail(email: string): Promise<UserRow | null> {
-    return this.database.prepare('SELECT * FROM users WHERE lower(current_email) = lower(?) LIMIT 1').bind(email).first<UserRow>();
+    return this.first<UserRow>('SELECT * FROM users WHERE lower(current_email) = lower(?) LIMIT 1', [email]);
   }
 
   public async getByUsernameCi(usernameCi: string): Promise<UserRow | null> {
-    return this.database.prepare('SELECT * FROM users WHERE lower(username) = ? LIMIT 1').bind(usernameCi).first<UserRow>();
+    return this.first<UserRow>('SELECT * FROM users WHERE lower(username) = ? LIMIT 1', [usernameCi]);
   }
 
   /**
@@ -132,10 +127,7 @@ class UserDAO extends BaseDAO {
    * every legacy `*_email` column and foreign key resolves against.
    */
   public async setCurrentEmail(id: string, email: string, now: number): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('UPDATE users SET current_email = ?, updated_at = ? WHERE id = ?').bind(email, now, id).run(),
-      'set current email',
-    );
+    await this.run('UPDATE users SET current_email = ?, updated_at = ? WHERE id = ?', [email, now, id]);
   }
 
   public async getByEmails(emails: string[]): Promise<UserRow[]> {

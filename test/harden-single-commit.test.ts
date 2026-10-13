@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BaseRoute } from '@/endpoints/IBaseRoute';
-import { Container, createServiceContext, setRequestScope, getRequestScope, asScopedContext } from '@edge-git/backend-runtime/di';
+import { Container, createServiceContext, setServiceContext, getRequestScope, asScopedContext } from '@edge-git/backend-runtime/di';
+import { setRequestScope } from '@rexezuge/runtime';
 import { createRequestScope, Tokens } from '@edge-git/backend-services/composition';
 import { AccessAuthService } from '@edge-git/backend-services/auth';
 import { collectEmails, presentMany, presentOne, usernameMap } from '@/workers/routes/IdentityPresenter';
@@ -77,7 +78,8 @@ describe('harden single-commit: single scope per request', () => {
     } as never;
     const scope = createRequestScope({ DB: {} } as never);
     const ctx = createServiceContext({ DB: {} } as never);
-    setRequestScope(asScopedContext(c), scope, ctx);
+    setRequestScope(asScopedContext(c), scope);
+    setServiceContext(asScopedContext(c), ctx);
     expect(BaseRoute.getScope(c)).toBe(scope);
     expect(getRequestScope(asScopedContext(c))).toBe(scope);
   });

@@ -1,5 +1,5 @@
 import { BaseDAO } from './BaseDAO';
-import type { D1Queryable } from '../utils/D1Types';
+import type { D1Queryable } from '@rexezuge/d1';
 
 export type NamespaceKind = 'user' | 'org';
 
@@ -32,14 +32,7 @@ class NamespaceDAO extends BaseDAO {
     orgId?: string | null;
     now: number;
   }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('INSERT INTO namespaces (username_ci, kind, user_email, org_id, created_at) VALUES (?, ?, ?, ?, ?)')
-          .bind(input.usernameCi, input.kind, input.userEmail ?? null, input.orgId ?? null, input.now)
-          .run(),
-      'claim namespace',
-    );
+    await this.run('INSERT INTO namespaces (username_ci, kind, user_email, org_id, created_at) VALUES (?, ?, ?, ?, ?)', [input.usernameCi, input.kind, input.userEmail ?? null, input.orgId ?? null, input.now]);
   }
 
   public async claimIgnore(input: {
@@ -49,21 +42,11 @@ class NamespaceDAO extends BaseDAO {
     orgId?: string | null;
     now: number;
   }): Promise<void> {
-    await this.withRetry(
-      () =>
-        this.database
-          .prepare('INSERT OR IGNORE INTO namespaces (username_ci, kind, user_email, org_id, created_at) VALUES (?, ?, ?, ?, ?)')
-          .bind(input.usernameCi, input.kind, input.userEmail ?? null, input.orgId ?? null, input.now)
-          .run(),
-      'claim namespace ignore',
-    );
+    await this.run('INSERT OR IGNORE INTO namespaces (username_ci, kind, user_email, org_id, created_at) VALUES (?, ?, ?, ?, ?)', [input.usernameCi, input.kind, input.userEmail ?? null, input.orgId ?? null, input.now]);
   }
 
   public async release(usernameCi: string): Promise<void> {
-    await this.withRetry(
-      () => this.database.prepare('DELETE FROM namespaces WHERE username_ci = ?').bind(usernameCi).run(),
-      'release namespace',
-    );
+    await this.run('DELETE FROM namespaces WHERE username_ci = ?', [usernameCi]);
   }
 }
 

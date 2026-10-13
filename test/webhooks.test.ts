@@ -116,8 +116,8 @@ function createWebhookFakeDb() {
       },
       run(): Promise<{ success: boolean; meta?: { changes?: number } }> {
         if (q.startsWith('INSERT INTO users')) {
-          const [email, created_at] = params as [string, number];
-          if (!state.users.some((u) => u.email === email)) state.users.push({ email, created_at, username: null, updated_at: null });
+          const [email, created_at, id, current_email] = params as Array<string | number>;
+          if (!state.users.some((u) => u.email === email)) state.users.push({ email, created_at, id, current_email, username: null, updated_at: null });
           return Promise.resolve({ success: true, meta: { changes: 1 } });
         }
         if (q.startsWith('UPDATE users SET')) {
