@@ -18,9 +18,9 @@
   },
   "dependencies": {
     "@edge-git/shared": "workspace:*",
-    "@rexezuge/d1": "link:../../../SDK/packages/d1",
-    "@rexezuge/errors": "link:../../../SDK/packages/errors",
-    "@rexezuge/shared": "link:../../../SDK/packages/shared"
+    "@rexezuge/d1": "^1.6.0",
+    "@rexezuge/errors": "^1.6.0",
+    "@rexezuge/shared": "^1.6.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260926.1",

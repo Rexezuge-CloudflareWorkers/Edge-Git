@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@edge-git/shared": "workspace:*",
-    "@rexezuge/errors": "link:../../../SDK/packages/errors"
+    "@rexezuge/errors": "^1.6.0"
   },
   "devDependencies": {
     "@types/node": "26.6.4",

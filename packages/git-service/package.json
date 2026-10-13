@@ -14,7 +14,7 @@
   "dependencies": {
     "@edge-git/git-protocol": "workspace:*",
     "@edge-git/shared": "workspace:*",
-    "@rexezuge/errors": "link:../../../SDK/packages/errors",
+    "@rexezuge/errors": "^1.6.0",
     "dofs": "^0.1.0",
     "isomorphic-git": "^1.42.6"
   },

@@ -15,29 +15,29 @@ importers:
         specifier: 0.22.0
         version: 0.22.0(@vitest/runner@4.1.10)(@vitest/snapshot@4.1.10)(vitest@4.1.10)
       '@rexezuge/d1':
-        specifier: link:../SDK/packages/d1
-        version: link:../SDK/packages/d1
+        specifier: ^1.6.0
+        version: 1.6.0
       '@rexezuge/errors':
-        specifier: link:../SDK/packages/errors
-        version: link:../SDK/packages/errors
+        specifier: ^1.6.0
+        version: 1.6.0
       '@rexezuge/http':
-        specifier: link:../SDK/packages/http
-        version: link:../SDK/packages/http
+        specifier: ^1.6.0
+        version: 1.6.0
       '@rexezuge/i18n':
-        specifier: link:../SDK/packages/i18n
-        version: link:../SDK/packages/i18n
+        specifier: ^1.6.0
+        version: 1.6.0
       '@rexezuge/identity':
-        specifier: link:../SDK/packages/identity
-        version: link:../SDK/packages/identity
+        specifier: ^1.6.0
+        version: 1.6.0
       '@rexezuge/runtime':
-        specifier: link:../SDK/packages/runtime
-        version: link:../SDK/packages/runtime
+        specifier: ^1.6.0
+        version: 1.6.0
       '@rexezuge/shared':
-        specifier: link:../SDK/packages/shared
-        version: link:../SDK/packages/shared
+        specifier: ^1.6.0
+        version: 1.6.0
       '@rexezuge/web':
-        specifier: link:../SDK/packages/web
-        version: link:../SDK/packages/web
+        specifier: ^1.6.0
+        version: 1.6.0(lucide-react@1.50.0(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@testing-library/jest-dom':
         specifier: 7.0.1
         version: 7.0.1(@testing-library/dom@10.4.2)(vitest@4.1.10)
@@ -147,20 +147,20 @@ importers:
         specifier: workspace:*
         version: link:../../packages/shared
       '@rexezuge/errors':
-        specifier: link:../../../SDK/packages/errors
-        version: link:../../../SDK/packages/errors
+        specifier: ^1.6.0
+        version: 1.6.0
       '@rexezuge/http':
-        specifier: link:../../../SDK/packages/http
-        version: link:../../../SDK/packages/http
+        specifier: ^1.6.0
+        version: 1.6.0
       '@rexezuge/i18n':
-        specifier: link:../../../SDK/packages/i18n
-        version: link:../../../SDK/packages/i18n
+        specifier: ^1.6.0
+        version: 1.6.0
       '@rexezuge/runtime':
-        specifier: link:../../../SDK/packages/runtime
-        version: link:../../../SDK/packages/runtime
+        specifier: ^1.6.0
+        version: 1.6.0
       '@rexezuge/shared':
-        specifier: link:../../../SDK/packages/shared
-        version: link:../../../SDK/packages/shared
+        specifier: ^1.6.0
+        version: 1.6.0
       chanfana:
         specifier: 3.4.0
         version: 3.4.0
@@ -202,11 +202,11 @@ importers:
         specifier: ^0.32.0
         version: 0.32.0
       '@rexezuge/errors':
-        specifier: link:../../../SDK/packages/errors
-        version: link:../../../SDK/packages/errors
+        specifier: ^1.6.0
+        version: 1.6.0
       '@rexezuge/shared':
-        specifier: link:../../../SDK/packages/shared
-        version: link:../../../SDK/packages/shared
+        specifier: ^1.6.0
+        version: 1.6.0
       quickjs-emscripten:
         specifier: 0.32.0
         version: 0.32.0
@@ -221,8 +221,8 @@ importers:
   apps/web:
     dependencies:
       '@rexezuge/web':
-        specifier: link:../../../SDK/packages/web
-        version: link:../../../SDK/packages/web
+        specifier: ^1.6.0
+        version: 1.6.0(lucide-react@1.50.0(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       class-variance-authority:
         specifier: 0.7.1
         version: 0.7.1
@@ -297,14 +297,14 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@rexezuge/d1':
-        specifier: link:../../../SDK/packages/d1
-        version: link:../../../SDK/packages/d1
+        specifier: ^1.6.0
+        version: 1.6.0
       '@rexezuge/errors':
-        specifier: link:../../../SDK/packages/errors
-        version: link:../../../SDK/packages/errors
+        specifier: ^1.6.0
+        version: 1.6.0
       '@rexezuge/shared':
-        specifier: link:../../../SDK/packages/shared
-        version: link:../../../SDK/packages/shared
+        specifier: ^1.6.0
+        version: 1.6.0
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 5.20260926.1
@@ -322,8 +322,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@rexezuge/runtime':
-        specifier: link:../../../SDK/packages/runtime
-        version: link:../../../SDK/packages/runtime
+        specifier: ^1.6.0
+        version: 1.6.0
     devDependencies:
       '@types/node':
         specifier: 26.6.4
@@ -347,17 +347,17 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@rexezuge/errors':
-        specifier: link:../../../SDK/packages/errors
-        version: link:../../../SDK/packages/errors
+        specifier: ^1.6.0
+        version: 1.6.0
       '@rexezuge/i18n':
-        specifier: link:../../../SDK/packages/i18n
-        version: link:../../../SDK/packages/i18n
+        specifier: ^1.6.0
+        version: 1.6.0
       '@rexezuge/identity':
-        specifier: link:../../../SDK/packages/identity
-        version: link:../../../SDK/packages/identity
+        specifier: ^1.6.0
+        version: 1.6.0
       '@rexezuge/shared':
-        specifier: link:../../../SDK/packages/shared
-        version: link:../../../SDK/packages/shared
+        specifier: ^1.6.0
+        version: 1.6.0
       jose:
         specifier: 6.2.12
         version: 6.2.12
@@ -375,8 +375,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@rexezuge/errors':
-        specifier: link:../../../SDK/packages/errors
-        version: link:../../../SDK/packages/errors
+        specifier: ^1.6.0
+        version: 1.6.0
     devDependencies:
       '@types/node':
         specifier: 26.6.4
@@ -394,11 +394,11 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@rexezuge/errors':
-        specifier: link:../../../SDK/packages/errors
-        version: link:../../../SDK/packages/errors
+        specifier: ^1.6.0
+        version: 1.6.0
       dofs:
         specifier: ^0.1.0
-        version: 0.1.0(patch_hash=a4e0c9784c0152850a43458069a84082829bcd7315a96a2c3a9f323f7e1d5fed)(hono@4.13.12)
+        version: 0.1.0(patch_hash=a4e0c9784c0152850a43458069a84082829bcd7315a96a2c3a9f323f7e1d5fed)(hono@4.13.13)
       isomorphic-git:
         specifier: ^1.42.6
         version: 1.42.6
@@ -413,8 +413,8 @@ importers:
   packages/shared:
     dependencies:
       '@rexezuge/shared':
-        specifier: link:../../../SDK/packages/shared
-        version: link:../../../SDK/packages/shared
+        specifier: ^1.6.0
+        version: 1.6.0
       zod:
         specifier: 4.6.5
         version: 4.6.5
@@ -1419,6 +1419,34 @@ packages:
   '@poppinss/exception@1.2.3':
     resolution: {integrity: sha512-dCED+QRChTVatE9ibtoaxc+WkdzOSjYTKi/+uacHWIsfodVfpsueo3+DKpgU5Px8qXjgmXkSvhXvSCz3fnP9lw==}
 
+  '@rexezuge/d1@1.6.0':
+    resolution: {integrity: sha512-uPb093yrsPvBvLfUk2uavWqz5NiNZXWqrOtiWX7OY3yI0CyIbdwlQgPT7HahBgsUJc97mKQq5ur7BogSIp/oVA==}
+
+  '@rexezuge/errors@1.6.0':
+    resolution: {integrity: sha512-tk1Un8+Npt2V65AJeWpRHvIhHhzcZTE20pYuepqfpLpWCrIxf+dWH9DQhoMmegw+1i0nwweUsz7xcYB5RRBmZQ==}
+
+  '@rexezuge/http@1.6.0':
+    resolution: {integrity: sha512-Cipn5gD6hxv1I3JVVvEwXEab+mFRI0tsz1lcNsdOZultu+y68QFg+i0RT8a+ympGg9uNF8XpDKLMzZKaM7TKiA==}
+
+  '@rexezuge/i18n@1.6.0':
+    resolution: {integrity: sha512-teh2tEWFDPWvW69EnvLoZ6cwGNrAroNZiDfIDxmBEI+uanlKMoMMmb7O9VEWYZDs0+hQg/amTawE6gvdnksDQA==}
+
+  '@rexezuge/identity@1.6.0':
+    resolution: {integrity: sha512-CrlY7poOi+DzMJ1F+FbQtaIW43m0lDNelAhTrydRKeLX652PLm9r8Xj5XIhDcWZdRfVzmrRpl0Bt03/t2Pgvzw==}
+
+  '@rexezuge/runtime@1.6.0':
+    resolution: {integrity: sha512-YSNkb50nDuE1ElJUX6BgJI4760Q+j6mrZ7eanSIIU9dBNVa632Q+rT98bsmeHqcLgAsYNWruQlD3vtB6PfR8dg==}
+
+  '@rexezuge/shared@1.6.0':
+    resolution: {integrity: sha512-stwLJeQX5sdMnxw6kRJKrtUVQPyKEQyTA42M85VhxLvQtto6PDFf4w4dCtFZWehDc5QLCcy80nLH4T6R1XKDlw==}
+
+  '@rexezuge/web@1.6.0':
+    resolution: {integrity: sha512-AB3enjhKd7Ob4qCE3p+MS8ZRtrvdGpcRAm7wzmqCTHYCevDOYsZAEoQ5NNkVYV3bUA4nyq94cCh5lVwdUyA82Q==}
+    peerDependencies:
+      lucide-react: ^1.49.0
+      react: ^19.3.0
+      react-dom: ^19.3.0
+
   '@rolldown/binding-android-arm-eabi@1.2.12':
     resolution: {integrity: sha512-dB/a1214qKfHMXCpgqR4OZT+jS4kTyEXbQGJPqzobt5EwH5rX080pxE37alt3RzvR1bf1Yz/yGqRfrYAxuPw0A==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -2355,6 +2383,10 @@ packages:
 
   hono@4.13.12:
     resolution: {integrity: sha512-6E2QDAc9Ick9Sq77ZrGS/dk2WUYni91aufTw6LJKpV7w8kW5/GxVUc650FOADOmlwg3K+f7Pun6XlV+pYmW6gw==}
+    engines: {node: '>=16.9.0'}
+
+  hono@4.13.13:
+    resolution: {integrity: sha512-CQ46U0ZkAGmbT/4UxdzzGJpacP2IeKgY4a5/tOI9AABbpOMfK739wfDXmv1usCk+3RkKj1hQy4/fjhiwa2xlrA==}
     engines: {node: '>=16.9.0'}
 
   hookified@1.15.1:
@@ -4322,6 +4354,41 @@ snapshots:
 
   '@poppinss/exception@1.2.3': {}
 
+  '@rexezuge/d1@1.6.0':
+    dependencies:
+      '@rexezuge/errors': 1.6.0
+      '@rexezuge/shared': 1.6.0
+
+  '@rexezuge/errors@1.6.0': {}
+
+  '@rexezuge/http@1.6.0':
+    dependencies:
+      '@rexezuge/errors': 1.6.0
+      '@rexezuge/shared': 1.6.0
+      chanfana: 3.4.0
+      hono: 4.13.13
+      jose: 6.2.12
+
+  '@rexezuge/i18n@1.6.0': {}
+
+  '@rexezuge/identity@1.6.0':
+    dependencies:
+      '@rexezuge/d1': 1.6.0
+      '@rexezuge/errors': 1.6.0
+      '@rexezuge/shared': 1.6.0
+
+  '@rexezuge/runtime@1.6.0': {}
+
+  '@rexezuge/shared@1.6.0': {}
+
+  '@rexezuge/web@1.6.0(lucide-react@1.50.0(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+    dependencies:
+      '@rexezuge/errors': 1.6.0
+      '@rexezuge/shared': 1.6.0
+      lucide-react: 1.50.0(@types/react@19.3.0)(react@19.3.0)
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
+
   '@rolldown/binding-android-arm-eabi@1.2.12':
     optional: true
 
@@ -4893,10 +4960,10 @@ snapshots:
 
   diff3@0.0.3: {}
 
-  dofs@0.1.0(patch_hash=a4e0c9784c0152850a43458069a84082829bcd7315a96a2c3a9f323f7e1d5fed)(hono@4.13.12):
+  dofs@0.1.0(patch_hash=a4e0c9784c0152850a43458069a84082829bcd7315a96a2c3a9f323f7e1d5fed)(hono@4.13.13):
     dependencies:
       commander: 14.0.3
-      hono: 4.13.12
+      hono: 4.13.13
       neofuse: 0.0.1-rc.3
 
   dom-accessibility-api@0.5.16: {}
@@ -5274,6 +5341,8 @@ snapshots:
       hermes-estree: 0.25.1
 
   hono@4.13.12: {}
+
+  hono@4.13.13: {}
 
   hookified@1.15.1: {}
 

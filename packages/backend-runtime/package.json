@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@edge-git/shared": "workspace:*",
-    "@rexezuge/runtime": "link:../../../SDK/packages/runtime"
+    "@rexezuge/runtime": "^1.6.0"
   },
   "devDependencies": {
     "@types/node": "26.6.4",
