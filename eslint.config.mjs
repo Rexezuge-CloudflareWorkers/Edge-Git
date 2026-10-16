@@ -70,7 +70,9 @@ export default tseslint.config(
   },
 
   // --- Unicorn: modern JS/TS quality rules ---
-  unicorn.configs['flat/recommended'],
+  // v78 dropped the `flat/`-prefixed presets; flat configs are now exported
+  // directly as `recommended` / `unopinionated` / `all`.
+  unicorn.configs.recommended,
   {
     rules: {
       // Codebase uses ctx, req, res, env, err, util, db, dao, etc. — too invasive to rename
@@ -138,6 +140,20 @@ export default tseslint.config(
       // repo is the last statement of a loop body, where `continue` is a no-op
       // that only adds noise.
       'unicorn/prefer-continue': 'off',
+      // v78 rewrites every JSDoc block comment to strip its `*` prefix; the
+      // codebase uses the standard `/**\n * ... */` convention everywhere.
+      'unicorn/no-asterisk-prefix-in-documentation-comments': 'off',
+    },
+  },
+
+  // v78's `recommended` preset now also enables rules marked "unopinionated",
+  // including `no-top-level-side-effects`. Vite/Vitest configs are toolchain
+  // entry points, not importable modules: plugin factories (`react()`,
+  // `tailwindcss()`) and local proxy helpers run at load by design.
+  {
+    files: ['**/vite.config.{ts,mts}', '**/vitest.config.{ts,mts}'],
+    rules: {
+      'unicorn/no-top-level-side-effects': 'off',
     },
   },
 

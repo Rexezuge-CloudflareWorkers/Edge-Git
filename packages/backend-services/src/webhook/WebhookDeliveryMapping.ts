@@ -27,8 +27,8 @@ function toPublicDelivery(row: WebhookDeliveryRow): WebhookDeliveryMetadata {
   };
 }
 
-function resolveSenderUsername(actorUsername?: string): string {
-  return actorUsername ?? 'ghost';
+function resolveSenderUsername(actorUsername = 'ghost'): string {
+  return actorUsername;
 }
 
 export { resolveSenderUsername, toPublicDelivery };

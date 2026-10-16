@@ -107,11 +107,7 @@ export function CommitView({
           <Card>
             <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('commits.commitNotFound', 'Commit Not Found.')}</h1>
           </Card>
-        ) : !diff || !commit ? (
-          <div className="min-h-32 flex items-center justify-center">
-            <div className="h-8 w-8 rounded-full border-2 border-[var(--color-accent)] border-t-transparent animate-spin" />
-          </div>
-        ) : (
+        ) : diff && commit ? (
           <>
             <Card>
               <p className="text-base font-medium text-[var(--color-text-primary)]">{firstLine(commit.commit.message)}</p>
@@ -127,6 +123,10 @@ export function CommitView({
             </Card>
             <DiffView files={diff.files} truncated={diff.truncated} />
           </>
+        ) : (
+          <div className="min-h-32 flex items-center justify-center">
+            <div className="h-8 w-8 rounded-full border-2 border-[var(--color-accent)] border-t-transparent animate-spin" />
+          </div>
         )}
       </AppPage>
     </div>

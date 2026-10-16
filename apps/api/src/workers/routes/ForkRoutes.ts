@@ -19,9 +19,8 @@ import { enqueueRepoVacuum } from './RepoVacuum';
 
 type ForkApp = Hono<{ Bindings: Env; Variables: { AuthenticatedUserEmailAddress: string } }>;
 
-function toForkJson(row: Parameters<typeof toRepoJson>[0], forksCount?: number): unknown {
-  const base = toRepoJson(row) as Record<string, unknown>;
-  return forksCount === undefined ? base : { ...base, forksCount };
+function toForkJson(row: Parameters<typeof toRepoJson>[0]): unknown {
+  return toRepoJson(row);
 }
 
 // Public fork listing — anonymous OK for public sources (private → 404).

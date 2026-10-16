@@ -159,8 +159,8 @@ async function collectTeamMemberEmails(
   }
 }
 
-async function resolveCodeownerEmails(env: Env, handles: readonly string[], excludeEmail?: string): Promise<string[]> {
-  const excluded = (excludeEmail ?? '').toLowerCase();
+async function resolveCodeownerEmails(env: Env, handles: readonly string[], excludeEmail = ''): Promise<string[]> {
+  const excluded = excludeEmail.toLowerCase();
   const scope = createRequestScope(env);
   const out: string[] = [];
   for (const handle of handles) {

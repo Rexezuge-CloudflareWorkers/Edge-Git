@@ -109,13 +109,13 @@ export function PullMergePanel(props: PullMergePanelProps) {
               <option value="rebase">rebase</option>
             </Select>
           </label>
-          {(pull.head_full_name ?? pull.full_name).toLowerCase() !== pull.full_name.toLowerCase() ||
-          pull.head_branch !== pull.base_branch ? (
+          {(pull.head_full_name ?? pull.full_name).toLowerCase() === pull.full_name.toLowerCase() &&
+          pull.head_branch === pull.base_branch ? null : (
             <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
               <input type="checkbox" checked={deleteHead} onChange={(e) => setDeleteHead(e.target.checked)} />
               {t('pulls.deleteHeadAfterMerge', 'Delete Head Branch After Merge')}
             </label>
-          ) : null}
+          )}
           <Button type="button" variant="primary" size="sm" loading={merging} disabled={blockedByReview} onClick={onMerge}>
             {t('pulls.mergePull', 'Merge Pull Request')}
           </Button>

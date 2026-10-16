@@ -204,6 +204,9 @@ class RealtimeWorker extends DurableObject<Env> {
       // hello is a nicety; the socket is still usable
     }
     if (attachment.channels.includes('presence')) this.broadcastPresence('presence');
+    // 101 Switching Protocols is the mandatory status for a Workers WebSocket
+    // upgrade response; the rule only accepts 200-599 fetch statuses.
+    // eslint-disable-next-line unicorn/no-invalid-response-options -- Workers allow 101 for `webSocket` upgrade responses.
     return new Response(null, { status: 101, webSocket: client });
   }
 
