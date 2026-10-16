@@ -27,7 +27,7 @@ interface CompactPacksInput {
 // delete, so an interrupted compaction cannot lose objects.
 async function maybeCompactPacks(input: CompactPacksInput): Promise<{ compacted: boolean; deleted: number }> {
   const idle = { compacted: false, deleted: 0 };
-  const { isoGitFs, git, maxObjects, maxPackBytes, fullName } = input;
+  const { isoGitFs, git, maxObjects, maxPackBytes, fullName = 'unknown repo' } = input;
   if (!isoGitFs) return idle;
   let names: string[];
   try {
@@ -78,10 +78,10 @@ async function maybeCompactPacks(input: CompactPacksInput): Promise<{ compacted:
       await isoGitFs.promises.unlink(oldIdx).catch(() => undefined);
     }
     git.clearCache();
-    logger.info(`(pack-compact) Compacted ${deleted} packs for ${fullName ?? 'unknown repo'} into ${fileName} (${oids.length} objects)`);
+    logger.info(`(pack-compact) Compacted ${deleted} packs for ${fullName} into ${fileName} (${oids.length} objects)`);
     return { compacted: deleted > 0, deleted };
   } catch (error) {
-    logger.error(`(pack-compact) Compaction skipped for ${fullName ?? 'unknown repo'}: `, error);
+    logger.error(`(pack-compact) Compaction skipped for ${fullName}: `, error);
     try {
       git.clearCache();
     } catch {

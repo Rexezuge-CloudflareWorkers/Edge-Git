@@ -25,7 +25,7 @@ class RepoCollaboratorDAO extends BaseDAO {
    * foreign key store); `userId` is what the grant is keyed on, so a
    * collaborator keeps access after changing their address.
    */
-  public async upsert(repoId: string, userEmail: string, role: RepoRole, grantedBy: string | null, now: number, userId?: string | null): Promise<void> {
+  public async upsert(repoId: string, userEmail: string, role: RepoRole, grantedBy: string | null, now: number, userId: string | null = null): Promise<void> {
     const normalized = userEmail.toLowerCase();
     const normalizedGrant = grantedBy?.toLowerCase() ?? null;
     // Collapse legacy mixed-case duplicates so `lower(user_email)` reads stay
@@ -37,7 +37,7 @@ class RepoCollaboratorDAO extends BaseDAO {
     ).catch(() => undefined);
     await this.run(
       'INSERT INTO repo_collaborators (repo_id, user_email, role, granted_by, created_at, user_id) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(repo_id, user_email) DO UPDATE SET role = excluded.role, granted_by = excluded.granted_by, user_id = COALESCE(excluded.user_id, repo_collaborators.user_id)',
-      [repoId, normalized, role, normalizedGrant, now, userId ?? null],
+      [repoId, normalized, role, normalizedGrant, now, userId],
     );
   }
 

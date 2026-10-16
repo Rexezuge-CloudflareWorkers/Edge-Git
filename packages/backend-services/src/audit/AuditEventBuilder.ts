@@ -51,25 +51,25 @@ class AuditEventBuilder {
     return this;
   }
 
-  public resource(resource: string | null | undefined): this {
-    this.input.resource = resource ?? null;
+  public resource(resource: string | null | undefined = null): this {
+    this.input.resource = resource;
     return this;
   }
 
-  public detail(detail: string | null | undefined): this {
-    this.input.detail = detail ?? null;
+  public detail(detail: string | null | undefined = null): this {
+    this.input.detail = detail;
     return this;
   }
 
-  public network(ipAddress: string | null | undefined, userAgent: string | null | undefined): this {
-    this.input.ipAddress = ipAddress ?? null;
-    this.input.userAgent = userAgent ?? null;
+  public network(ipAddress: string | null | undefined = null, userAgent: string | null | undefined = null): this {
+    this.input.ipAddress = ipAddress;
+    this.input.userAgent = userAgent;
     return this;
   }
 
-  public scope(orgId: string | null | undefined, repoId: string | null | undefined): this {
-    this.input.orgId = orgId ?? null;
-    this.input.repoId = repoId ?? null;
+  public scope(orgId: string | null | undefined = null, repoId: string | null | undefined = null): this {
+    this.input.orgId = orgId;
+    this.input.repoId = repoId;
     return this;
   }
 

@@ -19,7 +19,7 @@ class TeamMemberDAO extends BaseDAO {
     super(database);
   }
 
-  public async upsert(teamId: string, userEmail: string, role: TeamMemberRole, now: number, userId?: string | null): Promise<void> {
+  public async upsert(teamId: string, userEmail: string, role: TeamMemberRole, now: number, userId: string | null = null): Promise<void> {
     const normalized = userEmail.toLowerCase();
     // Collapse legacy mixed-case duplicates so `lower(user_email)` reads stay
     // unique. Best effort: a missing or failing DELETE leaves the duplicate in
@@ -30,7 +30,7 @@ class TeamMemberDAO extends BaseDAO {
     ).catch(() => undefined);
     await this.run(
       'INSERT INTO team_members (team_id, user_email, role, joined_at, user_id) VALUES (?, ?, ?, ?, ?) ON CONFLICT(team_id, user_email) DO UPDATE SET role = excluded.role, user_id = COALESCE(excluded.user_id, team_members.user_id)',
-      [teamId, normalized, role, now, userId ?? null],
+      [teamId, normalized, role, now, userId],
     );
   }
 

@@ -40,8 +40,8 @@ class ReadModelService {
   }
 
   public async getBranches(): Promise<{ branches: string[]; currentBranch: string | null }> {
-    const [branches, currentBranch] = await Promise.all([this.git.listBranches(), this.git.currentBranch()]);
-    return { branches, currentBranch: currentBranch ?? null };
+    const [branches, currentBranch = null] = await Promise.all([this.git.listBranches(), this.git.currentBranch()]);
+    return { branches, currentBranch };
   }
 
   public async getTags(): Promise<
@@ -195,7 +195,7 @@ class ReadModelService {
     // Parallelize independent reads (was 3 sequential round-trips).
     const [branches, currentBranch, tags] = await Promise.all([
       this.git.listBranches(),
-      this.git.currentBranch().then((b) => b ?? null),
+      this.git.currentBranch().then((b = null) => b),
       args.includeTags === false ? Promise.resolve([]) : this.getTags(),
     ]);
     // Default reads follow HEAD, but a fresh repo's HEAD can dangle (init

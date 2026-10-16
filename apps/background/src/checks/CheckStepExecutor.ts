@@ -101,9 +101,9 @@ async function executeBuiltInStep(
   await dao
     .updateStatus(runId, item.repositoryId, { status: 'in_progress', conclusion: null, now, completedAt: null })
     .catch(() => undefined);
-  const [base, arg] = context.split(/:(.*)/).map((s) => s?.trim() ?? '');
+  const [base, arg = ''] = context.split(/:(.*)/).map((s) => s?.trim() ?? '');
   try {
-    const step = await runBuiltInStep(env, repoStub, item.headSha, base ?? context, arg ?? '');
+    const step = await runBuiltInStep(env, repoStub, item.headSha, base ?? context, arg);
     const done = TimestampUtil.getCurrentUnixTimestampInSeconds();
     await dao
       .updateStatus(runId, item.repositoryId, {

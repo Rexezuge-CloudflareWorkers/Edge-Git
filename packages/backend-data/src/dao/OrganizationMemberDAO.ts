@@ -24,7 +24,7 @@ class OrganizationMemberDAO extends BaseDAO {
    * foreign key store); `userId` is what membership is actually keyed on, so a
    * member keeps access after changing their address.
    */
-  public async upsert(orgId: string, userEmail: string, role: OrgMemberRole, now: number, userId?: string | null): Promise<void> {
+  public async upsert(orgId: string, userEmail: string, role: OrgMemberRole, now: number, userId: string | null = null): Promise<void> {
     const normalized = userEmail.toLowerCase();
     // Collapse legacy mixed-case duplicates so `lower(user_email)` reads stay
     // unique. Best effort: a missing or failing DELETE leaves the duplicate in
@@ -35,7 +35,7 @@ class OrganizationMemberDAO extends BaseDAO {
     ).catch(() => undefined);
     await this.run(
       'INSERT INTO organization_members (org_id, user_email, role, created_at, user_id) VALUES (?, ?, ?, ?, ?) ON CONFLICT(org_id, user_email) DO UPDATE SET role = excluded.role, user_id = COALESCE(excluded.user_id, organization_members.user_id)',
-      [orgId, normalized, role, now, userId ?? null],
+      [orgId, normalized, role, now, userId],
     );
   }
 

@@ -22,8 +22,8 @@ function checkObjectBudget(input: { objectsToSend: number; visited: number; maxO
   }
 }
 
-function maxVisitedFor(maxObjects?: number): number {
-  return (maxObjects ?? 10_000) * 4 + 1000;
+function maxVisitedFor(maxObjects = 10_000): number {
+  return maxObjects * 4 + 1000;
 }
 
 export { PackLimitError, checkObjectBudget, maxVisitedFor };

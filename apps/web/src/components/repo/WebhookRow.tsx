@@ -29,15 +29,13 @@ async function runHookAction(
   showNotice: Notice,
   t: TranslateFn,
   successMessage: string,
-  failureKey: string,
-  failureDefault: string,
   action: () => Promise<unknown>,
 ): Promise<void> {
   try {
     await action();
     showNotice('success', successMessage);
   } catch (error) {
-    showNotice('error', toLocalizedErrorMessage(t, error, failureKey, failureDefault));
+    showNotice('error', toLocalizedErrorMessage(t, error, 'webhooks.actionFailed', 'Webhook Action Failed.'));
   }
 }
 
@@ -95,8 +93,6 @@ export function WebhookRow({
         showNotice,
         t,
         t(hook.isActive ? 'webhooks.disabled' : 'webhooks.enabled', hook.isActive ? 'Webhook Disabled.' : 'Webhook Enabled.'),
-        'webhooks.actionFailed',
-        'Webhook Action Failed.',
         async () => {
           const { hook: updated } = await updateWebhook(owner, repo, hook.id, { isActive: !hook.isActive });
           onChanged(updated);
@@ -110,8 +106,6 @@ export function WebhookRow({
         showNotice,
         t,
         t('webhooks.testSent', 'Test Ping Sent. See Delivery History.'),
-        'webhooks.actionFailed',
-        'Webhook Action Failed.',
         async () => {
           await testWebhook(owner, repo, hook.id);
           await loadDeliveries();

@@ -49,9 +49,9 @@ class UserAccessTokenDAO extends BaseDAO {
     now: number,
     scopes?: readonly TokenScope[] | null,
     tokenPrefix?: string | null,
-    userId?: string | null,
+    userId: string | null = null,
   ): Promise<void> {
-    await this.run('INSERT INTO user_access_tokens (token_id, user_email, token_hash, name, expires_at, last_used_at, created_at, token_prefix, user_id) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)', [tokenId, userEmail.toLowerCase(), tokenHash, name, expiresAt, now, tokenPrefix ?? null, userId ?? null]);
+    await this.run('INSERT INTO user_access_tokens (token_id, user_email, token_hash, name, expires_at, last_used_at, created_at, token_prefix, user_id) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)', [tokenId, userEmail.toLowerCase(), tokenHash, name, expiresAt, now, tokenPrefix ?? null, userId]);
     // Scopes live only in the junction table: fail closed by rolling back
     // the row when the junction write fails (a token without scopes must
     // never silently exist as unrestricted).

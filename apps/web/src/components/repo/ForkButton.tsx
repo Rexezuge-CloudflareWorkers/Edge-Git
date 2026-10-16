@@ -13,7 +13,7 @@ export function ForkButton({
   owner,
   repo,
   defaultOwner,
-  forksCount,
+  forksCount = 0,
   authorized,
   showNotice,
 }: {
@@ -87,7 +87,7 @@ export function ForkButton({
       <Button variant="secondary" size="sm" onClick={openModal}>
         <GitFork className="h-3.5 w-3.5" />
         {t('forks.fork', 'Fork')}
-        <span className="text-xs text-[var(--color-text-muted)]">{forksCount ?? 0}</span>
+        <span className="text-xs text-[var(--color-text-muted)]">{forksCount}</span>
       </Button>
       {open && (
         <ModalShell onClose={() => setOpen(false)} widthClass="w-full max-w-md mx-4" ariaLabel={t('forks.fork', 'Fork')}>

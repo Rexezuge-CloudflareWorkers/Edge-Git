@@ -45,7 +45,7 @@ function isNumericOrEncodedHost(host: string): boolean {
 }
 
 function normalizeEvents(input: unknown): WebhookEventName[] {
-  if (!Array.isArray(input)) throw new Error('events must be an array of event names');
+  if (!Array.isArray(input)) throw new TypeError('events must be an array of event names');
   const seen = new Set<WebhookEventName>();
   for (const entry of input) {
     if (typeof entry !== 'string' || !(WEBHOOK_EVENTS as readonly string[]).includes(entry)) {

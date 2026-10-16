@@ -67,7 +67,7 @@ function parseOne(raw: unknown, index: number): CustomCheckDefinition {
   if (!SCRIPT_PATH_RE.test(scriptPath)) throw new Error(`checks[${index}].script must be a .js file directly under .edgegit/checks/`);
   const env: Record<string, string> = {};
   if (entry.env !== undefined && entry.env !== null) {
-    if (typeof entry.env !== 'object' || Array.isArray(entry.env)) throw new Error(`checks[${index}].env must be an object`);
+    if (typeof entry.env !== 'object' || Array.isArray(entry.env)) throw new TypeError(`checks[${index}].env must be an object`);
     const pairs = Object.entries(entry.env as Record<string, unknown>);
     if (pairs.length > MAX_ENV_VARS) throw new Error(`checks[${index}].env must have at most ${MAX_ENV_VARS} entries`);
     for (const [key, value] of pairs) {
@@ -79,11 +79,11 @@ function parseOne(raw: unknown, index: number): CustomCheckDefinition {
   }
   const allowHosts: string[] = [];
   if (entry.allowHosts !== undefined && entry.allowHosts !== null) {
-    if (!Array.isArray(entry.allowHosts)) throw new Error(`checks[${index}].allowHosts must be an array of hostnames`);
+    if (!Array.isArray(entry.allowHosts)) throw new TypeError(`checks[${index}].allowHosts must be an array of hostnames`);
     if (entry.allowHosts.length > MAX_ALLOW_HOSTS)
       throw new Error(`checks[${index}].allowHosts must have at most ${MAX_ALLOW_HOSTS} entries`);
     for (const host of entry.allowHosts) {
-      if (typeof host !== 'string') throw new Error(`checks[${index}].allowHosts entries must be strings`);
+      if (typeof host !== 'string') throw new TypeError(`checks[${index}].allowHosts entries must be strings`);
       const normalized = host.trim().toLowerCase();
       if (normalized.length === 0 || normalized.length > 253 || !HOST_RE.test(normalized)) {
         throw new Error(`checks[${index}].allowHosts entry "${host}" is not a valid hostname`);
@@ -114,7 +114,7 @@ export function parseCheckDefinitionFile(text: string): CustomCheckDefinition[] 
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed))
     throw new Error(`${CHECKS_FILE_PATH} must be an object with a "checks" array`);
   const list = (parsed as Record<string, unknown>).checks;
-  if (!Array.isArray(list)) throw new Error(`${CHECKS_FILE_PATH} must contain a "checks" array`);
+  if (!Array.isArray(list)) throw new TypeError(`${CHECKS_FILE_PATH} must contain a "checks" array`);
   if (list.length > MAX_CHECKS) throw new Error(`${CHECKS_FILE_PATH} must define at most ${MAX_CHECKS} checks`);
   const seen = new Set<string>();
   const checks = list.map((raw, index) => parseOne(raw, index));

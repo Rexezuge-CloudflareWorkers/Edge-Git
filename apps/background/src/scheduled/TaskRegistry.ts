@@ -48,8 +48,8 @@ function tasksForPhase(phase: 1 | 2): ScheduledTask[] {
 // schedule changes.
 const SEARCH_TICK_CRON = '7 */4 * * *';
 
-function isSearchTick(cron: string): boolean {
-  const normalized = (cron ?? '').trim();
+function isSearchTick(cron = ''): boolean {
+  const normalized = cron.trim();
   // Manual POST /run and unit tests pass no cron — run everything so a
   // manual trigger never silently skips work.
   if (!normalized) return true;

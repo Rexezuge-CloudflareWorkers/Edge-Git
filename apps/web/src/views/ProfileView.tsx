@@ -145,9 +145,9 @@ export function ProfileView({ showNotice }: { showNotice: (type: 'success' | 'er
             </div>
             <p className="text-xs text-[var(--color-text-muted)] mt-1">
               {t('profile.repoCount', '{{count}} Repositories', { count: profile.repoCount ?? repos.length })}
-              {!isOrg && profile.orgCount != null
-                ? ` · ${t('profile.orgCount', '{{count}} Organizations', { count: profile.orgCount })}`
-                : ''}
+              {isOrg || profile.orgCount == null
+                ? ''
+                : ` · ${t('profile.orgCount', '{{count}} Organizations', { count: profile.orgCount })}`}
               {isOrg && profile.memberCount != null
                 ? ` · ${t('profile.memberCount', '{{count}} Members', { count: profile.memberCount })}`
                 : ''}
