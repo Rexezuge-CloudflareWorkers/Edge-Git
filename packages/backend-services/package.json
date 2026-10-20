@@ -79,7 +79,7 @@
     "@edge-git/shared": "workspace:*",
     "@rexezuge/errors": "^1.6.0",
     "@rexezuge/i18n": "^1.9.2",
-    "@rexezuge/identity": "^1.6.0",
+    "@rexezuge/identity": "^1.9.2",
     "@rexezuge/shared": "^1.6.0",
     "jose": "6.2.12"
   },
