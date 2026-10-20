@@ -18,8 +18,8 @@ importers:
         specifier: ^1.6.0
         version: 1.6.0
       '@rexezuge/errors':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       '@rexezuge/http':
         specifier: ^1.6.0
         version: 1.6.0
@@ -147,8 +147,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/shared
       '@rexezuge/errors':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       '@rexezuge/http':
         specifier: ^1.6.0
         version: 1.6.0
@@ -202,8 +202,8 @@ importers:
         specifier: ^0.32.0
         version: 0.32.0
       '@rexezuge/errors':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       '@rexezuge/shared':
         specifier: ^1.6.0
         version: 1.6.0
@@ -300,8 +300,8 @@ importers:
         specifier: ^1.6.0
         version: 1.6.0
       '@rexezuge/errors':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       '@rexezuge/shared':
         specifier: ^1.6.0
         version: 1.6.0
@@ -347,8 +347,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@rexezuge/errors':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       '@rexezuge/i18n':
         specifier: ^1.9.2
         version: 1.9.2
@@ -375,8 +375,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@rexezuge/errors':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
     devDependencies:
       '@types/node':
         specifier: 26.6.5
@@ -394,8 +394,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@rexezuge/errors':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       dofs:
         specifier: ^0.1.0
         version: 0.1.0(patch_hash=a4e0c9784c0152850a43458069a84082829bcd7315a96a2c3a9f323f7e1d5fed)(hono@4.13.13)
@@ -1428,6 +1428,9 @@ packages:
 
   '@rexezuge/errors@1.6.0':
     resolution: {integrity: sha512-tk1Un8+Npt2V65AJeWpRHvIhHhzcZTE20pYuepqfpLpWCrIxf+dWH9DQhoMmegw+1i0nwweUsz7xcYB5RRBmZQ==}
+
+  '@rexezuge/errors@1.9.2':
+    resolution: {integrity: sha512-2LBY01Ly8ZJH8YF3pqTfYGFF56WslywFiC3HeeEXSBSD0nKXA6WsELUa/xPbMXIhKnVz8z+UtgshuHsHlSMOeg==}
 
   '@rexezuge/http@1.6.0':
     resolution: {integrity: sha512-Cipn5gD6hxv1I3JVVvEwXEab+mFRI0tsz1lcNsdOZultu+y68QFg+i0RT8a+ympGg9uNF8XpDKLMzZKaM7TKiA==}
@@ -4372,6 +4375,8 @@ snapshots:
       '@rexezuge/shared': 1.6.0
 
   '@rexezuge/errors@1.6.0': {}
+
+  '@rexezuge/errors@1.9.2': {}
 
   '@rexezuge/http@1.6.0':
     dependencies:

@@ -20,7 +20,7 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.22.0",
     "@rexezuge/d1": "^1.6.0",
-    "@rexezuge/errors": "^1.6.0",
+    "@rexezuge/errors": "^1.9.2",
     "@rexezuge/http": "^1.6.0",
     "@rexezuge/i18n": "^1.9.2",
     "@rexezuge/identity": "^1.6.0",
