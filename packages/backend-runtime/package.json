@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@edge-git/shared": "workspace:*",
-    "@rexezuge/runtime": "^1.6.0"
+    "@rexezuge/runtime": "^1.9.2"
   },
   "devDependencies": {
     "@types/node": "26.6.5",

@@ -30,8 +30,8 @@ importers:
         specifier: ^1.6.0
         version: 1.6.0
       '@rexezuge/runtime':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       '@rexezuge/shared':
         specifier: ^1.6.0
         version: 1.6.0
@@ -156,8 +156,8 @@ importers:
         specifier: ^1.9.2
         version: 1.9.2
       '@rexezuge/runtime':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       '@rexezuge/shared':
         specifier: ^1.6.0
         version: 1.6.0
@@ -322,8 +322,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@rexezuge/runtime':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
     devDependencies:
       '@types/node':
         specifier: 26.6.5
@@ -1438,8 +1438,8 @@ packages:
   '@rexezuge/identity@1.6.0':
     resolution: {integrity: sha512-CrlY7poOi+DzMJ1F+FbQtaIW43m0lDNelAhTrydRKeLX652PLm9r8Xj5XIhDcWZdRfVzmrRpl0Bt03/t2Pgvzw==}
 
-  '@rexezuge/runtime@1.6.0':
-    resolution: {integrity: sha512-YSNkb50nDuE1ElJUX6BgJI4760Q+j6mrZ7eanSIIU9dBNVa632Q+rT98bsmeHqcLgAsYNWruQlD3vtB6PfR8dg==}
+  '@rexezuge/runtime@1.9.2':
+    resolution: {integrity: sha512-OfAtxqhCpt9QON1pNBY0IyRc5xEeX3UlkBg5cS1cqzq6FKisL4a/jvV6dJDYZzWCcJAMxzPDfWS1JY3Nj2tbXw==}
 
   '@rexezuge/shared@1.6.0':
     resolution: {integrity: sha512-stwLJeQX5sdMnxw6kRJKrtUVQPyKEQyTA42M85VhxLvQtto6PDFf4w4dCtFZWehDc5QLCcy80nLH4T6R1XKDlw==}
@@ -4385,7 +4385,7 @@ snapshots:
       '@rexezuge/errors': 1.6.0
       '@rexezuge/shared': 1.6.0
 
-  '@rexezuge/runtime@1.6.0': {}
+  '@rexezuge/runtime@1.9.2': {}
 
   '@rexezuge/shared@1.6.0': {}
 

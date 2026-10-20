@@ -16,7 +16,7 @@
     "@rexezuge/errors": "^1.6.0",
     "@rexezuge/http": "^1.6.0",
     "@rexezuge/i18n": "^1.9.2",
-    "@rexezuge/runtime": "^1.6.0",
+    "@rexezuge/runtime": "^1.9.2",
     "@rexezuge/shared": "^1.6.0",
     "chanfana": "3.4.0",
     "hono": "4.13.13",
