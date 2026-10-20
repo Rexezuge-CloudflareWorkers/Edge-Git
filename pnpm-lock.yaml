@@ -24,8 +24,8 @@ importers:
         specifier: ^1.6.0
         version: 1.6.0
       '@rexezuge/i18n':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       '@rexezuge/identity':
         specifier: ^1.6.0
         version: 1.6.0
@@ -153,8 +153,8 @@ importers:
         specifier: ^1.6.0
         version: 1.6.0
       '@rexezuge/i18n':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       '@rexezuge/runtime':
         specifier: ^1.6.0
         version: 1.6.0
@@ -350,8 +350,8 @@ importers:
         specifier: ^1.6.0
         version: 1.6.0
       '@rexezuge/i18n':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       '@rexezuge/identity':
         specifier: ^1.6.0
         version: 1.6.0
@@ -1432,8 +1432,8 @@ packages:
   '@rexezuge/http@1.6.0':
     resolution: {integrity: sha512-Cipn5gD6hxv1I3JVVvEwXEab+mFRI0tsz1lcNsdOZultu+y68QFg+i0RT8a+ympGg9uNF8XpDKLMzZKaM7TKiA==}
 
-  '@rexezuge/i18n@1.6.0':
-    resolution: {integrity: sha512-teh2tEWFDPWvW69EnvLoZ6cwGNrAroNZiDfIDxmBEI+uanlKMoMMmb7O9VEWYZDs0+hQg/amTawE6gvdnksDQA==}
+  '@rexezuge/i18n@1.9.2':
+    resolution: {integrity: sha512-GS+Z32BvCw8udC/uTEYYx2wp3gIvAfx89JhwXo0lxdQke3b4aFD42gZfsEixW+/tBRiNSCIonCAS9SmKMkTvqQ==}
 
   '@rexezuge/identity@1.6.0':
     resolution: {integrity: sha512-CrlY7poOi+DzMJ1F+FbQtaIW43m0lDNelAhTrydRKeLX652PLm9r8Xj5XIhDcWZdRfVzmrRpl0Bt03/t2Pgvzw==}
@@ -4381,7 +4381,7 @@ snapshots:
       hono: 4.13.13
       jose: 6.2.12
 
-  '@rexezuge/i18n@1.6.0': {}
+  '@rexezuge/i18n@1.9.2': {}
 
   '@rexezuge/identity@1.6.0':
     dependencies:
