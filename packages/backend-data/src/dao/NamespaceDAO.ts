@@ -1,5 +1,6 @@
 import { BaseDAO } from './BaseDAO';
 import type { D1Queryable } from '@rexezuge/d1';
+import type { SubrequestMeter } from '@rexezuge/shared';
 
 export type NamespaceKind = 'user' | 'org';
 
@@ -12,8 +13,8 @@ export interface NamespaceRow {
 }
 
 class NamespaceDAO extends BaseDAO {
-  constructor(database: D1Queryable) {
-    super(database);
+  constructor(database: D1Queryable, meter?: SubrequestMeter) {
+    super(database, meter);
   }
 
   public async get(usernameCi: string): Promise<NamespaceRow | null> {

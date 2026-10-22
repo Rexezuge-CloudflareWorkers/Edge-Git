@@ -90,11 +90,8 @@ export function ForkButton({
         <span className="text-xs text-[var(--color-text-muted)]">{forksCount}</span>
       </Button>
       {open && (
-        <ModalShell onClose={() => setOpen(false)} widthClass="w-full max-w-md mx-4" ariaLabel={t('forks.fork', 'Fork')}>
-          <ModalHeader
-            title={t('forks.forkRepository', 'Fork {{fullName}}', { fullName: `${owner}/${repo}` })}
-            onClose={() => setOpen(false)}
-          />
+        <ModalShell onClose={() => setOpen(false)} widthClass="w-full max-w-md mx-4" ariaLabel={t('forks.fork', 'Fork')} closeLabel={t('common.close', 'Close')}>
+          <ModalHeader title={t('forks.forkRepository', 'Fork {{fullName}}', { fullName: `${owner}/${repo}` })} />
           <ModalBody>
             <form onSubmit={submit} className="space-y-3">
               <div>

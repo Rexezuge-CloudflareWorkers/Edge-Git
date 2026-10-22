@@ -45,7 +45,7 @@ class SearchBackfillTask extends BaseScheduledTask {
   public readonly name = 'SearchBackfillTask';
   public readonly phase: 1 | 2 = 2;
 
-  protected async handleScheduledTask(env: Env): Promise<void> {
+  protected async performTask(env: Env): Promise<void> {
     const scope = createRequestScope(env);
     const repositoryDAO = await scope.get(Tokens.RepositoryDAO)();
     const search = scope.get(Tokens.SearchService);

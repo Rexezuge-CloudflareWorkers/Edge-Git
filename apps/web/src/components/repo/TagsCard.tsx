@@ -9,7 +9,7 @@ export function TagPicker({ tags, value, onChange }: { tags: TagInfo[]; value: s
   const { t } = useTranslation();
   return (
     <Select value={value} onChange={(e) => onChange(e.target.value)} aria-label={t('repos.tags', 'Tags')} disabled={tags.length === 0}>
-      <option value="">{tags.length === 0 ? t('repos.noTags', 'No Tags') : t('repos.tags', 'Tags')}</option>
+      <option value="">{tags.length === 0 ? t('repos.noTags', 'No Tags Yet.') : t('repos.tags', 'Tags')}</option>
       {tags.map((tg) => (
         <option key={tg.ref} value={tg.ref}>
           {tg.name}

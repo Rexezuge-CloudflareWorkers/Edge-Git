@@ -1,10 +1,19 @@
 import { ServiceError, DefaultInternalServerError } from '@rexezuge/errors';
 import type { ErrorResponse } from '@rexezuge/errors';
 import { getLocalizedStrings } from '@rexezuge/i18n';
+import { isD1DailyLimitError } from '@rexezuge/d1';
 
 interface MappedError {
   status: number;
   body: ErrorResponse;
+  /**
+   * How long the client should wait before trying again, in seconds.
+   *
+   * Present only when the failure is one that *will* get better on its own —
+   * a spent daily allowance comes back at midnight. A `Retry-After` on a
+   * failure that never clears is a promise the server cannot keep.
+   */
+  retryAfterSeconds?: number;
 }
 
 // Central error mapper (DIP): routes and DO handlers convert domain errors
@@ -21,7 +30,34 @@ function buildBody(error: ServiceError): ErrorResponse {
   return error.toErrorResponse().body;
 }
 
+/**
+ * A spent D1 daily allowance, or `null`.
+ *
+ * The refusal is not a fault and not a bug: the account is over its row
+ * allowance for the day, and the allowance comes back at midnight. Reporting
+ * it as a 500 says "the server broke" — and a client that reads it that way
+ * retries immediately, into the same refusal, for the rest of the day.
+ */
+function dailyLimitOf(error: unknown): { kind: 'read' | 'write'; resetsAt: number } | null {
+  return isD1DailyLimitError(error);
+}
+
 function mapServiceError(error: unknown, locale?: string | null): MappedError {
+  const dailyLimit = dailyLimitOf(error);
+  if (dailyLimit) {
+    // 503, not 500: the service is unavailable *for now*, and the client is
+    // told when to come back.
+    return {
+      status: 503,
+      body: {
+        Exception: {
+          Type: 'ServiceUnavailable',
+          Message: getLocalizedStrings(locale ?? 'en').common.internalError,
+        },
+      },
+      retryAfterSeconds: Math.max(1, Math.ceil((dailyLimit.resetsAt - Date.now()) / 1000)),
+    };
+  }
   if (error instanceof ServiceError) {
     const { status, body } = error.toErrorResponse();
     if (error.expose) return { status, body };

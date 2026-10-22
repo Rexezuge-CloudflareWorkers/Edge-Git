@@ -15,29 +15,32 @@ importers:
         specifier: 0.22.0
         version: 0.22.0(@cloudflare/workers-types@5.20261011.1)(@vitest/runner@4.1.10)(@vitest/snapshot@4.1.10)(vitest@4.1.10)
       '@rexezuge/d1':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       '@rexezuge/errors':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       '@rexezuge/http':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       '@rexezuge/i18n':
         specifier: ^1.9.2
         version: 1.9.2
       '@rexezuge/identity':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       '@rexezuge/runtime':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       '@rexezuge/shared':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
+      '@rexezuge/tooling':
+        specifier: ^1.9.2
+        version: 1.9.2(eslint-config-prettier@10.1.8(eslint@10.12.0(jiti@2.7.0)))(eslint-plugin-prettier@5.5.7(eslint-config-prettier@10.1.8(eslint@10.12.0(jiti@2.7.0)))(eslint@10.12.0(jiti@2.7.0))(prettier@3.9.10))(eslint-plugin-regexp@3.3.1(eslint@10.12.0(jiti@2.7.0)))(eslint-plugin-sonarjs@4.2.2(eslint@10.12.0(jiti@2.7.0)))(eslint-plugin-unicorn@78.0.0(eslint@10.12.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.12.0(jiti@2.7.0))(globals@17.13.0)(jsonc-parser@3.3.1)(prettier@3.9.10)(typescript-eslint@8.71.0(eslint@10.12.0(jiti@2.7.0))(typescript@6.0.3))(typescript@6.0.3)(vitest@4.1.10)
       '@rexezuge/web':
-        specifier: ^1.6.0
-        version: 1.6.0(lucide-react@1.50.0(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        specifier: ^1.9.2
+        version: 1.9.2(lucide-react@1.50.0(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@testing-library/jest-dom':
         specifier: 7.0.1
         version: 7.0.1(@testing-library/dom@10.4.2)(vitest@4.1.10)
@@ -147,20 +150,20 @@ importers:
         specifier: workspace:*
         version: link:../../packages/shared
       '@rexezuge/errors':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       '@rexezuge/http':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       '@rexezuge/i18n':
         specifier: ^1.9.2
         version: 1.9.2
       '@rexezuge/runtime':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       '@rexezuge/shared':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       chanfana:
         specifier: 3.4.0
         version: 3.4.0
@@ -202,11 +205,11 @@ importers:
         specifier: ^0.32.0
         version: 0.32.0
       '@rexezuge/errors':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       '@rexezuge/shared':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       quickjs-emscripten:
         specifier: 0.32.0
         version: 0.32.0
@@ -221,8 +224,8 @@ importers:
   apps/web:
     dependencies:
       '@rexezuge/web':
-        specifier: ^1.6.0
-        version: 1.6.0(lucide-react@1.50.0(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        specifier: ^1.9.2
+        version: 1.9.2(lucide-react@1.50.0(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       class-variance-authority:
         specifier: 0.7.1
         version: 0.7.1
@@ -257,6 +260,9 @@ importers:
         specifier: 3.7.0
         version: 3.7.0
     devDependencies:
+      '@rexezuge/tooling':
+        specifier: ^1.9.2
+        version: 1.9.2(eslint-config-prettier@10.1.8(eslint@10.12.0(jiti@2.7.0)))(eslint-plugin-prettier@5.5.7(eslint-config-prettier@10.1.8(eslint@10.12.0(jiti@2.7.0)))(eslint@10.12.0(jiti@2.7.0))(prettier@3.9.10))(eslint-plugin-regexp@3.3.1(eslint@10.12.0(jiti@2.7.0)))(eslint-plugin-sonarjs@4.2.2(eslint@10.12.0(jiti@2.7.0)))(eslint-plugin-unicorn@78.0.0(eslint@10.12.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.12.0(jiti@2.7.0))(globals@17.13.0)(jsonc-parser@3.3.1)(prettier@3.9.10)(typescript-eslint@8.71.0(eslint@10.12.0(jiti@2.7.0))(typescript@6.0.3))(typescript@6.0.3)(vitest@4.1.10)
       '@tailwindcss/vite':
         specifier: 4.3.3
         version: 4.3.3(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
@@ -297,14 +303,17 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@rexezuge/d1':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       '@rexezuge/errors':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
+      '@rexezuge/identity':
+        specifier: ^1.9.2
+        version: 1.9.2
       '@rexezuge/shared':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 5.20261011.1
@@ -322,8 +331,11 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@rexezuge/runtime':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
+      '@rexezuge/shared':
+        specifier: ^1.9.2
+        version: 1.9.2
     devDependencies:
       '@types/node':
         specifier: 26.6.5
@@ -347,17 +359,17 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@rexezuge/errors':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       '@rexezuge/i18n':
         specifier: ^1.9.2
         version: 1.9.2
       '@rexezuge/identity':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       '@rexezuge/shared':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       jose:
         specifier: 6.2.12
         version: 6.2.12
@@ -375,8 +387,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@rexezuge/errors':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
     devDependencies:
       '@types/node':
         specifier: 26.6.5
@@ -394,8 +406,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@rexezuge/errors':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       dofs:
         specifier: ^0.1.0
         version: 0.1.0(patch_hash=a4e0c9784c0152850a43458069a84082829bcd7315a96a2c3a9f323f7e1d5fed)(hono@4.13.13)
@@ -413,8 +425,8 @@ importers:
   packages/shared:
     dependencies:
       '@rexezuge/shared':
-        specifier: ^1.6.0
-        version: 1.6.0
+        specifier: ^1.9.2
+        version: 1.9.2
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -1426,29 +1438,45 @@ packages:
   '@poppinss/exception@1.2.3':
     resolution: {integrity: sha512-dCED+QRChTVatE9ibtoaxc+WkdzOSjYTKi/+uacHWIsfodVfpsueo3+DKpgU5Px8qXjgmXkSvhXvSCz3fnP9lw==}
 
-  '@rexezuge/d1@1.6.0':
-    resolution: {integrity: sha512-uPb093yrsPvBvLfUk2uavWqz5NiNZXWqrOtiWX7OY3yI0CyIbdwlQgPT7HahBgsUJc97mKQq5ur7BogSIp/oVA==}
+  '@rexezuge/d1@1.9.2':
+    resolution: {integrity: sha512-/9YPjn2WEKs53iY3upw7Yix6w4ANw6+CqhebuMVWqCOcoMSVd510JnQgQhGa2LqXOKqXEbkmDxjZopfVrD9aiw==}
 
-  '@rexezuge/errors@1.6.0':
-    resolution: {integrity: sha512-tk1Un8+Npt2V65AJeWpRHvIhHhzcZTE20pYuepqfpLpWCrIxf+dWH9DQhoMmegw+1i0nwweUsz7xcYB5RRBmZQ==}
+  '@rexezuge/errors@1.9.2':
+    resolution: {integrity: sha512-2LBY01Ly8ZJH8YF3pqTfYGFF56WslywFiC3HeeEXSBSD0nKXA6WsELUa/xPbMXIhKnVz8z+UtgshuHsHlSMOeg==}
 
-  '@rexezuge/http@1.6.0':
-    resolution: {integrity: sha512-Cipn5gD6hxv1I3JVVvEwXEab+mFRI0tsz1lcNsdOZultu+y68QFg+i0RT8a+ympGg9uNF8XpDKLMzZKaM7TKiA==}
+  '@rexezuge/http@1.9.2':
+    resolution: {integrity: sha512-kykFRPtAb/zWc81h3SEb78QAgezlTIqK8HUwsAvQ7bsaJ9M//iwZ+P3Vbk150pv/ouGtO7iOLZenn5HcDGcJIA==}
 
   '@rexezuge/i18n@1.9.2':
     resolution: {integrity: sha512-GS+Z32BvCw8udC/uTEYYx2wp3gIvAfx89JhwXo0lxdQke3b4aFD42gZfsEixW+/tBRiNSCIonCAS9SmKMkTvqQ==}
 
-  '@rexezuge/identity@1.6.0':
-    resolution: {integrity: sha512-CrlY7poOi+DzMJ1F+FbQtaIW43m0lDNelAhTrydRKeLX652PLm9r8Xj5XIhDcWZdRfVzmrRpl0Bt03/t2Pgvzw==}
+  '@rexezuge/identity@1.9.2':
+    resolution: {integrity: sha512-ZcGO6tGBcNZDbVHsjryKskTyzrnjtt6ev8xNSltP9QAFBAwh3NxDcsSfOu18pG/SPP6v9JI12tI+WiwzRm87rg==}
 
-  '@rexezuge/runtime@1.6.0':
-    resolution: {integrity: sha512-YSNkb50nDuE1ElJUX6BgJI4760Q+j6mrZ7eanSIIU9dBNVa632Q+rT98bsmeHqcLgAsYNWruQlD3vtB6PfR8dg==}
+  '@rexezuge/runtime@1.9.2':
+    resolution: {integrity: sha512-OfAtxqhCpt9QON1pNBY0IyRc5xEeX3UlkBg5cS1cqzq6FKisL4a/jvV6dJDYZzWCcJAMxzPDfWS1JY3Nj2tbXw==}
 
-  '@rexezuge/shared@1.6.0':
-    resolution: {integrity: sha512-stwLJeQX5sdMnxw6kRJKrtUVQPyKEQyTA42M85VhxLvQtto6PDFf4w4dCtFZWehDc5QLCcy80nLH4T6R1XKDlw==}
+  '@rexezuge/shared@1.9.2':
+    resolution: {integrity: sha512-B9PsD8vbAOSNa5TRlH7eXMVTSDxq3KZ+v3eU9SyWyywbtSc21AZkjHjqBoEQkfx3IkfFnBFa6jg5x/PagBtMLA==}
 
-  '@rexezuge/web@1.6.0':
-    resolution: {integrity: sha512-AB3enjhKd7Ob4qCE3p+MS8ZRtrvdGpcRAm7wzmqCTHYCevDOYsZAEoQ5NNkVYV3bUA4nyq94cCh5lVwdUyA82Q==}
+  '@rexezuge/tooling@1.9.2':
+    resolution: {integrity: sha512-8C6J7r5NFwtoODwWo/3LPwcbngIf0p/8EZQZjJYrWUMjVT/qM8dYM3pk0Em6T5f1VyWA0L/IlPLnfX4awx3nxQ==}
+    peerDependencies:
+      eslint: ^10.0.0
+      eslint-config-prettier: ^10.1.8
+      eslint-plugin-prettier: ^5.5.6
+      eslint-plugin-regexp: ^3.3.1
+      eslint-plugin-sonarjs: ^4.2.2
+      eslint-plugin-unicorn: ^76.0.0
+      globals: ^17.13.0
+      jsonc-parser: ^3.3.1
+      prettier: ^3.9.0
+      typescript: ^6.0.0
+      typescript-eslint: ^8.0.0
+      vitest: ^4.0.0
+
+  '@rexezuge/web@1.9.2':
+    resolution: {integrity: sha512-/t80lrU5IgbF23/25lnHRXQVoOGisjKjha7vzpHnTgzt1b/VdKX+tmr+tNuGYzyjB1aC2pD4+U7K9V71EofvzA==}
     peerDependencies:
       lucide-react: ^1.49.0
       react: ^19.3.0
@@ -4367,37 +4395,53 @@ snapshots:
 
   '@poppinss/exception@1.2.3': {}
 
-  '@rexezuge/d1@1.6.0':
+  '@rexezuge/d1@1.9.2':
     dependencies:
-      '@rexezuge/errors': 1.6.0
-      '@rexezuge/shared': 1.6.0
+      '@rexezuge/errors': 1.9.2
+      '@rexezuge/shared': 1.9.2
 
-  '@rexezuge/errors@1.6.0': {}
+  '@rexezuge/errors@1.9.2': {}
 
-  '@rexezuge/http@1.6.0':
+  '@rexezuge/http@1.9.2':
     dependencies:
-      '@rexezuge/errors': 1.6.0
-      '@rexezuge/shared': 1.6.0
+      '@rexezuge/errors': 1.9.2
+      '@rexezuge/shared': 1.9.2
       chanfana: 3.4.0
       hono: 4.13.13
       jose: 6.2.12
 
   '@rexezuge/i18n@1.9.2': {}
 
-  '@rexezuge/identity@1.6.0':
+  '@rexezuge/identity@1.9.2':
     dependencies:
-      '@rexezuge/d1': 1.6.0
-      '@rexezuge/errors': 1.6.0
-      '@rexezuge/shared': 1.6.0
+      '@rexezuge/d1': 1.9.2
+      '@rexezuge/errors': 1.9.2
+      '@rexezuge/shared': 1.9.2
 
-  '@rexezuge/runtime@1.6.0': {}
+  '@rexezuge/runtime@1.9.2': {}
 
-  '@rexezuge/shared@1.6.0': {}
+  '@rexezuge/shared@1.9.2': {}
 
-  '@rexezuge/web@1.6.0(lucide-react@1.50.0(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+  '@rexezuge/tooling@1.9.2(eslint-config-prettier@10.1.8(eslint@10.12.0(jiti@2.7.0)))(eslint-plugin-prettier@5.5.7(eslint-config-prettier@10.1.8(eslint@10.12.0(jiti@2.7.0)))(eslint@10.12.0(jiti@2.7.0))(prettier@3.9.10))(eslint-plugin-regexp@3.3.1(eslint@10.12.0(jiti@2.7.0)))(eslint-plugin-sonarjs@4.2.2(eslint@10.12.0(jiti@2.7.0)))(eslint-plugin-unicorn@78.0.0(eslint@10.12.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.12.0(jiti@2.7.0))(globals@17.13.0)(jsonc-parser@3.3.1)(prettier@3.9.10)(typescript-eslint@8.71.0(eslint@10.12.0(jiti@2.7.0))(typescript@6.0.3))(typescript@6.0.3)(vitest@4.1.10)':
     dependencies:
-      '@rexezuge/errors': 1.6.0
-      '@rexezuge/shared': 1.6.0
+      '@rexezuge/d1': 1.9.2
+      eslint: 10.12.0(jiti@2.7.0)
+      eslint-config-prettier: 10.1.8(eslint@10.12.0(jiti@2.7.0))
+      eslint-plugin-prettier: 5.5.7(eslint-config-prettier@10.1.8(eslint@10.12.0(jiti@2.7.0)))(eslint@10.12.0(jiti@2.7.0))(prettier@3.9.10)
+      eslint-plugin-regexp: 3.3.1(eslint@10.12.0(jiti@2.7.0))
+      eslint-plugin-sonarjs: 4.2.2(eslint@10.12.0(jiti@2.7.0))
+      eslint-plugin-unicorn: 78.0.0(eslint@10.12.0(jiti@2.7.0))(typescript@6.0.3)
+      globals: 17.13.0
+      jsonc-parser: 3.3.1
+      prettier: 3.9.10
+      typescript: 6.0.3
+      typescript-eslint: 8.71.0(eslint@10.12.0(jiti@2.7.0))(typescript@6.0.3)
+      vitest: 4.1.10(@types/node@26.6.5)(@vitest/coverage-v8@4.1.10)(jsdom@30.1.2)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
+  '@rexezuge/web@1.9.2(lucide-react@1.50.0(@types/react@19.3.0)(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+    dependencies:
+      '@rexezuge/errors': 1.9.2
+      '@rexezuge/shared': 1.9.2
       lucide-react: 1.50.0(@types/react@19.3.0)(react@19.3.0)
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)

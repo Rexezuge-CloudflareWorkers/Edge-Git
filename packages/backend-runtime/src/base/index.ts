@@ -21,4 +21,4 @@ export {
   AbstractQueueWorker,
   AbstractWorkflowWorker,
 } from '@rexezuge/runtime';
-export type { WorkerExecutionContext, WorkerMessageBatch, WorkerScheduledController, WorkflowEventLike, WorkflowStepLike } from '@rexezuge/runtime';
+export type { WorkerExecutionContext, WorkerScheduledController } from '@rexezuge/runtime';

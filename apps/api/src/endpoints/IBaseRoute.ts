@@ -2,7 +2,7 @@ import type { Context } from 'hono';
 import { ServiceError, DatabaseError } from '@rexezuge/errors';
 import { ErrorSanitizationUtil, canonicalizeLanguageTag } from '@edge-git/shared/utils';
 import { createRequestScope } from '@edge-git/backend-services/composition';
-import { getRequestScope, asScopedContext } from '@edge-git/backend-runtime/di';
+import { tryGetRequestScope, asScopedContext } from '@edge-git/backend-runtime/di';
 import { mapServiceError, toServiceStatus as toMappedStatus } from '@edge-git/backend-services/errors';
 import { readJsonBody } from '../workers/routes/BodyParser';
 
@@ -37,13 +37,15 @@ abstract class BaseRoute {
    * Single-scope resolution (Otter pattern). Prefers the per-request container
    * installed by `scopeMiddleware`; falls back to a fresh scope for call sites
    * outside middleware ordering (tests, git auth helpers).
+   *
+   * The installed scope is asked for, not caught: the kit's
+   * `tryGetRequestScope` answers "no scope" by construction, so the branch
+   * cannot drift from the throwing form's notion of a missing scope. A context
+   * whose `get` *throws* is a broken context rather than a missing scope, and
+   * it is allowed to surface.
    */
   public static getScope(c: { get(key: string): unknown; env: unknown }): ReturnType<typeof createRequestScope> {
-    try {
-      return getRequestScope(asScopedContext(c));
-    } catch {
-      return createRequestScope(c.env as Env);
-    }
+    return tryGetRequestScope(asScopedContext(c)) ?? createRequestScope(c.env as Env);
   }
 
   /**
@@ -138,8 +140,14 @@ abstract class BaseRoute {
     // rule that a non-exposing error never carries its own message outward —
     // the same `mapServiceError` the service layer maps through, so a typed
     // 5xx cannot leak here while being masked there.
-    const { status, body } = mapServiceError(error, this.resolveLocale(c));
-    return Response.json(body, { status });
+    const { status, body, retryAfterSeconds } = mapServiceError(error, this.resolveLocale(c));
+    // A failure that comes back on its own — a spent D1 daily allowance —
+    // carries the wait on the wire, so a client does not read it as a fault
+    // and retry straight back into it.
+    return Response.json(body, {
+      status,
+      ...(retryAfterSeconds !== undefined && { headers: { 'Retry-After': String(retryAfterSeconds) } }),
+    });
   }
 
   private static resolveLocale(c: HonoContext): string {

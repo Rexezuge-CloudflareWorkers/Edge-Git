@@ -1,5 +1,9 @@
-import { asScopedContext as kitAsScopedContext, getRequestScope as kitGetRequestScope } from '@rexezuge/runtime';
-import type {  ScopedContext } from '@rexezuge/runtime';
+import {
+  asScopedContext as kitAsScopedContext,
+  getRequestScope as kitGetRequestScope,
+  tryGetRequestScope as kitTryGetRequestScope,
+} from '@rexezuge/runtime';
+import type { ScopedContext } from '@rexezuge/runtime';
 import type { ServiceEnv } from '../config/ServiceEnv';
 import { createServiceContext } from './ServiceContext';
 import type { ServiceContext, ServiceContextOverrides } from './ServiceContext';
@@ -64,6 +68,15 @@ function createRequestContext(env: ServiceEnv, overrides: ServiceContextOverride
  */
 const asScopedContext = kitAsScopedContext;
 const getRequestScope = kitGetRequestScope;
+/**
+ * The installed scope, or `null`.
+ *
+ * The way to ask without throwing: `getRequestScope` is right where a missing
+ * scope is a bug that should surface, this is right where it is an expected
+ * branch — and it is checked by construction, so it cannot drift from the
+ * message the throwing form uses.
+ */
+const tryGetRequestScope = kitTryGetRequestScope;
 
 export {
   asScopedContext,
@@ -72,6 +85,7 @@ export {
   getServiceContext,
   memoizeAsync,
   setServiceContext,
+  tryGetRequestScope,
 };
 
 export { SERVICE_CONTEXT_KEY };

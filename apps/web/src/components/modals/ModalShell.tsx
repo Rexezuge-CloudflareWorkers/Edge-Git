@@ -1,56 +1,24 @@
-import { createPortal } from 'react-dom';
 import type { ReactNode } from 'react';
-import { X } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 
-export function ModalShell({
-  onClose,
-  children,
-  widthClass = 'w-80',
-  ariaLabel,
-}: {
-  onClose: () => void;
-  children: ReactNode;
-  widthClass?: string;
-  ariaLabel?: string;
-}) {
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label={ariaLabel}
-    >
-      <div className="fixed inset-0 bg-black/60 animate-backdrop-in" />
-      <div
-        className={`relative bg-[var(--color-surface-1)] border border-[var(--color-border-muted)] rounded-2xl shadow-2xl animate-fade-in ${widthClass}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {children}
-      </div>
-    </div>,
-    document.body,
-  );
-}
+// The frame is the kit's (`@rexezuge/web`'s `ModalShell`): it renders in a
+// portal, closes on Escape, puts the dialog role on the *panel* rather than on
+// the backdrop that contains it, and owns the close button.
+//
+// What stays here is what the kit does not carry: this repo's header, body and
+// row helpers, and the wide-modal width. The kit's frame draws no chrome of
+// its own beyond the backdrop and the panel, so those are ours to keep.
+//
+// The close button moved: it was an icon in the header, and is now the kit's
+// corner button. The header therefore no longer draws one, and keeps room for
+// it.
 
 export const WIDE_MODAL_CLASS = 'w-full max-w-2xl max-h-[82vh] overflow-hidden mx-4';
 
-export function ModalHeader({ title, onClose, actions }: { title: string; onClose: () => void; actions?: ReactNode }) {
-  const { t } = useTranslation();
+export function ModalHeader({ title, actions }: { title: string; actions?: ReactNode }) {
   return (
-    <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-border)]">
+    <div className="flex items-center justify-between gap-3 pl-5 pr-24 py-4 border-b border-[var(--color-border)]">
       <h2 className="text-base font-semibold text-[var(--color-text-primary)]">{title}</h2>
-      <div className="flex items-center gap-2">
-        {actions}
-        <button
-          className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors p-1 rounded-lg hover:bg-[var(--color-surface-3)]"
-          onClick={onClose}
-          aria-label={t('common.close', 'Close')}
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
+      <div className="flex items-center gap-2">{actions}</div>
     </div>
   );
 }
@@ -66,3 +34,5 @@ export function ModalRow({ children }: { children: ReactNode }) {
 export function ModalEmpty({ message }: { message: string }) {
   return <div className="text-center text-[var(--color-text-muted)] py-10 text-sm">{message}</div>;
 }
+
+export {ModalShell} from '@rexezuge/web';

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { KV_DOMAINS } from '@edge-git/backend-runtime/kv';
-import { KvCache } from '@edge-git/backend-runtime/kv';
-import type { KvNamespaceLike } from '@edge-git/backend-runtime/kv';
+import { createKvCache } from '@edge-git/backend-runtime/kv';
 import { AppConfiguration } from '@edge-git/backend-runtime/config';
+import { makeFakeKv } from './mocks/kv';
 import { IsoGitFs } from '../packages/git-service/src/IsoGitFs';
 import { RefService } from '../packages/git-service/src/RefService';
 import {
@@ -25,22 +25,6 @@ vi.mock('@edge-git/git-service', () => ({ setDofsDeviceSize: vi.fn() }));
 import { RepoLifecycle } from '@edge-git/background/RepoLifecycle';
 import { maybeCompactPacks } from '@edge-git/background/PackCompactor';
 
-function makeFakeKv(): KvNamespaceLike & { store: Map<string, string> } {
-  const store = new Map<string, string>();
-  return {
-    store,
-    get: (key: string) => Promise.resolve(store.get(key) ?? null),
-    put: (key: string, value: string) => {
-      store.set(key, value);
-      return Promise.resolve();
-    },
-    delete: (key: string) => Promise.resolve(store.delete(key)),
-    list: (options: { prefix: string }) => {
-      const keys = [...store.keys()].filter((k) => k.startsWith(options.prefix)).map((name) => ({ name }));
-      return Promise.resolve({ keys, list_complete: true });
-    },
-  };
-}
 
 describe('KV liveness', () => {
   it('keeps refs for 24h and adds a readmodel domain', () => {
@@ -125,7 +109,7 @@ describe('RepoReadCache', () => {
   });
 
   it('serves 304 without DO I/O when refs are cached', async () => {
-    const cache = new KvCache(makeFakeKv());
+    const cache = createKvCache(makeFakeKv());
     await putCachedRefs(cache, 'Foo/Bar', { refs: [{ ref: 'HEAD', oid: 'a'.repeat(40) }], symbolicHead: 'refs/heads/main' });
     const load = vi.fn(async () => ({ ok: true }));
     const c = {
@@ -139,7 +123,7 @@ describe('RepoReadCache', () => {
 
   it('caches DO results and invalidates them', async () => {
     const kv = makeFakeKv();
-    const cache = new KvCache(kv);
+    const cache = createKvCache(kv);
     const c = { req: { raw: new Request('https://x/') }, json: (data: unknown) => new Response(JSON.stringify(data)) } as never;
     const first = await serveReadModel(c, cache, 'a/b', 'branches', {}, async () => ['main'], {
       fetchRefs: async () => ({ refs: [{ ref: 'HEAD', oid: 'b'.repeat(40) }], symbolicHead: null }),
@@ -159,7 +143,7 @@ describe('RepoReadCache', () => {
   });
 
   it('429s repeated identical fetches', async () => {
-    const cache = new KvCache(makeFakeKv());
+    const cache = createKvCache(makeFakeKv());
     const body = new Uint8Array([1, 2, 3]);
     for (let i = 0; i < 2; i += 1) {
       const out = await checkFetchLoop(cache, 'a/b', 'ip:1', body);
@@ -170,7 +154,7 @@ describe('RepoReadCache', () => {
   });
 
   it('hashes the full body so same-prefix fetches do not collide', async () => {
-    const cache = new KvCache(makeFakeKv());
+    const cache = createKvCache(makeFakeKv());
     const a = new Uint8Array(600).fill(7);
     const b = new Uint8Array(600).fill(7);
     b[599] = 8;
@@ -182,7 +166,7 @@ describe('RepoReadCache', () => {
   });
 
   it('caches small fetch responses and purges them on push', async () => {
-    const cache = new KvCache(makeFakeKv());
+    const cache = createKvCache(makeFakeKv());
     const head = 'd'.repeat(40);
     const body = new Uint8Array([9, 9, 9]);
     const hash = hashFetchBody(body);

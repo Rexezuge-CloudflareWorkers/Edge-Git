@@ -1,18 +1,19 @@
 import { defineConfig } from 'vitest/config';
 import { cloudflareTest, cloudflarePool } from '@cloudflare/vitest-pool-workers';
-import { fileURLToPath } from 'node:url';
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { workspaceAliases } from '@rexezuge/tooling/vitest-aliases';
 
-const apiSrcPath = fileURLToPath(new URL('../../apps/api/src', import.meta.url));
-const backgroundSrcPath = fileURLToPath(new URL('../../apps/background/src', import.meta.url));
-const backendDataSrcPath = fileURLToPath(new URL('../../packages/backend-data/src', import.meta.url));
-const backendRuntimeSrcPath = fileURLToPath(new URL('../../packages/backend-runtime/src', import.meta.url));
-const gitProtocolSrcPath = fileURLToPath(new URL('../../packages/git-protocol/src', import.meta.url));
-const sharedSrcPath = fileURLToPath(new URL('../../packages/shared/src', import.meta.url));
-const backendServicesSrcPath = fileURLToPath(new URL('../../packages/backend-services/src', import.meta.url));
-const gitServiceSrcPath = fileURLToPath(new URL('../../packages/git-service/src', import.meta.url));
-
+// The workspace alias table is the kit's (`@rexezuge/tooling`'s
+// `workspaceAliases`), so the integration suite resolves `@edge-git/*` exactly
+// as the unit suite does. A suite resolving a workspace import differently from
+// its sibling fails in a way that looks like a product bug.
+//
+// The harness wiring stays this repo's: the workerd plugin and pool, the
+// migration SQL defines, and the coverage block (whose thresholds are
+// omitted on purpose — V8 coverage instrumentation does not work inside the
+// Cloudflare Workers sandbox).
 const migrationsDir = resolve(fileURLToPath(new URL('../../migrations', import.meta.url)));
 const migrationFiles = readdirSync(migrationsDir)
   .filter((f) => f.endsWith('.sql'))
@@ -59,22 +60,10 @@ export default defineConfig({
     noExternal: ['hono', 'chanfana', '@edge-git'],
   },
   resolve: {
-    alias: [
-      { find: /^@edge-git\/background$/, replacement: `${backgroundSrcPath}/index.ts` },
-      { find: /^@edge-git\/backend-data$/, replacement: `${backendDataSrcPath}/index.ts` },
-      { find: /^@edge-git\/backend-runtime$/, replacement: `${backendRuntimeSrcPath}/index.ts` },
-      { find: /^@edge-git\/git-protocol$/, replacement: `${gitProtocolSrcPath}/index.ts` },
-      { find: /^@edge-git\/shared$/, replacement: `${sharedSrcPath}/index.ts` },
-      { find: /^@edge-git\/backend-services$/, replacement: `${backendServicesSrcPath}/index.ts` },
-      { find: /^@edge-git\/git-service$/, replacement: `${gitServiceSrcPath}/index.ts` },
-      { find: '@edge-git/background', replacement: backgroundSrcPath },
-      { find: '@edge-git/backend-data', replacement: backendDataSrcPath },
-      { find: '@edge-git/backend-runtime', replacement: backendRuntimeSrcPath },
-      { find: '@edge-git/git-protocol', replacement: gitProtocolSrcPath },
-      { find: '@edge-git/shared', replacement: sharedSrcPath },
-      { find: '@edge-git/backend-services', replacement: backendServicesSrcPath },
-      { find: '@edge-git/git-service', replacement: gitServiceSrcPath },
-      { find: /^@\//, replacement: `${apiSrcPath}/` },
-    ],
+    alias: workspaceAliases({
+      scope: '@edge-git',
+      root: new URL('../../', import.meta.url).href,
+      mocks: [],
+    }),
   },
 });

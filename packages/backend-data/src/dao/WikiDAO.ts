@@ -1,5 +1,6 @@
 import { BaseDAO } from './BaseDAO';
 import type { D1Queryable } from '@rexezuge/d1';
+import type { SubrequestMeter } from '@rexezuge/shared';
 
 export interface WikiPageRow {
   id: string;
@@ -23,8 +24,8 @@ export interface WikiRevisionRow {
 }
 
 class WikiDAO extends BaseDAO {
-  constructor(database: D1Queryable) {
-    super(database);
+  constructor(database: D1Queryable, meter?: SubrequestMeter) {
+    super(database, meter);
   }
 
   public async createPage(input: {

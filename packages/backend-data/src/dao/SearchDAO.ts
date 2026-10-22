@@ -1,5 +1,6 @@
 import { BaseDAO } from './BaseDAO';
 import type { D1Queryable } from '@rexezuge/d1';
+import type { SubrequestMeter } from '@rexezuge/shared';
 import { rowsOrEmpty, searchScopedWithTokens, throwUnlessMissingSchema } from './SearchFallback';
 import { SearchCodeIndexDAO } from './SearchCodeIndexDAO';
 import type { CodeFileInput, CodeHit, CodeOidEntry } from './SearchCodeIndexDAO';
@@ -43,12 +44,12 @@ type SearchResource = 'repositories' | 'issues' | 'pulls' | 'code' | 'discussion
 class SearchDAO extends BaseDAO {
   private readonly codeIndex: SearchCodeIndexDAO;
 
-  constructor(database: D1Queryable) {
-    super(database);
+  constructor(database: D1Queryable, meter?: SubrequestMeter) {
+    super(database, meter);
     // Composition over inheritance: code-index writes live in
     // `SearchCodeIndexDAO` so this file stays under the god-file guard.
     // Delegates below preserve the old API for `SearchService`/tests.
-    this.codeIndex = new SearchCodeIndexDAO(database);
+    this.codeIndex = new SearchCodeIndexDAO(database, meter);
   }
 
   // Scoped FTS-first search lives in `./SearchFallback.ts` (Template Method);

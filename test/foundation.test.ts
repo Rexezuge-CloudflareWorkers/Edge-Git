@@ -10,7 +10,7 @@ import {
 } from '@rexezuge/errors';
 import { Container } from '@edge-git/backend-runtime/di/Container';
 import { ConsoleLogger, SystemClock, createServiceContext } from '@edge-git/backend-runtime/di/ServiceContext';
-import { KvCache } from '@edge-git/backend-runtime/kv';
+import { buildKvKey, createKvCache } from '@edge-git/backend-runtime/kv';
 import { AppConfiguration } from '@edge-git/backend-runtime/config/AppConfiguration';
 import { ConfigurationManager } from '@edge-git/backend-runtime/config/ConfigurationManager';
 import { CryptoUtil, TimestampUtil, UUIDUtil } from '@rexezuge/shared';
@@ -63,9 +63,9 @@ describe('DI container', () => {
 
 describe('single-KV keyspace', () => {
   it('builds stable domain-prefixed keys', () => {
-    const cache = new KvCache(null);
-    expect(cache.keyFor('refs', ['alice/demo', 'abc'])).toBe('refs:v1:alice%2Fdemo:abc');
-    expect(cache.keyFor('jwks', ['alice/demo', 'abc'])).not.toBe(cache.keyFor('refs', ['alice/demo', 'abc']));
+    const cache = createKvCache(null);
+    expect(buildKvKey('refs', ['alice/demo', 'abc'])).toBe('refs:v1:alice%2Fdemo:abc');
+    expect(buildKvKey('jwks', ['alice/demo', 'abc'])).not.toBe(buildKvKey('refs', ['alice/demo', 'abc']));
     expect(cache.available).toBe(false);
   });
 });

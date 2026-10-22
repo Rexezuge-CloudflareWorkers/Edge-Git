@@ -1,29 +1,12 @@
 import { stubIdentityService, emptyUserEmailRegistry } from './mocks/identity';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { KvCache } from '@edge-git/backend-runtime/kv';
-import type { KvNamespaceLike } from '@edge-git/backend-runtime/kv';
+import { buildKvKey, createKvCache } from '@edge-git/backend-runtime/kv';
 import { createLogger } from '@edge-git/backend-runtime/logger';
 import { BaseScheduledTask } from '@edge-git/background/scheduled/IScheduledTask';
 import { StarService } from '@edge-git/backend-services/social/StarService';
 import { WatchService } from '@edge-git/backend-services/social/WatchService';
 import { NotificationService } from '@edge-git/backend-services/social/NotificationService';
-
-function makeMemoryKv(): KvNamespaceLike & { store: Map<string, string> } {
-  const store = new Map<string, string>();
-  return {
-    store,
-    get: (key: string) => Promise.resolve(store.get(key) ?? null),
-    put: (key: string, value: string) => {
-      store.set(key, value);
-      return Promise.resolve();
-    },
-    delete: (key: string) => Promise.resolve(store.delete(key)),
-    list: (options: { prefix: string }) => {
-      const keys = [...store.keys()].filter((name) => name.startsWith(options.prefix)).map((name) => ({ name }));
-      return Promise.resolve({ keys, list_complete: true });
-    },
-  };
-}
+import { makeFakeKv } from './mocks/kv';
 
 class ProbeTask extends BaseScheduledTask {
   public readonly name = 'ProbeTask';
@@ -33,7 +16,7 @@ class ProbeTask extends BaseScheduledTask {
     super();
   }
 
-  protected handleScheduledTask(): Promise<void> {
+  protected performTask(): Promise<void> {
     this.calls.push('handled');
     if (this.fail) throw new Error('task-boom');
     return Promise.resolve();
@@ -42,17 +25,17 @@ class ProbeTask extends BaseScheduledTask {
 
 describe('cache helpers', () => {
   it('builds namespaced keys and round-trips through the single binding', async () => {
-    const kv = makeMemoryKv();
-    const cache = new KvCache(kv);
-    expect(cache.keyFor('refs', ['alice/demo', 'abc'])).toBe('refs:v1:alice%2Fdemo:abc');
+    const kv = makeFakeKv();
+    const cache = createKvCache(kv);
+    expect(buildKvKey('refs', ['alice/demo', 'abc'])).toBe('refs:v1:alice%2Fdemo:abc');
     await expect(cache.putJson('refs', ['k1'], { n: 1 })).resolves.toBe(true);
     await expect(cache.getJson<{ n: number }>('refs', ['k1'])).resolves.toEqual({ n: 1 });
     await expect(cache.getJson('refs', ['missing'])).resolves.toBeNull();
   });
 
   it('isolates purge by domain prefix', async () => {
-    const kv = makeMemoryKv();
-    const cache = new KvCache(kv);
+    const kv = makeFakeKv();
+    const cache = createKvCache(kv);
     await cache.putText('refs', ['a'], 'x');
     await cache.putText('jwks', ['a'], 'y');
     await expect(cache.purgePrefix('refs')).resolves.toBe(1);

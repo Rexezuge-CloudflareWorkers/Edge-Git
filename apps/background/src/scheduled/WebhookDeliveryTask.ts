@@ -13,7 +13,7 @@ class WebhookDeliveryTask extends BaseScheduledTask {
   public readonly name = 'WebhookDeliveryTask';
   public readonly phase: 1 | 2 = 2;
 
-  protected async handleScheduledTask(env: Env): Promise<void> {
+  protected async performTask(env: Env): Promise<void> {
     const scope = createRequestScope(env);
     const summary = await scope.get(Tokens.WebhookDeliveryService).processDue({ limit: WEBHOOK_FLUSH_LIMIT });
     if (summary.processed > 0) {

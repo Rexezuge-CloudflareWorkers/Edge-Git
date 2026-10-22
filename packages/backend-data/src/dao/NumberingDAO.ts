@@ -1,5 +1,6 @@
 import { BaseDAO } from './BaseDAO';
 import type { D1Queryable } from '@rexezuge/d1';
+import type { SubrequestMeter } from '@rexezuge/shared';
 
 type NumberedEntity = 'issue' | 'pull' | 'discussion' | 'project';
 
@@ -28,8 +29,8 @@ function isNumberedEntity(value: string): value is NumberedEntity {
 // retry as the backstop. The allocator is an optimization, never a new
 // failure mode.
 class NumberingDAO extends BaseDAO {
-  constructor(database: D1Queryable) {
-    super(database);
+  constructor(database: D1Queryable, meter?: SubrequestMeter) {
+    super(database, meter);
   }
 
   public async allocateNumber(repositoryId: string, entity: NumberedEntity): Promise<number> {

@@ -1,25 +1,31 @@
 // Single-KV keyspace: one `CACHE` binding, domains separated by key prefix.
 //
-// Rationale: D1 stays the source of truth (joins, transactions, FTS). KV is a
+// The cache *facade* is the kit's (`@rexezuge/runtime`'s `KvCache`), which brings
+// the circuit breaker, the subrequest charge on every issued operation, the
+// binary paths, and a 128-bit overflow digest. What stays here is the part the
+// kit cannot know: *which* domains this repo caches under, and for how long.
+//
+// The kit's own table is the default, not a requirement — the TTL and size
+// policy is per-repo by definition, so the names below are Edge-Git's.
+//
+// Rationale: D1 and the Durable Object stay the source of truth. KV is a
 // loss-tolerant, read-heavy cache only — a miss or eviction must always be
-// recoverable by recompute. Call sites never touch `env.CACHE` directly;
-// they go through `KvCache` with a closed `KvDomainName` registry so prefixes
+// recoverable by recompute. Call sites never touch `env.CACHE` directly; they
+// go through `KvCache` with a closed `KvDomainName` registry so prefixes
 // cannot collide and TTL/size policy lives in one table.
 
-const KV_KEY_VERSION = 'v1';
-const KV_MAX_KEY_LENGTH = 512;
-const KV_MIN_TTL_SECONDS = 60;
-const KV_PLATFORM_MAX_VALUE_BYTES = 26_214_400;
+import { buildKvKey as kitBuildKvKey, clampTtl as kitClampTtl } from '@rexezuge/runtime';
+import type { KvDomains } from '@rexezuge/runtime';
 
-type KvDomainName = 'jwks' | 'oauth2' | 'code' | 'searchCursor' | 'refs' | 'readmodel' | 'ratelimit';
+/**
+ * The domains this repo caches under.
+ *
+ * Closed on purpose: a typo must be a compile error rather than a new
+ * keyspace nobody invalidates.
+ */
+type KvDomainName = 'jwks' | 'oauth2' | 'searchCursor' | 'refs' | 'readmodel' | 'ratelimit';
 
-interface KvDomainDef {
-  ttlSeconds?: number;
-  maxValueBytes: number;
-  description: string;
-}
-
-const KV_DOMAINS: Record<KvDomainName, KvDomainDef> = {
+const KV_DOMAINS: KvDomains<KvDomainName> = {
   jwks: {
     ttlSeconds: 600,
     maxValueBytes: 65_536,
@@ -29,10 +35,6 @@ const KV_DOMAINS: Record<KvDomainName, KvDomainDef> = {
     ttlSeconds: 3600,
     maxValueBytes: 16_384,
     description: 'OAuth token artefacts; per-entry TTL should track expiry.',
-  },
-  code: {
-    maxValueBytes: 1_048_576,
-    description: 'Indexed file bodies (D1 code_index keeps metadata only). Persistent until invalidated on push.',
   },
   searchCursor: {
     ttlSeconds: 604_800,
@@ -56,44 +58,25 @@ const KV_DOMAINS: Record<KvDomainName, KvDomainDef> = {
   },
 };
 
-function fnv1aHex(input: string): string {
-  let hash = 0x81_1c_9d_c5;
-  for (let i = 0; i < input.length; i += 1) {
-    hash ^= input.codePointAt(i) ?? 0;
-    hash = Math.imul(hash, 0x01_00_01_93);
-  }
-  return (hash >>> 0).toString(16).padStart(8, '0');
-}
-
-function sanitizeSegment(segment: string): string {
-  const trimmed = segment.trim();
-  if (!trimmed) throw new Error('KV key segment must not be empty.');
-  return encodeURIComponent(trimmed);
-}
-
+/**
+ * The key for a value.
+ *
+ * The kit's builder, bound to *this* table: a key built against one registry
+ * and a TTL resolved against another is a cache that reads and writes under one
+ * policy and reports another.
+ */
 function buildKvKey(domain: KvDomainName, parts: readonly string[]): string {
-  const def = KV_DOMAINS[domain];
-  if (!def) throw new Error(`Unknown KV domain: ${domain}.`);
-  if (parts.length === 0) throw new Error(`KV domain ${domain} requires at least one key part.`);
-  const prefix = `${domain}:${KV_KEY_VERSION}:`;
-  const joined = parts.map((part) => sanitizeSegment(part)).join(':');
-  const full = prefix + joined;
-  if (full.length <= KV_MAX_KEY_LENGTH) return full;
-  // Deterministic fallback: a miss just recomputes, so a 32-bit digest is fine.
-  return `${prefix}h:${fnv1aHex(joined)}`;
+  return kitBuildKvKey(domain, parts, KV_DOMAINS);
 }
 
-function utf8ByteLength(value: string): number {
-  return new TextEncoder().encode(value).length;
+/**
+ * Resolve a TTL, defaulting to the domain's own.
+ */
+function clampTtl(ttlSeconds: number | undefined, domain: KvDomainName): number {
+  return kitClampTtl(ttlSeconds, domain, KV_DOMAINS);
 }
 
-function clampTtl(ttlSeconds: number | undefined, domain: KvDomainName): number | undefined {
-  const effective = ttlSeconds ?? KV_DOMAINS[domain].ttlSeconds;
-  if (effective === undefined) return undefined;
-  if (!Number.isFinite(effective)) return undefined;
-  return Math.max(KV_MIN_TTL_SECONDS, Math.floor(effective));
-}
-
-export { KV_DOMAINS, KV_KEY_VERSION, KV_MAX_KEY_LENGTH, KV_MIN_TTL_SECONDS, KV_PLATFORM_MAX_VALUE_BYTES };
-export { buildKvKey, clampTtl, fnv1aHex, utf8ByteLength };
-export type { KvDomainDef, KvDomainName };
+export { KV_DOMAINS, buildKvKey, clampTtl };
+export { KV_MAX_KEY_LENGTH, KV_MIN_TTL_SECONDS } from '@rexezuge/runtime';
+export type { KvDomainDef, KvDomains } from '@rexezuge/runtime';
+export type { KvDomainName };

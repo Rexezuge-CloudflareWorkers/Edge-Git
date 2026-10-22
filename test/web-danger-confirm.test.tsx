@@ -58,4 +58,21 @@ describe('danger zone type-to-confirm modal', () => {
     const copy = screen.getByRole('button', { name: 'Copy To Clipboard' });
     expect(() => fireEvent.click(copy)).not.toThrow();
   });
+
+  it('is a labelled dialog', () => {
+    renderModal();
+    // The kit's frame puts the dialog role on the *panel*, and the title is
+    // its accessible name.
+    expect(screen.getByRole('dialog', { name: 'Delete Repository' })).toBeTruthy();
+  });
+
+  it('closes on Escape and on the corner close button', () => {
+    const { onCancel } = renderModal();
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(onCancel).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onCancel).toHaveBeenCalledTimes(2);
+  });
 });

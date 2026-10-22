@@ -13,7 +13,7 @@ class CheckStaleTask extends BaseScheduledTask {
   public readonly name = 'CheckStaleTask';
   public readonly phase: 1 | 2 = 2;
 
-  protected async handleScheduledTask(env: Env): Promise<void> {
+  protected async performTask(env: Env): Promise<void> {
     const marked = await createRequestScope(env)
       .get(Tokens.CheckService)
       .markStale(undefined, CHECK_STALE_LIMIT)

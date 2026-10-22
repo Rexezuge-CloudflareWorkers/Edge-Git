@@ -57,49 +57,54 @@ function bindDaoBindings(scope: Container, env: RequestScopeEnv): void {
   const webhookKey = scope.get(Tokens.WebhookKey);
   const mirrorKey = scope.get(Tokens.MirrorKey);
   const importKey = scope.get(Tokens.ImportKey);
+  // The invocation's subrequest counter. Every DAO below is constructed with
+  // it, so the kit's `BaseDAO` charges this invocation's statements against
+  // one counter rather than the unmetered default — a DAO that charges
+  // nothing under-reports silently, and the ceiling never sees the spend.
+  const meter = scope.get(Tokens.SubrequestMeter);
   // Encrypted DAOs fail closed: a missing binding throws from the key thunk
   // (no plaintext fallback since 0027 dropped the plaintext columns).
-  const webhookDAO = async (): Promise<unknown> => new WebhookDAO(env.DB, await webhookKey());
-  const mirrorDAO = async (): Promise<unknown> => new MirrorDAO(env.DB, await mirrorKey());
-  const importDAO = async (): Promise<unknown> => new ImportDAO(env.DB, await importKey());
+  const webhookDAO = async (): Promise<unknown> => new WebhookDAO(env.DB, await webhookKey(), meter);
+  const mirrorDAO = async (): Promise<unknown> => new MirrorDAO(env.DB, await mirrorKey(), meter);
+  const importDAO = async (): Promise<unknown> => new ImportDAO(env.DB, await importKey(), meter);
   const daoDefs: Array<[Token<() => Promise<unknown>>, () => Promise<unknown>]> = [
-    [Tokens.UserDAO, () => Promise.resolve(new UserDAO(env.DB))],
-    [Tokens.UserEmailDAO, () => Promise.resolve(new UserEmailDAO(env.DB))],
-    [Tokens.RepositoryDAO, () => Promise.resolve(new RepositoryDAO(env.DB))],
-    [Tokens.UserAccessTokenDAO, () => Promise.resolve(new UserAccessTokenDAO(env.DB))],
-    [Tokens.IssueDAO, () => Promise.resolve(new IssueDAO(env.DB))],
-    [Tokens.PullRequestDAO, () => Promise.resolve(new PullRequestDAO(env.DB))],
-    [Tokens.PullThreadDAO, () => Promise.resolve(new PullThreadDAO(env.DB))],
-    [Tokens.NamespaceDAO, () => Promise.resolve(new NamespaceDAO(env.DB))],
-    [Tokens.NumberingDAO, () => Promise.resolve(new NumberingDAO(env.DB))],
-    [Tokens.OrganizationDAO, () => Promise.resolve(new OrganizationDAO(env.DB))],
-    [Tokens.OrganizationMemberDAO, () => Promise.resolve(new OrganizationMemberDAO(env.DB))],
-    [Tokens.RepoCollaboratorDAO, () => Promise.resolve(new RepoCollaboratorDAO(env.DB))],
-    [Tokens.BranchProtectionDAO, () => Promise.resolve(new BranchProtectionDAO(env.DB))],
-    [Tokens.CheckRunDAO, () => Promise.resolve(new CheckRunDAO(env.DB))],
-    [Tokens.CollaborationDAO, () => Promise.resolve(new CollaborationDAO(env.DB))],
-    [Tokens.SearchDAO, () => Promise.resolve(new SearchDAO(env.DB))],
-    [Tokens.StarDAO, () => Promise.resolve(new StarDAO(env.DB))],
-    [Tokens.WatchDAO, () => Promise.resolve(new WatchDAO(env.DB))],
-    [Tokens.EventDAO, () => Promise.resolve(new EventDAO(env.DB))],
-    [Tokens.NotificationDAO, () => Promise.resolve(new NotificationDAO(env.DB))],
+    [Tokens.UserDAO, () => Promise.resolve(new UserDAO(env.DB, meter))],
+    [Tokens.UserEmailDAO, () => Promise.resolve(new UserEmailDAO(env.DB, meter))],
+    [Tokens.RepositoryDAO, () => Promise.resolve(new RepositoryDAO(env.DB, meter))],
+    [Tokens.UserAccessTokenDAO, () => Promise.resolve(new UserAccessTokenDAO(env.DB, meter))],
+    [Tokens.IssueDAO, () => Promise.resolve(new IssueDAO(env.DB, meter))],
+    [Tokens.PullRequestDAO, () => Promise.resolve(new PullRequestDAO(env.DB, meter))],
+    [Tokens.PullThreadDAO, () => Promise.resolve(new PullThreadDAO(env.DB, meter))],
+    [Tokens.NamespaceDAO, () => Promise.resolve(new NamespaceDAO(env.DB, meter))],
+    [Tokens.NumberingDAO, () => Promise.resolve(new NumberingDAO(env.DB, meter))],
+    [Tokens.OrganizationDAO, () => Promise.resolve(new OrganizationDAO(env.DB, meter))],
+    [Tokens.OrganizationMemberDAO, () => Promise.resolve(new OrganizationMemberDAO(env.DB, meter))],
+    [Tokens.RepoCollaboratorDAO, () => Promise.resolve(new RepoCollaboratorDAO(env.DB, meter))],
+    [Tokens.BranchProtectionDAO, () => Promise.resolve(new BranchProtectionDAO(env.DB, meter))],
+    [Tokens.CheckRunDAO, () => Promise.resolve(new CheckRunDAO(env.DB, meter))],
+    [Tokens.CollaborationDAO, () => Promise.resolve(new CollaborationDAO(env.DB, meter))],
+    [Tokens.SearchDAO, () => Promise.resolve(new SearchDAO(env.DB, meter))],
+    [Tokens.StarDAO, () => Promise.resolve(new StarDAO(env.DB, meter))],
+    [Tokens.WatchDAO, () => Promise.resolve(new WatchDAO(env.DB, meter))],
+    [Tokens.EventDAO, () => Promise.resolve(new EventDAO(env.DB, meter))],
+    [Tokens.NotificationDAO, () => Promise.resolve(new NotificationDAO(env.DB, meter))],
     [Tokens.WebhookDAO, webhookDAO],
-    [Tokens.WebhookDeliveryDAO, () => Promise.resolve(new WebhookDeliveryDAO(env.DB))],
-    [Tokens.ReleaseDAO, () => Promise.resolve(new ReleaseDAO(env.DB))],
-    [Tokens.ProjectDAO, () => Promise.resolve(new ProjectDAO(env.DB))],
-    [Tokens.DiscussionDAO, () => Promise.resolve(new DiscussionDAO(env.DB))],
-    [Tokens.WikiDAO, () => Promise.resolve(new WikiDAO(env.DB))],
-    [Tokens.SnippetDAO, () => Promise.resolve(new SnippetDAO(env.DB))],
-    [Tokens.TeamDAO, () => Promise.resolve(new TeamDAO(env.DB))],
-    [Tokens.TeamMemberDAO, () => Promise.resolve(new TeamMemberDAO(env.DB))],
-    [Tokens.TeamRepoGrantDAO, () => Promise.resolve(new TeamRepoGrantDAO(env.DB))],
-    [Tokens.AuditLogDAO, () => Promise.resolve(new AuditLogDAO(env.DB))],
+    [Tokens.WebhookDeliveryDAO, () => Promise.resolve(new WebhookDeliveryDAO(env.DB, meter))],
+    [Tokens.ReleaseDAO, () => Promise.resolve(new ReleaseDAO(env.DB, meter))],
+    [Tokens.ProjectDAO, () => Promise.resolve(new ProjectDAO(env.DB, meter))],
+    [Tokens.DiscussionDAO, () => Promise.resolve(new DiscussionDAO(env.DB, meter))],
+    [Tokens.WikiDAO, () => Promise.resolve(new WikiDAO(env.DB, meter))],
+    [Tokens.SnippetDAO, () => Promise.resolve(new SnippetDAO(env.DB, meter))],
+    [Tokens.TeamDAO, () => Promise.resolve(new TeamDAO(env.DB, meter))],
+    [Tokens.TeamMemberDAO, () => Promise.resolve(new TeamMemberDAO(env.DB, meter))],
+    [Tokens.TeamRepoGrantDAO, () => Promise.resolve(new TeamRepoGrantDAO(env.DB, meter))],
+    [Tokens.AuditLogDAO, () => Promise.resolve(new AuditLogDAO(env.DB, meter))],
     [Tokens.ImportDAO, importDAO],
     [Tokens.MirrorDAO, mirrorDAO],
-    [Tokens.DeployKeyDAO, () => Promise.resolve(new DeployKeyDAO(env.DB))],
-    [Tokens.DeletedRepoDoDAO, () => Promise.resolve(new DeletedRepoDoDAO(env.DB))],
-    [Tokens.TokenRepoGrantDAO, () => Promise.resolve(new TokenRepoGrantDAO(env.DB))],
-    [Tokens.SecuritySettingsDAO, () => Promise.resolve(new SecuritySettingsDAO(env.DB))],
+    [Tokens.DeployKeyDAO, () => Promise.resolve(new DeployKeyDAO(env.DB, meter))],
+    [Tokens.DeletedRepoDoDAO, () => Promise.resolve(new DeletedRepoDoDAO(env.DB, meter))],
+    [Tokens.TokenRepoGrantDAO, () => Promise.resolve(new TokenRepoGrantDAO(env.DB, meter))],
+    [Tokens.SecuritySettingsDAO, () => Promise.resolve(new SecuritySettingsDAO(env.DB, meter))],
   ];
   for (const [token, create] of daoDefs) {
     scope.bindValue(token, memoizeAsync(create));

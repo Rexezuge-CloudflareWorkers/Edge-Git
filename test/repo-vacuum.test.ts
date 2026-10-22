@@ -8,7 +8,7 @@ import { DeletedRepoDoDAO } from '@edge-git/backend-data/dao';
 import { CheckRunDAO } from '@edge-git/backend-data/dao';
 import { NumberingDAO } from '@edge-git/backend-data/dao';
 import { SearchDAO } from '@edge-git/backend-data/dao';
-import { KvCache } from '@edge-git/backend-runtime/kv';
+import { createKvCache } from '@edge-git/backend-runtime/kv';
 import { Tokens, createRequestScope } from '@edge-git/backend-services/composition';
 import { RepoService } from '@edge-git/backend-services/repo';
 import type { D1Queryable } from '@edge-git/backend-data/utils';
@@ -327,7 +327,7 @@ describe('RepoVacuumTask background reclaim', () => {
     const tables = seedTables({ tombs: [oldTomb()] });
     const { env, cache, vacuumKeys, checkKeys, purgedIds } = taskEnv(tables);
     const key = repoDoKeyForFullName(FULL);
-    const kv = new KvCache(cache.ns as never);
+    const kv = createKvCache(cache.ns as never);
     await kv.putJson('refs', [key, 'snapshot'], { refs: [] });
     await kv.putJson('readmodel', [key, 'branches', 'empty', 'abc'], { branches: [] });
     await new RepoVacuumTask().run(env);

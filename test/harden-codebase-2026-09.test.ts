@@ -170,9 +170,9 @@ describe('harden: repo-scoped snippet search returns empty', () => {
     const fakeCtx = {
       req: { url, raw: new Request(url) },
       env: { DB: fakeDb },
-      get: (_key: string) => {
-        throw new Error('no scope');
-      },
+      // No scope installed: a Hono context answers a missing key with
+      // `undefined`, and the route falls back to a fresh scope.
+      get: (_key: string) => undefined,
       json: (body: unknown) => {
         seen.push(body);
         return Response.json(body);

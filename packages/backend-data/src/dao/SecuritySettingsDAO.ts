@@ -1,5 +1,6 @@
 import { BaseDAO } from './BaseDAO';
 import type { D1Queryable } from '@rexezuge/d1';
+import type { SubrequestMeter } from '@rexezuge/shared';
 
 type SecretScanMode = 'off' | 'warn' | 'block';
 
@@ -11,8 +12,8 @@ interface SecuritySettingsRow {
 }
 
 class SecuritySettingsDAO extends BaseDAO {
-  constructor(database: D1Queryable) {
-    super(database);
+  constructor(database: D1Queryable, meter?: SubrequestMeter) {
+    super(database, meter);
   }
 
   public async getByRepo(repositoryId: string): Promise<SecuritySettingsRow | null> {

@@ -1,5 +1,6 @@
 import { BaseDAO } from './BaseDAO';
 import type { D1Queryable } from '@rexezuge/d1';
+import type { SubrequestMeter } from '@rexezuge/shared';
 import { isMissingSchemaError } from '@rexezuge/d1';
 import { rowsOrEmpty, throwUnlessMissingSchema } from './SearchFallback';
 import { UPSERT_CODE_FILE_SQL } from './SearchQueries';
@@ -39,8 +40,8 @@ type CodeIndexUpsert = CodeFileInput;
  * callers (`SearchService`, backfill cron, tests) keep working unchanged.
  */
 class SearchCodeIndexDAO extends BaseDAO {
-  constructor(database: D1Queryable) {
-    super(database);
+  constructor(database: D1Queryable, meter?: SubrequestMeter) {
+    super(database, meter);
   }
 
   public async upsertCodeFile(input: CodeFileInput): Promise<number> {

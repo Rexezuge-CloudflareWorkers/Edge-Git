@@ -28,8 +28,8 @@
     "@edge-git/git-service": "workspace:*",
     "@edge-git/shared": "workspace:*",
     "@jitl/quickjs-wasmfile-release-asyncify": "^0.32.0",
-    "@rexezuge/errors": "^1.6.0",
-    "@rexezuge/shared": "^1.6.0",
+    "@rexezuge/errors": "^1.9.2",
+    "@rexezuge/shared": "^1.9.2",
     "quickjs-emscripten": "0.32.0"
   },
   "devDependencies": {

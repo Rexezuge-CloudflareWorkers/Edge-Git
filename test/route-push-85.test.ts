@@ -170,10 +170,13 @@ describe('slice1: SocialEmit channels and never-throw fan-out', () => {
 
 describe('slice1: EnvParser and Identity edges', () => {
   it('EnvParser coerces numerics and falls back', () => {
-    expect(EnvParser.positiveInt({ X: 5 } as unknown as Env, 'X', '10')).toBe(5);
+    // The kit reads a binding as a string or as unset — a number is not a
+    // binding the platform would ever produce, so it falls through to the
+    // default rather than being coerced.
+    expect(EnvParser.positiveInt({ X: 5 } as unknown as Env, 'X', '10')).toBe(10);
     expect(EnvParser.positiveInt({ X: ' 7 ' } as unknown as Env, 'X', '10')).toBe(7);
     expect(EnvParser.nonNegativeInt({ X: '' } as unknown as Env, 'X', '7')).toBe(0);
-    expect(EnvParser.string({ X: 5 } as unknown as Env, 'X', 'b')).toBe(5 as unknown as string);
+    expect(EnvParser.string({ X: 5 } as unknown as Env, 'X', 'b')).toBe('b');
     expect(EnvParser.boolean({ X: 'TRUE' } as unknown as Env, 'X', 'false')).toBe(false);
   });
 

@@ -1,4 +1,6 @@
 import { AbstractEntrypointWorker } from '@edge-git/backend-runtime/base';
+import { createLogger } from '@edge-git/backend-runtime/logger';
+import { ErrorSanitizationUtil } from '@edge-git/shared/utils';
 import { fromHono } from 'chanfana';
 import type { HonoOpenAPIRouterType } from 'chanfana';
 import { Hono } from 'hono';
@@ -49,12 +51,13 @@ type AppRouter = HonoOpenAPIRouterType<{
   Variables: { AuthenticatedUserEmailAddress: string; AuthenticatedUserId?: string };
 }>;
 
+const logger = createLogger('EdgeGitWorker');
+
 class EdgeGitWorker extends AbstractEntrypointWorker {
   protected readonly app: AppRouter;
 
   constructor() {
     super();
-
     const app = new Hono<{
       Bindings: Env;
       Variables: { AuthenticatedUserEmailAddress: string; AuthenticatedUserId?: string };
@@ -66,7 +69,7 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     // Global 500 mask: never leak D1/DO internals on uncaught throws.
     // Route handlers must still use toSafeErrorMessage for caught errors.
     app.onError((error, c) => {
-      console.error('Unhandled worker error', error instanceof Error ? error.message : error);
+      logger.error('Unhandled worker error', ErrorSanitizationUtil.sanitizeErrorForLogging(error));
       return c.json({ Exception: { Type: 'InternalServerError', Message: 'Internal Server Error.' } }, 500);
     });
 
@@ -211,6 +214,19 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
     return this.app.fetch(request, env, ctx);
   }
 
+  /**
+   * The sink for an unhandled rejection at this base's boundary.
+   *
+   * The kit's default hands the caught value to `console.error` verbatim, which
+   * is only safe when nothing in the call path can carry a secret — and this
+   * worker's does: a token, a webhook signing secret or a bearer header can
+   * reach a handler that throws. The message stays the kit's static one; the
+   * *value* is redacted here, where the threat model lives.
+   */
+  protected override reportUnhandled(message: string, error: unknown): void {
+    logger.error(message, ErrorSanitizationUtil.sanitizeErrorForLogging(error));
+  }
+
   protected onScheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     const id = env.CRON_TASKS.idFromName('global');
     const stub = env.CRON_TASKS.get(id);
@@ -224,10 +240,10 @@ class EdgeGitWorker extends AbstractEntrypointWorker {
         )
         .then((res: Response) => {
           if (!res.ok && res.status !== 202) {
-            console.error('CronTasksWorker error', res.status);
+            logger.error('CronTasksWorker error', res.status);
           }
         })
-        .catch((error: unknown) => console.error('Cron invoke failed', error)),
+        .catch((error: unknown) => logger.error('Cron invoke failed', ErrorSanitizationUtil.sanitizeErrorForLogging(error))),
     );
     return Promise.resolve();
   }

@@ -1,5 +1,6 @@
 import { BaseDAO } from './BaseDAO';
 import type { D1Queryable } from '@rexezuge/d1';
+import type { SubrequestMeter } from '@rexezuge/shared';
 import type { BranchProtectionRuleMetadata } from '@edge-git/shared';
 
 export interface BranchProtectionRuleRow {
@@ -31,8 +32,8 @@ function toMetadata(row: BranchProtectionRuleRow, requireStatusChecks: string[])
 }
 
 class BranchProtectionDAO extends BaseDAO {
-  constructor(database: D1Queryable) {
-    super(database);
+  constructor(database: D1Queryable, meter?: SubrequestMeter) {
+    super(database, meter);
   }
 
   public async create(input: {

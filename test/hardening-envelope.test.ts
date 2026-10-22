@@ -70,6 +70,17 @@ describe('hardening: AWS Exception envelope', () => {
     expect(toServiceStatus(new BadRequestError('b'))).toBe(400);
   });
 
+  it('reports a spent D1 daily allowance as 503 with the wait on the wire', () => {
+    const spent = new DatabaseError('Failed to run statement: exceeded D1’s free tier daily row write limit');
+    const mapped = mapServiceError(spent);
+    // Not a 500: the allowance comes back at midnight, and a client that reads
+    // it as a fault retries straight back into the same refusal.
+    expect(mapped.status).toBe(503);
+    expect(mapped.body.Exception?.Type).toBe('ServiceUnavailable');
+    expect(mapped.retryAfterSeconds).toBeGreaterThan(0);
+    expect(mapped.retryAfterSeconds).toBeLessThanOrEqual(86_400);
+  });
+
   it('failClosed propagates instead of swallowing', async () => {
     await expect(failClosed(async () => 7)).resolves.toBe(7);
     await expect(

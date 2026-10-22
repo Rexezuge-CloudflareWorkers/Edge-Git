@@ -1,5 +1,6 @@
 import { BaseDAO } from './BaseDAO';
 import type { D1Queryable } from '@rexezuge/d1';
+import type { SubrequestMeter } from '@rexezuge/shared';
 import { DatabaseError } from '@rexezuge/errors';
 import { buildSetClause } from './UpdateClause';
 
@@ -30,8 +31,8 @@ export interface RepositoryRow {
 }
 
 class RepositoryDAO extends BaseDAO {
-  constructor(database: D1Queryable) {
-    super(database);
+  constructor(database: D1Queryable, meter?: SubrequestMeter) {
+    super(database, meter);
   }
 
   // Fork lineage is computed live (`repositories` self-join) — the stored

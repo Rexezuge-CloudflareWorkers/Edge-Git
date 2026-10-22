@@ -1,7 +1,7 @@
 import { parse } from 'jsonc-parser';
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_HEX_ID } from '../scripts/wrangler-config/types';
-import { ensureRequiredKvBindings, getRequiredKvBindings } from '../scripts/wrangler-config/resources';
+import { DEFAULT_HEX_ID } from '@rexezuge/tooling/src/scripts/wrangler-config/types';
+import { ensureRequiredKvBindings, getRequiredKvBindings } from '@rexezuge/tooling/src/scripts/wrangler-config/resources';
 
 describe('ensureRequiredKvBindings', () => {
   it('requires the CACHE binding', () => {
