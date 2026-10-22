@@ -1,5 +1,6 @@
 import { BaseDAO } from './BaseDAO';
 import type { D1Queryable } from '@rexezuge/d1';
+import type { SubrequestMeter } from '@rexezuge/shared';
 
 interface DeletedRepoDoRow {
   do_key: string;
@@ -15,8 +16,8 @@ interface DeletedRepoDoRow {
 // and KV read-model caches only while the canonical DO key still maps to no
 // live repository (recreates win the race by design).
 class DeletedRepoDoDAO extends BaseDAO {
-  constructor(database: D1Queryable) {
-    super(database);
+  constructor(database: D1Queryable, meter?: SubrequestMeter) {
+    super(database, meter);
   }
 
   public async enqueue(doKey: string, fullName: string, repoId: string, now: number): Promise<void> {

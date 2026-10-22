@@ -1,5 +1,6 @@
 import { BaseDAO } from './BaseDAO';
 import type { D1Queryable } from '@rexezuge/d1';
+import type { SubrequestMeter } from '@rexezuge/shared';
 import type { RepoRole } from './RepoCollaboratorDAO';
 
 export interface TeamRepoGrantRow {
@@ -11,8 +12,8 @@ export interface TeamRepoGrantRow {
 }
 
 class TeamRepoGrantDAO extends BaseDAO {
-  constructor(database: D1Queryable) {
-    super(database);
+  constructor(database: D1Queryable, meter?: SubrequestMeter) {
+    super(database, meter);
   }
 
   public async upsert(teamId: string, repoId: string, role: RepoRole, grantedBy: string | null, now: number): Promise<void> {

@@ -1,6 +1,7 @@
 import { BaseDAO } from './BaseDAO';
 import { CollaborationQueries } from './CollaborationQueries';
 import type { D1Queryable } from '@rexezuge/d1';
+import type { SubrequestMeter } from '@rexezuge/shared';
 
 export interface LabelRow {
   id: string;
@@ -29,8 +30,8 @@ export interface PullReviewerRow {
 }
 
 class CollaborationDAO extends BaseDAO {
-  constructor(database: D1Queryable) {
-    super(database);
+  constructor(database: D1Queryable, meter?: SubrequestMeter) {
+    super(database, meter);
   }
 
   // Generic subject-label/assignee writer shared by the issue/pull mirrors

@@ -5,3 +5,4 @@ export * from './di';
 export { createLogger, isLogLevel, resolveLogLevel } from '@rexezuge/runtime';
 export type { LogLevel, Logger } from '@rexezuge/runtime';
 export * from './kv';
+export * from './scheduled';

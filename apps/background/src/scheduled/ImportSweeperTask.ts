@@ -14,7 +14,7 @@ class ImportSweeperTask extends BaseScheduledTask {
   public readonly name = 'ImportSweeperTask';
   public readonly phase: 1 | 2 = 2;
 
-  protected async handleScheduledTask(env: Env): Promise<void> {
+  protected async performTask(env: Env): Promise<void> {
     const scope = createRequestScope(env);
     const svc = scope.get(Tokens.ImportService);
     const limits = svc.transferLimits();

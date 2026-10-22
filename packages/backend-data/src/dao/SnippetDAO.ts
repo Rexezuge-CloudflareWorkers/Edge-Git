@@ -1,5 +1,6 @@
 import { BaseDAO } from './BaseDAO';
 import type { D1Queryable } from '@rexezuge/d1';
+import type { SubrequestMeter } from '@rexezuge/shared';
 
 export interface SnippetRow {
   id: string;
@@ -19,8 +20,8 @@ export interface SnippetFileRow {
 }
 
 class SnippetDAO extends BaseDAO {
-  constructor(database: D1Queryable) {
-    super(database);
+  constructor(database: D1Queryable, meter?: SubrequestMeter) {
+    super(database, meter);
   }
 
   public async createSnippet(input: { id: string; ownerEmail: string; title: string; visibility: string; now: number }): Promise<void> {

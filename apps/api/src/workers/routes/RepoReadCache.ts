@@ -1,5 +1,5 @@
 import type { KvCache } from '@edge-git/backend-runtime/kv';
-import { fnv1aHex } from '@edge-git/backend-runtime/kv';
+import { digest128 } from '@rexezuge/runtime';
 import { repoDoKeyForFullName } from '@edge-git/shared/utils';
 
 // KV-backed read-model cache for repo RPCs (Otter pure-helper + facade).
@@ -40,7 +40,7 @@ function etagForRefs(snapshot: RefsSnapshot | null): string | null {
 
 function etagForReadModel(headOid: string, kind: string, argsKey: string): string {
   const base = headOid === 'empty' ? 'empty' : headOid.slice(0, 16);
-  return `W/"${kind}-${base}-${fnv1aHex(argsKey)}"`;
+  return `W/"${kind}-${base}-${digest128(argsKey)}"`;
 }
 
 function argsKeyFor(value: unknown): string {
@@ -95,7 +95,7 @@ async function getCachedReadModel<T>(
   argsKey: string,
   headOid = 'empty',
 ): Promise<T | null> {
-  return cache.getJson<T>('readmodel', [cacheKeyForRepo(fullName), kind, headOid.slice(0, 16), fnv1aHex(argsKey)]);
+  return cache.getJson<T>('readmodel', [cacheKeyForRepo(fullName), kind, headOid.slice(0, 16), digest128(argsKey)]);
 }
 
 async function putCachedReadModel(
@@ -106,7 +106,7 @@ async function putCachedReadModel(
   headOid: string,
   value: unknown,
 ): Promise<void> {
-  await cache.putJson('readmodel', [cacheKeyForRepo(fullName), kind, headOid.slice(0, 16), fnv1aHex(argsKey)], value, {
+  await cache.putJson('readmodel', [cacheKeyForRepo(fullName), kind, headOid.slice(0, 16), digest128(argsKey)], value, {
     ttlSeconds: READMODEL_TTL_SECONDS,
   });
 }
@@ -119,22 +119,6 @@ async function invalidateRepoCaches(cache: KvCache, fullName: string): Promise<v
   await cache.purgePrefix('readmodel', [key]);
 }
 
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = '';
-  const chunk = 8192;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCodePoint(...bytes.subarray(i, i + chunk));
-  }
-  return btoa(binary);
-}
-
-function base64ToBytes(b64: string): Uint8Array {
-  const binary = atob(b64);
-  const out = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) out[i] = (binary.codePointAt(i) ?? 0) & 0xff;
-  return out;
-}
-
 // Small fetch-response cache for identical `git fetch` polls between pushes.
 // Keyed by (headOid, bodyHash): pushes invalidate via `invalidateRepoCaches`
 // (refs snapshot miss => new head => miss), so stale packs are impossible.
@@ -142,9 +126,7 @@ function base64ToBytes(b64: string): Uint8Array {
 // Fail-soft like the rest of this module: misses recompute from the DO.
 async function getCachedPack(cache: KvCache, fullName: string, headOid: string, bodyHash: string): Promise<Uint8Array | null> {
   try {
-    const entry = await cache.getJson<{ b64: string }>('readmodel', [cacheKeyForRepo(fullName), 'pack', headOid.slice(0, 16), bodyHash]);
-    if (!entry?.b64) return null;
-    return base64ToBytes(entry.b64);
+    return await cache.getBytes('readmodel', [cacheKeyForRepo(fullName), 'pack', headOid.slice(0, 16), bodyHash]);
   } catch {
     return null;
   }
@@ -153,14 +135,12 @@ async function getCachedPack(cache: KvCache, fullName: string, headOid: string, 
 async function putCachedPack(cache: KvCache, fullName: string, headOid: string, bodyHash: string, bytes: Uint8Array): Promise<void> {
   if (bytes.byteLength > MAX_CACHED_PACK_BYTES) return;
   try {
-    await cache.putJson(
-      'readmodel',
-      [cacheKeyForRepo(fullName), 'pack', headOid.slice(0, 16), bodyHash],
-      { b64: bytesToBase64(bytes) },
-      {
-        ttlSeconds: READMODEL_TTL_SECONDS,
-      },
-    );
+    // Raw bytes, not base64 in a JSON envelope: the kit's binary path stores
+    // them as they are, so the cache does not pay the ~33% inflation base64
+    // costs on every cached pack.
+    await cache.putBytes('readmodel', [cacheKeyForRepo(fullName), 'pack', headOid.slice(0, 16), bodyHash], bytes, {
+      ttlSeconds: READMODEL_TTL_SECONDS,
+    });
   } catch {
     // Best-effort cache population.
   }

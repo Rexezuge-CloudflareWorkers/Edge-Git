@@ -38,9 +38,10 @@ jobs:
       - name: Prepare Wrangler Configuration
         uses: ./.github/actions/retry-step
         with:
-          command: pnpm exec tsx scripts/prepare-wrangler-config.ts
+          command: pnpm exec tsx node_modules/@rexezuge/tooling/src/scripts/prepare-wrangler-config.ts
           max_attempts: '3'
         env:
+          WRANGLER_WORKER_NAME: edge-git
           WRANGLER_JSONC: ${{ vars.WRANGLER_JSONC }}
           WRANGLER_PATCH_JSON: ${{ vars.WRANGLER_PATCH_JSON }}
           WRANGLER_VARS_PATCH_JSON: ${{ vars.WRANGLER_VARS_PATCH_JSON }}

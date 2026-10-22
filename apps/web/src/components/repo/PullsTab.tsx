@@ -225,7 +225,7 @@ export function PullsTab({
             />
             <label className="flex items-center gap-2 text-sm text-[var(--color-text-muted)]">
               <input type="checkbox" checked={isDraft} onChange={(e) => setIsDraft(e.target.checked)} />
-              {t('pulls.draft', 'Draft Pull Request')}
+              {t('pulls.draft', 'Draft')}
             </label>
             <Button type="submit" variant="primary" size="sm" loading={saving}>
               {t('pulls.createPull', 'Create Pull Request')}

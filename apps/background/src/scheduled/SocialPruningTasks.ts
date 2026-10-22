@@ -10,7 +10,7 @@ class BackgroundTaskRunPruningTask extends BaseScheduledTask {
   public readonly name = 'BackgroundTaskRunPruningTask';
   public readonly phase: 1 | 2 = 2;
 
-  protected handleScheduledTask(env: Env): Promise<void> {
+  protected performTask(env: Env): Promise<void> {
     const retention = ConfigurationManager.processing.getTaskRunRetentionDays(env);
     logger.info(`Background task retention ${retention}d (no-op v1)`);
     return Promise.resolve();
@@ -21,7 +21,7 @@ class SocialPruningTask extends BaseScheduledTask {
   public readonly name = 'SocialPruningTask';
   public readonly phase: 1 | 2 = 2;
 
-  protected async handleScheduledTask(env: Env): Promise<void> {
+  protected async performTask(env: Env): Promise<void> {
     const retentionDays = ConfigurationManager.processing.getAuditLogRetentionDays(env);
     const cutoff = TimestampUtil.getCurrentUnixTimestampInSeconds() - retentionDays * 86_400;
     const scope = createRequestScope(env);

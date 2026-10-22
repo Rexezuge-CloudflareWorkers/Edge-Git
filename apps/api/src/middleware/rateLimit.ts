@@ -12,17 +12,20 @@ type RateLimitContext = Context<{ Bindings: Env; Variables: { AuthenticatedUserE
  * every other error on this worker uses, so a client that parses that envelope
  * does not read a 429 as a server fault and retry straight back into it.
  *
- * The kit also scopes its bucket map to the *limiter instance* rather than to
- * the module. Two consequences worth stating, because the old module-scoped map
+ * The kit scopes its bucket map to the *limiter instance* rather than to the
+ * module. Two consequences worth stating, because the old module-scoped map
  * hid both:
  *
  * - Limiters installed with different `keyPrefix`es cannot collide, and a test
- *   that builds a fresh `EdgeGitWorker` gets fresh buckets with no reset seam
- *   to remember — which is why there is no `resetRateLimitForTests` here any
- *   more.
+ *   that builds a fresh `EdgeGitWorker` gets fresh buckets.
  * - The bucket state lives as long as the route registration, which is as long
  *   as the isolate. Nothing leaks between requests that share a limiter, and
  *   nothing leaks between limiters.
+ *
+ * The kit also keeps a registry of every limiter it installed, and exposes
+ * `resetRateLimitForTests` / `getRateLimitBucketCountForTests` over it — so a
+ * suite can forget the buckets between cases and can assert the cap rather
+ * than infer it.
  *
  * IP grouping stays fail-closed: without a trusted `CF-Connecting-IP` all
  * callers share the `unknown` bucket rather than getting per-spoofed-header
@@ -33,4 +36,5 @@ const rateLimit = kitRateLimit as unknown as (
 ) => (c: RateLimitContext, next: Next) => Promise<Response | void>;
 
 export { rateLimit };
+export { getRateLimitBucketCountForTests, resetRateLimitForTests } from '@rexezuge/http';
 export type { RateLimitContext };

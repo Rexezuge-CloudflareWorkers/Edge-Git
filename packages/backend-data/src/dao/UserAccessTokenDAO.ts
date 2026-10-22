@@ -1,5 +1,6 @@
 import { BaseDAO } from './BaseDAO';
 import type { D1Queryable } from '@rexezuge/d1';
+import type { SubrequestMeter } from '@rexezuge/shared';
 import type { TokenScope, UserAccessTokenMetadata } from '@edge-git/shared';
 
 export interface TokenRow {
@@ -36,8 +37,8 @@ function toMetadata(row: TokenRow, scopes: TokenScope[]): UserAccessTokenMetadat
 }
 
 class UserAccessTokenDAO extends BaseDAO {
-  constructor(database: D1Queryable) {
-    super(database);
+  constructor(database: D1Queryable, meter?: SubrequestMeter) {
+    super(database, meter);
   }
 
   public async create(

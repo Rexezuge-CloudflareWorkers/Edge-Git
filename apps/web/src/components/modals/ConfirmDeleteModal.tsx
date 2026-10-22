@@ -16,7 +16,7 @@ export function ConfirmDeleteModal({
 }) {
   const { t } = useTranslation();
   return (
-    <ModalShell onClose={onCancel} widthClass="w-80" ariaLabel={title}>
+    <ModalShell onClose={onCancel} widthClass="w-80" ariaLabel={title} closeLabel={t('common.close', 'Close')}>
       <div className="p-6">
         <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--color-error-bg)] mb-4 mx-auto">
           <AlertTriangle className="h-5 w-5 text-[var(--color-error-text)]" />

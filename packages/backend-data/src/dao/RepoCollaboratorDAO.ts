@@ -1,5 +1,6 @@
 import { BaseDAO } from './BaseDAO';
 import type { D1Queryable } from '@rexezuge/d1';
+import type { SubrequestMeter } from '@rexezuge/shared';
 
 export type RepoRole = 'admin' | 'write' | 'read';
 
@@ -16,8 +17,8 @@ export interface RepoCollaboratorRow {
 }
 
 class RepoCollaboratorDAO extends BaseDAO {
-  constructor(database: D1Queryable) {
-    super(database);
+  constructor(database: D1Queryable, meter?: SubrequestMeter) {
+    super(database, meter);
   }
 
   /**

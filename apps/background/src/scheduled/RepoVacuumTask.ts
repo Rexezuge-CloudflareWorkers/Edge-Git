@@ -38,7 +38,7 @@ class RepoVacuumTask extends BaseScheduledTask {
   public readonly name = 'RepoVacuumTask';
   public readonly phase: 1 | 2 = 2;
 
-  protected async handleScheduledTask(env: Env): Promise<void> {
+  protected async performTask(env: Env): Promise<void> {
     const scope = createRequestScope(env);
     const tombstones = await scope.get(Tokens.DeletedRepoDoDAO)().catch(() => null);
     if (!tombstones) return;

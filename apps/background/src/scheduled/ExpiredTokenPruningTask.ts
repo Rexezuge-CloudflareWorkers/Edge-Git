@@ -12,7 +12,7 @@ class ExpiredTokenPruningTask extends BaseScheduledTask {
   public readonly name = 'ExpiredTokenPruningTask';
   public readonly phase: 1 | 2 = 1;
 
-  protected async handleScheduledTask(env: Env): Promise<void> {
+  protected async performTask(env: Env): Promise<void> {
     const dao = await createRequestScope(env).get(Tokens.UserAccessTokenDAO)();
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const pruned = await dao.pruneExpired(now, 500);

@@ -1,6 +1,7 @@
 import { BaseDAO as KitBaseDAO, executeWithRetry } from '@rexezuge/d1';
 import type { D1PreparedStatement, D1Queryable, D1Result } from '@rexezuge/d1';
 import { CursorCodec } from '@rexezuge/shared';
+import type { SubrequestMeter } from '@rexezuge/shared';
 import { assertSqlIdentifier } from '@rexezuge/d1';
 
 /**
@@ -15,10 +16,16 @@ import { assertSqlIdentifier } from '@rexezuge/d1';
  * the opaque-cursor helpers, both of which every DAO in this repo reaches for.
  * Cursors live in `@rexezuge/shared`'s `CursorCodec` rather than the local
  * `CursorUtil` — same encoding, one copy.
+ *
+ * The meter is a constructor dependency, not a module singleton: the kit's
+ * `BaseDAO` charges every statement it runs against it, and the composition
+ * root hands each DAO the counter for the invocation it is serving. A DAO
+ * constructed without one runs unmetered, which under-reports silently — it
+ * spends a subrequest the ceiling never saw.
  */
 abstract class BaseDAO extends KitBaseDAO {
-  protected constructor(database: D1Queryable) {
-    super(database);
+  protected constructor(database: D1Queryable, meter?: SubrequestMeter) {
+    super(database, meter);
   }
 
   /**
@@ -115,8 +122,9 @@ abstract class EncryptedDAO extends BaseDAO {
   constructor(
     database: D1Queryable,
     protected readonly masterKey: string,
+    meter?: SubrequestMeter,
   ) {
-    super(database);
+    super(database, meter);
   }
 }
 

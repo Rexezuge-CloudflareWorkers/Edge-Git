@@ -7,14 +7,15 @@ allowBuilds:
   workerd: true
 minimumReleaseAgeExclude:
   - '@cloudflare/workers-types@5.20260915.1'
-  - '@rexezuge/d1@1.6.0'
-  - '@rexezuge/errors@1.6.0'
-  - '@rexezuge/http@1.6.0'
-  - '@rexezuge/i18n@1.6.0'
-  - '@rexezuge/identity@1.6.0'
-  - '@rexezuge/runtime@1.6.0'
-  - '@rexezuge/shared@1.6.0'
-  - '@rexezuge/web@1.6.0'
+  - '@rexezuge/d1@1.9.2'
+  - '@rexezuge/errors@1.9.2'
+  - '@rexezuge/http@1.9.2'
+  - '@rexezuge/i18n@1.9.2'
+  - '@rexezuge/identity@1.9.2'
+  - '@rexezuge/runtime@1.9.2'
+  - '@rexezuge/shared@1.9.2'
+  - '@rexezuge/tooling@1.9.2'
+  - '@rexezuge/web@1.9.2'
 
 patchedDependencies:
   dofs@0.1.0: patches/dofs@0.1.0.patch

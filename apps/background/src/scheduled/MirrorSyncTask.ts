@@ -14,7 +14,7 @@ class MirrorSyncTask extends BaseScheduledTask {
   public readonly name = 'MirrorSyncTask';
   public readonly phase: 1 | 2 = 2;
 
-  protected async handleScheduledTask(env: Env): Promise<void> {
+  protected async performTask(env: Env): Promise<void> {
     const scope = createRequestScope(env);
     const mirrorDAO = await scope.get(Tokens.MirrorDAO)();
     const now = TimestampUtil.getCurrentUnixTimestampInSeconds();

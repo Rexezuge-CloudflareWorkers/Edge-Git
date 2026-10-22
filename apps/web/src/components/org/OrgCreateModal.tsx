@@ -41,7 +41,7 @@ export function OrgCreateModal({
   };
 
   return (
-    <ModalShell onClose={onClose} widthClass="w-full max-w-md mx-4" ariaLabel={t('orgs.newOrg', 'New Organization')}>
+    <ModalShell onClose={onClose} widthClass="w-full max-w-md mx-4" ariaLabel={t('orgs.newOrg', 'New Organization')} closeLabel={t('common.close', 'Close')}>
       <form onSubmit={submit} className="p-6 space-y-4">
         <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('orgs.newOrg', 'New Organization')}</h2>
         <div className="space-y-1.5">

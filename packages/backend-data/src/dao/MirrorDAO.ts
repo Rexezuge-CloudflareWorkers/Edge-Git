@@ -1,6 +1,7 @@
 import { DatabaseError } from '@rexezuge/errors';
 import { decryptData, encryptData } from '../crypto/aes-gcm';
 import type { D1Queryable } from '@rexezuge/d1';
+import type { SubrequestMeter } from '@rexezuge/shared';
 import { EncryptedDAO } from './BaseDAO';
 
 interface RepoMirrorRow {
@@ -23,8 +24,8 @@ interface RepoMirrorRow {
 }
 
 class MirrorDAO extends EncryptedDAO {
-  constructor(database: D1Queryable, masterKey: string) {
-    super(database, masterKey);
+  constructor(database: D1Queryable, masterKey: string, meter?: SubrequestMeter) {
+    super(database, masterKey, meter);
   }
 
   private async resolveSourceUrl(row: RepoMirrorRow): Promise<string> {

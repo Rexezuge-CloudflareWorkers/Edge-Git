@@ -101,8 +101,21 @@ describe('locale fallback', () => {
 });
 
 describe('web locale bundles', () => {
-  it('passes scripts/validate_locales.mjs (all 12 bundles + SUPPORTED_LANGUAGES parity)', () => {
-    const output = execFileSync('node', ['scripts/validate_locales.mjs'], { encoding: 'utf-8' });
-    expect(output).toContain('ALL OK');
+  // The validator runs as a separate process through `tsx`, so it pays the
+  // TypeScript transform on every run. The default 5s budget is not enough for
+  // that under the coverage run's load.
+  it('passes the kit locale validator (all 12 bundles + SUPPORTED_LANGUAGES parity)', { timeout: 60_000 }, () => {
+    const output = execFileSync(
+      'pnpm',
+      [
+        'exec',
+        'tsx',
+        'node_modules/@rexezuge/tooling/src/scripts/validate-locales.ts',
+        'apps/web/src/locales',
+        '--tags=apps/web/src/i18n.ts',
+      ],
+      { encoding: 'utf-8' },
+    );
+    expect(output).toContain('Locale validation passed');
   });
 });
